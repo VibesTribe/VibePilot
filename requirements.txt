@@ -1,0 +1,9 @@
+streamlit
+supabase
+python-dotenv
+cryptography
+litellm[proxy]
+zhipuai
+openai
+psycopg2-binary
+asyncio
