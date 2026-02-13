@@ -99,17 +99,17 @@ BEGIN
     'total_tasks', total_tasks,
     'completed_tasks', completed_tasks,
     'completion_rate', CASE WHEN total_tasks > 0 
-                           THEN ROUND((completed_tasks::FLOAT / total_tasks) * 100, 1)
+                           THEN ROUND(((completed_tasks::FLOAT / total_tasks) * 100)::numeric, 1)
                            ELSE 0 END,
     'total_tokens', total_tokens_used,
-    'total_theoretical_cost', ROUND(total_theoretical_cost, 2),
-    'total_actual_cost', ROUND(total_actual_cost, 2),
-    'total_savings', ROUND(total_savings, 2),
+    'total_theoretical_cost', ROUND(total_theoretical_cost::numeric, 2),
+    'total_actual_cost', ROUND(total_actual_cost::numeric, 2),
+    'total_savings', ROUND(total_savings::numeric, 2),
     'roi_percentage', CASE WHEN total_actual_cost > 0 
-                          THEN ROUND((total_savings / total_actual_cost) * 100, 1)
+                          THEN ROUND(((total_savings / total_actual_cost) * 100)::numeric, 1)
                           ELSE 0 END,
     'avg_tokens_per_task', CASE WHEN completed_tasks > 0 
-                                THEN ROUND(total_tokens_used::FLOAT / completed_tasks, 0)
+                                THEN ROUND((total_tokens_used::FLOAT / completed_tasks)::numeric, 0)
                                 ELSE 0 END
   ) INTO v_result
   FROM projects WHERE id = p_project_id;
@@ -130,9 +130,9 @@ BEGIN
       'project_name', name,
       'status', status,
       'completed_tasks', completed_tasks,
-      'total_savings', ROUND(total_savings, 2),
+      'total_savings', ROUND(total_savings::numeric, 2),
       'completion_rate', CASE WHEN total_tasks > 0 
-                             THEN ROUND((completed_tasks::FLOAT / total_tasks) * 100, 1)
+                             THEN ROUND(((completed_tasks::FLOAT / total_tasks) * 100)::numeric, 1)
                              ELSE 0 END
     )
   ) INTO v_result
@@ -151,13 +151,13 @@ SELECT
   p.status,
   p.total_tasks,
   p.completed_tasks,
-  ROUND((p.completed_tasks::FLOAT / NULLIF(p.total_tasks, 0)) * 100, 1) as completion_pct,
+  ROUND(((p.completed_tasks::FLOAT / NULLIF(p.total_tasks, 0)) * 100)::numeric, 1) as completion_pct,
   p.total_tokens_used,
-  ROUND(p.total_theoretical_cost, 2) as would_have_cost,
-  ROUND(p.total_actual_cost, 2) as actually_cost,
-  ROUND(p.total_savings, 2) as savings,
+  ROUND(p.total_theoretical_cost::numeric, 2) as would_have_cost,
+  ROUND(p.total_actual_cost::numeric, 2) as actually_cost,
+  ROUND(p.total_savings::numeric, 2) as savings,
   CASE WHEN p.total_actual_cost > 0 
-       THEN ROUND((p.total_savings / p.total_actual_cost) * 100, 1)
+       THEN ROUND(((p.total_savings / p.total_actual_cost) * 100)::numeric, 1)
        ELSE 0 END as roi_pct
 FROM projects p
 ORDER BY p.updated_at DESC;
