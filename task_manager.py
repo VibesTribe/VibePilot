@@ -235,6 +235,108 @@ class TaskManager:
             self.logger.info(f"Checked dependents for {completed_task_id}")
         except Exception as e:
             self.logger.error(f"Failed to check dependents: {e}")
+    
+    def handle_failure(self, task_id: str, reason: str, error_details: str = None):
+        task = self.get_task(task_id)
+        attempts = task.get("attempts", 0)
+        max_attempts = task.get("max_attempts", 3)
+        
+        notes = f"Attempt {attempts}/{max_attempts}: {reason}"
+        if error_details:
+            notes += f"\nDetails: {error_details}"
+        
+        if attempts >= max_attempts:
+            db.table("tasks").update({
+                "status": "escalated",
+                "failure_notes": notes,
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", task_id).execute()
+            self.logger.warning(f"Task {task_id} ESCALATED after {attempts} attempts")
+            return {"escalated": True, "reason": "Max attempts reached"}
+        else:
+            db.table("tasks").update({
+                "status": "available",
+                "failure_notes": notes,
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", task_id).execute()
+            self.logger.info(f"Task {task_id} returned to queue (attempt {attempts}/{max_attempts})")
+            return {"escalated": False, "remaining_attempts": max_attempts - attempts}
+    
+    def get_escalated_tasks(self) -> List[Dict]:
+        res = db.table("tasks").select("*").eq("status", "escalated").execute()
+        return res.data if res.data else []
+    
+    def reassign_task(self, task_id: str, new_model_id: str = None, refined_prompt: str = None):
+        task = self.get_task(task_id)
+        if not task:
+            return {"success": False, "error": "Task not found"}
+        
+        update_data = {
+            "status": "available",
+            "attempts": 0,
+            "assigned_to": None,
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        db.table("tasks").update(update_data).eq("id", task_id).execute()
+        
+        if refined_prompt:
+            self.create_task_packet(
+                task_id, 
+                refined_prompt,
+                task.get("result", {}).get("tech_spec"),
+                task.get("result", {}).get("expected_output")
+            )
+            self.logger.info(f"Task {task_id} reassigned with refined prompt")
+        
+        self.logger.info(f"Task {task_id} reassigned to {new_model_id or 'any available model'}")
+        return {"success": True}
+    
+    def split_task(self, task_id: str, subtasks: List[Dict]) -> List[str]:
+        task = self.get_task(task_id)
+        if not task:
+            return []
+        
+        subtask_ids = []
+        for i, subtask in enumerate(subtasks):
+            sub_id = self.create_task(
+                title=f"{task.get('title', 'Task')} - Part {i+1}",
+                task_type=task.get("type", "feature"),
+                priority=task.get("priority", 5),
+                dependencies=subtask.get("dependencies", [])
+            )
+            self.create_task_packet(
+                sub_id,
+                subtask.get("prompt"),
+                subtask.get("tech_spec"),
+                subtask.get("expected_output")
+            )
+            subtask_ids.append(sub_id)
+        
+        db.table("tasks").update({
+            "status": "merged",
+            "failure_notes": f"Split into {len(subtask_ids)} subtasks: {', '.join(subtask_ids)}",
+            "updated_at": datetime.utcnow().isoformat()
+        }).eq("id", task_id).execute()
+        
+        self.logger.info(f"Task {task_id} split into {len(subtask_ids)} subtasks")
+        return subtask_ids
+    
+    def needs_human_approval(self, task_id: str) -> bool:
+        task = self.get_task(task_id)
+        task_type = task.get("type", "")
+        return task_type == "ui_ux"
+    
+    def approve_ui_ux(self, task_id: str, approved_by: str, notes: str = None):
+        task = self.get_task(task_id)
+        approval = task.get("approval") or {}
+        approval["human_approved"] = True
+        approval["approved_by"] = approved_by
+        approval["human_notes"] = notes
+        approval["human_approved_at"] = datetime.utcnow().isoformat()
+        
+        self.approve_and_merge(task_id, merged_by=f"human:{approved_by}")
+        self.logger.info(f"UI/UX task {task_id} approved by human: {approved_by}")
 
 
 if __name__ == "__main__":
