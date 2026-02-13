@@ -236,12 +236,12 @@ class TaskManager:
         except Exception as e:
             self.logger.error(f"Failed to check dependents: {e}")
     
-    def handle_failure(self, task_id: str, reason: str, error_details: str = None):
+    def handle_failure(self, task_id: str, reason: str, error_details: str = None, error_code: str = None):
         task = self.get_task(task_id)
         attempts = task.get("attempts", 0)
         max_attempts = task.get("max_attempts", 3)
         
-        notes = f"Attempt {attempts}/{max_attempts}: {reason}"
+        notes = f"[{error_code or 'UNKNOWN'}] Attempt {attempts}/{max_attempts}: {reason}"
         if error_details:
             notes += f"\nDetails: {error_details}"
         
@@ -252,7 +252,11 @@ class TaskManager:
                 "updated_at": datetime.utcnow().isoformat()
             }).eq("id", task_id).execute()
             self.logger.warning(f"Task {task_id} ESCALATED after {attempts} attempts")
-            return {"escalated": True, "reason": "Max attempts reached"}
+            
+            # Escalation flow: Supervisor → Planner → Council
+            self._trigger_escalation_flow(task_id, notes)
+            
+            return {"escalated": True, "reason": "Max attempts reached", "flow": "supervisor_review"}
         else:
             db.table("tasks").update({
                 "status": "available",
@@ -261,6 +265,73 @@ class TaskManager:
             }).eq("id", task_id).execute()
             self.logger.info(f"Task {task_id} returned to queue (attempt {attempts}/{max_attempts})")
             return {"escalated": False, "remaining_attempts": max_attempts - attempts}
+    
+    def _trigger_escalation_flow(self, task_id: str, notes: str):
+        """
+        Escalation flow for failed tasks:
+        1. Supervisor reviews failure
+        2. Supervisor calls Planner for reassignment options
+        3. If architecture issue → Council review
+        4. Options: Reassign, Split, Refine prompt, Council review
+        """
+        self.logger.info(f"Escalation flow triggered for task {task_id}")
+        
+        # Log escalation event for supervisor to pick up
+        escalation_event = {
+            "task_id": task_id,
+            "triggered_at": datetime.utcnow().isoformat(),
+            "status": "awaiting_supervisor_review",
+            "notes": notes,
+            "options": ["reassign", "split", "refine_prompt", "council_review"]
+        }
+        
+        # Store in task result for supervisor visibility
+        db.table("tasks").update({
+            "result": {"escalation": escalation_event}
+        }).eq("id", task_id).execute()
+    
+    def supervisor_process_escalation(self, task_id: str, action: str, **kwargs):
+        """
+        Supervisor processes escalated task.
+        
+        Actions:
+        - 'reassign': Assign to different model/platform
+        - 'split': Break into subtasks
+        - 'refine': Update prompt and retry
+        - 'council': Send to Council for review
+        """
+        if action == "reassign":
+            return self.reassign_task(
+                task_id, 
+                new_model_id=kwargs.get("model_id"),
+                refined_prompt=kwargs.get("refined_prompt")
+            )
+        elif action == "split":
+            return self.split_task(task_id, kwargs.get("subtasks", []))
+        elif action == "refine":
+            return self.reassign_task(task_id, refined_prompt=kwargs.get("prompt"))
+        elif action == "council":
+            return self._send_to_council(task_id, kwargs.get("council_type", "plan_review"))
+        else:
+            return {"success": False, "error": f"Unknown action: {action}"}
+    
+    def _send_to_council(self, task_id: str, council_type: str):
+        """Send task to Council for review."""
+        task = self.get_task(task_id)
+        
+        council_request = {
+            "task_id": task_id,
+            "council_type": council_type,
+            "triggered_at": datetime.utcnow().isoformat(),
+            "task_data": task,
+            "status": "pending_council_review"
+        }
+        
+        # Council reviews independently (no chat between agents)
+        # Each member receives: system summary + task + role prompt
+        
+        self.logger.info(f"Task {task_id} sent to Council for {council_type}")
+        return {"success": True, "council_request": council_request}
     
     def get_escalated_tasks(self) -> List[Dict]:
         res = db.table("tasks").select("*").eq("status", "escalated").execute()
