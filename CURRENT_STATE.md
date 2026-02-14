@@ -8,9 +8,9 @@
 
 ---
 
-**Last Updated:** 2026-02-14 19:45 UTC
-**Updated By:** GLM-5 (README + cleanup + cron setup)
-**Known Good Commit:** `3382449f` (verified working)
+**Last Updated:** 2026-02-14 20:15 UTC
+**Updated By:** GLM-5 (completed 1, 2, 3)
+**Known Good Commit:** `c5c5b143` (verified working)
 
 ---
 
@@ -31,12 +31,12 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 
 | Commit | Date | Status | Notes |
 |--------|------|--------|-------|
-| `3382449f` | 2026-02-14 | ✅ Verified | Current - README + cleanup |
-| `af237421` | 2026-02-14 | ✅ Verified | Migration infrastructure |
+| `c5c5b143` | 2026-02-14 | ✅ Verified | Current - Schema audit, caching, Council RPC |
+| `3382449f` | 2026-02-14 | ✅ Verified | README + cleanup |
 
 **If everything breaks:**
 ```bash
-git checkout 3382449f
+git checkout c5c5b143
 ```
 
 ---
@@ -342,14 +342,23 @@ git status
 │   ├── SESSION_LOG.md        # Session history
 │   ├── UPDATE_CONSIDERATIONS.md  # Daily improvement input
 │   ├── prd_v1.3.md           # Product requirements
-│   ├── schema_*.sql          # Database schemas
+│   ├── schema_*.sql          # Database schemas (9 files)
+│   │   schema_v1_core.sql
+│   │   schema_safety_patches.sql
+│   │   schema_platforms.sql
+│   │   schema_project_tracking.sql
+│   │   schema_rls_fix.sql
+│   │   schema_reset.sql
+│   │   schema_timestamp_fixes.sql (NEW - apply to Supabase)
+│   │   schema_council_rpc.sql (NEW - apply to Supabase)
 │   └── scripts/              # Test/demo scripts
 │
 ├── core/
 │   └── roles.py              # Role definitions
 │
 ├── runners/
-│   └── kimi_runner.py        # Kimi CLI integration
+│   ├── kimi_runner.py        # Kimi CLI integration
+│   └── api_runner.py         # API runner with caching (NEW)
 │
 ├── agents/                   # Agent implementations
 │
