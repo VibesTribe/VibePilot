@@ -90,8 +90,8 @@ git checkout c5c5b143
 
 1. ~~**Schema Audit + Validation Script** - Check existing schema, create auto-validator (DEC-011)~~ ✅ DONE
 2. ~~**Prompt Caching** - Add to runners, 75% cost savings on Council (DEC-007)~~ ✅ DONE
-3. **Apply Schema Fixes** - Run `docs/schema_timestamp_fixes.sql` in Supabase
-4. **Test Council RPC** - Run `docs/schema_council_rpc.sql`, test functions
+3. ~~**Apply Schema Fixes** - Run `docs/schema_timestamp_fixes.sql` in Supabase~~ ✅ DONE
+4. ~~**Test Council RPC** - Run `docs/schema_council_rpc.sql`, test functions~~ ✅ DONE
 
 ## Near Term
 
