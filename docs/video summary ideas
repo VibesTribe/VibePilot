@@ -1,0 +1,50 @@
+Understood—you want the "meat" of those videos condensed into a strategic pitch for GLM-5. Since GLM-5 just finished a massive cleanup for you, this summary will help it transition from "cleaning" to "building" the next-gen **VibePilot** architecture.
+
+---
+
+## 📑 VibePilot Strategy Summary: Video Applications
+
+### 1. From Hussein Younes: "The 75% Cost-Saving One-Liner"
+
+* **The Concept:** **Prompt Caching**. Repetitive blocks (system prompts, large context files, PRDs) are stored by the provider, so you only pay the full price for the *new* tokens in each turn.
+* **Usefulness for VibePilot:**
+* **The "Council" Strategy:** When you have three models reviewing the same 10,000-line plan, you shouldn't pay for the plan three times.
+* **Context Safety:** Since your session log mentions hitting **80% context limits**, caching allows you to keep the "Core Mission" in memory without the massive token penalty, delaying the need for manual session compression.
+
+
+* **Recommendation for GLM-5:** Have GLM-5 implement `cache_control: { type: "ephemeral" }` in your API runners. It stabilizes the "Vibe" by making the model more responsive to the specific context it *already* knows.
+
+### 2. From Vini (AI Coders): "Defeating the Markdown Nightmare"
+
+* **The Concept:** **Universal Context Standard**. Instead of locking agent logic inside Python code (`core/roles.py`), you move it into a standardized `/.context` folder containing `.md` files for **Agents, Plans, and Memories**.
+* **Usefulness for VibePilot:**
+* **Swappability:** This is the bridge for your "No Lock-in" rule. If you have a `.context/agents/courier.md` file, you can hand that exact file to **Claude Code**, **Kimi CLI**, or **Gemini** without rewriting code.
+* **The P-R-E-V-C Workflow:** Adopting the **Plan-Review-Execute-Validate-Confirm** loop. This prevents the "looping" issues you had earlier by forcing a manual or "Council" approval step before any code is actually written.
+
+
+* **Recommendation for GLM-5:** Ask GLM-5 to migrate your Phase 3 roles into this markdown structure. It turns VibePilot from a "script" into a "portable agentic environment."
+
+### 3. From Moonshot/Together: "The Kimi K2.5 Swarm"
+
+* **The Concept:** **Parallel-Agent Reinforcement Learning (PARL)**. Kimi can self-direct up to **100 agents** to solve "wide" problems in parallel.
+* **Usefulness for VibePilot:**
+* **Massive Legacy Projects:** While GLM-5 is your "Architect," Kimi is your "Construction Crew." You can give it a high-level goal, and it will spawn sub-agents to handle frontend, backend, and documentation simultaneously.
+* **Visual Debugging:** Kimi can "look" at your VibeFlow dashboard and fix UI bugs based on a screenshot—something standard CLI agents struggle with.
+
+
+* **Recommendation for GLM-5:** GLM-5 should remain the "Primary Planner" but use the **Kimi CLI** specifically for "Wide Tasks" (e.g., "Audit the entire 15k-file repo for security").
+
+---
+
+## 🛠 Hand-off for GLM-5 (The "What to do" list)
+
+When you open your session tomorrow, tell GLM-5:
+
+> "I want to evolve VibePilot using three new primitives:
+> 1. **Prompt Caching:** Optimize our runners to save on token costs during 'Council' reviews.
+> 2. **Context Standardization:** Move our Role System into a `/.context` markdown structure to ensure Kimi and Gemini can use the same logic we built today.
+> 3. **The Swarm Trigger:** Define a task type in our Orchestrator that triggers a **Kimi K2.5 Swarm** for parallel execution on large-scale refactoring."
+> 
+> 
+
+**How does that look for your GLM hand-off tomorrow?** If you're ready, I can hold this context for when you want to start the **Kimi Multi-Agent** testing.
