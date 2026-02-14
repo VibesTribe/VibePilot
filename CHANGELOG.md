@@ -8,6 +8,37 @@
 
 # 2026-02-14
 
+## 19:15 UTC - GLM-5
+**Commit:** (pending)
+**Type:** Rename + Restructure
+**Files Renamed:**
+- `docs/video summary ideas` → `docs/UPDATE_CONSIDERATIONS.md`
+
+**Files Removed:**
+- `docs/video_insights_2026-02-14.md` (content merged into UPDATE_CONSIDERATIONS.md)
+
+**Files Changed:**
+- `CURRENT_STATE.md` - Updated references, directory index
+
+**Why:** 
+- Set up daily workflow for research agent input
+- File will be cleared after each day's considerations are processed
+- Archive of decisions kept in DECISION_LOG.md
+- Future: Research agent finds improvements, adds here, Council/GLM-5 vets
+
+**Structure:**
+- Daily considerations → UPDATE_CONSIDERATIONS.md
+- Vetting → GLM-5 / Council
+- Decisions → DECISION_LOG.md
+- Clear file → Ready for next day
+
+**Rollback:**
+```bash
+git revert <commit_hash>
+```
+
+---
+
 ## 19:00 UTC - GLM-5
 **Commit:** `872b6e21`
 **Type:** Update
