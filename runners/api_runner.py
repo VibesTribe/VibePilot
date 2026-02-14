@@ -21,6 +21,8 @@ import requests
 from typing import Optional, Dict, Any, List
 from abc import ABC, abstractmethod
 
+from vault_manager import get_api_key
+
 logger = logging.getLogger("VibePilot.APIRunner")
 
 
@@ -194,7 +196,7 @@ class DeepSeekRunner(APIRunnerWithCaching):
     """DeepSeek API runner with caching."""
 
     def __init__(self, api_key: str = None):
-        api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
+        api_key = api_key or get_api_key("DEEPSEEK_API_KEY")
         super().__init__(
             api_key=api_key,
             base_url="https://api.deepseek.com/v1",
@@ -207,7 +209,7 @@ class GLMAPIRunner(APIRunnerWithCaching):
     """GLM API runner with caching."""
 
     def __init__(self, api_key: str = None):
-        api_key = api_key or os.getenv("GLM_API_KEY")
+        api_key = api_key or get_api_key("GLM_API_KEY")
         super().__init__(
             api_key=api_key,
             base_url="https://open.bigmodel.cn/api/paas/v4",
@@ -220,7 +222,7 @@ class GeminiRunner(APIRunnerWithCaching):
     """Gemini API runner with caching."""
 
     def __init__(self, api_key: str = None):
-        api_key = api_key or os.getenv("GEMINI_API_KEY")
+        api_key = api_key or get_api_key("GEMINI_API_KEY")
         super().__init__(
             api_key=api_key,
             base_url="https://generativelanguage.googleapis.com/v1beta",
@@ -229,18 +231,36 @@ class GeminiRunner(APIRunnerWithCaching):
         )
 
 
+class OpenRouterRunner(APIRunnerWithCaching):
+    """OpenRouter API runner - gateway to many models."""
+
+    def __init__(self, api_key: str = None, model: str = "anthropic/claude-3.5-sonnet"):
+        api_key = api_key or get_api_key("OPENROUTER_API_KEY")
+        super().__init__(
+            api_key=api_key,
+            base_url="https://openrouter.ai/api/v1",
+            model=model,
+            provider="openrouter",
+        )
+
+
 # Factory function
-def get_runner(provider: str, api_key: str = None) -> APIRunnerWithCaching:
+def get_runner(
+    provider: str, api_key: str = None, model: str = None
+) -> APIRunnerWithCaching:
     """Get appropriate runner for provider."""
     runners = {
         "deepseek": DeepSeekRunner,
         "glm": GLMAPIRunner,
         "gemini": GeminiRunner,
+        "openrouter": OpenRouterRunner,
     }
 
     if provider not in runners:
         raise ValueError(f"Unknown provider: {provider}")
 
+    if provider == "openrouter" and model:
+        return runners[provider](api_key, model=model)
     return runners[provider](api_key)
 
 
