@@ -8,8 +8,8 @@
 
 ---
 
-**Last Updated:** 2026-02-14 19:35 UTC
-**Updated By:** GLM-5 (created setup.sh, .env.example, backup script)
+**Last Updated:** 2026-02-14 19:45 UTC
+**Updated By:** GLM-5 (README + cleanup + cron setup)
 **Known Good Commit:** `af237421` (verified working)
 
 ---
@@ -319,6 +319,8 @@ git status
 │
 ├── CURRENT_STATE.md          # THIS FILE - start here
 ├── CHANGELOG.md              # Audit trail - rollback info
+├── README.md                 # GitHub landing page
+├── TEMP_CRON_COMMANDS.md     # DELETE AFTER USE - cron setup
 ├── setup.sh                  # One-command setup for fresh machine
 ├── .env                      # Secrets (NOT in git)
 ├── .env.example              # Secret template (in git) - COPY THIS
@@ -335,12 +337,12 @@ git status
 │   └── ops_handbook.md       # Disaster recovery
 │
 ├── docs/
-│   ├── MASTER_PLAN.md        # Full specification (858 lines)
+│   ├── MASTER_PLAN.md        # Full specification
 │   ├── SESSION_LOG.md        # Session history
 │   ├── UPDATE_CONSIDERATIONS.md  # Daily improvement input
 │   ├── prd_v1.3.md           # Product requirements
 │   ├── schema_*.sql          # Database schemas
-│   └── scripts/              # Utility scripts
+│   └── scripts/              # Test/demo scripts
 │
 ├── core/
 │   └── roles.py              # Role definitions
@@ -351,11 +353,8 @@ git status
 ├── agents/                   # Agent implementations
 │
 ├── scripts/
-│   ├── setup.sh              # One-command setup (NEW)
-│   ├── backup_supabase.sh    # Daily backup automation (NEW)
+│   ├── backup_supabase.sh    # Daily backup automation
 │   └── prep_migration.sh     # Migration prep
-│
-├── archive/                  # Old/unused
 │
 ├── venv/                     # Python venv (ignored)
 └── __pycache__/              # Cache (ignored)
