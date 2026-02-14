@@ -8,6 +8,32 @@
 
 # 2026-02-14
 
+## 19:00 UTC - GLM-5
+**Commit:** (pending)
+**Type:** Update
+**Files Changed:**
+- `CURRENT_STATE.md` - Added Must Preserve/Never Do sections, simplified priorities
+- `.context/DECISION_LOG.md` - Marked DEC-012 to DEC-015 as rejected with reasoning
+- `docs/video_insights_2026-02-14.md` - Added what was rejected and why
+
+**Why:** Vetted research suggestions against VibePilot's specific needs. Rejected over-engineering in favor of simpler approach.
+
+**Decisions:**
+- DEC-012, 013, 014, 015: Rejected (over-engineering, duplicates, complexity)
+- Solution: Add Must Preserve/Never Do to CURRENT_STATE.md instead
+
+**Priorities Updated:**
+1. Schema Audit + Validation Script (DEC-011)
+2. Prompt Caching (DEC-007)
+3. Council RPC
+
+**Rollback:**
+```bash
+git revert <commit_hash>
+```
+
+---
+
 ## 18:35 UTC - GLM-5
 **Commit:** `98668742`
 **Type:** Add

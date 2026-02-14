@@ -241,6 +241,34 @@ Give agents terminal tools instead of feeding all context:
 
 ---
 
+# Strategic Synthesis - VibePilot Specific
+
+## What We're Keeping
+
+| Item | Decision | Why |
+|------|----------|-----|
+| Senior Schema Rules | DEC-011 (Pending) | Standard practices, immediate value |
+| Prompt Caching | DEC-007 (Pending) | 75% cost savings, high impact |
+
+## What We Rejected (And Why)
+
+| Item | Rejected Because |
+|------|------------------|
+| Separate SSOT Document | Duplicates CURRENT_STATE.md - one source of truth is enough |
+| Noiseless Compression | Loses WHY (reasoning), not just WHAT - summary/detail pattern already exists |
+| Navigation Tools | Security risk, complexity - directory index in CURRENT_STATE.md solves navigation |
+| Awareness Agent | Heuristic risk, over-engineering - explicit structure is clearer |
+
+## Simpler Solution Applied
+
+Added to `CURRENT_STATE.md`:
+- **WHAT AI MUST PRESERVE** - Non-negotiables
+- **WHAT AI MUST NEVER DO** - Causes of system instability
+
+One file. No new documents. No complexity.
+
+---
+
 # Pending Decisions
 
 | ID | Topic | Status |

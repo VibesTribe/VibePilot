@@ -27,6 +27,34 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 
 ---
 
+# WHAT AI MUST PRESERVE
+
+These are non-negotiable. Changing these requires human approval:
+
+- **Context isolation** - Task agents see ONLY their task (prevents drift)
+- **Config-driven swaps** - No code edits for model/platform/role changes
+- **Council process** - Iterative for PRDs, one-shot for updates
+- **Single source of truth** - CURRENT_STATE.md + CHANGELOG.md for context
+- **All state in Supabase** - Nothing persisted locally
+- **All code in GitHub** - Nothing uncommitted
+
+---
+
+# WHAT AI MUST NEVER DO
+
+These cause system instability:
+
+- Delete core files without human approval
+- Modify schema without Council review
+- Add "helpful" features not in PRD
+- Assume anything not documented
+- Create new "source of truth" documents (one is enough)
+- Over-compress logs (lose WHY, not just WHAT)
+- Give agents execution tools without sandbox
+- Bypass context isolation for "convenience"
+
+---
+
 # KNOWN GOOD STATE
 
 | Commit | Date | Status | Notes |
@@ -88,25 +116,21 @@ git checkout 98668742
 
 ## Immediate (Next Session)
 
-1. **Schema Audit** - Apply senior engineer rules (DEC-011)
-2. **Prompt Caching** - Add to runners (DEC-007)
-3. **Self-Awareness Doc** - SSOT for AI (DEC-012)
-4. **Council RPC** - Supabase function for iterative consensus
+1. **Schema Audit + Validation Script** - Check existing schema, create auto-validator (DEC-011)
+2. **Prompt Caching** - Add to runners, 75% cost savings on Council (DEC-007)
+3. **Council RPC** - Supabase function for iterative consensus
 
 ## Near Term
 
-5. **Noiseless Compression** - 80% token reduction (DEC-013)
-6. **Kimi Swarm** - Add trigger to orchestrator (DEC-008)
-7. **Courier Agent** - Dispatch to web platforms
-8. **Migration Prep** - Test setup.sh, prep for cheaper hosting
-9. **TypeScript Decision** - DEC-006 (migrate or not?)
+4. **Kimi Swarm** - Add trigger to orchestrator (DEC-008)
+5. **Courier Agent** - Dispatch to web platforms
+6. **Migration Prep** - Test setup.sh, prep for cheaper hosting
+7. **TypeScript Decision** - DEC-006 (migrate or not?)
 
 ## Future
 
-10. **Navigation-Based Context** - Terminal tools (DEC-014)
-11. **Awareness Agent** - Auto-inject by keyword (DEC-015)
-12. **Voice Interface** - Talk to Vibes
-13. **Multi-Project** - Recipe app, finance app, VibePilot, legacy project
+8. **Voice Interface** - Talk to Vibes
+9. **Multi-Project** - Recipe app, finance app, VibePilot, legacy project
 
 ---
 
@@ -377,13 +401,12 @@ git status
 | DEC-009 | Council Feedback Summary | ✅ | Supervisor summarizes to prevent bloat |
 | DEC-010 | Single Source of Truth | ✅ | CURRENT_STATE.md for context |
 | DEC-011 | Schema Senior Rules Audit | ⏳ | Apply senior engineer DB rules |
-| DEC-012 | Self-Awareness SSOT Doc | ⏳ | Document explaining system to AI |
-| DEC-013 | Noiseless Compression | ⏳ | 80% token reduction on logs |
-| DEC-014 | Navigation-Based Context | ⏳ | Terminal tools vs feeding all files |
-| DEC-015 | Awareness Agent | ⏳ | Auto-inject context by keyword |
 
 Full details: `.context/DECISION_LOG.md`
 Video insights: `docs/video_insights_2026-02-14.md`
+
+**Rejected/Simplified:**
+- DEC-012/013/014/015: Over-engineering. Solved by Must Preserve/Never Do sections above.
 
 ---
 
