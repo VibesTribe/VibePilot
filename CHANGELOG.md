@@ -8,6 +8,56 @@
 
 # 2026-02-14
 
+## 21:30 UTC - GLM-5
+**Commit:** `46423d69`
+**Type:** Security + Migration
+**Files Changed:**
+- `vault_manager.py` - Fixed schema column names, added get_api_key() helper
+- `runners/api_runner.py` - Runners now use vault, added OpenRouter runner
+- `.env.example` - Reduced to 3 bootstrap keys, vault instructions
+
+**Vault Secrets Added:**
+- DEEPSEEK_API_KEY ✅
+- GITHUB_TOKEN ✅
+- GEMINI_API_KEY ✅
+- OPENROUTER_API_KEY ✅
+
+**Why:**
+- Secrets in .env file = prompt injection risk (any agent could read them)
+- Vault approach: keys encrypted in Supabase, retrieved on demand
+- Migration now needs only 3 keys (SUPABASE_URL, SUPABASE_KEY, VAULT_KEY)
+- Store those 3 in GitHub Secrets → instant setup on new machine
+
+**Migration Path:**
+```
+git clone → set 3 env vars → ./setup.sh → done
+```
+
+**Rollback:**
+```bash
+git revert 46423d69
+```
+
+---
+
+## 21:00 UTC - GLM-5
+**Commit:** N/A (no code change)
+**Type:** Documentation
+**Files Changed:**
+- `~/AGENTS.md` - Added "READ BEFORE ANY TOOL USE" warning, philosophy preamble
+
+**Why:**
+- Session started with reactive "fix it" behavior (reinstalled Kimi without reading context)
+- AGENTS.md now enforces reading CURRENT_STATE.md BEFORE any tool use
+- Prevents context window waste from fixing things that aren't broken
+
+**Rollback:**
+```bash
+git checkout HEAD~1 -- ~/AGENTS.md
+```
+
+---
+
 ## 20:25 UTC - GLM-5
 **Commit:** `eb3a85e3`
 **Type:** Setup
