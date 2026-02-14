@@ -52,10 +52,19 @@
 ---
 
 ## Next Steps
+- [ ] **Project Selector** - Support multiple concurrent projects
 - [ ] Activate Council for plan review
 - [ ] Build courier agent for web platforms
 - [ ] Implement voice interface (Vibes)
 - [ ] Connect Vibeflow dashboard to Supabase
+
+## Feature Requests
+- **Multi-Project Support**: VibePilot can work on multiple projects simultaneously
+  - Recipe app
+  - Personal finance app
+  - VibePilot itself (current)
+  - Future massive legacy project
+  - Need: Project selector in dashboard, tasks linked to projects (already in schema)
 
 ---
 
