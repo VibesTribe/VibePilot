@@ -8,7 +8,7 @@
 
 ---
 
-**Last Updated:** 2026-02-14 18:00 UTC
+**Last Updated:** 2026-02-14 18:30 UTC
 **Updated By:** GLM-5 (session with human)
 **Known Good Commit:** `33d1b015` (verified working)
 
@@ -88,20 +88,25 @@ git checkout 33d1b015
 
 ## Immediate (Next Session)
 
-1. **Council RPC** - Supabase function for iterative consensus
+1. **Schema Audit** - Apply senior engineer rules (DEC-011)
 2. **Prompt Caching** - Add to runners (DEC-007)
-3. **Kimi Swarm** - Add trigger to orchestrator (DEC-008)
+3. **Self-Awareness Doc** - SSOT for AI (DEC-012)
+4. **Council RPC** - Supabase function for iterative consensus
 
 ## Near Term
 
-4. **Courier Agent** - Dispatch to web platforms
-5. **Migration Prep** - Test setup.sh, prep for cheaper hosting
-6. **TypeScript Decision** - DEC-006 (migrate or not?)
+5. **Noiseless Compression** - 80% token reduction (DEC-013)
+6. **Kimi Swarm** - Add trigger to orchestrator (DEC-008)
+7. **Courier Agent** - Dispatch to web platforms
+8. **Migration Prep** - Test setup.sh, prep for cheaper hosting
+9. **TypeScript Decision** - DEC-006 (migrate or not?)
 
 ## Future
 
-7. **Voice Interface** - Talk to Vibes
-8. **Multi-Project** - Recipe app, finance app, VibePilot, legacy project
+10. **Navigation-Based Context** - Terminal tools (DEC-014)
+11. **Awareness Agent** - Auto-inject by keyword (DEC-015)
+12. **Voice Interface** - Talk to Vibes
+13. **Multi-Project** - Recipe app, finance app, VibePilot, legacy project
 
 ---
 
@@ -333,6 +338,7 @@ git status
 ├── docs/
 │   ├── MASTER_PLAN.md        # Full specification (858 lines)
 │   ├── SESSION_LOG.md        # Session history
+│   ├── video_insights_*.md   # Video insights and analysis
 │   ├── prd_v1.3.md           # Product requirements
 │   ├── schema_*.sql          # Database schemas
 │   └── scripts/              # Utility scripts
@@ -370,8 +376,14 @@ git status
 | DEC-008 | Kimi Swarm | ⏳ | Trigger for wide tasks |
 | DEC-009 | Council Feedback Summary | ✅ | Supervisor summarizes to prevent bloat |
 | DEC-010 | Single Source of Truth | ✅ | CURRENT_STATE.md for context |
+| DEC-011 | Schema Senior Rules Audit | ⏳ | Apply senior engineer DB rules |
+| DEC-012 | Self-Awareness SSOT Doc | ⏳ | Document explaining system to AI |
+| DEC-013 | Noiseless Compression | ⏳ | 80% token reduction on logs |
+| DEC-014 | Navigation-Based Context | ⏳ | Terminal tools vs feeding all files |
+| DEC-015 | Awareness Agent | ⏳ | Auto-inject context by keyword |
 
 Full details: `.context/DECISION_LOG.md`
+Video insights: `docs/video_insights_2026-02-14.md`
 
 ---
 

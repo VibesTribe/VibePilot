@@ -371,6 +371,107 @@ Target: <3000 tokens for full context restoration.
 
 ---
 
+### DEC-011: Schema Senior Rules Audit
+
+**Date:** 2026-02-14
+**Status:** Proposed
+**Context:** Video insights on senior engineer database design rules. Current schema may not follow best practices.
+
+### Proposed Rules
+- All tables: `id` (UUID), `created_at`, `updated_at`
+- All FKs indexed and marked
+- 1:1 relationships: UNIQUE constraint on FK
+- N:N relationships: junction tables
+- All names: lowercase_snake_case
+- No business logic in primary keys
+
+### Why
+- Swappability: Standard SQL = portable
+- Auditability: Timestamps on everything
+- Stability: UUID IDs don't break
+
+### Open Questions
+- Audit current schema against these rules?
+- What needs to be fixed?
+
+---
+
+### DEC-012: Self-Awareness SSOT Document
+
+**Date:** 2026-02-14
+**Status:** Proposed
+**Context:** AI needs document explaining system architecture to itself. Prevents assumptions and bugs.
+
+### Proposal
+Create document injected at session start:
+- What VibePilot is
+- Current architecture
+- What to preserve
+- What to never do
+
+### Why
+- AI assumes things without this
+- Assumptions lead to bugs
+- SSOT = Single Source of Truth for self-awareness
+
+---
+
+### DEC-013: Noiseless Compression Protocol
+
+**Date:** 2026-02-14
+**Status:** Proposed
+**Context:** Session logs grow unbounded. 400k+ tokens to maintain context. Manolo Remiddi video shows 80% reduction possible.
+
+### Proposal
+- Compress verbose logs to shorthand functions/signals
+- Hash-tag blocks for fetch-on-demand
+- AI sees compressed, fetches raw when needed
+
+### Example
+Before: "On 2026-02-13, we discussed the role system. We decided each role should have 2-3 skills maximum."
+After: "DEC-003: roles.bounded_skills | 2026-02-13 | max 3 skills/role"
+
+---
+
+### DEC-014: Navigation-Based Context
+
+**Date:** 2026-02-14
+**Status:** Proposed
+**Context:** Current approach feeds entire codebase. Adam Lucek video shows navigation is better than RAG.
+
+### Proposal
+- Give agents terminal tools: `ls`, `cat`, `grep`, `find`
+- Agents explore like human devs
+- Recursive sub-LLM for large tasks (fresh context)
+
+### Why
+- No fuzzy vector search
+- Precision of exact file reading
+- Main context stays clean
+
+---
+
+### DEC-015: Awareness Agent
+
+**Date:** 2026-02-14
+**Status:** Proposed
+**Context:** Tiny watcher that auto-injects context based on keywords.
+
+### Proposal
+| Keyword | Auto-Inject |
+|---------|-------------|
+| "schema" | Schema decisions, SQL files |
+| "model" | Model config, registry |
+| "council" | Council process docs |
+| "rollback" | CHANGELOG, known good commits |
+
+### Why
+- No manual context selection
+- Relevant info auto-injected
+- Reduces human cognitive load
+
+---
+
 ## Decision Log Index
 
 | ID | Title | Status | Date |
@@ -385,8 +486,13 @@ Target: <3000 tokens for full context restoration.
 | DEC-008 | Kimi K2.5 Swarm Trigger | Pending | 2026-02-14 |
 | DEC-009 | Council Feedback Summarization | Accepted | 2026-02-14 |
 | DEC-010 | Single Source of Truth (CURRENT_STATE.md) | Accepted | 2026-02-14 |
+| DEC-011 | Schema Senior Rules Audit | Proposed | 2026-02-14 |
+| DEC-012 | Self-Awareness SSOT Document | Proposed | 2026-02-14 |
+| DEC-013 | Noiseless Compression Protocol | Proposed | 2026-02-14 |
+| DEC-014 | Navigation-Based Context | Proposed | 2026-02-14 |
+| DEC-015 | Awareness Agent | Proposed | 2026-02-14 |
 
 ---
 
 *Last updated: 2026-02-14*
-*Next decision number: DEC-011*
+*Next decision number: DEC-016*
