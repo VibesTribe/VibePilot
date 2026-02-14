@@ -2,7 +2,7 @@
 
 **Read this first. This is the only document you need.**
 
-**Last Updated:** 2026-02-14 17:00 UTC
+**Last Updated:** 2026-02-14 17:30 UTC
 **Updated By:** GLM-5 (session with human)
 
 ---
@@ -81,6 +81,8 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 | DEC-006 | TypeScript Migration | ⏳ Proposed | Pending decision |
 | DEC-007 | Prompt Caching | ⏳ Pending | Add to API runners |
 | DEC-008 | Kimi Swarm | ⏳ Pending | Trigger for wide tasks |
+| DEC-009 | Council Feedback Summary | ✅ Accepted | Supervisor summarizes to prevent bloat |
+| DEC-010 | Single Source of Truth | ✅ Accepted | CURRENT_STATE.md for context |
 
 Full details: `.context/DECISION_LOG.md`
 
@@ -90,9 +92,128 @@ Full details: `.context/DECISION_LOG.md`
 
 | Issue | Status | Notes |
 |-------|--------|-------|
-| Context bloat | 🟡 Active | This doc solves it |
 | Kimi subscription ending | 🟡 Soon | End of month, plan migration |
 | GCE cost | 🟡 Monitoring | Consider Hetzner/other |
+
+---
+
+# SOURCE OF TRUTH INDEX
+
+## Supabase (All State)
+
+| Table | Purpose | Key Fields | Update Frequency |
+|-------|---------|------------|------------------|
+| `tasks` | Task queue + state | id, status, priority, dependencies, project_id | Constant |
+| `task_packets` | Versioned prompts | task_id, prompt, tech_spec, version | On task create/update |
+| `models` | In-house model registry | id, platform, status, limits, usage | On model change |
+| `platforms` | Web AI platforms | id, type, capabilities, limits, status | On platform change |
+| `projects` | Multi-project tracking | id, name, status, roi_cumulative | On project change |
+| `task_runs` | Execution history | task_id, model_id, platform, tokens, duration | Every execution |
+
+**Connection:** Via `.env` → `SUPABASE_URL`, `SUPABASE_KEY`
+
+## GitHub (All Code + Docs)
+
+| Path | Purpose | Update When |
+|------|---------|-------------|
+| `CURRENT_STATE.md` | Context restoration | Every session |
+| `config/vibepilot.yaml` | Runtime config | Config change |
+| `.context/DECISION_LOG.md` | Full decision details | New decision |
+| `.context/guardrails.md` | Pre-code gates | Rare |
+| `docs/MASTER_PLAN.md` | Full specification | Architecture change |
+| `core/roles.py` | Role definitions | Role change |
+| `runners/kimi_runner.py` | Kimi CLI integration | Runner change |
+| `dual_orchestrator.py` | Multi-model routing | Orchestrator change |
+| `task_manager.py` | Task CRUD | Task logic change |
+| `agents/` | Agent implementations | Agent change |
+
+**Repo:** `git@github.com:VibesTribe/VibePilot.git`
+
+## GCE/Terminal (Ephemeral Only)
+
+| Path | Purpose | Persistent? | Update When |
+|------|---------|-------------|-------------|
+| `~/vibepilot/` | Main project | No (git clone) | After git pull |
+| `~/vibepilot/venv/` | Python venv | No | After setup.sh |
+| `~/vibepilot/.env` | Secrets | No (recreate) | On new machine |
+| `~/.local/bin/kimi` | Kimi CLI | No | After install |
+
+**Server:** `ssh mjlockboxsocial@vibestribe`
+**Important:** Nothing on GCE is source of truth. Everything is in Supabase or GitHub.
+
+---
+
+# DIRECTORY INDEX
+
+```
+~/vibepilot/                      # Project root (git clone)
+│
+├── CURRENT_STATE.md              # THIS FILE - context restoration
+├── STATUS.md                     # Quick status (deprecated, use CURRENT_STATE)
+├── .env                          # Secrets (NOT in git)
+├── .env.example                  # Secret template (in git)
+├── .gitignore                    # Ignore rules
+├── requirements.txt              # Python deps
+├── setup.sh                      # One-command setup (TODO: create)
+│
+├── config/
+│   └── vibepilot.yaml            # ALL runtime config (models, roles, prompts, thresholds)
+│
+├── .context/                     # Strategic documentation
+│   ├── guardrails.md             # Pre-code gates, P-R-E-V-C
+│   ├── DECISION_LOG.md           # Full decision details
+│   ├── agent_protocol.md         # Agent coordination rules
+│   ├── quick_reference.md        # Cheat sheet
+│   └── ops_handbook.md           # Disaster recovery
+│
+├── docs/                         # Documentation
+│   ├── MASTER_PLAN.md            # Full system specification
+│   ├── SESSION_LOG.md            # Session history
+│   ├── prd_v1.3.md               # Product requirements
+│   ├── architecture_diagram.md   # Visual architecture
+│   ├── voice_interface.md        # Voice interface design
+│   ├── vibeflow_adoption.md      # Patterns from Vibeflow
+│   ├── schema_*.sql              # Database schemas
+│   └── scripts/                  # Utility scripts
+│       ├── pipeline_test.py
+│       └── kimi_dispatch_demo.py
+│
+├── core/                         # Core logic
+│   ├── roles.py                  # Role definitions
+│   └── __init__.py
+│
+├── runners/                      # Model runners
+│   ├── kimi_runner.py            # Kimi CLI integration
+│   └── __init__.py
+│
+├── agents/                       # Agent implementations
+│   ├── base.py                   # Base agent class
+│   ├── code_hand.py              # Coding agent
+│   ├── executioner.py            # Execution agent
+│   ├── council/                  # Council agents
+│   │   ├── security.py
+│   │   └── maintenance.py
+│   └── __init__.py
+│
+├── scripts/                      # Utility scripts
+│   └── prep_migration.sh         # Migration prep
+│
+├── archive/                      # Old/unused files
+│   ├── agents.md
+│   └── dashboard.py
+│
+├── venv/                         # Python venv (IGNORED)
+├── __pycache__/                  # Python cache (IGNORED)
+└── *.log                         # Logs (IGNORED)
+```
+
+**Keep Updated:**
+- `CURRENT_STATE.md` - Every session
+- `config/vibepilot.yaml` - Every config change
+- `.context/DECISION_LOG.md` - Every decision
+
+**Never Edit (Generated/Cache):**
+- `venv/`, `__pycache__/`, `*.log`
 
 ---
 
@@ -137,20 +258,14 @@ Full details: `.context/DECISION_LOG.md`
 
 # FILE MAP
 
-```
-vibepilot/
-├── THIS_FILE              ← You are here
-├── config/vibepilot.yaml  ← All runtime config
-├── .context/
-│   ├── guardrails.md      ← Pre-code gates
-│   └── DECISION_LOG.md    ← Full decision details
-├── docs/
-│   └── MASTER_PLAN.md     ← Full specification
-├── core/roles.py          ← Role definitions
-├── runners/kimi_runner.py ← Kimi CLI
-├── dual_orchestrator.py   ← Multi-model routing
-└── task_manager.py        ← Task CRUD
-```
+See DIRECTORY INDEX above for full structure. Key files:
+
+| File | Purpose |
+|------|---------|
+| `CURRENT_STATE.md` | Context restoration (this file) |
+| `config/vibepilot.yaml` | ALL runtime config |
+| `.context/DECISION_LOG.md` | Full decision details |
+| `docs/MASTER_PLAN.md` | Full specification |
 
 ---
 
@@ -208,6 +323,6 @@ council_feedback:
 
 ---
 
-*Token count target: <3000 tokens (this doc)*
-*Actual: ~2000 tokens*
+*Token count target: <4000 tokens (this doc)*
+*Actual: ~3500 tokens*
 *Context restoration: ONE file read*
