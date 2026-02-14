@@ -9,7 +9,7 @@
 # 2026-02-14
 
 ## 19:35 UTC - GLM-5
-**Commit:** (pending)
+**Commit:** `af237421`
 **Type:** Add
 **Files Added:**
 - `setup.sh` - One-command setup for fresh machine
