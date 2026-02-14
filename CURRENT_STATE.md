@@ -68,7 +68,7 @@ git checkout 3382449f
 | Model Registry | Tracks available AI models | Supabase `models` table |
 | Platform Registry | Tracks web AI platforms | Supabase `platforms` table |
 | Kimi CLI Runner | Executes tasks via Kimi | `runners/kimi_runner.py` |
-| Dual Orchestrator | Routes tasks to right model | `dual_orchestrator.py` |
+| Dual Orchestrator | Routes tasks to right model | `orchestrator.py` |
 | Role System | Defines agent capabilities | `core/roles.py` + `config/vibepilot.yaml` |
 
 ## Not Yet Built
@@ -88,16 +88,17 @@ git checkout 3382449f
 
 ## Immediate (Next Session)
 
-1. **Schema Audit + Validation Script** - Check existing schema, create auto-validator (DEC-011)
-2. **Prompt Caching** - Add to runners, 75% cost savings on Council (DEC-007)
-3. **Council RPC** - Supabase function for iterative consensus
+1. ~~**Schema Audit + Validation Script** - Check existing schema, create auto-validator (DEC-011)~~ ✅ DONE
+2. ~~**Prompt Caching** - Add to runners, 75% cost savings on Council (DEC-007)~~ ✅ DONE
+3. **Apply Schema Fixes** - Run `docs/schema_timestamp_fixes.sql` in Supabase
+4. **Test Council RPC** - Run `docs/schema_council_rpc.sql`, test functions
 
 ## Near Term
 
-4. **Kimi Swarm** - Add trigger to orchestrator (DEC-008)
-5. **Courier Agent** - Dispatch to web platforms
-6. **Migration Prep** - Test setup.sh, prep for cheaper hosting
-7. **TypeScript Decision** - DEC-006 (migrate or not?)
+5. **Kimi Swarm** - Add trigger to orchestrator (DEC-008)
+6. **Courier Agent** - Dispatch to web platforms
+7. **Migration Prep** - Test setup.sh, prep for cheaper hosting
+8. **TypeScript Decision** - DEC-006 (migrate or not?)
 
 ## Future
 
@@ -292,7 +293,7 @@ git status
 | `docs/MASTER_PLAN.md` | Full specification | Architecture change |
 | `core/roles.py` | Role definitions | Role change |
 | `runners/kimi_runner.py` | Kimi CLI integration | Runner change |
-| `dual_orchestrator.py` | Multi-model routing | Orchestrator change |
+| `orchestrator.py` | Multi-model routing | Orchestrator change |
 | `task_manager.py` | Task CRUD | Task logic change |
 | `agents/` | Agent implementations | Agent change |
 
