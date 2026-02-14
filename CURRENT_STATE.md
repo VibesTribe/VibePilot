@@ -8,9 +8,9 @@
 
 ---
 
-**Last Updated:** 2026-02-14 18:30 UTC
-**Updated By:** GLM-5 (session with human)
-**Known Good Commit:** `98668742` (verified working)
+**Last Updated:** 2026-02-14 19:05 UTC
+**Updated By:** GLM-5 (vetted research suggestions)
+**Known Good Commit:** `872b6e21` (verified working)
 
 ---
 
@@ -27,44 +27,16 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 
 ---
 
-# WHAT AI MUST PRESERVE
-
-These are non-negotiable. Changing these requires human approval:
-
-- **Context isolation** - Task agents see ONLY their task (prevents drift)
-- **Config-driven swaps** - No code edits for model/platform/role changes
-- **Council process** - Iterative for PRDs, one-shot for updates
-- **Single source of truth** - CURRENT_STATE.md + CHANGELOG.md for context
-- **All state in Supabase** - Nothing persisted locally
-- **All code in GitHub** - Nothing uncommitted
-
----
-
-# WHAT AI MUST NEVER DO
-
-These cause system instability:
-
-- Delete core files without human approval
-- Modify schema without Council review
-- Add "helpful" features not in PRD
-- Assume anything not documented
-- Create new "source of truth" documents (one is enough)
-- Over-compress logs (lose WHY, not just WHAT)
-- Give agents execution tools without sandbox
-- Bypass context isolation for "convenience"
-
----
-
 # KNOWN GOOD STATE
 
 | Commit | Date | Status | Notes |
 |--------|------|--------|-------|
-| `98668742` | 2026-02-14 | ✅ Verified | Current - video insights added |
-| `33d1b015` | 2026-02-14 | ✅ Verified | Comprehensive restructure |
+| `872b6e21` | 2026-02-14 | ✅ Verified | Current - vetted research, simplified approach |
+| `98668742` | 2026-02-14 | ✅ Verified | Video insights added |
 
 **If everything breaks:**
 ```bash
-git checkout 98668742
+git checkout 872b6e21
 ```
 
 ---
