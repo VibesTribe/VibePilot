@@ -1,8 +1,8 @@
 # VibePilot Status
 
-**Last Updated:** 2026-02-13 23:55 UTC  
-**Session:** Foundational Build Complete  
-**Next Phase:** Council Activation + Courier Agent
+**Last Updated:** 2026-02-14 16:00 UTC  
+**Session:** Strategic Guardrails + Master Plan Complete  
+**Next Phase:** Council Activation + Prompt Caching
 
 ---
 
@@ -15,6 +15,9 @@
 | Kimi Integration | ✅ Working | CLI dispatch functional |
 | Role System | ✅ Defined | 7 roles, 2-3 skills each |
 | Config System | ✅ Ready | `config/vibepilot.yaml` |
+| **Guardrails** | ✅ Complete | `.context/` folder structure |
+| **Master Plan** | ✅ Complete | Zero-ambiguity specification |
+| **Migration Prep** | ✅ Ready | `scripts/prep_migration.sh` |
 | GLM-5 (OpenCode) | ✅ Active | Primary coder/supervisor |
 | Kimi K2.5 | ✅ Active | Parallel executor |
 | Gemini Flash | ✅ Active | Research (rate-limited) |
@@ -43,29 +46,33 @@ source venv/bin/activate
 
 ## Where Things Are
 
-| What | Location |
-|------|----------|
-| **Config (everything)** | `config/vibepilot.yaml` |
-| **Session Log** | `docs/SESSION_LOG.md` |
-| **PRD** | `docs/prd_v1.3.md` |
-| **Architecture** | `docs/architecture_diagram.md` |
-| **Schemas** | `docs/schema_*.sql` |
-| **Role Definitions** | `core/roles.py` |
-| **Kimi Runner** | `runners/kimi_runner.py` |
-| **Dual Orchestrator** | `dual_orchestrator.py` |
-| **TaskManager** | `task_manager.py` |
-| **Agents** | `agents/` |
+| What | Location | Purpose |
+|------|----------|---------|
+| **Master Plan** | `docs/MASTER_PLAN.md` | Zero-ambiguity system specification |
+| **Guardrails** | `.context/guardrails.md` | Pre-code gates and production checklist |
+| **Decision Log** | `.context/DECISION_LOG.md` | All architectural decisions |
+| **Config (everything)** | `config/vibepilot.yaml` | Runtime configuration |
+| **Session Log** | `docs/SESSION_LOG.md` | Session history |
+| **PRD** | `docs/prd_v1.3.md` | Product requirements |
+| **Architecture** | `docs/architecture_diagram.md` | Visual architecture |
+| **Schemas** | `docs/schema_*.sql` | Database schemas |
+| **Role Definitions** | `core/roles.py` | Role implementations |
+| **Kimi Runner** | `runners/kimi_runner.py` | Kimi CLI integration |
+| **Dual Orchestrator** | `dual_orchestrator.py` | Multi-model routing |
+| **TaskManager** | `task_manager.py` | Task CRUD/claiming |
+| **Agents** | `agents/` | Agent implementations |
 
 ---
 
 ## Next Steps
 
-1. [ ] **Project Selector** - Multi-project support (recipe app, finance app, VibePilot, etc.)
-2. [ ] **Activate Council** - 3-model independent review for plans
-3. [ ] **Build Courier Agent** - Dispatch to web platforms
-4. [ ] **Gemini Integration** - Add API runner for research
-5. [ ] **Voice Interface** - "Talk to Vibes" via Deepgram/Kokoro
-6. [ ] **Dashboard Connection** - Vibeflow → Supabase
+1. [ ] **Commit MASTER_PLAN.md** to GitHub
+2. [ ] **DEC-004: Prompt Caching** - Implement in runners
+3. [ ] **DEC-005: Kimi Swarm** - Add trigger to orchestrator
+4. [ ] **DEC-006: TypeScript** - Decision needed
+5. [ ] **Council Activation** - Wire 3 models to review roles
+6. [ ] **Courier Agent** - Build for web platforms
+7. [ ] **Migration Prep** - Test on fresh machine
 
 ---
 
