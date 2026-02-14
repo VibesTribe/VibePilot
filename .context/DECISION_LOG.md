@@ -374,7 +374,7 @@ Target: <3000 tokens for full context restoration.
 ### DEC-011: Schema Senior Rules Audit
 
 **Date:** 2026-02-14
-**Status:** Proposed
+**Status:** Pending
 **Context:** Video insights on senior engineer database design rules. Current schema may not follow best practices.
 
 ### Proposed Rules
@@ -390,85 +390,74 @@ Target: <3000 tokens for full context restoration.
 - Auditability: Timestamps on everything
 - Stability: UUID IDs don't break
 
-### Open Questions
-- Audit current schema against these rules?
-- What needs to be fixed?
+### Implementation
+1. Audit existing schema against rules
+2. Create validation script (`scripts/validate_schema.sh`)
+3. Fix any violations
 
 ---
 
 ### DEC-012: Self-Awareness SSOT Document
 
 **Date:** 2026-02-14
-**Status:** Proposed
-**Context:** AI needs document explaining system architecture to itself. Prevents assumptions and bugs.
+**Status:** Rejected
+**Context:** Proposed separate document explaining system to AI.
 
-### Proposal
-Create document injected at session start:
-- What VibePilot is
-- Current architecture
-- What to preserve
-- What to never do
+### Why Rejected
+- Duplicates CURRENT_STATE.md (two sources of truth)
+- Better: Add "Must Preserve / Never Do" sections to existing file
+- Simpler is better
 
-### Why
-- AI assumes things without this
-- Assumptions lead to bugs
-- SSOT = Single Source of Truth for self-awareness
+### Resolution
+Added sections to CURRENT_STATE.md instead of new file.
 
 ---
 
 ### DEC-013: Noiseless Compression Protocol
 
 **Date:** 2026-02-14
-**Status:** Proposed
-**Context:** Session logs grow unbounded. 400k+ tokens to maintain context. Manolo Remiddi video shows 80% reduction possible.
+**Status:** Rejected
+**Context:** Proposed compressing logs to shorthand signals for 80% token reduction.
 
-### Proposal
-- Compress verbose logs to shorthand functions/signals
-- Hash-tag blocks for fetch-on-demand
-- AI sees compressed, fetches raw when needed
+### Why Rejected
+- "Noise" often contains WHY, not just WHAT
+- Over-compression loses reasoning
+- Already solved: CURRENT_STATE.md (summary) + DECISION_LOG.md (detail)
 
-### Example
-Before: "On 2026-02-13, we discussed the role system. We decided each role should have 2-3 skills maximum."
-After: "DEC-003: roles.bounded_skills | 2026-02-13 | max 3 skills/role"
+### Resolution
+Keep existing summary/detail pattern. Don't compress further.
 
 ---
 
 ### DEC-014: Navigation-Based Context
 
 **Date:** 2026-02-14
-**Status:** Proposed
-**Context:** Current approach feeds entire codebase. Adam Lucek video shows navigation is better than RAG.
+**Status:** Rejected
+**Context:** Proposed giving agents terminal tools (ls, cat, grep) instead of feeding files.
 
-### Proposal
-- Give agents terminal tools: `ls`, `cat`, `grep`, `find`
-- Agents explore like human devs
-- Recursive sub-LLM for large tasks (fresh context)
+### Why Rejected
+- Requires execution capability → security risk
+- Implementation complexity
+- Context index in CURRENT_STATE.md solves the same problem
 
-### Why
-- No fuzzy vector search
-- Precision of exact file reading
-- Main context stays clean
+### Resolution
+Directory index + Source of Truth index already tells agents where to look.
 
 ---
 
 ### DEC-015: Awareness Agent
 
 **Date:** 2026-02-14
-**Status:** Proposed
-**Context:** Tiny watcher that auto-injects context based on keywords.
+**Status:** Rejected
+**Context:** Proposed auto-injecting context based on keywords.
 
-### Proposal
-| Keyword | Auto-Inject |
-|---------|-------------|
-| "schema" | Schema decisions, SQL files |
-| "model" | Model config, registry |
-| "council" | Council process docs |
-| "rollback" | CHANGELOG, known good commits |
+### Why Rejected
+- Heuristic risk ("model" = AI model vs data model)
+- Over-engineering
+- CURRENT_STATE.md structure already provides clear navigation
 
-### Why
-- No manual context selection
-- Relevant info auto-injected
-- Reduces human cognitive load
+### Resolution
+Explicit structure in CURRENT_STATE.md is sufficient.
 
 ---
 
@@ -486,11 +475,13 @@ After: "DEC-003: roles.bounded_skills | 2026-02-13 | max 3 skills/role"
 | DEC-008 | Kimi K2.5 Swarm Trigger | Pending | 2026-02-14 |
 | DEC-009 | Council Feedback Summarization | Accepted | 2026-02-14 |
 | DEC-010 | Single Source of Truth (CURRENT_STATE.md) | Accepted | 2026-02-14 |
-| DEC-011 | Schema Senior Rules Audit | Proposed | 2026-02-14 |
-| DEC-012 | Self-Awareness SSOT Document | Proposed | 2026-02-14 |
-| DEC-013 | Noiseless Compression Protocol | Proposed | 2026-02-14 |
-| DEC-014 | Navigation-Based Context | Proposed | 2026-02-14 |
-| DEC-015 | Awareness Agent | Proposed | 2026-02-14 |
+| DEC-011 | Schema Senior Rules Audit | Pending | 2026-02-14 |
+| DEC-012 | Self-Awareness SSOT Document | Rejected | 2026-02-14 |
+| DEC-013 | Noiseless Compression Protocol | Rejected | 2026-02-14 |
+| DEC-014 | Navigation-Based Context | Rejected | 2026-02-14 |
+| DEC-015 | Awareness Agent | Rejected | 2026-02-14 |
+
+**Why DEC-012 to DEC-015 rejected:** Over-engineering. Solved by adding Must Preserve/Never Do sections to CURRENT_STATE.md.
 
 ---
 
