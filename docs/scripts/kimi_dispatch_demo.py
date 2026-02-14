@@ -1,5 +1,7 @@
 import os
 import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 from supabase import create_client
 from dotenv import load_dotenv
 from runners.kimi_runner import KimiRunner
