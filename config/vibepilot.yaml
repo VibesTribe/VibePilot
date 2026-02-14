@@ -1,0 +1,227 @@
+# VibePilot Configuration
+# Edit this file to modify: roles, models, prompts, tools
+# Changes take effect immediately (no code changes needed)
+
+# =============================================================================
+# MODELS (Add/remove/swap models here)
+# =============================================================================
+
+models:
+  glm-5:
+    platform: opencode
+    role: primary_executor
+    context_limit: 128000
+    cost_per_1k_tokens: 0  # Subscription
+    status: active
+    
+  kimi-k2.5:
+    platform: kimi-cli
+    role: parallel_executor
+    context_limit: 128000
+    cost_per_1k_tokens: 0  # Subscription
+    status: active
+    
+  gemini-flash:
+    platform: google-ai
+    role: researcher
+    context_limit: 32000
+    cost_per_1k_tokens: 0  # Free tier
+    daily_limit: 30  # Preserve free tier
+    status: active
+    
+  deepseek-chat:
+    platform: deepseek-api
+    role: backup
+    context_limit: 64000
+    cost_per_1k_tokens: 0.14
+    status: paused
+    status_reason: "Low credits - backup only"
+
+# =============================================================================
+# ROLES (What hats can agents wear)
+# =============================================================================
+
+roles:
+  supervisor:
+    description: "Reviews task outputs for quality"
+    skills: [review, validate, approve]
+    max_skills: 3
+    default_model: glm-5
+    alternative_models: [kimi-k2.5]
+    
+  coder:
+    description: "Writes clean, production-ready code"
+    skills: [generate, modify, refactor]
+    max_skills: 3
+    default_model: glm-5
+    alternative_models: [kimi-k2.5]
+    
+  researcher:
+    description: "Researches and summarizes"
+    skills: [research, summarize, compare]
+    max_skills: 3
+    default_model: gemini-flash
+    alternative_models: []
+    
+  council_member:
+    description: "Independently reviews decisions"
+    skills: [review, analyze, vote]
+    max_skills: 3
+    default_model: null  # Requires 3 different models
+    requires_multiple_models: true
+    
+  executor:
+    description: "Executes tasks efficiently"
+    skills: [execute, implement, deliver]
+    max_skills: 3
+    default_model: kimi-k2.5
+    alternative_models: [glm-5]
+    
+  planner:
+    description: "Breaks work into atomic tasks"
+    skills: [decompose, sequence, estimate]
+    max_skills: 3
+    default_model: glm-5
+    alternative_models: []
+    
+  consultant:
+    description: "Turns ideas into PRDs"
+    skills: [analyze, document, specify]
+    max_skills: 3
+    default_model: glm-5
+    alternative_models: []
+
+# =============================================================================
+# PROMPTS (Role-specific prompts - editable from dashboard)
+# =============================================================================
+
+prompts:
+  supervisor: |
+    You are the Supervisor. Review task outputs.
+    
+    CHECK:
+    1. Does this match the plan?
+    2. Any issues or conflicts?
+    3. Production-ready?
+    
+    Return JSON: {"passed": bool, "confidence": float, "issues": [], "notes": str}
+    
+  coder: |
+    You are the Coder. Write clean code.
+    
+    RULES:
+    - No comments unless complex
+    - Proper error handling
+    - Clear variable names
+    - No hardcoded secrets
+    
+    Return: Only the code.
+    
+  researcher: |
+    You are the Researcher. Gather and summarize.
+    
+    RULES:
+    - No opinions, just facts
+    - Include pros/cons
+    - Stay under 200 words
+    - Note confidence level
+    
+    Return JSON: {"summary": str, "pros": [], "cons": [], "confidence": float}
+    
+  council_member: |
+    You are a Council Member. Review independently.
+    
+    RULES:
+    - Do NOT chat with other members
+    - Review independently
+    - Consider: architecture, security, feasibility, PRD alignment
+    
+    Return JSON: {"vote": "APPROVED|REVISION_NEEDED|BLOCKED", "confidence": float, "concerns": [], "reasoning": str}
+    
+  executor: |
+    You are the Executor. Get tasks done.
+    
+    RULES:
+    - Follow specs exactly
+    - No commentary
+    - Return only requested output
+    
+  planner: |
+    You are the Planner. Break work into atomic tasks.
+    
+    RULES:
+    - Each task independently testable
+    - Vertical slicing (complete feature per task)
+    - Confidence >= 0.95 (split if lower)
+    - Define acceptance criteria
+    
+  consultant: |
+    You are the Consultant. Create PRDs.
+    
+    INCLUDE:
+    - Overview
+    - Objectives
+    - Technical Stack
+    - Features (P0/P1/P2)
+    - Architecture
+    - Security Requirements
+    - Success Metrics
+
+# =============================================================================
+# TOOLS (Available tools per role)
+# =============================================================================
+
+tools:
+  file_read:
+    description: "Read file contents"
+    available_to: [coder, supervisor, executor]
+    
+  file_write:
+    description: "Write/create files"
+    available_to: [coder, executor]
+    
+  web_search:
+    description: "Search the web"
+    available_to: [researcher]
+    
+  code_execute:
+    description: "Run code"
+    available_to: [executor, coder]
+    
+  git_operations:
+    description: "Git commit/push/branch"
+    available_to: [executor]
+    
+  supabase_query:
+    description: "Query Supabase"
+    available_to: [supervisor, planner]
+
+# =============================================================================
+# THRESHOLDS (System limits)
+# =============================================================================
+
+thresholds:
+  max_task_attempts: 3
+  context_warning_pct: 70
+  context_max_pct: 80
+  token_warning_pct: 70
+  token_max_pct: 80
+  daily_gemini_limit: 30
+  timeout_minutes: 30
+
+# =============================================================================
+# ESCALATION RULES
+# =============================================================================
+
+escalation:
+  on_max_attempts:
+    action: escalate_to_supervisor
+    notify_human: false  # Only for UI/UX
+  
+  on_council_blocked:
+    action: require_human_review
+    notify_human: true
+  
+  on_budget_exceeded:
+    action: pause_non_critical
+    notify_human: true
