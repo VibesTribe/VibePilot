@@ -8,6 +8,36 @@
 
 # 2026-02-14
 
+## 18:35 UTC - GLM-5
+**Commit:** (pending)
+**Type:** Add
+**Files Added:**
+- `docs/video_insights_2026-02-14.md` - Senior engineer rules, noiseless memory, navigation context
+
+**Files Changed:**
+- `CURRENT_STATE.md` - Updated decisions, priorities, directory index
+- `.context/DECISION_LOG.md` - Added DEC-011 through DEC-015
+
+**Why:** Capture video insights for next session:
+- Senior engineer schema rules (portability, auditability)
+- Noiseless compression (80% token reduction)
+- Navigation-based context (terminal tools vs RAG)
+- Awareness agents (auto-inject by keyword)
+
+**New Proposed Decisions:**
+- DEC-011: Schema Senior Rules Audit
+- DEC-012: Self-Awareness SSOT Document
+- DEC-013: Noiseless Compression Protocol
+- DEC-014: Navigation-Based Context
+- DEC-015: Awareness Agent
+
+**Rollback:**
+```bash
+git revert <commit_hash>
+```
+
+---
+
 ## 18:10 UTC - GLM-5
 **Commit:** `8df8c51e`
 **Type:** Update
