@@ -194,34 +194,39 @@ Replace roles with single generalist prompt.
 
 ## Pending Decisions
 
-### DEC-004: Council Iterative Consensus Process
+### DEC-004: Council Two-Process Model
 
 **Date:** 2026-02-14
 **Status:** Accepted
-**Context:** Council review is not a one-shot vote. Real experience shows 3 different models (GPT, Gemini, GLM-5) start with very different approaches and need 4 rounds to reach consensus.
+**Context:** Council review isn't one-size-fits-all. PRDs and plans need iterative consensus. System updates need quick validation.
 
 ### Decision
-Council uses iterative consensus process:
-- Round 1: Each model reviews independently with their lens
-- Round 2+: Each model sees others' feedback, adjusts position
-- Continue until all 3 models agree
-- Max 5 rounds, then human arbitration
+Two Council processes:
+
+**Process A - One-Shot Vote:** System updates, maintenance, new features
+- 1 round, vote-based
+- 3 APPROVED = proceed
+- Fast, clear-cut decisions
+
+**Process B - Iterative Consensus:** PRDs, full vertical slice plans
+- 3-4 rounds typical
+- Each model sees others' feedback
+- Ensures: user intent, system goals, no tech drift, clear dependencies, preventative medicine
 
 ### Model Lenses
-| Model | Lens | Strength |
-|-------|------|----------|
-| GPT | User Alignment | True to user intent, catches drift |
-| Gemini | Ideal/Vision | Explores best possible, may drift from practical |
-| GLM-5 | Technical/Security | Finds vulnerabilities, suggests better options |
+| Model | Lens | Catches |
+|-------|------|---------|
+| GPT | User Alignment | Drift from user intent |
+| Gemini | Ideal/Vision | Opportunities (may need reining) |
+| GLM-5 | Technical/Security | Build issues, vulnerabilities |
 
 ### Trade-offs
-- We gain: Multiple perspectives converge on best approach
-- We lose: Time (3-4 rounds typical)
-- We accept: Complex decisions need more rounds
+- We gain: Right process for right decision type
+- We lose: None (more efficient)
+- We accept: PRDs take longer, but worth it
 
 ### Review Notes
-- [x] Human validated: 2026-02-14, "This is exactly how it worked in practice"
-- [ ] Kimi attacked: pending
+- [x] Human validated: 2026-02-14, "One-shot for updates, iterative for PRDs/plans"
 
 ---
 

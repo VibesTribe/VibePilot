@@ -314,82 +314,132 @@ Every task prompt follows these rules to prevent drift:
 
 ## 4.1 When Council Reviews
 
-| Trigger | Council Required | Why |
-|---------|------------------|-----|
-| New plan (before execution) | Yes | Multiple approaches possible, need consensus |
-| Architecture change | Yes | System-wide impact |
-| System update (major) | Yes | Affects multiple components |
-| Complex maintenance | Yes | Changes core functionality |
+| Trigger | Council Required | Process Type |
+|---------|------------------|--------------|
+| **PRD (new project)** | Yes | Iterative consensus |
+| **Full vertical slice plan** | Yes | Iterative consensus |
+| Architecture change | Yes | One-shot vote |
+| System update | Yes | One-shot vote |
+| New feature (major) | Yes | One-shot vote |
+| Complex maintenance | Yes | One-shot vote |
 
 | Trigger | Council NOT Required | Why |
 |---------|----------------------|-----|
-| Single feature task | No | Supervisor validates |
-| New model (simple API add) | No | Supervisor validates, config change |
-| New platform (web AI add) | No | Supervisor validates, config change |
-| Simple maintenance | No | Supervisor validates |
+| Single task execution | No | Supervisor validates |
+| New model (simple add) | No | Supervisor validates |
+| New platform (simple add) | No | Supervisor validates |
 | Config tweak | No | Supervisor validates |
+| Bug fix | No | Supervisor validates |
 
-**Rule of thumb:** Council for decisions where different valid approaches exist. Supervisor for validation of straightforward implementations.
+## 4.2 Two Council Processes
 
-## 4.2 Council Composition
+### Process A: One-Shot Vote (System Updates, Maintenance, Features)
 
-Three independent models, each with a different lens:
-
-| Lens | Focus | Typical Model | Strength |
-|------|-------|---------------|----------|
-| **User Alignment** | True to user intent | GPT-4 / ChatGPT | Understands user's actual goal, catches drift |
-| **Ideal/Vision** | Best possible solution | Gemini | Explores ideal state, may drift from practical |
-| **Technical/Security** | Vulnerabilities, better options | GLM-5 | Finds issues, suggests alternatives, catches edge cases |
-
-**Why Different Lenses Matter:**
-- GPT stays aligned with what user actually wants
-- Gemini explores what could be ideal (may need reining in)
-- GLM finds what will break and what's technically better
-
-Each model starts with their own approach. Through iterative review, they converge on the best path that satisfies all three lenses.
-
-## 4.3 Council Review Process (Iterative Consensus)
-
-This is NOT a one-shot vote. It's an iterative process where models see each other's feedback and refine.
+For straightforward decisions where options are clear:
 
 ```
+1. Each model receives: Change request, System State, Options
+2. Each model votes: APPROVED / REVISION_NEEDED / BLOCKED
+3. Each model provides: Reasoning, Concerns
+
+RESULT:
+├── 3 APPROVED → Proceed
+├── 2 APPROVED + 1 minor concern → Proceed with notes
+├── 2 APPROVED + 1 BLOCKED → Address concern, re-vote
+└── No majority → Human arbitration
+
+TYPICAL: 1 round
+```
+
+### Process B: Iterative Consensus (PRDs, Full Plans)
+
+For complex specifications where alignment is critical:
+
+```
+PURPOSE: Ensure full compliance with user intent, prevent tech drift, 
+         clarify versions/dependencies, preventative medicine for build issues
+
 ROUND 1: Independent Review
-├── Each model receives: PRD, Plan, System State, their lens prompt
+├── Each model receives: PRD, System State, their lens prompt
 ├── Each model reviews independently
 ├── Each model outputs: approach, concerns, suggested changes
 └── Results aggregated (no chat, just structured output)
 
 ROUND 2+: Cross-Review
-├── Each model receives: All Round 1 outputs
+├── Each model receives: All previous round outputs
 ├── Each model sees: Other models' approaches, concerns, suggestions
-├── Each model can: Adjust their position, address concerns, refine
+├── Each model can: Adjust position, address concerns, refine
 └── Results aggregated
 
 CONSENSUS CHECK:
-├── All 3 aligned → APPROVED, proceed
-├── 2 aligned, 1 minor concern → APPROVED with notes
-├── Fundamental disagreement → Continue rounds (max 5)
-└── No consensus after 5 rounds → Human arbitration
+├── All 3 aligned on: user intent, system goals, tech choices, versions, dependencies
+├── No tech drift detected
+├── No ambiguity remaining
+└── Preventative issues identified and addressed
 
-TYPICAL: 3-4 rounds for complex decisions
+TYPICAL: 3-4 rounds for PRDs and full plans
 ```
 
-## 4.4 Model Output Format (Per Round)
+## 4.3 Council Composition
+
+Three independent models, each with a different lens:
+
+| Lens | Focus | Typical Model | What They Catch |
+|------|-------|---------------|-----------------|
+| **User Alignment** | True to user intent | GPT-4 / ChatGPT | Drift from what user actually wants |
+| **Ideal/Vision** | Best possible solution | Gemini | Opportunities, but may drift from practical |
+| **Technical/Security** | Vulnerabilities, better options | GLM-5 | Build issues, version conflicts, security risks |
+
+**Why This Works:**
+- GPT ensures user's actual goal is preserved
+- Gemini explores what's possible (kept in check by GPT and GLM)
+- GLM finds what will break and suggests better technical options
+
+Each model starts with their own approach. Through iterative review (for PRDs/plans), they converge on the best path that satisfies all three lenses.
+
+## 4.4 What Iterative Consensus Ensures (PRDs and Plans)
+
+| Check | Why It Matters |
+|-------|----------------|
+| User intent preserved | No drift from what user actually wants |
+| Project/system goals aligned | Feature serves the bigger picture |
+| No tech drift | Using right versions, right libraries |
+| Dependencies clear | Version conflicts caught early |
+| Build issues prevented | "Preventative medicine" - catch problems before coding |
+
+## 4.5 Model Output Format
+
+### One-Shot Vote Format
+
+```json
+{
+  "model": "gpt-4",
+  "lens": "user_alignment",
+  "vote": "APPROVED",
+  "reasoning": "Change aligns with system goals and user intent",
+  "concerns": [],
+  "conditions": []
+}
+```
+
+### Iterative Consensus Format (Per Round)
 
 ```json
 {
   "round": 1,
   "model": "gpt-4",
   "lens": "user_alignment",
-  "approach": "I recommend approach A because it directly solves the user's stated goal...",
-  "concerns": [
-    "Approach B drifts from user intent by adding feature X that wasn't requested",
-    "Approach C is technically sound but doesn't address the core use case"
-  ],
-  "suggestions": [
-    "Combine approach A's user alignment with approach C's security measures"
-  ],
-  "status": "PROPOSAL",
+  "approach": "I recommend approach A because...",
+  "user_intent_check": "Does this preserve user's goal? Yes/No + reasoning",
+  "tech_drift_check": "Any drift from specified tech? Yes/No + details",
+  "dependencies_check": "Are versions and dependencies clear? Yes/No + gaps",
+  "preventative_issues": ["Issue 1", "Issue 2"],
+  "concerns": ["Concern about X"],
+  "suggestions": ["Suggestion Y"],
+  "status": "PROPOSAL | ALIGNED | BLOCKED",
+  "confidence": 0.85
+}
+```
   "confidence": 0.85
 }
 ```
