@@ -2,7 +2,7 @@
 
 **Read this first. This is the only document you need.**
 
-**Last Updated:** 2026-02-14 17:30 UTC
+**Last Updated:** 2026-02-14 17:40 UTC
 **Updated By:** GLM-5 (session with human)
 
 ---
@@ -97,7 +97,17 @@ Full details: `.context/DECISION_LOG.md`
 
 ---
 
-# SOURCE OF TRUTH INDEX
+# Source of Truth Index
+
+## Changelog (Audit Trail)
+
+| File | Purpose | Update Frequency |
+|------|---------|------------------|
+| `CHANGELOG.md` | Full audit trail of all changes | After EVERY change |
+
+**Contains:** What changed, when, why, commit hash, rollback command
+
+**Includes:** Files added/changed/removed, merges, branch deletions, timestamps
 
 ## Supabase (All State)
 
@@ -149,6 +159,7 @@ Full details: `.context/DECISION_LOG.md`
 ~/vibepilot/                      # Project root (git clone)
 │
 ├── CURRENT_STATE.md              # THIS FILE - context restoration
+├── CHANGELOG.md                  # FULL AUDIT TRAIL - every change with timestamps
 ├── STATUS.md                     # Quick status (deprecated, use CURRENT_STATE)
 ├── .env                          # Secrets (NOT in git)
 ├── .env.example                  # Secret template (in git)
@@ -209,6 +220,7 @@ Full details: `.context/DECISION_LOG.md`
 
 **Keep Updated:**
 - `CURRENT_STATE.md` - Every session
+- `CHANGELOG.md` - After EVERY change (add, update, remove, merge)
 - `config/vibepilot.yaml` - Every config change
 - `.context/DECISION_LOG.md` - Every decision
 
@@ -263,6 +275,7 @@ See DIRECTORY INDEX above for full structure. Key files:
 | File | Purpose |
 |------|---------|
 | `CURRENT_STATE.md` | Context restoration (this file) |
+| `CHANGELOG.md` | Full audit trail (every change, timestamps, rollback) |
 | `config/vibepilot.yaml` | ALL runtime config |
 | `.context/DECISION_LOG.md` | Full decision details |
 | `docs/MASTER_PLAN.md` | Full specification |
@@ -306,6 +319,17 @@ council_feedback:
 3. Update "WHERE WE'RE GOING" if priorities changed
 4. Add new decisions to "KEY DECISIONS"
 5. Update "CURRENT ISSUES" as they arise/resolve
+6. **Update CHANGELOG.md with all changes made**
+
+**CHANGELOG.md must be updated after EVERY change:**
+```markdown
+## HH:MM UTC - <Agent/Human>
+**Commit:** `<hash>`
+**Type:** Add | Update | Remove | Merge
+**Files Added/Changed/Removed:** ...
+**Why:** ...
+**Rollback:** `git revert <hash>`
+```
 
 **This file must always be accurate. It is the source of truth for context restoration.**
 
