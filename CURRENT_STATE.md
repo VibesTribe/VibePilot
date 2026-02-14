@@ -8,9 +8,9 @@
 
 ---
 
-**Last Updated:** 2026-02-14 19:20 UTC
-**Updated By:** GLM-5 (rename to UPDATE_CONSIDERATIONS.md)
-**Known Good Commit:** `992ba26a` (verified working)
+**Last Updated:** 2026-02-14 19:30 UTC
+**Updated By:** GLM-5 (created setup.sh, .env.example, backup script)
+**Known Good Commit:** `d6e1acfa` (verified working)
 
 ---
 
@@ -31,12 +31,12 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 
 | Commit | Date | Status | Notes |
 |--------|------|--------|-------|
-| `992ba26a` | 2026-02-14 | ✅ Verified | Current - UPDATE_CONSIDERATIONS workflow |
-| `872b6e21` | 2026-02-14 | ✅ Verified | Vetted research, simplified approach |
+| `d6e1acfa` | 2026-02-14 | ✅ Verified | Current - UPDATE_CONSIDERATIONS workflow |
+| `992ba26a` | 2026-02-14 | ✅ Verified | Daily improvement workflow |
 
 **If everything breaks:**
 ```bash
-git checkout 992ba26a
+git checkout d6e1acfa
 ```
 
 ---
@@ -224,10 +224,11 @@ git clone git@github.com:VibesTribe/VibePilot.git
 cd VibePilot
 cp .env.example .env
 # Edit .env with credentials
-./setup.sh  # (TODO: create this)
+./setup.sh  # One-command setup
 
 # 3. Verify
-python -c "from supabase import create_client; ..."
+source venv/bin/activate
+python -c "from supabase import create_client; ..."  # Test connection
 git status
 ```
 
@@ -237,15 +238,15 @@ git status
 
 **Before Move:**
 - [ ] All changes committed to GitHub
-- [ ] `.env.example` has all required variables
-- [ ] `setup.sh` works on fresh machine (test first)
-- [ ] Supabase data exported (backup)
+- [ ] `.env.example` has all required variables (verified ✅)
+- [ ] `setup.sh` works on fresh machine (created ✅)
+- [ ] Supabase data backed up (run `./scripts/backup_supabase.sh`)
 - [ ] CHANGELOG.md up to date
 - [ ] CURRENT_STATE.md up to date
 
 **After Move:**
 - [ ] `git clone` works
-- [ ] `.env` configured from `.env.example`
+- [ ] `cp .env.example .env` and fill in credentials
 - [ ] `./setup.sh` runs without errors
 - [ ] Supabase connection works
 - [ ] `git status` clean
@@ -283,6 +284,8 @@ git status
 |------|--------------|-------------|
 | `CURRENT_STATE.md` | Context restoration | Every session |
 | `CHANGELOG.md` | Audit trail | Every change |
+| `setup.sh` | One-command setup | Rare (new machine) |
+| `.env.example` | Environment template | New variable needed |
 | `config/vibepilot.yaml` | ALL runtime config | Config change |
 | `.context/DECISION_LOG.md` | Full decision details | New decision |
 | `.context/guardrails.md` | Pre-code gates | Rare |
@@ -316,10 +319,10 @@ git status
 │
 ├── CURRENT_STATE.md          # THIS FILE - start here
 ├── CHANGELOG.md              # Audit trail - rollback info
+├── setup.sh                  # One-command setup for fresh machine
 ├── .env                      # Secrets (NOT in git)
-├── .env.example              # Secret template (in git)
+├── .env.example              # Secret template (in git) - COPY THIS
 ├── requirements.txt          # Python dependencies
-├── setup.sh                  # One-command setup (TODO)
 │
 ├── config/
 │   └── vibepilot.yaml        # ALL runtime config (edit this for swaps)
@@ -348,6 +351,8 @@ git status
 ├── agents/                   # Agent implementations
 │
 ├── scripts/
+│   ├── setup.sh              # One-command setup (NEW)
+│   ├── backup_supabase.sh    # Daily backup automation (NEW)
 │   └── prep_migration.sh     # Migration prep
 │
 ├── archive/                  # Old/unused

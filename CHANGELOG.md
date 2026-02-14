@@ -8,6 +8,48 @@
 
 # 2026-02-14
 
+## 19:35 UTC - GLM-5
+**Commit:** (pending)
+**Type:** Add
+**Files Added:**
+- `setup.sh` - One-command setup for fresh machine
+- `.env.example` - Environment template with documentation
+- `scripts/backup_supabase.sh` - Daily backup automation
+
+**Files Changed:**
+- `CURRENT_STATE.md` - Updated directory index, migration checklist, removed TODOs
+
+**Why:** Critical gaps that could block migration:
+- setup.sh: Can't spin up on new server without it
+- .env.example: Incomplete = silent failures
+- backup script: Data loss = total loss
+
+**setup.sh features:**
+- Checks prerequisites (python3, pip, git, curl)
+- Verifies .env exists and has required variables
+- Creates venv and installs dependencies
+- Tests Supabase connection
+- Tests GitHub access
+- Clear next steps output
+
+**.env.example features:**
+- All 6 required variables documented
+- Instructions on where to get each key
+- Notes on model priority
+- Security reminders
+
+**backup_supabase.sh features:**
+- 30-day retention
+- Timestamped backups
+- Cleanup of old backups
+
+**Rollback:**
+```bash
+git revert <commit_hash>
+```
+
+---
+
 ## 19:15 UTC - GLM-5
 **Commit:** `992ba26a`
 **Type:** Rename + Restructure
