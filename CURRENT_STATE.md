@@ -8,9 +8,9 @@
 
 ---
 
-**Last Updated:** 2026-02-14 19:05 UTC
-**Updated By:** GLM-5 (vetted research suggestions)
-**Known Good Commit:** `872b6e21` (verified working)
+**Last Updated:** 2026-02-14 19:20 UTC
+**Updated By:** GLM-5 (rename to UPDATE_CONSIDERATIONS.md)
+**Known Good Commit:** `992ba26a` (verified working)
 
 ---
 
@@ -31,12 +31,12 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 
 | Commit | Date | Status | Notes |
 |--------|------|--------|-------|
-| `872b6e21` | 2026-02-14 | ✅ Verified | Current - vetted research, simplified approach |
-| `98668742` | 2026-02-14 | ✅ Verified | Video insights added |
+| `992ba26a` | 2026-02-14 | ✅ Verified | Current - UPDATE_CONSIDERATIONS workflow |
+| `872b6e21` | 2026-02-14 | ✅ Verified | Vetted research, simplified approach |
 
 **If everything breaks:**
 ```bash
-git checkout 872b6e21
+git checkout 992ba26a
 ```
 
 ---
