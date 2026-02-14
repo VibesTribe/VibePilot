@@ -304,6 +304,73 @@ Enforce context isolation by agent role:
 
 ---
 
+### DEC-009: Council Feedback Summarization Protocol
+
+**Date:** 2026-02-14
+**Status:** Accepted
+**Context:** Council produces lots of feedback across 3-4 rounds → context bloat. Need to capture insights without token explosion.
+
+### Decision
+Supervisor acts as mediator, summarizes Council feedback into plan notes:
+
+1. Council Round 1: Each model outputs approach, concerns, suggestions
+2. Supervisor aggregates: Summarize common themes, key concerns, required fixes
+3. Summary added to plan as `council_feedback` field
+4. Council Round 2+: Each model sees summary (not full outputs)
+5. Final consensus: Summary of agreed approach in plan
+
+### Council Feedback Note Format
+
+```yaml
+council_feedback:
+  round: 2
+  consensus_reached: true
+  summary: "One-line agreed approach"
+  key_concerns_addressed:
+    - "Concern 1 → how addressed"
+    - "Concern 2 → how addressed"
+  modifications_to_plan:
+    - "Modification 1"
+    - "Modification 2"
+```
+
+### Trade-offs
+- We gain: Reduced context, captured insights
+- We lose: Full detail of each model's reasoning
+- We accept: Summary is sufficient for execution
+
+### Review Notes
+- [x] Human approved: 2026-02-14
+
+---
+
+### DEC-010: Single Source of Truth for Context
+
+**Date:** 2026-02-14
+**Status:** Accepted
+**Context:** 77k tokens (38% context) just to understand current state. Info scattered across multiple files, GitHub, Supabase.
+
+### Decision
+One document: `CURRENT_STATE.md`
+- What we're building
+- Where we are
+- Where we're going
+- Key decisions (with links)
+- Current issues
+- Architecture quick reference
+
+Target: <3000 tokens for full context restoration.
+
+### Trade-offs
+- We gain: Instant context, one file read
+- We lose: Full detail (available via links)
+- We accept: Summary is sufficient to start work
+
+### Review Notes
+- [x] Human approved: 2026-02-14, "One or two docs max"
+
+---
+
 ## Decision Log Index
 
 | ID | Title | Status | Date |
@@ -311,13 +378,15 @@ Enforce context isolation by agent role:
 | DEC-001 | Dual Orchestrator Architecture | Accepted | 2026-02-13 |
 | DEC-002 | State in Supabase, Code in GitHub | Accepted | 2026-02-13 |
 | DEC-003 | Role System with Bounded Skills | Accepted | 2026-02-13 |
-| DEC-004 | Council Iterative Consensus Process | Accepted | 2026-02-14 |
+| DEC-004 | Council Two-Process Model | Accepted | 2026-02-14 |
 | DEC-005 | Context Isolation by Agent Role | Accepted | 2026-02-14 |
 | DEC-006 | TypeScript Migration | Proposed | 2026-02-14 |
 | DEC-007 | Prompt Caching Implementation | Pending | 2026-02-14 |
 | DEC-008 | Kimi K2.5 Swarm Trigger | Pending | 2026-02-14 |
+| DEC-009 | Council Feedback Summarization | Accepted | 2026-02-14 |
+| DEC-010 | Single Source of Truth (CURRENT_STATE.md) | Accepted | 2026-02-14 |
 
 ---
 
 *Last updated: 2026-02-14*
-*Next decision number: DEC-009*
+*Next decision number: DEC-011*

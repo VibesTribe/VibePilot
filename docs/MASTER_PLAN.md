@@ -440,9 +440,6 @@ Each model starts with their own approach. Through iterative review (for PRDs/pl
   "confidence": 0.85
 }
 ```
-  "confidence": 0.85
-}
-```
 
 ## 4.5 Consensus Example
 
@@ -486,6 +483,41 @@ Council member MUST flag as BLOCKING ISSUE if:
 | Fundamental disagreement (after 5 rounds) | Human arbitration |
 | User intent vs technical ideal | User intent wins (with technical safeguards) |
 | Security concern raised | Must be addressed before approval |
+
+## 4.8 Council Feedback Summarization (Prevents Context Bloat)
+
+**Problem:** 3 models × 3-4 rounds = lots of output → context explosion
+
+**Solution:** Supervisor summarizes Council feedback into plan notes
+
+```
+PROCESS:
+1. Council Round 1: Each model outputs approach, concerns, suggestions
+2. Supervisor aggregates: Summarize common themes, key concerns, required fixes
+3. Summary added to plan as "council_feedback" field
+4. Council Round 2+: Each model sees summary (not full outputs)
+5. Final consensus: Summary of agreed approach added to plan
+
+BENEFIT:
+- Full insights captured
+- Minimal context required
+- Models see what matters, not raw output
+```
+
+**Council Feedback Note Format (stored in plan):**
+
+```yaml
+council_feedback:
+  round: 2
+  consensus_reached: true
+  summary: "Use Python + Supabase + edge functions. TypeScript benefits without rewrite."
+  key_concerns_addressed:
+    - "Gemini's scalability concern → addressed via edge functions"
+    - "GLM-5's security concern → addressed via auth middleware"
+  modifications_to_plan:
+    - "Add edge function for X"
+    - "Use auth middleware for Y"
+```
 
 ---
 
