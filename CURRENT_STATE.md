@@ -10,7 +10,7 @@
 
 **Last Updated:** 2026-02-14 19:45 UTC
 **Updated By:** GLM-5 (README + cleanup + cron setup)
-**Known Good Commit:** `af237421` (verified working)
+**Known Good Commit:** `3382449f` (verified working)
 
 ---
 
@@ -31,12 +31,12 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 
 | Commit | Date | Status | Notes |
 |--------|------|--------|-------|
-| `af237421` | 2026-02-14 | ✅ Verified | Current - migration infrastructure |
-| `d6e1acfa` | 2026-02-14 | ✅ Verified | UPDATE_CONSIDERATIONS workflow |
+| `3382449f` | 2026-02-14 | ✅ Verified | Current - README + cleanup |
+| `af237421` | 2026-02-14 | ✅ Verified | Migration infrastructure |
 
 **If everything breaks:**
 ```bash
-git checkout af237421
+git checkout 3382449f
 ```
 
 ---
