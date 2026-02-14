@@ -334,7 +334,7 @@ git status
 ├── docs/
 │   ├── MASTER_PLAN.md        # Full specification (858 lines)
 │   ├── SESSION_LOG.md        # Session history
-│   ├── video_insights_*.md   # Video insights and analysis
+│   ├── UPDATE_CONSIDERATIONS.md  # Daily improvement input
 │   ├── prd_v1.3.md           # Product requirements
 │   ├── schema_*.sql          # Database schemas
 │   └── scripts/              # Utility scripts
@@ -375,7 +375,7 @@ git status
 | DEC-011 | Schema Senior Rules Audit | ⏳ | Apply senior engineer DB rules |
 
 Full details: `.context/DECISION_LOG.md`
-Video insights: `docs/video_insights_2026-02-14.md`
+Daily input: `docs/UPDATE_CONSIDERATIONS.md`
 
 **Rejected/Simplified:**
 - DEC-012/013/014/015: Over-engineering. Solved by Must Preserve/Never Do sections above.
