@@ -60,11 +60,12 @@ source venv/bin/activate
 
 ## Next Steps
 
-1. [ ] **Activate Council** - 3-model independent review for plans
-2. [ ] **Build Courier Agent** - Dispatch to web platforms
-3. [ ] **Gemini Integration** - Add API runner for research
-4. [ ] **Voice Interface** - "Talk to Vibes" via Deepgram/Kokoro
-5. [ ] **Dashboard Connection** - Vibeflow → Supabase
+1. [ ] **Project Selector** - Multi-project support (recipe app, finance app, VibePilot, etc.)
+2. [ ] **Activate Council** - 3-model independent review for plans
+3. [ ] **Build Courier Agent** - Dispatch to web platforms
+4. [ ] **Gemini Integration** - Add API runner for research
+5. [ ] **Voice Interface** - "Talk to Vibes" via Deepgram/Kokoro
+6. [ ] **Dashboard Connection** - Vibeflow → Supabase
 
 ---
 
