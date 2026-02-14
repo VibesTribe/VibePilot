@@ -2,6 +2,26 @@
 
 > "The difference between a senior dev and a vibe coder is that seniors make decisions explicitly, even if they're wrong. Vibe coders never make decisions at all."
 
+## Core Philosophy
+
+**We design to prevent the plague of legacy monolithic systems where one tiny change breaks things five levels down.**
+
+Our approach:
+- **World-class engineering** - Think ahead, design for change
+- **Permaculture principles** - Sustainable, self-evolving, resilient
+- **Prevent slop at the source** - Bad design = technical debt compounds
+- **Absorb the new** - New tools/approaches integrate without rewrites
+- **Modular & swappable** - Every component replaceable without cascade
+
+**What we absolutely avoid:**
+- Monolithic anything
+- Tightly coupled dependencies
+- Changes that require full rewrites
+- "Just this once" shortcuts
+- Assumptions that become hard-coded
+
+---
+
 This document defines the mandatory checks that must pass before any code is written. No exceptions.
 
 ---

@@ -22,7 +22,7 @@ cp .env.example .env
 
 # 4. Start
 source venv/bin/activate
-python dual_orchestrator.py
+python orchestrator.py
 ```
 
 ---

@@ -8,6 +8,45 @@
 
 # 2026-02-14
 
+## 19:55 UTC - GLM-5
+**Commit:** (pending)
+**Type:** Refactor + Philosophy
+**Files Renamed:**
+- `dual_orchestrator.py` → `orchestrator.py` (main orchestrator now)
+- `orchestrator.py` → `docs/orchestrator_v1_reference.py` (kept for reference)
+
+**Files Changed:**
+- `README.md` - Updated command to `python orchestrator.py`
+- `CURRENT_STATE.md` - Updated file references
+- `.context/guardrails.md` - Added core philosophy
+
+**Why:** 
+- "dual" naming was about current state (GLM + Kimi), not architecture
+- Architecture already handles unlimited models via config
+- Drop Kimi, add Gemini CLI, swap OpenCode for Codex - no problem
+- One orchestrator, reads config, routes dynamically
+
+**Philosophy Added:**
+```
+Core Philosophy:
+- World-class engineering - design for change
+- Permaculture principles - sustainable, self-evolving
+- Prevent slop at source - bad design compounds
+- Modular & swappable - no cascade failures
+
+We avoid:
+- Monolithic anything
+- Tightly coupled dependencies
+- Changes requiring full rewrites
+```
+
+**Rollback:**
+```bash
+git revert <commit_hash>
+```
+
+---
+
 ## 19:40 UTC - GLM-5
 **Commit:** `3382449f`
 **Type:** Add + Cleanup

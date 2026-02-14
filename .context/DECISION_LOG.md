@@ -275,107 +275,29 @@ Enforce context isolation by agent role:
 ### DEC-007: Prompt Caching Implementation
 
 **Date:** 2026-02-14
-**Status:** Pending
-**Context:** Hussein Younes video showed 75% cost savings via prompt caching. Council reviews repeat same context 3x.
-
-### Decision
-[Pending implementation]
-
-### Implementation Notes
-- Add `cache_control: { type: "ephemeral" }` to API runners
-- Cache system prompts, PRD, plan context
-- Measure actual savings
-
----
-
-### DEC-008: Kimi K2.5 Swarm Trigger
-
-**Date:** 2026-02-14
-**Status:** Pending
-**Context:** Kimi can spawn up to 100 parallel agents. Useful for massive refactoring, audits, parallel work.
-
-### Decision
-[Pending implementation]
-
-### Implementation Notes
-- Define "wide task" type in orchestrator
-- Trigger Kimi swarm for: repo-wide audits, parallel refactoring, large-scale testing
-- GLM-5 remains architect, Kimi is construction crew
-
----
-
-### DEC-009: Council Feedback Summarization Protocol
-
-**Date:** 2026-02-14
 **Status:** Accepted
-**Context:** Council produces lots of feedback across 3-4 rounds → context bloat. Need to capture insights without token explosion.
+**Context:** Council reviews repeat same context 3x. Hussein Younes video showed 75% cost savings via prompt caching.
 
 ### Decision
-Supervisor acts as mediator, summarizes Council feedback into plan notes:
+Implement `cache_control: { type: "ephemeral" }` in API runners.
 
-1. Council Round 1: Each model outputs approach, concerns, suggestions
-2. Supervisor aggregates: Summarize common themes, key concerns, required fixes
-3. Summary added to plan as `council_feedback` field
-4. Council Round 2+: Each model sees summary (not full outputs)
-5. Final consensus: Summary of agreed approach in plan
+### Implementation
+- Created `runners/api_runner.py` - Base class with caching support
+- Supports: DeepSeek, GLM API, Gemini API
+- Cached context: System prompts, PRD, plans
+- Only pay for new tokens
 
-### Council Feedback Note Format
-
-```yaml
-council_feedback:
-  round: 2
-  consensus_reached: true
-  summary: "One-line agreed approach"
-  key_concerns_addressed:
-    - "Concern 1 → how addressed"
-    - "Concern 2 → how addressed"
-  modifications_to_plan:
-    - "Modification 1"
-    - "Modification 2"
+### Usage
+```python
+runner = DeepSeekRunner()
+result = runner.execute(
+    prompt="What is VibePilot?",
+    cached_context=["PRD content", "Architecture overview"],
+    system_prompt="You are a helpful assistant."
+)
 ```
 
-### Trade-offs
-- We gain: Reduced context, captured insights
-- We lose: Full detail of each model's reasoning
-- We accept: Summary is sufficient for execution
-
-### Review Notes
-- [x] Human approved: 2026-02-14
-
 ---
-
-### DEC-010: Single Source of Truth for Context
-
-**Date:** 2026-02-14
-**Status:** Accepted
-**Context:** 77k tokens (38% context) just to understand current state. Info scattered across multiple files, GitHub, Supabase.
-
-### Decision
-One document: `CURRENT_STATE.md`
-- What we're building
-- Where we are
-- Where we're going
-- Key decisions (with links)
-- Current issues
-- Architecture quick reference
-
-Target: <3000 tokens for full context restoration.
-
-### Trade-offs
-- We gain: Instant context, one file read
-- We lose: Full detail (available via links)
-- We accept: Summary is sufficient to start work
-
-### Review Notes
-- [x] Human approved: 2026-02-14, "One or two docs max"
-
----
-
-### DEC-011: Schema Senior Rules Audit
-
-**Date:** 2026-02-14
-**Status:** Pending
-**Context:** Video insights on senior engineer database design rules. Current schema may not follow best practices.
 
 ### Proposed Rules
 - All tables: `id` (UUID), `created_at`, `updated_at`
@@ -471,11 +393,11 @@ Explicit structure in CURRENT_STATE.md is sufficient.
 | DEC-004 | Council Two-Process Model | Accepted | 2026-02-14 |
 | DEC-005 | Context Isolation by Agent Role | Accepted | 2026-02-14 |
 | DEC-006 | TypeScript Migration | Proposed | 2026-02-14 |
-| DEC-007 | Prompt Caching Implementation | Pending | 2026-02-14 |
+| DEC-007 | Prompt Caching Implementation | Accepted | 2026-02-14 |
 | DEC-008 | Kimi K2.5 Swarm Trigger | Pending | 2026-02-14 |
 | DEC-009 | Council Feedback Summarization | Accepted | 2026-02-14 |
 | DEC-010 | Single Source of Truth (CURRENT_STATE.md) | Accepted | 2026-02-14 |
-| DEC-011 | Schema Senior Rules Audit | Pending | 2026-02-14 |
+| DEC-011 | Schema Senior Rules Audit | Accepted | 2026-02-14 |
 | DEC-012 | Self-Awareness SSOT Document | Rejected | 2026-02-14 |
 | DEC-013 | Noiseless Compression Protocol | Rejected | 2026-02-14 |
 | DEC-014 | Navigation-Based Context | Rejected | 2026-02-14 |
