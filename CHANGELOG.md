@@ -8,6 +8,46 @@
 
 # 2026-02-14
 
+## 19:40 UTC - GLM-5
+**Commit:** (pending)
+**Type:** Add + Cleanup
+**Files Added:**
+- `README.md` - GitHub landing page, quick start
+- `TEMP_CRON_COMMANDS.md` - Cron setup (DELETE AFTER USE)
+- `.env.example` - Environment template
+
+**Files Removed (Obsolete):**
+- `STATUS.md` - Superseded by CURRENT_STATE.md
+- `archive/` - Old unused files
+- `docs/scripts/kimi_setup.sh` - Kimi already set up
+- `docs/scripts/sync_structure.py` - References non-existent table
+- `docs/scripts/ingest_keys.py` - We use .env now
+
+**Why:** Lean and clean. Removed obsolete files, added GitHub discoverability.
+
+**README.md features:**
+- Quick start (4 commands)
+- Documentation map
+- Architecture overview
+- Maintenance commands
+
+**Cleanup:**
+- Removed 5 obsolete files
+- Removed archive folder
+- Updated directory index in CURRENT_STATE.md
+
+**TEMP_CRON_COMMANDS.md:**
+- Cron job for daily backup
+- Instructions for setup
+- DELETE THIS FILE after setting up cron
+
+**Rollback:**
+```bash
+git revert <commit_hash>
+```
+
+---
+
 ## 19:35 UTC - GLM-5
 **Commit:** `af237421`
 **Type:** Add
