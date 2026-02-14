@@ -9,7 +9,7 @@
 # 2026-02-14
 
 ## 18:35 UTC - GLM-5
-**Commit:** (pending)
+**Commit:** `98668742`
 **Type:** Add
 **Files Added:**
 - `docs/video_insights_2026-02-14.md` - Senior engineer rules, noiseless memory, navigation context
