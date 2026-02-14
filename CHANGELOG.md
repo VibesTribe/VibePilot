@@ -8,6 +8,24 @@
 
 # 2026-02-14
 
+## 17:45 UTC - GLM-5
+**Commit:** `8b104062`
+**Type:** Add
+**Files Added:**
+- `CHANGELOG.md` - Full audit trail for easy rollback
+
+**Files Changed:**
+- `CURRENT_STATE.md` - Added CHANGELOG references
+
+**Why:** Track every change with timestamps for easy rollback. Prevent debugging when rollback is faster.
+
+**Rollback:**
+```bash
+git revert 8b104062
+```
+
+---
+
 ## 17:35 UTC - GLM-5
 **Commit:** `0715bfae`
 **Type:** Update
