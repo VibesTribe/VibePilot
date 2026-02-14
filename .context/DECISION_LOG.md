@@ -194,7 +194,64 @@ Replace roles with single generalist prompt.
 
 ## Pending Decisions
 
-### DEC-004: TypeScript Migration (Proposed)
+### DEC-004: Council Iterative Consensus Process
+
+**Date:** 2026-02-14
+**Status:** Accepted
+**Context:** Council review is not a one-shot vote. Real experience shows 3 different models (GPT, Gemini, GLM-5) start with very different approaches and need 4 rounds to reach consensus.
+
+### Decision
+Council uses iterative consensus process:
+- Round 1: Each model reviews independently with their lens
+- Round 2+: Each model sees others' feedback, adjusts position
+- Continue until all 3 models agree
+- Max 5 rounds, then human arbitration
+
+### Model Lenses
+| Model | Lens | Strength |
+|-------|------|----------|
+| GPT | User Alignment | True to user intent, catches drift |
+| Gemini | Ideal/Vision | Explores best possible, may drift from practical |
+| GLM-5 | Technical/Security | Finds vulnerabilities, suggests better options |
+
+### Trade-offs
+- We gain: Multiple perspectives converge on best approach
+- We lose: Time (3-4 rounds typical)
+- We accept: Complex decisions need more rounds
+
+### Review Notes
+- [x] Human validated: 2026-02-14, "This is exactly how it worked in practice"
+- [ ] Kimi attacked: pending
+
+---
+
+### DEC-005: Context Isolation by Agent Role
+
+**Date:** 2026-02-14
+**Status:** Accepted
+**Context:** Task agents seeing full system causes drift and hallucination. Each agent should see only what they need.
+
+### Decision
+Enforce context isolation by agent role:
+- Task Agent: ONLY their task (zero drift risk)
+- Planner: Full PRD, system overview
+- Council: Everything (for thorough review)
+- Supervisor: Plan + task (for validation)
+- Maintenance: Everything (sandbox tested first)
+- Researcher: System overview (to find improvements)
+- Tester: Only code (objective testing)
+
+### Trade-offs
+- We gain: Zero drift, no hallucination from context overflow
+- We lose: Some context that might be helpful
+- We accept: Explicit handoffs required
+
+### Review Notes
+- [x] Human approved: 2026-02-14
+
+---
+
+### DEC-006: TypeScript Migration
 
 **Date:** 2026-02-14
 **Status:** Proposed
@@ -210,6 +267,38 @@ Replace roles with single generalist prompt.
 
 ---
 
+### DEC-007: Prompt Caching Implementation
+
+**Date:** 2026-02-14
+**Status:** Pending
+**Context:** Hussein Younes video showed 75% cost savings via prompt caching. Council reviews repeat same context 3x.
+
+### Decision
+[Pending implementation]
+
+### Implementation Notes
+- Add `cache_control: { type: "ephemeral" }` to API runners
+- Cache system prompts, PRD, plan context
+- Measure actual savings
+
+---
+
+### DEC-008: Kimi K2.5 Swarm Trigger
+
+**Date:** 2026-02-14
+**Status:** Pending
+**Context:** Kimi can spawn up to 100 parallel agents. Useful for massive refactoring, audits, parallel work.
+
+### Decision
+[Pending implementation]
+
+### Implementation Notes
+- Define "wide task" type in orchestrator
+- Trigger Kimi swarm for: repo-wide audits, parallel refactoring, large-scale testing
+- GLM-5 remains architect, Kimi is construction crew
+
+---
+
 ## Decision Log Index
 
 | ID | Title | Status | Date |
@@ -217,9 +306,13 @@ Replace roles with single generalist prompt.
 | DEC-001 | Dual Orchestrator Architecture | Accepted | 2026-02-13 |
 | DEC-002 | State in Supabase, Code in GitHub | Accepted | 2026-02-13 |
 | DEC-003 | Role System with Bounded Skills | Accepted | 2026-02-13 |
-| DEC-004 | TypeScript Migration | Proposed | 2026-02-14 |
+| DEC-004 | Council Iterative Consensus Process | Accepted | 2026-02-14 |
+| DEC-005 | Context Isolation by Agent Role | Accepted | 2026-02-14 |
+| DEC-006 | TypeScript Migration | Proposed | 2026-02-14 |
+| DEC-007 | Prompt Caching Implementation | Pending | 2026-02-14 |
+| DEC-008 | Kimi K2.5 Swarm Trigger | Pending | 2026-02-14 |
 
 ---
 
 *Last updated: 2026-02-14*
-*Next decision number: DEC-005*
+*Next decision number: DEC-009*

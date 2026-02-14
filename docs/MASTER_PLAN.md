@@ -314,79 +314,128 @@ Every task prompt follows these rules to prevent drift:
 
 ## 4.1 When Council Reviews
 
-| Trigger | Council Required |
-|---------|------------------|
-| New plan (all tasks) | Yes, before any execution |
-| Architecture change | Yes |
-| System update | Yes |
-| New model integration | Yes |
-| New platform integration | Yes |
-| Maintenance task | Yes |
-| Single feature task | No (Planner already reviewed) |
+| Trigger | Council Required | Why |
+|---------|------------------|-----|
+| New plan (before execution) | Yes | Multiple approaches possible, need consensus |
+| Architecture change | Yes | System-wide impact |
+| System update (major) | Yes | Affects multiple components |
+| Complex maintenance | Yes | Changes core functionality |
+
+| Trigger | Council NOT Required | Why |
+|---------|----------------------|-----|
+| Single feature task | No | Supervisor validates |
+| New model (simple API add) | No | Supervisor validates, config change |
+| New platform (web AI add) | No | Supervisor validates, config change |
+| Simple maintenance | No | Supervisor validates |
+| Config tweak | No | Supervisor validates |
+
+**Rule of thumb:** Council for decisions where different valid approaches exist. Supervisor for validation of straightforward implementations.
 
 ## 4.2 Council Composition
 
-Three independent reviewers, each with different focus:
+Three independent models, each with a different lens:
 
-| Role | Focus | Key Questions |
-|------|-------|---------------|
-| **Structural Validator** | Architecture | Does this fit the system architecture? Any conflicts? |
-| **Specification Precision Reviewer** | PRD Alignment | Does this match the PRD exactly? Any gaps or additions? |
-| **Feasibility Analyst** | Buildability | Can this be built as specified? Any risks? |
+| Lens | Focus | Typical Model | Strength |
+|------|-------|---------------|----------|
+| **User Alignment** | True to user intent | GPT-4 / ChatGPT | Understands user's actual goal, catches drift |
+| **Ideal/Vision** | Best possible solution | Gemini | Explores ideal state, may drift from practical |
+| **Technical/Security** | Vulnerabilities, better options | GLM-5 | Finds issues, suggests alternatives, catches edge cases |
 
-## 4.3 Council Review Process
+**Why Different Lenses Matter:**
+- GPT stays aligned with what user actually wants
+- Gemini explores what could be ideal (may need reining in)
+- GLM finds what will break and what's technically better
+
+Each model starts with their own approach. Through iterative review, they converge on the best path that satisfies all three lenses.
+
+## 4.3 Council Review Process (Iterative Consensus)
+
+This is NOT a one-shot vote. It's an iterative process where models see each other's feedback and refine.
 
 ```
-1. Each member receives:
-   - Full PRD
-   - Complete Plan (all tasks)
-   - System State (current state)
-   - Their role-specific prompt
-   
-2. Each member reviews INDEPENDENTLY:
-   - No communication between members
-   - No "I think X means Y" discussions
-   - If ambiguous, flag as BLOCKED
-   
-3. Results aggregated:
-   - 3 APPROVED → Plan proceeds
-   - 2 APPROVED, 1 REVISION → Fix issues, re-review
-   - Any BLOCKED → Escalate to human
-   
-4. No consensus after 2 rounds → Human arbitration
+ROUND 1: Independent Review
+├── Each model receives: PRD, Plan, System State, their lens prompt
+├── Each model reviews independently
+├── Each model outputs: approach, concerns, suggested changes
+└── Results aggregated (no chat, just structured output)
+
+ROUND 2+: Cross-Review
+├── Each model receives: All Round 1 outputs
+├── Each model sees: Other models' approaches, concerns, suggestions
+├── Each model can: Adjust their position, address concerns, refine
+└── Results aggregated
+
+CONSENSUS CHECK:
+├── All 3 aligned → APPROVED, proceed
+├── 2 aligned, 1 minor concern → APPROVED with notes
+├── Fundamental disagreement → Continue rounds (max 5)
+└── No consensus after 5 rounds → Human arbitration
+
+TYPICAL: 3-4 rounds for complex decisions
 ```
 
-## 4.4 Council Vote Format
+## 4.4 Model Output Format (Per Round)
 
 ```json
 {
-  "member": "structural_validator",
-  "model": "gemini-2.0-flash",
-  "vote": "APPROVED",
-  "confidence": 0.95,
-  "checks": {
-    "architecture_alignment": true,
-    "no_conflicts": true,
-    "follows_patterns": true,
-    "integration_safe": true
-  },
-  "concerns": [],
-  "notes": "Architecture aligns. No conflicts detected."
+  "round": 1,
+  "model": "gpt-4",
+  "lens": "user_alignment",
+  "approach": "I recommend approach A because it directly solves the user's stated goal...",
+  "concerns": [
+    "Approach B drifts from user intent by adding feature X that wasn't requested",
+    "Approach C is technically sound but doesn't address the core use case"
+  ],
+  "suggestions": [
+    "Combine approach A's user alignment with approach C's security measures"
+  ],
+  "status": "PROPOSAL",
+  "confidence": 0.85
 }
 ```
 
-## 4.5 Blocking Conditions
+## 4.5 Consensus Example
 
-Council member MUST vote BLOCKED if:
+**Scenario:** Tech stack decision for VibePilot
+
+**Round 1:**
+| Model | Approach | Key Concern |
+|-------|----------|-------------|
+| GPT-4 | Python + Supabase (user's stated preference) | None - aligns with intent |
+| Gemini | TypeScript + custom backend (more scalable ideal) | Python may limit future growth |
+| GLM-5 | Python + Supabase + edge functions | TypeScript adds migration cost; Supabase edge functions give TypeScript benefits without rewrite |
+
+**Round 2:** (Each sees others' concerns)
+| Model | Adjusted Position | Why |
+|-------|-------------------|-----|
+| GPT-4 | Agrees with GLM-5's edge function suggestion | Keeps user's Python preference, adds TypeScript benefits |
+| Gemini | Agrees with GLM-5's edge function suggestion | Achieves scalability goal without forcing rewrite |
+| GLM-5 | Maintains position | Both concerns addressed |
+
+**Result:** Consensus after 2 rounds. Decision: Python + Supabase + edge functions.
+
+## 4.6 Blocking Conditions
+
+Council member MUST flag as BLOCKING ISSUE if:
 
 | Condition | Why Block |
 |-----------|-----------|
-| Ambiguity in any task | Agent could interpret multiple ways |
-| PRD mismatch | Task does something not in PRD |
-| Missing test criteria | Can't verify completion |
-| Dependency unclear | Order of execution ambiguous |
-| Integration conflict | Could break existing system |
-| Implicit assumptions | "As usual" or "standard" found |
+| Ambiguity in approach | Multiple valid interpretations |
+| User intent unclear | Risk of building wrong thing |
+| Technical risk unaddressed | Could break system |
+| Approach contradicts PRD | Drift from specification |
+| Security vulnerability | Production risk |
+
+**Note:** Blocking doesn't stop the process - it surfaces issues for other models to address in next round.
+
+## 4.7 When Models Disagree
+
+| Situation | Resolution |
+|-----------|------------|
+| Minor disagreement | Continue rounds, let models address concerns |
+| Fundamental disagreement (after 5 rounds) | Human arbitration |
+| User intent vs technical ideal | User intent wins (with technical safeguards) |
+| Security concern raised | Must be addressed before approval |
 
 ---
 
@@ -457,19 +506,54 @@ If output doesn't match spec:
 | Update role | Add/remove skills, change tools |
 | System update | Architecture changes, new components |
 
-## 6.2 Maintenance Process
+## 6.2 Maintenance Tiers (Council vs Supervisor)
+
+| Change Type | Review Required | Why |
+|-------------|-----------------|-----|
+| Add model (simple API) | Supervisor | Straightforward config add, no architecture impact |
+| Add platform (web AI) | Supervisor | Straightforward registry add, no architecture impact |
+| Remove model/platform | Supervisor | Config status change, low risk |
+| Swap model for role | Supervisor | Config change, testable |
+| Update thresholds | Supervisor | Config change, reversible |
+| Update prompts | Supervisor | Config change, testable |
+| Update role skills/tools | Supervisor | Config change, testable |
+| **Architecture change** | **Council** | Multiple approaches, system-wide impact |
+| **New component** | **Council** | Integration complexity, multiple approaches |
+| **Core system update** | **Council** | Affects multiple parts, needs consensus |
+
+**Rule:** If it's a config change that can be tested and rolled back easily → Supervisor. If it changes how the system works or there are multiple valid approaches → Council.
+
+## 6.3 Simple Maintenance Process (Supervisor Review)
+
+For config changes, model/platform adds, swaps:
+
+```
+1. Human creates maintenance request
+2. Maintenance Agent implements change
+3. Test in sandbox
+4. Supervisor validates
+5. If approved → Apply to live
+6. Log in DECISION_LOG.md
+
+Time: Minutes (config-only changes have zero downtime)
+```
+
+## 6.4 Complex Maintenance Process (Council Review)
+
+For architecture changes, new components, system updates:
 
 ```
 1. Human creates maintenance request
 2. Maintenance Agent creates change plan
-3. Council reviews change plan
-4. Council approves
+3. Council iterative review (3-4 rounds)
+4. Council consensus reached
 5. Maintenance Agent implements IN SANDBOX
 6. Full system test in sandbox
 7. If tests pass → Apply to live
-8. If tests fail → Debug, fix, re-test
-9. Update documentation
-10. Log change in DECISION_LOG.md
+8. Update documentation
+9. Log change in DECISION_LOG.md
+
+Time: Hours to days (depending on complexity)
 ```
 
 ## 6.3 Sandbox Testing Requirements
@@ -626,40 +710,54 @@ Validates code against test criteria - nothing else.
 
 ## 9.1 What Can Be Swapped
 
-| Component | Swap Method | Requires Council | Downtime |
-|-----------|-------------|------------------|----------|
-| Default model for role | Edit config | No | Zero |
-| Add new model | Add to registry + config | Yes (new integration) | Zero |
-| Remove model | Set status to 'paused' in config | No | Zero |
-| Add new platform | Add to registry + config | Yes (new integration) | Zero |
-| Remove platform | Set status to 'offline' in config | No | Zero |
-| Role skills | Edit config | No (if reducing) | Zero |
-| Role tools | Edit config | No | Zero |
-| Prompts | Edit config | No | Zero |
-| Thresholds | Edit config | No | Zero |
-| Orchestrator model | Edit config | No | Zero |
-| Supervisor model | Edit config | No | Zero |
+| Component | Swap Method | Review Required | Downtime |
+|-----------|-------------|-----------------|----------|
+| Default model for role | Edit config | Supervisor | Zero |
+| Add new model (API) | Add to registry + config | Supervisor | Zero |
+| Add new model (CLI) | Add to registry + config | Supervisor | Zero |
+| Remove model | Set status to 'paused' in config | Supervisor | Zero |
+| Add new platform (web AI) | Add to registry + config | Supervisor | Zero |
+| Remove platform | Set status to 'offline' in config | Supervisor | Zero |
+| Role skills | Edit config | Supervisor | Zero |
+| Role tools | Edit config | Supervisor | Zero |
+| Prompts | Edit config | Supervisor | Zero |
+| Thresholds | Edit config | Supervisor | Zero |
+| Orchestrator model | Edit config | Supervisor | Zero |
+| Supervisor model | Edit config | Supervisor | Zero |
+| **Architecture change** | Code + config | **Council** | Planned |
+| **New component** | Code + config | **Council** | Planned |
 
-## 9.2 Swap Procedure (No Council Required)
+## 9.2 Simple Swap Procedure (Supervisor Review)
+
+For config-only changes:
 
 ```
 1. Edit config/vibepilot.yaml
 2. Save file
 3. Config hot-reloads (no restart needed)
-4. Verify change in next task execution
+4. Supervisor validates in next execution
 5. Log change in DECISION_LOG.md
+
+Time: Seconds to minutes
+Downtime: Zero
 ```
 
-## 9.3 Swap Procedure (Council Required)
+## 9.3 Complex Swap Procedure (Council Review)
+
+For architecture changes, new components:
 
 ```
 1. Create maintenance request
 2. Maintenance Agent creates plan
-3. Council reviews
-4. Implement in sandbox
-5. Test in sandbox
-6. Apply to live
-7. Log in DECISION_LOG.md
+3. Council iterative review (3-4 rounds)
+4. Council consensus reached
+5. Implement in sandbox
+6. Test in sandbox
+7. Apply to live
+8. Log in DECISION_LOG.md
+
+Time: Hours to days
+Downtime: Planned (if any)
 ```
 
 ## 9.4 Config Structure for Swappability
