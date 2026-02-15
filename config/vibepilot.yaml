@@ -329,6 +329,17 @@ orchestrator:
   
   # Enable telemetry
   telemetry_enabled: true
+  
+  # Kimi swarm settings
+  swarm:
+    enabled: true
+    max_workers: 100          # Kimi's limit
+    default_workers: 10       # Sensible default
+    task_types:               # Auto-trigger swarm for these
+      - repo_audit
+      - bulk_refactor
+      - parallel_test
+      - wide_search
 
 # =============================================================================
 # WATCHER THRESHOLDS (Guardian settings)

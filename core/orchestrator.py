@@ -256,7 +256,64 @@ class ConcurrentOrchestrator:
         self.min_workers = self.config.get("min_workers", 1)
         self.max_workers_cap = self.config.get("max_workers_cap", 50)
 
+        swarm_config = self.config.get("swarm", {})
+        self.swarm_enabled = swarm_config.get("enabled", True)
+        self.swarm_max_workers = swarm_config.get("max_workers", 100)
+        self.swarm_default_workers = swarm_config.get("default_workers", 10)
+        self.swarm_task_types = swarm_config.get(
+            "task_types",
+            ["repo_audit", "bulk_refactor", "parallel_test", "wide_search"],
+        )
+
         self.logger = logger
+
+    def _should_use_swarm(self, task: Dict) -> bool:
+        """Determine if task should use Kimi swarm mode."""
+        if not self.swarm_enabled:
+            return False
+
+        task_type = task.get("type", "")
+        if task_type in self.swarm_task_types:
+            return True
+
+        subtasks = task.get("subtasks", [])
+        if len(subtasks) >= 3:
+            return True
+
+        return False
+
+    def _dispatch_swarm(self, task: Dict) -> Dict:
+        """Dispatch task to Kimi swarm."""
+        from runners.kimi_runner import KimiRunner
+
+        runner = KimiRunner()
+        subtasks = task.get("subtasks", [])
+
+        if subtasks:
+            swarm_result = runner.execute_swarm(
+                tasks=subtasks, max_workers=min(len(subtasks), self.swarm_max_workers)
+            )
+        else:
+            task_type = task.get("type", "")
+
+            if task_type == "repo_audit":
+                swarm_result = runner.execute_repo_audit(
+                    repo_path=task.get("repo_path", os.getcwd()),
+                    checks=task.get("checks"),
+                )
+            elif task_type == "bulk_refactor":
+                swarm_result = runner.execute_parallel_refactor(
+                    files=task.get("files", []),
+                    refactoring=task.get("refactoring", ""),
+                    work_dir=task.get("work_dir"),
+                )
+            else:
+                swarm_result = runner.execute_swarm(
+                    tasks=[{"prompt": task.get("prompt", ""), "id": task.get("id")}],
+                    max_workers=self.swarm_default_workers,
+                )
+
+        return swarm_result
 
     def _get_max_workers(self) -> int:
         """
