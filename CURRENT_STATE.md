@@ -76,7 +76,7 @@ git checkout aaabc5c5
 | Role System | Defines agent capabilities | `core/roles.py` + `config/vibepilot.yaml` |
 | **Vault** | Encrypted secret storage | `vault_manager.py` + Supabase `secrets_vault` |
 | **Agent Definitions** | Complete spec for all 11 agents | `agents/agent_definitions.md` |
-| **Agent Prompts** | Full prompts for 9 agents | `prompts/*.md` (9 files) |
+| **Agent Prompts** | Full prompts for all 10 agents | `prompts/*.md` (10 files - all complete) |
 | **Tech Stack Decisions** | Documented technology choices | `docs/tech_stack.md` |
 
 ## Vault (Secret Management)
