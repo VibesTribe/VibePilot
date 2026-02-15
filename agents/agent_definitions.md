@@ -1,9 +1,382 @@
 # VibePilot Agent Definitions
 ## Complete Agent Specifications for Plan-Ready System
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2026-02-15
 **Purpose:** Zero-gap agent definitions for Planner to create atomic build tasks
+
+---
+
+# AGENT 0: ORCHESTRATOR ("VIBES")
+
+## Identity
+**Name:** Orchestrator (aka "Vibes")
+**Type:** Dispatcher/Monitor/Optimizer (NOT an executor)
+**Default Model:** System (rule-based with AI enhancement)
+**Role:** Human's direct interface to VibePilot
+
+## Purpose
+The brain of VibePilot. Dispatches tasks to models, monitors execution, tracks ROI, learns from results, recommends subscriptions. Only agent the human talks to directly.
+
+## Key Principle
+**Orchestrator does NOT execute. It routes.** It watches, dispatches, learns, and optimizes. Execution happens through Runners and Couriers.
+
+## Skills
+| Skill | Description |
+|-------|-------------|
+| `task_dispatch` | Assign tasks to appropriate models |
+| `load_balancing` | Distribute across models based on capacity |
+| `roi_tracking` | Calculate and report cost savings |
+| `model_selection` | Pick best model for task type |
+| `performance_learning` | Update model scores from results |
+| `subscription_analysis` | Recommend keep/drop/add subscriptions |
+| `human_communication` | Dashboard + daily summary + direct chat |
+
+## Tools
+| Tool | Usage |
+|------|-------|
+| `supabase_query` | Read tasks, models, runs, ROI data |
+| `supabase_update` | Update task status, model scores |
+| `runner_dispatch` | Send tasks to CLI/API runners |
+| `courier_dispatch` | Send tasks to web platform couriers |
+| `alert_send` | Notify human/supervisor of issues |
+| `email_send` | Daily summary to human |
+
+## Routing Priority (Configurable)
+
+```yaml
+routing_priority:
+  # Phase 1: In-house (never goes to web platforms)
+  internal_governance:
+    - glm-5      # Consultant, Planner, Council, Supervisor
+    - kimi-cli   # Backup for governance if GLM unavailable
+  
+  # Phase 2: Task execution (CLI subscriptions first)
+  task_execution:
+    - kimi-cli          # Primary task executor (subscription)
+    - opencode          # You are here (subscription)
+    
+  # Phase 3: API (paid, use sparingly)
+  api_fallback:
+    - deepseek-api     # $2 credit, cache when possible
+    - gemini-api       # Free tier, rate limited
+    
+  # Phase 4: LAST RESORT ONLY (dangerous)
+  gateway_fallback:
+    - openrouter       # WARNING: "Free" models often not available
+                       # Can charge without warning
+                       # Only use if explicitly configured
+```
+
+## OpenRouter Warning
+
+```
+⚠️  OPENROUTER IS LAST RESORT ONLY ⚠️
+
+PROBLEM: "Free" models shown may not actually be available.
+         When unavailable, it routes to PAID models without warning.
+         Example: $5 charged for a model that just asked for more info.
+
+RULES:
+1. Never auto-route to OpenRouter
+2. Only use when human explicitly approves
+3. Always check model availability before dispatch
+4. Set hard spending limit ($16 credit = hard cap)
+5. Log all OpenRouter usage with model + cost
+
+PREFERENCE: Use direct APIs (DeepSeek, Gemini) or CLI (Kimi, OpenCode)
+           These have predictable pricing and no bait-and-switch.
+```
+
+## Platform Types
+
+| Type | Examples | Cost | When Used |
+|------|----------|------|-----------|
+| **CLI Subscription** | Kimi, OpenCode | Fixed monthly | Primary execution |
+| **Direct API** | DeepSeek, Gemini | Per-token | Fallback, research |
+| **Gateway** | OpenRouter | Varies | LAST RESORT |
+| **Web Platform** | ChatGPT, Claude web | Free tier | Via Courier only |
+| **Hugging Face** | Various free models | Free | New releases, testing |
+
+## Input Formats
+
+### Input A: New Task Available
+```json
+{
+  "event": "task_available",
+  "task_id": "uuid",
+  "task_number": "T001",
+  "task_type": "code_generation" | "research" | "review" | "...",
+  "requires_codebase": true | false,
+  "estimated_context": 8000,
+  "dependencies": ["T000"],
+  "priority": 5,
+  "routing_hints": {
+    "suggested_model": "kimi-k2.5",
+    "requires_cli": false
+  }
+}
+```
+
+### Input B: Task Completed
+```json
+{
+  "event": "task_completed",
+  "task_id": "uuid",
+  "model_id": "kimi-k2.5",
+  "platform": "kimi-cli",
+  "success": true | false,
+  "tokens_used": 15000,
+  "duration_seconds": 45,
+  "error": "string (if failed)"
+}
+```
+
+### Input C: Human Query
+```json
+{
+  "event": "human_query",
+  "query": "What's the status on auth slice?",
+  "context": "dashboard" | "email" | "voice"
+}
+```
+
+## Output Formats
+
+### Output A: Task Assignment
+```json
+{
+  "task_id": "uuid",
+  "assigned_to": {
+    "model_id": "kimi-k2.5",
+    "platform": "kimi-cli",
+    "runner_type": "cli"
+  },
+  "reason": "Best performance for code generation tasks (95% success rate)",
+  "fallback": {
+    "model_id": "deepseek-chat",
+    "platform": "deepseek-api"
+  }
+}
+```
+
+### Output B: ROI Report
+```json
+{
+  "period": "today" | "week" | "month",
+  "summary": {
+    "tasks_completed": 47,
+    "tasks_failed": 3,
+    "total_tokens": 847000,
+    "theoretical_cost": 127.40,
+    "actual_cost": 23.50,
+    "savings": 103.90,
+    "roi_percentage": 81.6
+  },
+  "by_model": [
+    {
+      "model_id": "kimi-k2.5",
+      "tasks": 22,
+      "success_rate": 0.95,
+      "avg_cost_per_task": 0.09,
+      "recommendation": "keep"
+    }
+  ],
+  "subscription_recommendations": [
+    "Kimi CLI: 95% success, $0.09/task. Recommend keeping.",
+    "DeepSeek API: 68% success, $0.14/task. Consider dropping."
+  ]
+}
+```
+
+### Output C: Human Response
+```json
+{
+  "query": "What's the status on auth slice?",
+  "response": "Auth slice has 12 tasks. 8 complete, 3 in progress, 1 awaiting review. ETA: 2 hours.",
+  "details": {
+    "project": "auth-rbac",
+    "completion_pct": 67,
+    "blocking_issues": []
+  }
+}
+```
+
+## Process
+
+### Task Dispatch Process
+```
+1. RECEIVE task_available event
+
+2. ANALYZE task:
+   - Type (code, research, review, etc.)
+   - Context requirements
+   - Codebase access needed?
+   - Priority
+   - Routing hints
+
+3. SELECT model:
+   a. Check model availability (status = active?)
+   b. Check rate limits/credits
+   c. Check historical performance for this task type
+   d. Apply routing priority rules
+   
+4. VERIFY selection:
+   - Is model status = active?
+   - Are we under rate limit?
+   - Is credit available (if API)?
+   - Is context sufficient?
+   
+5. ASSIGN task:
+   - Update task.assigned_to
+   - Create task_run record
+   - Dispatch to runner/courier
+
+6. MONITOR execution:
+   - Watch for completion
+   - Watch for timeout
+   - Watch for Watcher interventions
+
+7. RECORD result:
+   - Update model performance scores
+   - Calculate cost
+   - Log for ROI
+
+8. LEARN:
+   - Update success rate by task type
+   - Adjust future routing decisions
+```
+
+### Model Selection Logic
+```python
+def select_model(task):
+    # 1. Is this governance (Planner, Council, Supervisor)?
+    if task.role in GOVERNANCE_ROLES:
+        return select_from(["glm-5", "kimi-cli"])
+    
+    # 2. Does it need codebase access?
+    if task.requires_codebase:
+        return select_from(["kimi-cli", "opencode"])
+    
+    # 3. Is it research?
+    if task.type == "research":
+        return select_from(["gemini-2.0-flash"])  # Free tier
+    
+    # 4. Standard task execution
+    candidates = get_active_models()
+    candidates = filter_by_context(candidates, task.estimated_context)
+    candidates = filter_by_rate_limit(candidates)
+    candidates = filter_by_credit(candidates)
+    candidates = sort_by_performance(candidates, task.type)
+    
+    # 5. NEVER auto-select OpenRouter
+    candidates = remove_gateway_models(candidates)
+    
+    return candidates[0] if candidates else queue_for_later(task)
+```
+
+### Platform Exhaustion Handling
+```
+IF all platforms at 80% capacity:
+  1. Log warning
+  2. Default to CLI subscriptions (unlimited)
+  3. Reserve API credits for emergencies only
+  4. Queue low-priority tasks
+
+IF truly no capacity:
+  1. Pause all new task assignments
+  2. Alert human: "All models at capacity"
+  3. Wait for capacity to free up
+  4. Resume when available
+```
+
+## Learning Mechanism
+
+```
+AFTER EVERY TASK:
+
+1. Record outcome:
+   - Success or failure
+   - Tokens used
+   - Duration
+   - Error (if any)
+
+2. Update model stats:
+   - success_rate_by_task_type[model][type] = rolling_average
+   - avg_tokens_by_task_type[model][type] = rolling_average
+   - avg_duration_by_task_type[model][type] = rolling_average
+
+3. Calculate cost:
+   - If subscription: allocation = subscription_cost / tasks_this_month
+   - If API: actual cost from tokens × rate
+   - theoretical_cost = tokens × best_api_rate
+
+4. Update recommendation score:
+   - score = (success_rate × 0.4) + (cost_efficiency × 0.3) + (speed × 0.3)
+   - Used for subscription keep/drop decisions
+
+5. Log for daily summary
+```
+
+## Daily Summary Email
+
+Sent to human once per day:
+
+```
+VIBES DAILY REPORT - 2026-02-15
+
+TASKS
+  Completed: 47
+  Failed: 3 (2 reassigned, 1 escalated)
+  In Progress: 8
+  
+TOKENS & COST
+  Tokens Used: 847K
+  Theoretical Cost: $127.40
+  Actual Cost: $23.50
+  Savings: $103.90 (81.6% ROI)
+
+MODEL PERFORMANCE
+  Kimi CLI:     22 tasks, 95% success, $0.09/task ⭐
+  DeepSeek API:  8 tasks, 75% success, $0.14/task
+  Gemini:       12 tasks, 92% success, $0.00/task (free)
+
+RECOMMENDATIONS
+  ✓ Keep Kimi CLI subscription
+  ⚠ DeepSeek success rate dropping - monitor
+  ✓ Gemini free tier excellent for research
+
+CREDITS REMAINING
+  DeepSeek: $1.42
+  OpenRouter: $16.00 (unused - last resort)
+  Gemini: Free tier (847K/1M tokens today)
+
+BLOCKERS
+  None
+
+[View Dashboard] [Reply to Vibes]
+```
+
+## Edge Cases
+
+| Situation | Action |
+|-----------|--------|
+| Model goes offline mid-task | Reassign to backup, log, alert |
+| All models paused | Alert human, queue tasks |
+| Credit exhausted | Pause that model, route elsewhere |
+| OpenRouter "free" model unavailable | Do NOT auto-switch to paid. Alert, wait, or use different platform. |
+| Human asks routing question | Provide data-backed answer |
+| Task stuck in loop | Watcher handles, Orchestrator notified |
+
+## Constraints
+
+- NEVER execute tasks directly
+- NEVER auto-route to OpenRouter (gateway fallback only)
+- NEVER send internal governance to web platforms
+- ALWAYS track cost per task
+- ALWAYS log model performance
+- ALWAYS provide ROI visibility
+- Human communication is ALWAYS available
 
 ---
 
@@ -1355,22 +1728,36 @@ Verify UI/UX output matches expected design. Human approval ALWAYS required rega
 **Runs:** Once per day at 6 AM UTC
 
 ## Purpose
-Autonomously research improvements to VibePilot itself. Find new models, platforms, tools, approaches.
+Autonomously research improvements to VibePilot itself. Find new models, platforms, tools, approaches. Return COMPLETE data for informed decisions.
 
 ## Skills
 | Skill | Description |
 |-------|-------------|
-| `web_research` | Search AI papers, announcements |
+| `web_research` | Search AI papers, announcements, releases |
+| `model_analysis` | Gather complete model specifications |
+| `platform_analysis` | Gather complete platform details |
 | `trend_analysis` | Identify emerging patterns |
 | `cost_monitoring` | Track pricing changes |
-| `opportunity_finding` | Spot better options |
+| `user_sentiment` | Check LM Arena, forums for feedback |
 
 ## Tools
 | Tool | Usage |
 |------|-------|
 | `web_search` | Search the web |
-| `web_fetch` | Read articles, docs |
+| `web_fetch` | Read articles, docs, pricing pages |
+| `api_query` | Query model/platform APIs for specs |
 | `file_write` | Write findings to considerations |
+
+## Research Sources
+
+| Source | What to Check | URL |
+|--------|---------------|-----|
+| **Official Docs** | Pricing, limits, specs | API docs for each provider |
+| **Hugging Face** | New free models, beta releases | huggingface.co/models |
+| **LM Arena** | User rankings, strengths/weaknesses | lmarena.ai |
+| **Reddit/Twitter** | User experiences, issues | r/LocalLLaMA, etc |
+| **GitHub** | New tools, CLI releases | github.com/trending |
+| **Provider Blogs** | Announcements, changes | Official blogs |
 
 ## Input Format
 ```json
@@ -1378,38 +1765,131 @@ Autonomously research improvements to VibePilot itself. Find new models, platfor
   "research_areas": [
     "new_ai_models",
     "new_platforms",
-    "new_tools",
     "pricing_changes",
-    "performance_benchmarks"
+    "free_tier_availability",
+    "user_rankings",
+    "new_tools"
   ],
-  "current_models": ["glm-5", "kimi-k2.5", "gemini-flash", "deepseek-chat"],
-  "current_platforms": ["opencode", "kimi-cli", "deepseek-api"]
+  "current_models": ["glm-5", "kimi-k2.5", "gemini-2.0-flash", "deepseek-chat"],
+  "current_platforms": ["opencode", "kimi-cli", "deepseek-api", "google-ai", "openrouter"],
+  "focus_on_free": true
 }
 ```
 
-## Output Format
+## Output Format (COMPREHENSIVE)
+
+### Complete Model Report
 ```json
 {
   "date": "2026-02-15",
-  "findings": [
-    {
-      "category": "new_model" | "new_platform" | "pricing_change" | "tool" | "approach",
-      "name": "string",
-      "description": "string",
-      "relevance": "high" | "medium" | "low",
-      "action_suggested": "add_to_registry" | "council_review" | "monitor" | "ignore",
-      "source_url": "string",
-      "details": "string"
-    }
-  ],
-  "pricing_alerts": [
-    {
-      "model_or_platform": "string",
-      "change": "price_increase" | "price_decrease" | "limit_change",
-      "details": "string"
-    }
-  ],
-  "summary": "string (brief overview of findings)"
+  "findings": {
+    "new_models": [
+      {
+        "name": "model-id",
+        "provider": "company",
+        "source": "huggingface" | "official" | "lm_arena",
+        
+        "specs": {
+          "context_limit": 128000,
+          "context_effective": 100000,
+          "max_output": 8192,
+          "supports_streaming": true,
+          "supports_tools": true,
+          "supports_vision": false
+        },
+        
+        "pricing": {
+          "type": "free" | "subscription" | "pay_per_use",
+          "cost_per_1m_input": 0.28,
+          "cost_per_1m_output": 0.42,
+          "cost_per_1m_cached": 0.028,
+          "subscription_monthly": null,
+          "free_tier_available": true,
+          "free_tier_limits": {
+            "requests_per_minute": 15,
+            "requests_per_day": 1500,
+            "tokens_per_day": 1000000
+          }
+        },
+        
+        "rate_limits": {
+          "requests_per_minute": null,
+          "requests_per_hour": null,
+          "requests_per_day": null,
+          "tokens_per_day": null,
+          "note": "No hard limits" | "Specific limits"
+        },
+        
+        "performance": {
+          "lm_arena_rank": 15,
+          "lm_arena_elo": 1250,
+          "user_strengths": ["coding", "reasoning", "fast"],
+          "user_weaknesses": ["hallucinations", "chinese"],
+          "best_for": ["code_generation", "technical_docs"],
+          "avoid_for": ["creative_writing", "multilingual"]
+        },
+        
+        "access": {
+          "api_available": true,
+          "cli_available": false,
+          "web_available": true,
+          "huggingface_available": true,
+          "openrouter_available": true
+        },
+        
+        "relevance": "high" | "medium" | "low",
+        "action_suggested": "add_to_registry" | "council_review" | "monitor" | "ignore",
+        "notes": "Why this model matters"
+      }
+    ],
+    
+    "platform_updates": [
+      {
+        "platform": "openrouter",
+        "type": "warning" | "pricing_change" | "new_feature" | "limit_change",
+        "description": "Free models often unavailable, routes to paid without warning",
+        "impact": "high" | "medium" | "low",
+        "recommendation": "Last resort only, set hard spending limit",
+        "source_url": "..."
+      }
+    ],
+    
+    "pricing_alerts": [
+      {
+        "model_or_platform": "deepseek-chat",
+        "change_type": "price_increase" | "price_decrease" | "limit_change" | "new_tier",
+        "old_value": "$0.14/1M",
+        "new_value": "$0.28/1M",
+        "effective_date": "2026-03-01",
+        "impact_on_vibepilot": "Increases cost per task by 2x"
+      }
+    ],
+    
+    "free_opportunities": [
+      {
+        "source": "huggingface",
+        "model": "new-free-model",
+        "context": 128000,
+        "notes": "New release, free during beta",
+        "expires": "2026-04-01" | null
+      }
+    ],
+    
+    "user_sentiment": [
+      {
+        "model": "kimi-k2.5",
+        "source": "lm_arena" | "reddit" | "twitter",
+        "sentiment": "positive" | "mixed" | "negative",
+        "key_feedback": ["Great for long context", "Agent swarm is powerful"],
+        "issues_reported": ["Occasional timeouts"]
+      }
+    ]
+  },
+  
+  "summary": "Brief overview of today's findings",
+  "urgent_alerts": [
+    "Pricing change on DeepSeek effective March 1"
+  ]
 }
 ```
 
@@ -1417,38 +1897,68 @@ Autonomously research improvements to VibePilot itself. Find new models, platfor
 ```
 1. RECEIVE research parameters
 
-2. SEARCH for:
-   - New AI models released
-   - New free tier platforms
-   - New CLI tools
-   - Pricing announcements
-   - Performance comparisons
+2. CHECK OFFICIAL SOURCES:
+   For each current model/platform:
+   - Fetch pricing page
+   - Fetch API docs
+   - Check for announcements
+   - Note any changes
 
-3. FILTER by relevance:
-   - Is it actually better/cheaper?
-   - Does it fit VibePilot architecture?
-   - Is it mature enough?
+3. CHECK HUGGING FACE:
+   - New models with "free" tag
+   - Beta releases from major providers
+   - Trending models this week
+   - Note context limits and access method
 
-4. CATEGORIZE findings:
-   - High relevance: Immediate action
-   - Medium: Council review needed
-   - Low: Monitor only
+4. CHECK LM ARENA:
+   - Current rankings
+   - User comments on strengths/weaknesses
+   - New models entering rankings
+   - Head-to-head comparisons
 
-5. WRITE to docs/UPDATE_CONSIDERATIONS.md
+5. CHECK COMMUNITY:
+   - Reddit r/LocalLLaMA for new releases
+   - Twitter for announcements
+   - GitHub for new tools/CLIs
 
-6. ALERT supervisor if:
+6. COMPILE COMPLETE DATA:
+   - Every finding has full specs
+   - No partial information
+   - Include source URLs
+   - Note confidence level
+
+7. WRITE to docs/UPDATE_CONSIDERATIONS.md
+
+8. ALERT supervisor if:
+   - Pricing change on current platform
    - New free tier found
-   - Price drop on current platform
-   - Critical security issue found
+   - Critical security issue
+   - Major new model release
 
-7. OUTPUT findings (JSON)
+9. OUTPUT findings (JSON)
 ```
+
+## Data Completeness Checklist
+
+Every model finding MUST include:
+- [ ] Full name and provider
+- [ ] Context limit (and effective if different)
+- [ ] Pricing (all tiers)
+- [ ] Rate limits (all timeframes)
+- [ ] Free tier availability and limits
+- [ ] Access methods (API, CLI, web, HuggingFace)
+- [ ] LM Arena ranking (if available)
+- [ ] User-reported strengths (min 2)
+- [ ] User-reported weaknesses (min 1)
+- [ ] Source URLs
 
 ## Constraints
 - Runs daily, not on-demand
 - Only writes to considerations file
 - Never makes changes directly
+- MUST return complete data, not partial
 - Escalates significant findings to Council
+- Mark confidence level if uncertain
 
 ---
 

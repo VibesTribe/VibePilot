@@ -78,45 +78,48 @@ models:
     notes: "Free tier, good for System Research agent"
 
   # ============================================================================
-  # OPENROUTER GATEWAY (Access to many models, $16 credit)
+  # LAST RESORT ONLY (Dangerous - use with extreme caution)
   # ============================================================================
   
-  openrouter-free:
+  openrouter:
     platform: openrouter
     type: gateway
-    role: free_tier_router
-    context_limit: 200000
-    cost_per_1k_tokens: 0  # Routes to free models
+    role: last_resort_only
+    status: paused
+    status_reason: "Free models often unavailable, routes to paid without warning"
     credit_available: 16.00
-    credit_used: 0
-    status: active
-    routes_to:
-      - meta-llama/llama-3.3-70b-instruct:free
-      - deepseek/deepseek-r1-0528:free
-      - qwen/qwen3-coder:free
-    notes: "Router picks best available free model"
-    
-  openrouter-qwen-coder:
-    platform: openrouter
-    type: runner
-    role: code_executor
-    context_limit: 262000
-    cost_per_1k_tokens: 0  # FREE
-    model_id: qwen/qwen3-coder:free
-    status: active
-    strengths: [coding, large_context]
-    notes: "Best free coding model on OpenRouter"
-    
-  openrouter-llama-70b:
-    platform: openrouter
-    type: runner
-    role: general_executor
-    context_limit: 128000
-    cost_per_1k_tokens: 0  # FREE
-    model_id: meta-llama/llama-3.3-70b-instruct:free
-    status: active
-    strengths: [general_reasoning, instruction_following]
-    notes: "Llama 3.3 70B - strong all-rounder"
+    credit_used: 5.00  # Already burned $5 on failed "free" model
+    hard_spending_limit: 16.00  # NEVER exceed this
+    warning: |
+      ⚠️  DANGER: "Free" models shown may not be available.
+          When unavailable, OpenRouter routes to PAID models without warning.
+          Example: Charged $5 for a model that just asked for more info.
+          
+          RULES:
+          1. Never auto-route to OpenRouter
+          2. Only use when human explicitly approves
+          3. Always verify model availability before dispatch
+          4. Never exceed hard_spending_limit
+    notes: "Gateway to many models, but unreliable pricing. Use direct APIs instead."
+
+  # ============================================================================
+  # EMERGING PLATFORMS (Monitor, not yet in rotation)
+  # ============================================================================
+  
+  huggingface:
+    platform: huggingface
+    type: inference
+    role: monitor_only
+    status: paused
+    status_reason: "Research only - not yet integrated"
+    notes: |
+      Free models, often new releases/betas from major providers.
+      Good for testing new models before adding to registry.
+      Check: huggingface.co/models for free inference models.
+    potential_models:
+      - name: "Various free tier models"
+        notes: "New releases often free during beta"
+        access: "Inference API or download for local"
 
   # ============================================================================
   # PAUSED/DISABLED
