@@ -8,6 +8,33 @@
 
 # 2026-02-15
 
+## 00:45 UTC - GLM-5
+**Commit:** `910a2918`
+**Type:** Documentation
+**Files Changed:**
+- `docs/prd_v1.4.md` - Added research agents, watcher, clarified runners vs couriers
+
+**Additions:**
+- **Consultant Research Agent** — Deep market/competition research, works with user until PRD approved
+- **System Research Agent** — Daily web scouring, findings → UPDATE_CONSIDERATIONS.md
+- **Watcher Agent** — Prevents loops of doom, kills stuck tasks, detects drift
+- **Runners vs Couriers clarification:**
+  - Runners: May see codebase (dependencies), NO chat URL
+  - Couriers: Browser delivery, chat URL captured, NO codebase
+- **Dashboard watcher alerts** section
+
+**Why:**
+- Task agents were conflated with couriers
+- Research agents were missing from role definitions
+- Watcher prevents the "fix it" loop we experienced this session
+
+**Rollback:**
+```bash
+git revert 910a2918
+```
+
+---
+
 ## 00:15 UTC - GLM-5
 **Commit:** `f3feb88c`
 **Type:** Documentation (Critical)
