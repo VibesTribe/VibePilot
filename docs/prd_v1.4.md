@@ -933,7 +933,23 @@ Orchestrator will route to CLI subscription (Kimi, OpenCode), not free tier API.
 
 ## 6.2 Couriers (Browser Automation)
 
-Courier navigates web platforms, drops off tasks, collects results + chat URLs.
+**What Couriers ARE:**
+A model with full multimodal browser use capability (not Playwright, not Selenium — native computer use). This model navigates, logs in, enters prompts, waits, copies results, and returns.
+
+**Courier Model Requirements:**
+- Full browser use (computer use API)
+- Multimodal (can see screen, interact)
+- Can handle login flows
+- Can copy/paste text and URLs
+
+**Courier Model Examples:**
+| Model | Cost | Browser Use |
+|-------|------|-------------|
+| Gemini 2.0 | Subscription | Native computer use |
+| Claude Computer Use | Pay-per-use | Native computer use |
+| (Future options) | ? | ? |
+
+**Target Platforms (where courier delivers):**
 
 | Platform | Type | Capabilities |
 |----------|------|--------------|
@@ -941,15 +957,21 @@ Courier navigates web platforms, drops off tasks, collects results + chat URLs.
 | Claude | Free tier | Reasoning, code |
 | Gemini | Free tier | Reasoning, vision |
 | Perplexity | Free tier | Research |
+| Grok | Free tier | Reasoning |
 
 **Courier lifecycle:**
 1. Receive task packet
-2. Navigate to platform
-3. Log in (shared Gmail: vibes.agents@gmail.com)
-4. Submit prompt
+2. Navigate to target platform
+3. Log in if needed (shared Gmail: vibes.agents@gmail.com)
+4. Enter task packet as prompt
 5. Wait for response
-6. Capture result + chat URL
+6. Copy result + chat URL
 7. Return to VibePilot
+
+**Courier Cost:**
+- Courier model has subscription OR API cost
+- This cost is attributed per task for ROI calculation
+- We track: tokens in/out for courier AND target platform
 
 **Chat URL purpose:**
 - Revisit for revisions without full context
@@ -1077,28 +1099,69 @@ Alert severity:
 
 # 10. ROI Tracking
 
-## 10.1 Per Task
+## 10.1 The Concept
+
+**ROI = What it WOULD have cost vs What it DID cost**
+
+We use a courier model (e.g., Gemini with full browser use) to access free web platforms (Claude, ChatGPT). The courier costs us subscription. The target platform costs us nothing. We calculate what we saved by using the free web version instead of that platform's API.
+
+## 10.2 Per Task Calculation
 
 ```python
-theoretical_cost = (tokens / 1000) * api_rate
-actual_cost = courier_time OR subscription_cost OR $0 (free tier)
+# Task executed via COURIER (web platform)
+# Example: Gemini (courier) → Claude web (target)
+
+# What we actually paid
+courier_subscription = $20 / month
+tasks_this_month = 100
+actual_cost = courier_subscription / tasks_this_month  # $0.20 per task
+
+# What we WOULD have paid if using target's API
+target_api_rate_in = $3 / 1M tokens
+target_api_rate_out = $15 / 1M tokens
+theoretical_cost = (tokens_in / 1M * target_api_rate_in) + (tokens_out / 1M * target_api_rate_out)
+
+# ROI
 savings = theoretical_cost - actual_cost
+roi_percentage = (savings / theoretical_cost) * 100
 ```
 
-## 10.2 Per Project
+## 10.3 Different Scenarios
 
-- Total tokens used
-- Total theoretical cost
-- Total actual cost
-- Total savings
-- ROI percentage
+| Execution Type | Actual Cost | Theoretical Cost | Savings |
+|----------------|-------------|------------------|---------|
+| Courier → Claude web | Courier subscription ÷ tasks | Claude API rates | High |
+| Courier → ChatGPT web | Courier subscription ÷ tasks | OpenAI API rates | High |
+| Direct → DeepSeek API | Real money spent | Same as actual | $0 (visibility only) |
+| CLI → Kimi subscription | Kimi subscription ÷ tasks | Kimi API rates (if existed) | Variable |
 
-## 10.3 Model Performance
+## 10.4 Why This Matters
+
+- **Courier choice:** Is Gemini subscription worth it? ROI tells us.
+- **Platform choice:** Which free web platforms save us most?
+- **Subscription decisions:** Renew Kimi? ROI vs DeepSeek API tells us.
+- **Hosting costs:** GCE vs Hetzner — total cost of ownership.
+
+## 10.5 Per Project Aggregate
+
+```
+Project: Auth & RBAC
+Tasks completed: 47
+Total tokens: 847K
+
+Theoretical cost (if all via APIs): $127.40
+Actual cost (courier + subscriptions): $23.50
+Total savings: $103.90
+ROI: 81.6%
+```
+
+## 10.6 Model Performance (Informs ROI)
 
 - Success rate by task type
 - Average tokens per task type
 - Average runtime
 - Reliability score
+- **Recommendation score** — Should we keep subscribing?
 
 ---
 
