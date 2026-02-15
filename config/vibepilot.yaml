@@ -202,12 +202,57 @@ tools:
 
 thresholds:
   max_task_attempts: 3
-  context_warning_pct: 70
-  context_max_pct: 80
+  timeout_minutes: 30
+  
+  # Context window management
+  context_warn_pct: 70      # Warn at 70% context usage
+  context_stop_pct: 80      # Stop assignments at 80%, start fresh session
+  
+  # Token management  
   token_warning_pct: 70
   token_max_pct: 80
   daily_gemini_limit: 30
-  timeout_minutes: 30
+
+# =============================================================================
+# WATCHER THRESHOLDS (Guardian settings)
+# =============================================================================
+
+watcher:
+  # Real-time file guard
+  file_guard_enabled: true
+  revert_unauthorized_changes: true
+  
+  # Context monitoring
+  context_check: post_task  # When to check: post_task | continuous
+  context_warn_pct: 70
+  context_stop_pct: 80
+  
+  # Loop/stuck detection (runs every 30s)
+  check_interval_seconds: 30
+  error_repeat_limit: 3     # Same error N times triggers action
+  stuck_minutes: 10         # No progress threshold
+  timeout_minutes: 30       # Max task duration
+  retry_limit: 3            # Max attempts before escalation
+  repetitive_pct: 50        # Token waste threshold
+
+# =============================================================================
+# SUPERVISOR QUALITY GATES
+# =============================================================================
+
+supervisor:
+  quality_gates:
+    check_secrets: true           # No hardcoded API keys, passwords
+    check_error_handling: true    # Try/catch or equivalent present
+    check_patterns: true          # Follows specified patterns
+    check_test_coverage: true     # Tests written for new code
+    check_documentation: false    # Only if required in task
+  
+  # Council consensus settings
+  max_council_rounds: 6           # Max rounds before forced decision
+  escalate_to_human_only_for:
+    - business_scope_conflict
+    - visual_ux_decision
+    - ethical_legal_concern
 
 # =============================================================================
 # ESCALATION RULES
@@ -218,9 +263,16 @@ escalation:
     action: escalate_to_supervisor
     notify_human: false  # Only for UI/UX
   
+  on_council_round_6_no_consensus:
+    action: supervisor_decides
+    notify_human: false  # Document and proceed
+  
   on_council_blocked:
     action: require_human_review
     notify_human: true
+    reasons:
+      - business_scope_conflict
+      - ethical_legal_concern
   
   on_budget_exceeded:
     action: pause_non_critical
