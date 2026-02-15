@@ -4,38 +4,125 @@
 
 # =============================================================================
 # MODELS (Add/remove/swap models here)
+# Last updated: 2026-02-15
 # =============================================================================
 
 models:
+  # ============================================================================
+  # PRIMARY IN-HOUSE (VibePilot Governance - NEVER route to web platforms)
+  # ============================================================================
+  
   glm-5:
     platform: opencode
-    role: primary_executor
+    type: runner
+    role: primary_governance
     context_limit: 128000
+    context_effective: 100000  # Real-world usable
     cost_per_1k_tokens: 0  # Subscription
+    subscription_cost_monthly: 0  # Already paying
     status: active
+    strengths: [reasoning, planning, review, governance]
+    weaknesses: []
+    notes: "Primary model for Consultant, Planner, Council, Supervisor"
     
   kimi-k2.5:
     platform: kimi-cli
+    type: runner
     role: parallel_executor
     context_limit: 128000
+    context_effective: 100000
     cost_per_1k_tokens: 0  # Subscription
+    subscription_cost_monthly: 10  # Approximate
+    subscription_renews: monthly
     status: active
-    
-  gemini-flash:
-    platform: google-ai
-    role: researcher
-    context_limit: 32000
-    cost_per_1k_tokens: 0  # Free tier
-    daily_limit: 30  # Preserve free tier
-    status: active
-    
+    strengths: [long_context, code_generation, web_browsing, agent_swarm]
+    weaknesses: [english_reasoning]
+    cli_path: ~/.local/bin/kimi
+    notes: "Parallel task execution, swarm mode for wide tasks"
+
+  # ============================================================================
+  # API RUNNERS (Pay-per-use or free tier)
+  # ============================================================================
+  
   deepseek-chat:
     platform: deepseek-api
-    role: backup
-    context_limit: 64000
-    cost_per_1k_tokens: 0.14
-    status: paused
-    status_reason: "Low credits - backup only"
+    type: runner
+    role: backup_executor
+    context_limit: 128000
+    context_effective: 100000
+    cost_per_1k_input: 0.00028  # $0.28/1M cache miss
+    cost_per_1k_input_cached: 0.000028  # $0.028/1M cache hit
+    cost_per_1k_output: 0.00042  # $0.42/1M
+    credit_available: 2.00  # User has $2
+    credit_used: 0
+    rate_limit: none  # They serve all requests
+    status: active
+    strengths: [coding, chinese_language, low_latency]
+    weaknesses: [less_mature_than_gpt]
+    notes: "Use for code tasks, cache when possible"
+    
+  gemini-2.0-flash:
+    platform: google-ai
+    type: runner
+    role: researcher
+    context_limit: 128000
+    context_effective: 100000
+    cost_per_1k_tokens: 0  # Free tier
+    free_tier_limits:
+      requests_per_minute: 15
+      requests_per_day: 1500
+      tokens_per_day: 1000000
+    status: active
+    strengths: [research, multimodal, fast]
+    weaknesses: [rate_limits]
+    notes: "Free tier, good for System Research agent"
+
+  # ============================================================================
+  # OPENROUTER GATEWAY (Access to many models, $16 credit)
+  # ============================================================================
+  
+  openrouter-free:
+    platform: openrouter
+    type: gateway
+    role: free_tier_router
+    context_limit: 200000
+    cost_per_1k_tokens: 0  # Routes to free models
+    credit_available: 16.00
+    credit_used: 0
+    status: active
+    routes_to:
+      - meta-llama/llama-3.3-70b-instruct:free
+      - deepseek/deepseek-r1-0528:free
+      - qwen/qwen3-coder:free
+    notes: "Router picks best available free model"
+    
+  openrouter-qwen-coder:
+    platform: openrouter
+    type: runner
+    role: code_executor
+    context_limit: 262000
+    cost_per_1k_tokens: 0  # FREE
+    model_id: qwen/qwen3-coder:free
+    status: active
+    strengths: [coding, large_context]
+    notes: "Best free coding model on OpenRouter"
+    
+  openrouter-llama-70b:
+    platform: openrouter
+    type: runner
+    role: general_executor
+    context_limit: 128000
+    cost_per_1k_tokens: 0  # FREE
+    model_id: meta-llama/llama-3.3-70b-instruct:free
+    status: active
+    strengths: [general_reasoning, instruction_following]
+    notes: "Llama 3.3 70B - strong all-rounder"
+
+  # ============================================================================
+  # PAUSED/DISABLED
+  # ============================================================================
+  
+  # Add paused models here with status: paused and status_reason
 
 # =============================================================================
 # ROLES (What hats can agents wear)
