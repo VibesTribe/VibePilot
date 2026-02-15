@@ -10,6 +10,34 @@
 
 # 2026-02-15
 
+# 2026-02-15
+
+## 02:00 UTC - GLM-5
+**Commit:** `967dee2e`
+**Type:** Documentation
+**Files Changed:**
+- `docs/prd_v1.4.md` — Complete ROI calculator with full task cost tracking
+
+**Key Additions:**
+- Philosophy: Real world testing, continuous evaluation, best/cheapest wins
+- Full task cost: ALL attempts counted (failed attempt 1 + failed attempt 2 + split + passed attempts)
+- Live ROI calculator dashboard mockup
+- Courier cost attribution per task
+- Model performance with cost per SUCCESSFUL task
+
+**Why:**
+- ROI wasn't tracking failed attempts
+- Need to see total cost of task including all retries/reassignments
+- Dashboard must show live, always-current ROI
+- Model routing decisions need real data
+
+**Rollback:**
+```bash
+git revert 967dee2e
+```
+
+---
+
 ## 01:30 UTC - GLM-5
 **Commit:** `aaabc5c5`
 **Type:** Documentation (Major)

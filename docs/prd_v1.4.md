@@ -127,6 +127,16 @@ A sovereign AI execution engine that turns ideas into production code through co
 │          2. CLI subscriptions (Kimi, OpenCode) — default fallback        │
 │          3. API (DeepSeek) — last resort, cost                           │
 │                                                                          │
+│  Internal Roles NEVER Go to Web Platforms:                               │
+│          - Supervisor, Orchestrator, Council, Planner                    │
+│          - Maintenance, Watcher, Testing agents                          │
+│          - These are VibePilot infrastructure                            │
+│          - They stay in-house (GLM, Kimi CLI, local API)                 │
+│                                                                          │
+│  Only TASK EXECUTION goes to web platforms:                               │
+│          - Code generation, research, content                            │
+│          - When financially makes sense                                  │
+│                                                                          │
 │  Learning Mechanism:                                                     │
 │          - Sees every task result (success/failure)                      │
 │          - Tracks tokens in/out per model per task type                  │
