@@ -16,6 +16,45 @@
 
 **Source 1:** Vibeflow prototype review (github.com/VibesTribe/vibeflow)
 **Source 2:** Surya's "Agent Engineering 2026" video via Gemini analysis
+**Source 3:** Session discussion on context/memory efficiency
+
+---
+
+## Consideration 16: Pluggable Memory Architecture
+
+**From:** Session discussion - 100k context load concern
+
+**Problem:**
+- Currently: Agents read full documents for context
+- Future: Projects with months of history may exceed document approach
+- Risk: Retrofitting memory systems = painful rewrite
+
+**Proposal:**
+Design memory interface now, implement with documents, swap later.
+
+```
+Memory Interface:
+├── store(project_id, key, content, metadata)
+├── retrieve(project_id, query, limit, filters)
+└── search(project_id, embedding, threshold)
+
+Current Implementation: File-based (read docs)
+Future Implementations: Vector DB, Graph RAG, Whatever Comes Next
+```
+
+**Where it plugs in:**
+- Consultant stores research findings
+- Planner retrieves relevant context for planning
+- Council retrieves relevant past decisions
+- Supervisor retrieves similar past approvals/rejections
+- All agents: semantic search of project history
+
+**VibePilot Fit:** ✅ Essential
+- Core principle: Build for change, not for now
+- Unknown future tech → design interface, swap implementation
+- Zero pain to add vector/graph/superseding-rag when ready
+
+**Decision:** Accepted - Design memory interface into agent architecture
 
 ---
 

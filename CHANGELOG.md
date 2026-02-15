@@ -8,6 +8,35 @@
 
 # 2026-02-15
 
+## [Same Session - Update 3] - GLM-5 + Human
+**Type:** Documentation (Philosophy + Prevention)
+**Summary:** Add prevention principle, Type 1 errors, pluggable memory consideration, NO FORMS rule
+
+**Files Changed:**
+- `docs/core_philosophy.md` — Added "Prevention over cure" with futurologist mindset
+- `docs/UPDATE_CONSIDERATIONS.md` — Added Consideration 16: Pluggable Memory Architecture
+- `~/AGENTS.md` — Added NO MULTIPLE CHOICE FORMS rule, Type 1 Error awareness, core_philosophy to required reading
+
+**Key Additions:**
+- Prevention = 1% of cure cost
+- Type 1 Error: Fundamental mistake that ruins everything downstream
+- Futurologist glasses: What WILL go wrong eventually?
+- Pluggable memory interface: Design now, implement later, swap when better tech emerges
+- NO FORMS: Two sessions tried restrictive multiple-choice, user hated it, never again
+
+**Why:**
+- User emphasized prevention and foresight
+- Memory systems may be needed later - design interface now
+- Forms create friction, humans hate filling them
+- Type 1 errors must be prevented, not fixed
+
+**Rollback:**
+```bash
+git checkout HEAD~1 -- docs/core_philosophy.md docs/UPDATE_CONSIDERATIONS.md ~/AGENTS.md
+```
+
+---
+
 ## [Same Session - Update 2] - GLM-5 + Human
 **Type:** Documentation (Philosophy)
 **Summary:** Add core philosophy document - strategic mindset for all agents
