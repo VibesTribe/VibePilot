@@ -73,12 +73,20 @@ git checkout aaabc5c5
 | Platform Registry | Tracks web AI platforms | Supabase `platforms` table |
 | Kimi CLI Runner | Executes tasks via Kimi | `runners/kimi_runner.py` |
 | API Runner with Caching | DeepSeek, Gemini, OpenRouter | `runners/api_runner.py` |
-| Dual Orchestrator | Routes tasks to right model | `orchestrator.py` |
+| Dual Orchestrator | Routes tasks to right model | `orchestrator.py` (legacy), `core/orchestrator.py` (NEW concurrent) |
 | Role System | Defines agent capabilities | `core/roles.py` + `config/vibepilot.yaml` |
 | **Vault** | Encrypted secret storage | `vault_manager.py` + Supabase `secrets_vault` |
 | **Agent Definitions** | Complete spec for all 11 agents | `agents/agent_definitions.md` |
 | **Agent Prompts** | Full prompts for all 10 agents | `prompts/*.md` (10 files - all complete) |
 | **Tech Stack Decisions** | Documented technology choices | `docs/tech_stack.md` |
+| **Supervisor Agent** | Reviews, approves, coordinates testing | `agents/supervisor.py` (NEW) |
+| **Concurrent Orchestrator** | Parallel task execution | `core/orchestrator.py` (NEW) |
+| **Dependency Manager** | Unlock tasks when deps complete | `core/orchestrator.py` (NEW) |
+| **Runner Pool** | Track available/used runners | `core/orchestrator.py` (NEW) |
+| **Telemetry** | OpenTelemetry observability | `core/telemetry.py` (NEW) |
+| **Loop Detector** | Detect stuck agents | `core/telemetry.py` (NEW) |
+| **Memory Interface** | Pluggable context storage | `core/memory.py` (NEW) |
+| **Dependency RPC** | Supabase functions for dep unlock | `docs/schema_dependency_rpc.sql` (NEW) |
 
 ## Vault (Secret Management)
 
