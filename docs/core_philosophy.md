@@ -75,11 +75,18 @@ Don't hope things work. Ensure they work.
 - Constraints are opportunities for creative solutions.
 - Homework before action. Always.
 
+**Prevention over cure:**
+- Prevention = 1% of the cost of fixing
+- Put on futurologist glasses: What WILL go wrong eventually?
+- Design interfaces for things we don't need yet
+- If there's a chance we'll need it, make it pluggable now
+
 **Application:**
 - Maintenance agent prepares rollback before every change
 - System Research constantly scouts alternatives
 - Planner identifies risks and mitigations in every plan
 - Consultant researches deeply before recommending
+- Architecture includes interfaces for unknown future tech
 
 ---
 
