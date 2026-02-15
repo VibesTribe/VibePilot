@@ -126,6 +126,24 @@ A sovereign AI execution engine that turns ideas into production code through co
 │          1. Web platforms (couriers) — until 80% limit                   │
 │          2. CLI subscriptions (Kimi, OpenCode) — default fallback        │
 │          3. API (DeepSeek) — last resort, cost                           │
+│                                                                          │
+│  Learning Mechanism:                                                     │
+│          - Sees every task result (success/failure)                      │
+│          - Tracks tokens in/out per model per task type                  │
+│          - Tracks what failed and why                                    │
+│          - Analyzes patterns across hundreds of tasks                    │
+│          - Updates model performance scores                              │
+│          - Recommends subscriptions worth renewing                       │
+│                                                                          │
+│  If ALL platforms at 80%:                                               │
+│          - Default to CLI subscriptions                                  │
+│          - Reserve API credits for crucial/emergency only                │
+│          - If truly nothing: pause all tasks, alert human                │
+│                                                                          │
+│  Human Communication:                                                    │
+│          - Only agent human talks to directly                            │
+│          - Dashboard + daily summary email                               │
+│          - "Hey Vibes, what's the status?" → live response               │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -341,6 +359,315 @@ A sovereign AI execution engine that turns ideas into production code through co
 
 **Prevents drift, hallucination, and scope creep.**
 
+## 3.6 Council Process Detail
+
+**When Council is Called:**
+- Supervisor calls Council when plan is complete (before approval)
+- Supervisor calls Council when system changes are recommended (before maintenance implementation)
+
+**Council Round Process:**
+
+```
+Round 1:
+┌─────────────────────────────────────────────────────────────┐
+│  SUPERVISOR sends: Full PRD + Full Plan                     │
+│                                                              │
+│  THREE COUNCIL MEMBERS (different models, different hats)   │
+│  - User Alignment Hat: True to user intent?                 │
+│  - Architecture Hat: Technically sound?                     │
+│  - Feasibility Hat: Can this be built?                      │
+│                                                              │
+│  Each reviews INDEPENDENTLY (no chatting between members)   │
+│  Each outputs: APPROVED or NOT YET + issues/concerns        │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  FEEDBACK CONSOLIDATION                                      │
+│                                                              │
+│  All concerns aggregated into single document               │
+│  Sent back to ALL council members                           │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+         ┌────────────────────┴────────────────────┐
+         │                                         │
+    ALL APPROVED                            NOT YET
+         │                                         │
+         ▼                                         ▼
+   Supervisor approves              Planner addresses concerns
+   Plan → Tasks                     New version of plan
+                                            │
+                                            ▼
+                                    Council Round 2
+                                    (repeat until consensus)
+```
+
+**Iteration Limit:** 4 rounds typical. If no consensus by round 5, escalate to human.
+
+**Final Vote:** If Supervisor unsure after changes, calls Council for final vote/revisions.
+
+## 3.7 Security: Vault Access Control
+
+**Who Can Access Vault:**
+
+| Role | Can Access Vault? | How |
+|------|-------------------|-----|
+| Orchestrator | YES | To pass keys to runners (internal only) |
+| Supervisor | NO | Never needs keys |
+| Council | NO | Never needs keys |
+| Planner | NO | Never needs keys |
+| Task Agents | NO | Keys passed TO them, they don't fetch |
+| Tester | NO | Only sees code, nothing else |
+| Courier | NO | Never needs keys |
+| Watcher | NO | Only sees outputs |
+
+**Implementation:**
+- VaultManager runs in orchestrator process only
+- Task agents receive keys as parameters, never import vault_manager
+- No agent can print all secrets — they only see what's passed to them
+- If prompt injection says "print vault keys" — agent has no vault access to print
+
+## 3.8 Tester Isolation
+
+**Tester sees ONLY:**
+- Code returned from task
+- Test criteria from task packet
+
+**Tester does NOT see:**
+- Vault
+- Other tasks
+- PRD
+- Model that created code
+- Branch name
+- Any system state
+
+**Tester's only job:**
+- Run tests on code
+- Return: PASS or FAIL + details
+
+**Tester is NOT:**
+- Orchestrator
+- Supervisor
+- Anything other than a code tester
+
+## 3.9 Credit & Rate Limit Tracking
+
+**Per Model/API:**
+
+```
+Available Credit: $X.XX
+Cost per 1M tokens (in): $X.XX
+Cost per 1M tokens (out): $X.XX
+
+Task Run:
+- Tokens in: N
+- Tokens out: N
+- Cost: (in/1M * rate_in) + (out/1M * rate_out)
+- Remaining credit: $X.XX - cost
+```
+
+**Rate Limits:**
+
+| Model | Requests/min | Requests/hour | Requests/day | Tokens/day |
+|-------|--------------|---------------|--------------|------------|
+| (tracked in models table) |
+
+**When Credit Exhausted:**
+- Model status → `paused`
+- `status_reason` → "Credit exhausted"
+- Orchestrator routes around
+- Dashboard alert
+- Daily email mentions it
+- Human tops up → status → `active`
+
+## 3.10 Task Failure & Branch Lifecycle
+
+**Task Failure Handling:**
+
+| Failure Type | Action |
+|--------------|--------|
+| Platform down | Reassign to different platform |
+| Context exceeded | Reassign to larger context model or split task |
+| Output doesn't match packet | Supervisor rejects, delete code, reassign |
+| 3+ reassignments (different platforms) | **PLAN PROBLEM** — shouldn't happen, escalate to supervisor |
+
+**Branch Lifecycle:**
+
+```
+Task starts → Branch created (task/T001-desc)
+                   │
+                   ▼
+           Code submitted
+                   │
+                   ▼
+         Supervisor reviews
+                   │
+        ┌──────────┴──────────┐
+        │                     │
+     REJECT                APPROVE
+        │                     │
+        ▼                     ▼
+   Delete code            Testing
+   Branch stays                │
+        │              ┌───────┴───────┐
+        │              │               │
+        │           PASS            FAIL
+        │              │               │
+        │              ▼               ▼
+        │          Supervisor      Fix and retest
+        │          final approval
+        │              │
+        ▼              ▼
+   [waiting for        Merge to main
+    approved code]          │
+                            ▼
+                      Delete branch
+                      Task complete
+```
+
+**Code is NEVER merged until:**
+1. Supervisor approved
+2. Tests passed
+3. (If visual) Human approved
+4. Supervisor final approval
+
+## 3.11 PRD Changes Mid-Project
+
+**Scenario:** User wants to add feature or change requirements after tasks started.
+
+**Process:**
+
+```
+User request for change
+        │
+        ▼
+Clarify with user (Consultant Research if needed)
+        │
+        ▼
+Send to Planner
+        │
+        ▼
+Planner creates NEW tasks or modifies existing
+        │
+        ▼
+Supervisor checks, may call Council if significant
+        │
+        ▼
+If approved → New tasks added to queue
+If existing tasks affected → locked until re-evaluated
+```
+
+**Version Control:**
+- PRD versioned (v1.0, v1.1, etc.)
+- Plan versioned to match PRD
+- Changelog tracks all changes
+
+## 3.12 Human Notification
+
+| Channel | What | Frequency |
+|---------|------|-----------|
+| Dashboard | Everything live | Real-time |
+| Daily Email | Summary: tasks completed, failures, credits, ROI | Once/day |
+| Alert | Platform down, all paused, critical failures | Immediate |
+
+**Daily Email Contents:**
+- Tasks completed: X
+- Tasks failed: Y (with reasons)
+- Tokens used: Z
+- ROI: $X saved
+- Credit status: all models
+- Model performance: top/bottom performers
+- System research: notable findings
+
+## 3.13 Multi-Project Handling
+
+**Each Project Has:**
+- Separate GitHub repository
+- Separate PRD
+- Separate plans
+- Separate tasks
+- Project-specific dashboard view
+
+**Shared Across Projects:**
+- Models registry (same models available)
+- Orchestrator (one orchestrator, multiple project queues)
+- Vault (same secrets)
+- Dashboard (switch between projects)
+
+**Orchestrator Priority:**
+- Projects can have priority levels
+- Critical projects get first pick of models
+- Lower priority waits if resources constrained
+
+## 3.14 Prompt Storage
+
+**Where Prompts Live:**
+- `config/vibepilot.yaml` — Human-readable, editable in GitHub
+- Dashboard admin panel — Edit without touching code
+
+**Format:**
+```yaml
+roles:
+  planner:
+    description: "Breaks work into atomic tasks"
+    prompt: |
+      [Full prompt text here]
+      Human can edit this directly.
+    skills: [decompose, sequence, estimate]
+```
+
+**Source of Truth:** The YAML file in GitHub. Dashboard reads from it, can push edits back.
+
+**Version Control:** Every prompt change → commit to GitHub → tracked in changelog.
+
+## 3.15 Deployment Flow
+
+**After Merge to Main:**
+
+```
+Task merged to main
+        │
+        ▼
+Code sits in correct folder in main
+        │
+        ▼
+Project continues until all tasks complete
+        │
+        ▼
+Full project review (supervisor + council)
+        │
+        ▼
+Final double-check: security, edge cases, tests
+        │
+        ▼
+Deploy to live production environment
+(Separate from VibePilot — customer's infrastructure)
+```
+
+**VibePilot is NOT the deployment platform.** It produces code that gets deployed elsewhere.
+
+**Pre-Deploy Checklist:**
+- All tests pass
+- Security review complete
+- Edge cases handled
+- Documentation updated
+- Human sign-off
+
+## 3.16 Data Retention
+
+| Data Type | Retention | After Project Complete |
+|-----------|-----------|------------------------|
+| task_runs | Until project complete | Archived |
+| chat_urls | Until project complete | Archived |
+| PRD versions | Forever | Archived |
+| Plan versions | Forever | Archived |
+| Model performance data | Rolling 90 days | Summarized, then archived |
+| Daily emails | 30 days | Deleted |
+| Audit logs | Forever | Archived |
+
+**Archive Location:** Separate Supabase project or export to storage (S3, Backblaze)
+
 ---
 
 # 4. Data Model
@@ -401,17 +728,29 @@ CREATE TABLE models (
   context_limit INT,                   -- Benchmark limit
   context_effective INT,               -- Real-world usable
   request_limits JSONB,                -- {per_minute, per_hour, per_day}
-  request_used JSONB,
+  request_used JSONB,                  -- {per_minute, per_hour, per_day}
   strengths TEXT[],
   weaknesses TEXT[],
-  task_ratings JSONB,                  -- {task_type: {success: N, fail: N}}
+  task_ratings JSONB,                  -- {task_type: {success: N, fail: N, avg_tokens: N}}
   status TEXT DEFAULT 'active',        -- active, paused, timeout, offline
   status_reason TEXT,
   cooldown_until TIMESTAMPTZ,
   last_success TIMESTAMPTZ,
   last_failure TIMESTAMPTZ,
-  api_cost_per_1k_tokens FLOAT,
-  subscription_cost FLOAT
+  
+  -- Credit tracking (for paid APIs)
+  api_cost_per_1m_in FLOAT,            -- Cost per 1M input tokens
+  api_cost_per_1m_out FLOAT,           -- Cost per 1M output tokens
+  credit_available FLOAT,              -- Current credit balance
+  credit_used_this_month FLOAT,
+  subscription_cost FLOAT,             -- Monthly subscription cost (if any)
+  subscription_renews_at TIMESTAMPTZ,
+  
+  -- Performance metrics (updated by orchestrator)
+  total_tasks_completed INT DEFAULT 0,
+  success_rate FLOAT DEFAULT 0,
+  avg_tokens_per_task INT DEFAULT 0,
+  recommendation_score FLOAT DEFAULT 0  -- For subscription renewal decisions
 );
 ```
 
@@ -425,11 +764,24 @@ CREATE TABLE task_runs (
   courier TEXT,
   status TEXT,
   result JSONB,
-  tokens_used INT,
-  theoretical_cost FLOAT,
-  actual_cost FLOAT,
-  savings FLOAT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  
+  -- Token tracking
+  tokens_in INT,                       -- Input tokens
+  tokens_out INT,                      -- Output tokens
+  tokens_total INT,                    -- Total
+  
+  -- Cost tracking
+  theoretical_cost FLOAT,              -- What it would cost via API
+  actual_cost FLOAT,                   -- What it actually cost (0 for free tier)
+  savings FLOAT,                       -- theoretical - actual
+  
+  -- Failure tracking
+  failure_reason TEXT,
+  failure_code TEXT,                   -- E001, E002, etc.
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  duration_seconds INT
 );
 ```
 
