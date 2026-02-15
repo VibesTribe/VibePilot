@@ -8,6 +8,49 @@
 
 # 2026-02-15
 
+# 2026-02-15
+
+## 01:30 UTC - GLM-5
+**Commit:** `aaabc5c5`
+**Type:** Documentation (Major)
+**Files Changed:**
+- `docs/prd_v1.4.md` — Comprehensive operational details added
+
+**New Sections (10):**
+- 3.6 Council Process Detail — Iterative rounds, feedback consolidation
+- 3.7 Security: Vault Access Control — Who can access vault
+- 3.8 Tester Isolation — Only code, nothing else
+- 3.9 Credit & Rate Limit Tracking — Tokens in/out, cost calc
+- 3.10 Task Failure & Branch Lifecycle — Handling, branch states
+- 3.11 PRD Changes Mid-Project — Version control process
+- 3.12 Human Notification — Dashboard, daily email, alerts
+- 3.13 Multi-Project Handling — Separate repos, shared models
+- 3.14 Prompt Storage — YAML in GitHub, human editable
+- 3.15 Deployment Flow — Merge to deploy process
+- 3.16 Data Retention — Lifecycle, archive rules
+
+**Orchestrator Enhanced:**
+- Learning mechanism detailed
+- Platform exhaustion handling
+- Only agent user communicates with
+
+**Data Model:**
+- models: credit tracking, tokens in/out costs, recommendation_score
+- task_runs: separate tokens_in/out, failure_reason/code
+
+**Why:**
+- Gaps identified after thorough review
+- Clarifies security (vault access control)
+- Operational details for every edge case
+- No ambiguity for future sessions
+
+**Rollback:**
+```bash
+git revert aaabc5c5
+```
+
+---
+
 ## 00:45 UTC - GLM-5
 **Commit:** `910a2918`
 **Type:** Documentation
