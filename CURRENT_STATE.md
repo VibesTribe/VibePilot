@@ -9,9 +9,9 @@
 
 ---
 
-**Last Updated:** 2026-02-15 01:35 UTC
-**Updated By:** GLM-5 (PRD v1.4 comprehensive operational details)
-**Known Good Commit:** `aaabc5c5` (PRD complete)
+**Last Updated:** 2026-02-15 06:30 UTC
+**Updated By:** GLM-5 (Agent definitions + prompts complete, tech stack documented)
+**Known Good Commit:** `07d5fd62` (Maintenance agent added)
 
 ---
 
@@ -68,12 +68,16 @@ git checkout aaabc5c5
 | Component | What It Does | Location |
 |-----------|--------------|----------|
 | Core Schema | Stores all state | Supabase: tasks, task_packets, models, platforms, projects, task_runs |
-| Model Registry | Tracks available AI models | Supabase `models` table |
+| Model Registry | Tracks available AI models | Supabase `models` table + `config/vibepilot.yaml` |
 | Platform Registry | Tracks web AI platforms | Supabase `platforms` table |
 | Kimi CLI Runner | Executes tasks via Kimi | `runners/kimi_runner.py` |
+| API Runner with Caching | DeepSeek, Gemini, OpenRouter | `runners/api_runner.py` |
 | Dual Orchestrator | Routes tasks to right model | `orchestrator.py` |
 | Role System | Defines agent capabilities | `core/roles.py` + `config/vibepilot.yaml` |
 | **Vault** | Encrypted secret storage | `vault_manager.py` + Supabase `secrets_vault` |
+| **Agent Definitions** | Complete spec for all 11 agents | `agents/agent_definitions.md` |
+| **Agent Prompts** | Full prompts for 9 agents | `prompts/*.md` (9 files) |
+| **Tech Stack Decisions** | Documented technology choices | `docs/tech_stack.md` |
 
 ## Vault (Secret Management)
 
@@ -103,12 +107,12 @@ vault.ingest_secret('KEY_NAME', 'key_value')
 
 | Component | What It Will Do | Notes |
 |-----------|-----------------|-------|
-| Council RPC | Multi-model consensus | Needs Supabase function |
-| Courier Agent | Dispatch to web platforms | Web AI dispatch |
-| Prompt Caching | Reduce token costs | DEC-007 |
-| Kimi Swarm | Parallel execution | DEC-008 |
+| Council RPC | Multi-model consensus | Schema ready, needs Python integration |
+| Courier Agent | Dispatch to web platforms | Definition + prompt ready (Phase 3) |
+| Dashboard | Visual monitoring | Frontend in Vibeflow, needs Supabase connection |
 | Voice Interface | Talk to Vibes | Designed in `docs/voice_interface.md` |
-| Dashboard | Visual monitoring | Vibeflow repo, needs Supabase connection |
+| Email Notifications | Daily summaries via Gmail | browser-use approach decided |
+| Consultant Prompt | User has notes to add | Stub in `prompts/consultant.md` |
 
 ---
 
@@ -388,7 +392,8 @@ python -c "from vault_manager import VaultManager; v=VaultManager(); print(v.get
 │   ├── MASTER_PLAN.md        # Full specification
 │   ├── SESSION_LOG.md        # Session history
 │   ├── UPDATE_CONSIDERATIONS.md  # Daily improvement input
-│   ├── prd_v1.3.md           # Product requirements
+│   ├── prd_v1.4.md           # Product requirements v1.4
+│   ├── tech_stack.md         # Technology decisions (NEW)
 │   ├── schema_*.sql          # Database schemas (9 files)
 │   │   schema_v1_core.sql
 │   │   schema_safety_patches.sql
@@ -396,18 +401,30 @@ python -c "from vault_manager import VaultManager; v=VaultManager(); print(v.get
 │   │   schema_project_tracking.sql
 │   │   schema_rls_fix.sql
 │   │   schema_reset.sql
-│   │   schema_timestamp_fixes.sql (NEW - apply to Supabase)
-│   │   schema_council_rpc.sql (NEW - apply to Supabase)
-│   └── scripts/              # Test/demo scripts
+│   │   schema_timestamp_fixes.sql
+│   │   schema_council_rpc.sql
+│   │   └── scripts/          # Test/demo scripts
 │
 ├── core/
 │   └── roles.py              # Role definitions
 │
 ├── runners/
 │   ├── kimi_runner.py        # Kimi CLI integration
-│   └── api_runner.py         # API runner with caching (NEW)
+│   └── api_runner.py         # API runner with caching
 │
-├── agents/                   # Agent implementations
+├── agents/
+│   └── agent_definitions.md  # Complete agent specs (NEW)
+│
+├── prompts/                  # Agent prompts (NEW)
+│   ├── planner.md
+│   ├── supervisor.md
+│   ├── council.md
+│   ├── orchestrator.md
+│   ├── testers.md
+│   ├── system_researcher.md
+│   ├── watcher.md
+│   ├── maintenance.md
+│   └── consultant.md (stub - awaiting user notes)
 │
 ├── scripts/
 │   ├── backup_supabase.sh    # Daily backup automation
