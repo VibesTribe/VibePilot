@@ -9,9 +9,9 @@
 
 ---
 
-**Last Updated:** 2026-02-15 00:15 UTC
-**Updated By:** GLM-5 (PRD v1.4 comprehensive update)
-**Known Good Commit:** `46423d69` (vault + migration ready)
+**Last Updated:** 2026-02-15 01:35 UTC
+**Updated By:** GLM-5 (PRD v1.4 comprehensive operational details)
+**Known Good Commit:** `aaabc5c5` (PRD complete)
 
 ---
 
@@ -32,12 +32,13 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 
 | Commit | Date | Status | Notes |
 |--------|------|--------|-------|
+| `aaabc5c5` | 2026-02-15 | ✅ Verified | PRD v1.4 complete (operational details) |
 | `46423d69` | 2026-02-14 | ✅ Verified | Vault-based secrets, migration ready |
 | `c5c5b143` | 2026-02-14 | ✅ Verified | Schema audit, caching, Council RPC |
 
 **If everything breaks:**
 ```bash
-git checkout 46423d69
+git checkout aaabc5c5
 ```
 
 ---
