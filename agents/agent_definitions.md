@@ -664,19 +664,49 @@ Independent multi-lens review of PRD + Plan to catch issues before execution.
 | REVISION_NEEDED | Major concerns that can be addressed |
 | BLOCKED | Critical issues that need human decision |
 
+## Consensus Process
+
+```
+Round 1 → Reviews → Feedback consolidated → Planner revises → Round 2
+Round 2 → Reviews → Feedback consolidated → Planner revises → Round 3
+Round 3 → Reviews → Feedback consolidated → Planner revises → Round 4
+Round 4 → Reviews → Feedback consolidated → Planner revises → Round 5
+Round 5 → Reviews → Feedback consolidated → Planner revises → Round 6 (MAX)
+
+Round 6 no consensus?
+  → Identify the SPECIFIC unresolvable issue
+  → Route based on issue type:
+    
+    IF business/scope question:
+      → Human decides (not a coder issue)
+    
+    IF PRD ambiguity:
+      → Back to Consultant for clarification
+    
+    IF fundamental disagreement on approach:
+      → Supervisor picks best option, documents reasoning, proceeds
+      → Human notified but not blocked
+```
+
+**Human escalation is RARE.** Only for:
+- Business direction changes
+- Scope conflicts (what features, what priority)
+- Visual/UX decisions (human taste, not code)
+- Ethical/legal concerns
+
+**Human is NEVER called for:**
+- Technical implementation details
+- Task breakdown issues
+- Code architecture disputes
+- Model routing decisions
+
 ## Edge Cases
 | Situation | Action |
 |-----------|--------|
-| Unsure about intent | REVISION_NEEDED with question for human |
-| Technical unknown | Flag as preventative issue, not blocker |
+| Unsure about intent | REVISION_NEEDED with question for Planner to clarify |
+| Technical unknown | Flag as preventative issue, don't block |
 | Disagree with confidence | Note it, don't block unless critical |
-
-## Constraints
-- NEVER collaborate with other council members during review
-- NEVER vote APPROVED with major concerns
-- ALWAYS provide specific, actionable feedback
-- ALWAYS explain reasoning
-- If previous feedback provided, verify it was addressed
+| Round 6 stalemate | Supervisor decides, documents, moves forward |
 
 ---
 
@@ -828,28 +858,42 @@ Gatekeeper and quality controller. Validates outputs, manages branch lifecycle, 
 ```
 1. RECEIVE task output
 
-2. LOAD expected output from task
+2. LOAD expected output from task packet
 
-3. COMPARE:
-   - Files created match?
-   - Files modified match?
-   - APIs implemented?
-   - No extra files changed?
+3. VALIDATE:
+   - Output format correct?
+   - All required deliverables present?
+   - Acceptance criteria met?
+   - Code quality gates passed?
+     - No hardcoded secrets
+     - No obvious bugs
+     - Follows specified patterns
+     - Error handling present
 
-4. CHECK code quality:
-   - No hardcoded secrets
-   - No spaghetti code
-   - Follows patterns
-   - Error handling present
-
-5. DECIDE:
+4. DECIDE:
    - PASS → Queue for testing
-   - FAIL → Return to runner with notes
-   - REROUTE → Assign different model
+   - FAIL → Return to runner with specific feedback
+   - REROUTE → Assign different model (if model was the issue)
 
-6. UPDATE task status
+5. UPDATE task status
 
-7. OUTPUT decision
+6. OUTPUT decision
+
+NOTE: "Extra files touched" is NOT a supervisor check.
+If that happens, it's a PLAN/DESIGN problem:
+- Task packet wasn't specific enough → Planner fix
+- Runner went rogue → Don't use that runner
+- Watcher catches it in real-time
+```
+
+## Quality Gates (Configurable)
+```yaml
+supervisor_quality_gates:
+  check_secrets: true          # No hardcoded API keys, passwords
+  check_error_handling: true   # Try/catch or equivalent present
+  check_patterns: true         # Follows specified patterns
+  check_test_coverage: true    # Tests written for new code
+  check_documentation: false   # Only if required in task
 ```
 
 ### Process C: Test Result Processing
@@ -897,115 +941,216 @@ Gatekeeper and quality controller. Validates outputs, manages branch lifecycle, 
 
 ## Identity
 **Name:** Watcher Agent
-**Type:** Background (always running, monitoring)
+**Type:** Background (real-time + scheduled monitoring)
 **Default Model:** System (not AI, rule-based monitoring)
-**Runs:** Every 60 seconds
+**Philosophy:** Proactive prevention over reactive cure
 
 ## Purpose
-Prevent loops, detect stuck tasks, intervene before resources wasted.
+Prevent problems before they happen. Catch violations instantly. Protect context windows. Guardian of system integrity.
 
 ## Skills
 | Skill | Description |
 |-------|-------------|
-| `pattern_detection` | Spot repeating errors, loops |
-| `threshold_monitoring` | Track time, tokens, attempts |
-| `intervention` | Kill stuck tasks safely |
+| `file_guard` | Real-time monitoring of filesystem changes |
+| `context_monitoring` | Track context usage, prevent overflow |
+| `loop_detection` | Spot repeating errors, stuck tasks |
+| `instant_intervention` | Stop violations immediately |
 | `alerting` | Notify appropriate parties |
 
 ## Tools
 | Tool | Usage |
 |------|-------|
+| `inotify` | Real-time filesystem monitoring |
 | `supabase_query` | Read task_runs for patterns |
 | `supabase_update` | Update task status |
 | `process_signal` | Kill runaway processes |
+| `git_operations` | Revert unauthorized changes |
 | `alert_send` | Send notifications |
 
-## Monitoring Rules
+## Prevention Layers (Permaculture Design)
+
+| Level | What | Who | Purpose |
+|-------|------|-----|---------|
+| **Layer 1** | Clear task packets with explicit allowed_files | Planner | Prevention at source |
+| **Layer 2** | Real-time file guard | Watcher | Instant containment |
+| **Layer 3** | Post-task review | Supervisor | Quality gate |
+
+If Watcher catches something, Layer 1 failed. But Layer 2 prevents catastrophe.
+
+## Monitoring Types
+
+### Type A: Real-Time (Instant)
+| Detection | Action | Why Instant |
+|-----------|--------|-------------|
+| File change outside allowed_files | STOP task, revert, alert supervisor | 60 seconds = too much damage |
+| Unauthorized file access attempt | STOP task, log, alert | Prevention not cure |
+
+### Type B: After Each Task
+| Detection | Threshold | Action |
+|-----------|-----------|--------|
+| Context usage | > 70% of effective | WARN (log, continue) |
+| Context usage | > 80% of effective | STOP assignments, start new session |
+| Token waste pattern | Repetitive > 50% | Alert, log pattern |
+
+### Type C: Scheduled (Every 30 seconds)
 | Detection | Threshold | Action |
 |-----------|-----------|--------|
 | Same error | 3 consecutive | Kill, flag for different model |
 | Output loop | Same output 2x | Kill, alert supervisor |
 | Stuck context | No progress 10 min | Kill, suggest split |
 | Task timeout | 30 minutes | Kill, log duration |
-| Token waste | Repetitive context > 50% | Alert, log pattern |
 | High retry count | > 3 attempts | Escalate to supervisor |
+
+## Thresholds (Configurable in vibepilot.yaml)
+```yaml
+watcher_thresholds:
+  context_warn_pct: 70      # Warn at 70% context
+  context_stop_pct: 80      # Stop at 80% context
+  error_repeat_limit: 3     # Same error 3x triggers action
+  stuck_minutes: 10         # No progress threshold
+  timeout_minutes: 30       # Max task duration
+  retry_limit: 3            # Max attempts before escalation
+  repetitive_pct: 50        # Token waste threshold
+```
 
 ## Input Format
 ```json
 {
-  "check_type": "scheduled" | "alert_triggered",
-  "scope": "all_tasks" | "task_id",
-  "task_id": "uuid (if scoped)"
+  "check_type": "realtime_file" | "post_task" | "scheduled",
+  "event": {
+    "type": "file_change" | "context_check" | "error_pattern",
+    "task_id": "uuid",
+    "details": { ... }
+  }
 }
 ```
 
 ## Output Format
 ```json
 {
-  "check_timestamp": "ISO8601",
-  "tasks_checked": 10,
-  "interventions": [
-    {
-      "task_id": "uuid",
-      "detection_type": "same_error_3x",
-      "action_taken": "killed_and_flagged",
-      "details": {
-        "error_pattern": "string",
-        "occurrences": 3,
-        "model_id": "string"
-      },
-      "recommendation": "string"
-    }
-  ],
-  "alerts_sent": [
-    {
-      "alert_type": "token_waste",
-      "severity": "warning" | "intervention" | "critical",
-      "recipient": "supervisor" | "human",
-      "message": "string"
-    }
-  ]
+  "timestamp": "ISO8601",
+  "event_type": "file_violation" | "context_warning" | "context_stop" | "loop_detected" | "timeout",
+  "task_id": "uuid",
+  "action_taken": "stopped" | "reverted" | "killed" | "warned" | "escalated",
+  "details": {
+    "violation": "string",
+    "files_affected": ["path"],
+    "context_pct": 75,
+    "reverted": true | false
+  },
+  "alert_sent": {
+    "recipient": "supervisor" | "orchestrator" | "human",
+    "severity": "warning" | "intervention" | "critical",
+    "message": "string"
+  }
 }
 ```
 
 ## Process
+
+### Real-Time File Guard
 ```
-EVERY 60 SECONDS:
+ON FILE SYSTEM EVENT (create/modify/delete):
 
-1. QUERY active tasks and recent runs
+1. IDENTIFY which task (if any) triggered this
 
-2. FOR each in_progress task:
+2. LOAD allowed_files from task packet
+
+3. CHECK:
+   IF file in allowed_files:
+     → Allow, log, continue
+   
+   IF file NOT in allowed_files:
+     → STOP task immediately
+     → git checkout (revert changes)
+     → Log violation with details
+     → Alert supervisor
+     → Flag task for review
+
+4. OUTPUT intervention report
+```
+
+### Post-Task Context Check
+```
+AFTER TASK COMPLETION:
+
+1. CALCULATE context_used / context_effective
+
+2. CHECK thresholds (from config):
+   
+   IF pct >= context_stop_pct (80%):
+     → STOP: No new assignments
+     → Alert orchestrator: "Session at X%, start fresh"
+     → Queue pending tasks for new session
+     → Log
+   
+   ELIF pct >= context_warn_pct (70%):
+     → WARN: Log only
+     → Continue assignments
+     → Note in daily summary
+
+3. OUTPUT status
+```
+
+### Scheduled Loop/Stuck Detection (Every 30 seconds)
+```
+EVERY 30 SECONDS:
+
+1. QUERY in_progress tasks
+
+2. FOR each task:
    
    CHECK error patterns:
-   - Get last 3 runs for this task
-   - Same error? → INTERVENE
+   - Get last N runs (configurable)
+   - Same error >= error_repeat_limit? → KILL, reassign
    
    CHECK progress:
-   - Last output update > 10 min?
-   - Same content as before? → INTERVENE
+   - Last output > stuck_minutes? → KILL, suggest split
    
    CHECK duration:
-   - Running > 30 min? → KILL
+   - Running > timeout_minutes? → KILL, log
    
-   CHECK token usage:
-   - Repetitive content > 50%? → ALERT
+   CHECK attempts:
+   - Attempts >= retry_limit? → Escalate, don't auto-retry
 
-3. FOR each killed task:
-   - Update status to 'available'
-   - Increment attempts
-   - Flag for different model
-   - Log intervention
+3. LOG all interventions
 
 4. SEND alerts as needed
 
 5. OUTPUT report
 ```
 
+## Context Window Management
+
+When context hits 80%:
+```
+1. Orchestrator stops accepting new tasks
+2. Current task completes (if in progress)
+3. Alert: "Session context exhausted. Starting fresh session."
+4. New session initialized
+5. Pending tasks reassigned to new session
+6. Old session archived (state preserved in Supabase)
+```
+
+This prevents:
+- Degraded output quality from overstuffed context
+- Hallucinations from context confusion
+- Wasted tokens on poor reasoning
+
+## Edge Cases
+| Situation | Action |
+|-----------|--------|
+| File violation but change is good | Supervisor reviews, may approve manually |
+| Context 80% mid-task | Let task finish, then stop |
+| New session fails | Escalate, human may need to intervene |
+| Multiple violations same task | Kill, flag model as problematic |
+
 ## Constraints
 - NEVER intervene with Council or Supervisor decisions
-- ONLY act on execution loops
-- ALWAYS log interventions
-- ALERT but don't kill on first detection (except timeout)
+- ONLY act on execution issues, not governance
+- ALWAYS log interventions with full details
+- REAL-TIME for file violations (not scheduled)
+- CONFIGURABLE thresholds (no hardcoded values)
 
 ---
 
