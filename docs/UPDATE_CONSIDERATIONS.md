@@ -12,6 +12,183 @@
 
 ---
 
+# 2026-02-15 Considerations (New)
+
+**Source 1:** Vibeflow prototype review (github.com/VibesTribe/vibeflow)
+**Source 2:** Surya's "Agent Engineering 2026" video via Gemini analysis
+
+---
+
+## Consideration 8: Vibeflow Dashboard Reuse
+
+**From:** Vibeflow `mission-control-mockup.tsx` review
+
+**Proposal:**
+- Reuse Vibeflow's dashboard mockup for VibePilot frontend
+- Already built: slice progress rings, agent hangar, task cards, ROI modal
+- Just needs Supabase connection instead of static data
+
+**VibePilot Fit:** ✅ Excellent fit
+- Don't rebuild what exists
+- Same team, same vision
+- React + TypeScript already matches our tech stack
+
+**Decision:** Accepted - Use Vibeflow dashboard as frontend starting point
+
+---
+
+## Consideration 9: Skills Manifest Pattern
+
+**From:** Vibeflow `skills/` directory structure
+
+**Proposal:**
+- Declarative skill manifests (`skill.json`) + tiny runners (`skill.runner.mjs`)
+- Skills defined outside agent code
+- Swapping behavior = edit manifest, not rewrite agent
+
+**VibePilot Fit:** ✅ Good fit
+- Matches our "zero code changes for swaps" principle
+- Current approach: skills defined in agent prompts
+- Could enhance: external skill registry
+
+**Decision:** Pending - Consider for future, current prompt-based approach works
+
+---
+
+## Consideration 10: Event Log Pattern
+
+**From:** Vibeflow `data/state/events.log.jsonl`
+
+**Proposal:**
+- Single append-only log of all events
+- State derived from events (not mutated directly)
+- Full audit trail, replayable
+
+**VibePilot Fit:** ⚠️ Partial fit
+- Good for audit, but adds complexity
+- We already have task_runs table for execution history
+- CURRENT_STATE.md + CHANGELOG.md provide context restoration
+
+**Decision:** Pending - Evaluate if we need event sourcing or if current approach sufficient
+
+---
+
+## Consideration 11: CI Gate Structure
+
+**From:** Vibeflow `.github/workflows/` (5 CI gates)
+
+**Proposal:**
+```
+ci-contracts.yml    → Schema validation
+ci-diff-scope.yml   → Region-scoped patches only
+ci-merge-gate.yml   → Final alignment check
+ci-tests.yml        → Test suite
+ci-backup.yml       → Auto-backup on merge
+```
+
+**VibePilot Fit:** ✅ Good fit for later
+- We have no CI yet
+- These patterns are solid
+- Implement when we have tests to run
+
+**Decision:** Pending - Implement in Phase 2 (after core system working)
+
+---
+
+## Consideration 12: Router Scoring Formula
+
+**From:** Vibeflow system_plan_v5.md
+
+**Proposal:**
+```
+score = w1*priority + w2*confidence + w3*provider_success_rate
+        - w4*expected_latency - w5*token_over_budget_penalty
+```
+
+**VibePilot Fit:** ✅ Good fit
+- Orchestrator already routes based on multiple factors
+- Formalized scoring is cleaner than heuristics
+- Tunable weights
+
+**Decision:** Accepted - Implement in Orchestrator routing logic
+
+---
+
+## Consideration 13: OpenTelemetry Tracing
+
+**From:** Surya "Agent Engineering" video (via Gemini)
+
+**Proposal:**
+- Every LLM call: timestamp, tokens, cost, duration
+- Every tool invocation: what, when, result
+- Detect loops, token waste, stuck states
+- Essential for "invisible token burn" problem
+
+**VibePilot Fit:** ✅ Excellent fit
+- Watcher agent already designed for loop detection
+- Tracing provides the DATA Watcher needs
+- Hard to retrofit - add early
+- We already track tokens in task_runs, expand to all calls
+
+**Decision:** Accepted - Add OpenTelemetry to runners early (before we scale)
+
+---
+
+## Consideration 14: Agent Engineering Principles
+
+**From:** Surya video (via Gemini)
+
+**Principles:**
+1. **Observability is non-negotiable** - See what agents are actually doing
+2. **Product thinking** - Define what "good" looks like
+3. **Engineering** - Durable execution, error handling
+4. **Evaluation** - Test cases before users see output
+
+**VibePilot Fit:** ✅ Already aligned
+- We have Watcher for observability
+- PRD-first approach for product thinking
+- Error handling built into agents
+- Code Tester exists, need evaluation harness
+
+**Decision:** Confirmed - We're on the right track, add evaluation harness
+
+---
+
+## Consideration 15: Skills for Latest SDK Context
+
+**From:** Surya video on "legacy SDK problem"
+
+**Problem:** Agents default to outdated SDKs/models because training data is stale
+
+**Proposal:**
+- Use Gemini API Dev Skill or similar
+- Live index of latest models, SDKs, documentation
+- Agents always write current code, not legacy
+
+**VibePilot Fit:** ⚠️ Consider later
+- Our System Research agent already finds new models/tools
+- Could enhance with live documentation fetching
+- Not urgent for current phase
+
+**Decision:** Pending - Consider when we have more API integrations
+
+---
+
+# Summary of This Session
+
+| Consideration | Decision | Priority |
+|---------------|----------|----------|
+| Vibeflow Dashboard | Accepted | High - immediate reuse |
+| Skills Manifest | Pending | Medium - current approach works |
+| Event Log Pattern | Pending | Low - evaluate need |
+| CI Gates | Pending | Phase 2 - after tests |
+| Router Scoring | Accepted | Medium - implement in orchestrator |
+| OpenTelemetry | Accepted | High - add early |
+| Agent Engineering | Confirmed | N/A - already aligned |
+| SDK Skills | Pending | Low - future consideration |
+
+---
+
 # 2026-02-14 Considerations (Processed)
 
 **Source:** Gemini analysis of 3 videos on database design, AI memory, context management
