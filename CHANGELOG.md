@@ -49,6 +49,37 @@
 git checkout HEAD~1 -- prompts/consultant.md
 ```
 
+---
+
+## [Same Session - Update] - GLM-5
+**Type:** Documentation
+**Summary:** Add Vibeflow and Gemini video considerations to UPDATE_CONSIDERATIONS.md
+
+**Files Changed:**
+- `docs/UPDATE_CONSIDERATIONS.md` — Added 8 new considerations (8-15)
+
+**New Considerations Added:**
+| ID | Topic | Decision |
+|----|-------|----------|
+| DEC-008 | Vibeflow Dashboard | Accepted - reuse for frontend |
+| DEC-009 | Skills Manifest | Pending - current approach works |
+| DEC-010 | Event Log Pattern | Pending - evaluate need |
+| DEC-011 | CI Gates | Pending - Phase 2 |
+| DEC-012 | Router Scoring Formula | Accepted - add to orchestrator |
+| DEC-013 | OpenTelemetry Tracing | Accepted - add early |
+| DEC-014 | Agent Engineering Principles | Confirmed - already aligned |
+| DEC-015 | SDK Skills | Pending - future consideration |
+
+**Why:**
+- Session produced actionable research findings
+- Needed proper documentation, not just CHANGELOG mention
+- UPDATE_CONSIDERATIONS.md is the canonical place for vetted improvements
+
+**Rollback:**
+```bash
+git checkout HEAD~1 -- docs/UPDATE_CONSIDERATIONS.md
+```
+
 ## 06:30 UTC - GLM-5
 **Commit:** `6ccdeb5a`
 **Type:** Documentation (Major Session)
