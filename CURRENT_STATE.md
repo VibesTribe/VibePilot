@@ -1,11 +1,12 @@
 # VibePilot Current State
 
-**Required reading: THREE files**
+**Required reading: FOUR files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
-2. **`docs/prd_v1.4.md`** - Complete system specification (NEW - read this)
-3. **`CHANGELOG.md`** - History, changes, rollback commands
+2. **`docs/prd_v1.4.md`** - Complete system specification
+3. **`docs/core_philosophy.md`** - Strategic mindset and inviolable principles (NEW)
+4. **`CHANGELOG.md`** - History, changes, rollback commands
 
-**Read all three → Know everything → Do anything**
+**Read all four → Know everything → Do anything**
 
 ---
 
