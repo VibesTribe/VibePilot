@@ -1,6 +1,13 @@
 -- VibePilot Dependency Management RPC Functions
 -- Run this in Supabase SQL Editor
 
+-- Drop existing functions if they have different signatures
+DROP FUNCTION IF EXISTS get_available_tasks();
+DROP FUNCTION IF EXISTS claim_next_task(TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS unlock_dependent_tasks(UUID);
+DROP FUNCTION IF EXISTS check_dependencies_complete(UUID);
+DROP FUNCTION IF EXISTS make_task_available(UUID);
+
 -- Function to check if all dependencies are complete
 CREATE OR REPLACE FUNCTION check_dependencies_complete(p_task_id UUID)
 RETURNS BOOLEAN AS $$
