@@ -136,7 +136,7 @@ A sovereign AI execution engine that turns ideas into production code through co
 │                                                                          │
 │  ┌─────────────────────┐         ┌─────────────────────┐                │
 │  │       RUNNERS       │         │      COURIERS       │                │
-│  │  (Programmatic)     │         │  (Browser Use)      │                │
+│  │  (Task Agents)      │         │  (Web Delivery)     │                │
 │  │                     │         │                     │                │
 │  │  - Kimi CLI         │         │  - ChatGPT web      │                │
 │  │  - OpenCode         │         │  - Claude web       │                │
@@ -144,14 +144,21 @@ A sovereign AI execution engine that turns ideas into production code through co
 │  │  - Gemini API       │         │  - Perplexity       │                │
 │  │                     │         │                     │                │
 │  │  Direct execution   │         │  Navigate, submit,  │                │
-│  │  No browser needed  │         │  collect result     │                │
-│  │                     │         │  + chat URL         │                │
+│  │  May see codebase   │         │  collect result     │                │
+│  │  (for dependencies) │         │  + chat URL         │                │
+│  │  NO chat URL        │         │  NO codebase access │                │
 │  └─────────────────────┘         └─────────────────────┘                │
+│                                                                          │
+│  Runner task return:                                                     │
+│          - result + task_id + model_name                                 │
+│                                                                          │
+│  Courier task return:                                                    │
+│          - result + chat_url + task_id + model_name                      │
 │                                                                          │
 │  Each task:                                                              │
 │          1. Create branch: task/T001-short-desc                          │
 │          2. Execute prompt packet                                        │
-│          3. Return: result + chat_url + task_id + model_name             │
+│          3. Return result (runner) or result + chat_url (courier)        │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -236,24 +243,101 @@ A sovereign AI execution engine that turns ideas into production code through co
 
 | Role | Responsibilities | Sees | Output |
 |------|-----------------|------|--------|
-| **Consultant** | Turns ideas into PRDs | System overview | Zero-ambiguity PRD |
+| **Consultant Research** | Deep research with user until PRD approved | Market, competition, tech stacks, features, gaps | Zero-ambiguity PRD (user approved) |
 | **Planner** | Breaks PRD into atomic tasks | PRD, system state, model constraints | Full plan with prompt packets |
 | **Council Member** | Independent review | Full PRD + Plan | Vote + concerns + reasoning |
 | **Supervisor** | Validates output, merges | Task output, expected output | Pass/Fail + notes |
-| **Task Agent** | Executes single task | ONLY task packet | Result + chat_url |
+| **Task Agent (Runner)** | Executes single task via CLI/API | Task packet + relevant codebase (dependencies) | Result (no chat URL) |
+| **Courier** | Web platform delivery | Task packet + platform | Result + chat_url |
 | **Tester (Code)** | Automated testing | Code, test criteria | Pass/Fail + details |
 | **Tester (Visual)** | UI verification | Visual output | Human approval needed |
 | **Maintenance** | System updates | Full system | Safe changes |
-| **Courier** | Web platform delivery | Task packet + platform | Result + chat_url |
+| **System Research** | Daily web scouring for improvements | AI papers, models, platforms, tools | Considerations file (for council review) |
+| **Watcher** | Prevents loops, detects drift | Model outputs, error patterns | Alerts, automatic interventions |
 
-## 3.3 Context Isolation
+## 3.3 Research Agents
+
+### Consultant Research Agent
+
+**Purpose:** Works directly with user from idea to approved PRD.
+
+**Researches:**
+- Market landscape
+- Competitor features and gaps
+- Tech stack options
+- Marketing/positioning
+- User intent clarification
+
+**Process:**
+1. User presents rough idea
+2. Agent asks clarifying questions
+3. Agent researches market/competition
+4. Agent drafts PRD sections
+5. User reviews, provides feedback
+6. Iterate until user approves final PRD
+7. PRD handed to Planner
+
+**NOT automated. Interactive with human until PRD is signed off.**
+
+### System Research Agent
+
+**Purpose:** Daily autonomous research to improve VibePilot itself.
+
+**Searches for:**
+- New AI papers and breakthroughs
+- New models (open source, free tier, lightweight)
+- New platforms (zero lock-in, free tiers)
+- New tools and frameworks
+- Better strategies and approaches
+
+**Output:** Findings go to `docs/UPDATE_CONSIDERATIONS.md`
+
+**Review Process:**
+- Maintenance supervisor reviews daily
+- Council reviews significant findings
+- New models/platforms: direct add to registry
+- Other changes: Council approval before implementation
+
+**Runs:** Daily (scheduled), not on-demand
+
+## 3.4 Watcher Agent
+
+**Purpose:** Prevents models from getting stuck in loops of doom.
+
+**Monitors:**
+- Same error 3+ times in a row
+- Same output pattern repeating
+- Context not progressing (stuck)
+- Task running > 30 minutes
+- Token waste (repetitive context)
+
+**Actions:**
+| Detection | Action |
+|-----------|--------|
+| Same error 3x | Kill task, flag for different model |
+| Output loop | Kill task, alert supervisor |
+| Stuck context | Kill task, suggest split |
+| Timeout | Kill task, log duration |
+| Token waste | Alert, log pattern |
+
+**Works with:**
+- CLI runners (Kimi, OpenCode)
+- IDE integrations (future MCP support)
+- API runners
+
+**Does NOT intervene with Council or Supervisor decisions. Only execution loops.**
+
+## 3.5 Context Isolation
 
 | Role | What They See | What They Don't See |
 |------|---------------|---------------------|
-| Task Agent | Only their task packet | Other tasks, PRD, full codebase |
-| Planner | PRD, system overview | Individual task outputs |
+| Task Agent (Runner) | Task packet + relevant code (dependencies focused) | Other tasks, full PRD, unrelated codebase |
+| Task Agent (Courier) | Task packet only | Any codebase, other tasks, PRD |
+| Planner | PRD, system overview, model registry | Individual task outputs |
 | Supervisor | Task output, expected output | Other parallel tasks |
 | Council | Full PRD + Plan | Code implementation details |
+| System Research | Web, AI landscape | Internal task states |
+| Watcher | Model outputs, error logs | PRD, business logic |
 
 **Prevents drift, hallucination, and scope creep.**
 
@@ -613,7 +697,20 @@ Each task shows:
 - Update model limits
 - Credit top-ups
 
-## 9.5 Preview
+## 9.5 Watcher Alerts
+
+Real-time alerts from Watcher Agent:
+- Loop detection warnings
+- Timeout notifications
+- Token waste alerts
+- Model intervention logs
+
+Alert severity:
+- **Warning** — Pattern detected, monitoring
+- **Intervention** — Task killed, reassigned
+- **Critical** — Multiple models affected
+
+## 9.6 Preview
 
 - Vercel integration for visual tasks
 - Human review before merge
@@ -707,7 +804,9 @@ VibePilot succeeds when:
 5. **No vendor lock-in**
 6. **Human oversight** where needed (visual, security, architecture)
 7. **System learns** from every task
-8. **New session starts** with two files: CURRENT_STATE.md + this PRD
+8. **New session starts** with three files: CURRENT_STATE.md + this PRD + CHANGELOG.md
+9. **Watcher prevents** loop-of-doom scenarios
+10. **Research agents** keep system improving daily
 
 ---
 
@@ -717,11 +816,13 @@ VibePilot succeeds when:
 |------|---------|
 | `CURRENT_STATE.md` | Where we are, what's working |
 | `CHANGELOG.md` | Audit trail |
+| `docs/prd_v1.4.md` | This document - complete system spec |
+| `docs/UPDATE_CONSIDERATIONS.md` | System research findings (daily update) |
 | `config/vibepilot.yaml` | Roles, prompts, thresholds |
 | `vault_manager.py` | Secret management |
 | `orchestrator.py` | Task dispatch |
-| `runners/` | Programmatic execution |
-| `agents/` | Courier agents (future) |
+| `runners/` | Programmatic execution (CLI/API) |
+| `agents/` | Courier agents (browser automation) |
 
 ---
 
