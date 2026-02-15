@@ -304,6 +304,33 @@ thresholds:
   daily_gemini_limit: 30
 
 # =============================================================================
+# ORCHESTRATOR (Parallel execution settings)
+# =============================================================================
+
+orchestrator:
+  # Max concurrent tasks. null = dynamic (matches available runners)
+  # Set to specific number to cap: e.g., max_workers: 10
+  max_workers: null
+  
+  # How often to check for new tasks (seconds)
+  tick_interval: 2
+  
+  # Automatically scale thread pool when runners change
+  dynamic_scaling: true
+  
+  # Minimum workers even if no runners available (for testing)
+  min_workers: 1
+  
+  # Maximum workers cap (safety limit, even with many runners)
+  max_workers_cap: 50
+  
+  # Enable ROI tracking
+  track_roi: true
+  
+  # Enable telemetry
+  telemetry_enabled: true
+
+# =============================================================================
 # WATCHER THRESHOLDS (Guardian settings)
 # =============================================================================
 

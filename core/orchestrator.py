@@ -16,6 +16,7 @@ import json
 import time
 import logging
 import threading
+import yaml
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
@@ -42,6 +43,21 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Missing SUPABASE_URL or SUPABASE_KEY")
 
 db = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+def load_config() -> Dict:
+    """Load orchestrator config from vibepilot.yaml."""
+    config_path = os.path.join(
+        os.path.dirname(__file__), "..", "config", "vibepilot.yaml"
+    )
+
+    try:
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+        return config.get("orchestrator", {})
+    except Exception as e:
+        logger.warning(f"Could not load config: {e}, using defaults")
+        return {}
 
 
 class RunnerPool:
@@ -209,39 +225,96 @@ class ConcurrentOrchestrator:
     - Supervisor integration
     - Telemetry
     - ROI tracking
+
+    Concurrency is dynamic - scales based on available runners and tasks.
     """
 
-    def __init__(self, max_workers: int = 5):
-        self.max_workers = max_workers
+    def __init__(self, max_workers: int = None, config_path: str = None):
+        """
+        Initialize orchestrator.
+
+        Args:
+            max_workers: Maximum concurrent tasks. None = from config or auto
+            config_path: Path to config file for settings
+        """
         self.runner_pool = RunnerPool()
         self.dependency_manager = DependencyManager()
         self.supervisor = SupervisorAgent()
         self.task_manager = TaskManager()
         self.telemetry = get_telemetry()
 
+        self.config = load_config()
+        self._explicit_max_workers = max_workers
+
         self.executor: Optional[ThreadPoolExecutor] = None
         self.active_tasks: Dict[str, Future] = {}
         self.running = False
         self.lock = threading.Lock()
 
+        self.tick_interval = self.config.get("tick_interval", 2)
+        self.dynamic_scaling = self.config.get("dynamic_scaling", True)
+        self.min_workers = self.config.get("min_workers", 1)
+        self.max_workers_cap = self.config.get("max_workers_cap", 50)
+
         self.logger = logger
+
+    def _get_max_workers(self) -> int:
+        """
+        Determine max concurrent workers.
+
+        Priority:
+        1. Explicit constructor arg
+        2. Config file max_workers
+        3. Number of available runners (dynamic)
+        4. min_workers as floor, max_workers_cap as ceiling
+        """
+        if self._explicit_max_workers is not None:
+            return min(self._explicit_max_workers, self.max_workers_cap)
+
+        config_max = self.config.get("max_workers")
+        if config_max is not None:
+            return min(config_max, self.max_workers_cap)
+
+        available_runners = len(self.runner_pool.get_available())
+
+        workers = max(self.min_workers, available_runners)
+        workers = min(workers, self.max_workers_cap)
+
+        return workers
 
     def start(self):
         """Start the orchestrator loop."""
         self.running = True
-        self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
 
-        self.logger.info(f"Orchestrator started with {self.max_workers} workers")
+        max_w = self._get_max_workers()
+        self.executor = ThreadPoolExecutor(max_workers=max_w)
+
+        self.logger.info(f"Orchestrator started with up to {max_w} workers (dynamic)")
         self.logger.info(f"Available runners: {len(self.runner_pool.get_available())}")
 
         try:
             while self.running:
                 self._tick()
-                time.sleep(2)
+                time.sleep(self.tick_interval)
         except KeyboardInterrupt:
             self.logger.info("Shutdown requested")
         finally:
             self.stop()
+
+    def scale_workers(self):
+        """
+        Dynamically scale thread pool based on available runners.
+        Call periodically or when runner pool changes significantly.
+        """
+        if self.executor is None:
+            return
+
+        current_max = self.executor._max_workers
+        new_max = self._get_max_workers()
+
+        if new_max != current_max:
+            self.logger.info(f"Scaling workers: {current_max} → {new_max}")
+            self.executor._max_workers = new_max
 
     def stop(self):
         """Stop the orchestrator."""
