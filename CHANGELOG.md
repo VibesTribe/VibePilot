@@ -8,6 +8,47 @@
 
 # 2026-02-15
 
+## [Current Session] - GLM-5 + Human
+**Type:** Documentation
+**Summary:** Complete Consultant Research Agent prompt, review Vibeflow for learnings
+
+**Files Changed:**
+- `prompts/consultant.md` — Complete prompt (was stub, now 500+ lines)
+- `CURRENT_STATE.md` — Updated prompts status
+
+**Consultant Prompt Key Features:**
+- VibePilot positioning: Ambitious, production-grade projects only (simple apps go to Google Studio/Claude)
+- Conversation flow: Get details → Research → Recommend → Document
+- Adaptive behavior: Non-technical users with big visions (user knows WHAT, Consultant figures out HOW)
+- Research depth: Light for personal/fun, extensive for business
+- Business deliverables: Market report, pitch deck, marketing strategy, creative guide (optional)
+- Architecture principles: Modularity, zero lock-in, production-grade, AI-agent maintainable
+- Swap strategy: Every component swappable via config, no rewrites
+
+**Vibeflow Review (Prototype):**
+- Dashboard mockup (`mission-control-mockup.tsx`) available for VibePilot frontend
+- Skills manifest pattern worth borrowing
+- Event log pattern for audit trail
+- CI gate structure for later
+- Router scoring formula for orchestrator
+
+**Gemini Video Feedback (Surya):**
+- OpenTelemetry tracing recommended for observability
+- Agent Engineering vs prompt engineering (we're doing this right)
+- Loop detection (Watcher already designed)
+- Skills for latest SDK context (consider for future)
+
+**Why:**
+- Consultant was the only incomplete agent prompt
+- Needed correct positioning: VibePilot is for ambitious projects, not simple apps
+- User clarified research approach: Consultant researches, user reacts (not interrogation)
+- Business deliverables added for go-to-market readiness
+
+**Rollback:**
+```bash
+git checkout HEAD~1 -- prompts/consultant.md
+```
+
 ## 06:30 UTC - GLM-5
 **Commit:** `6ccdeb5a`
 **Type:** Documentation (Major Session)
