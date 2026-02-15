@@ -8,9 +8,59 @@
 
 # 2026-02-15
 
-# 2026-02-15
+## 06:30 UTC - GLM-5
+**Commit:** `6ccdeb5a`
+**Type:** Documentation (Major Session)
+**Summary:** Complete agent definitions, prompts, tech stack decisions
 
-# 2026-02-15
+**Files Created:**
+- `agents/agent_definitions.md` — Complete specs for 11 agents
+- `prompts/planner.md` — Full prompt (400+ lines)
+- `prompts/supervisor.md` — Full prompt (400+ lines)
+- `prompts/council.md` — Full prompt (400+ lines)
+- `prompts/orchestrator.md` — Full prompt (400+ lines)
+- `prompts/testers.md` — Code + Visual tester prompts
+- `prompts/system_researcher.md` — Full prompt (400+ lines)
+- `prompts/watcher.md` — Full prompt (400+ lines)
+- `prompts/maintenance.md` — Full prompt (400+ lines)
+- `prompts/consultant.md` — Stub (awaiting user notes)
+- `docs/tech_stack.md` — Technology decisions documented
+
+**Key Decisions:**
+- Python backend, React/TS/Vite frontend
+- pytest (Python), Vitest (TS) for testing
+- browser-use for browser automation (Gemini primary, ChatBrowserUse backup)
+- GitHub Actions for CI/CD
+- Gmail via browser-use for notifications
+- Hetzner VPS target (€4/mo vs GCE $24/2wks)
+- OpenRouter marked DANGEROUS (last resort only)
+- Runner variants: Kimi CLI, OpenCode, DeepSeek API, Gemini API
+
+**Agent Definitions Include:**
+- Agent 0: Orchestrator (Vibes)
+- Agent 1: Consultant Research
+- Agent 2: Planner
+- Agent 3: Council Member (3 lenses)
+- Agent 4: Supervisor
+- Agent 5: Watcher (redesigned - proactive prevention)
+- Agent 6: Code Tester
+- Agent 7: Visual Tester
+- Agent 8: System Research (enhanced with comprehensive data collection)
+- Agent 9: Task Runners (4 variants)
+- Agent 10: Courier (Phase 3)
+- Agent 11: Maintenance
+
+**Why:**
+- PRD was descriptive but not plan-ready
+- Agents needed full specs before Planner can create build tasks
+- Tech stack decisions needed documentation for consistency
+
+**Rollback:**
+```bash
+git revert 6ccdeb5a
+```
+
+---
 
 ## 02:00 UTC - GLM-5
 **Commit:** `967dee2e`
