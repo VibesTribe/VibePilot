@@ -6,6 +6,36 @@
 
 ---
 
+# 2026-02-15
+
+## 00:15 UTC - GLM-5
+**Commit:** `f3feb88c`
+**Type:** Documentation (Critical)
+**Files Added:**
+- `docs/prd_v1.4.md` - Comprehensive system specification
+
+**Files Changed:**
+- `CURRENT_STATE.md` - Updated required reading to 3 files
+
+**Why:**
+- Previous PRD missing key concepts from this session
+- New sessions need complete context without re-explaining everything
+- Captures: full pipeline, planner spec, runners vs couriers, vault, GitHub flow, dashboard, ROI
+
+**Key Sections:**
+- Section 2: Complete pipeline diagram
+- Section 5: Planner specification with confidence calculation
+- Section 6: Runners vs Couriers distinction
+- Section 8: Vault (secret management)
+- Section 9: Dashboard features
+
+**Rollback:**
+```bash
+git revert f3feb88c
+```
+
+---
+
 # 2026-02-14
 
 ## 21:30 UTC - GLM-5
