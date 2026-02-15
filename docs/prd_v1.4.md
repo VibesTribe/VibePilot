@@ -1099,34 +1099,152 @@ Alert severity:
 
 # 10. ROI Tracking
 
-## 10.1 The Concept
+## 10.1 Philosophy: Real World, Not Benchmarks
 
-**ROI = What it WOULD have cost vs What it DID cost**
+**How we know which model/platform is best:**
+- NOT benchmarks (trained for, not real)
+- NOT marketing claims
+- NOT theoretical comparisons
+- **REAL TASKS sent to REAL PLATFORMS with REAL RESULTS tracked**
 
-We use a courier model (e.g., Gemini with full browser use) to access free web platforms (Claude, ChatGPT). The courier costs us subscription. The target platform costs us nothing. We calculate what we saved by using the free web version instead of that platform's API.
-
-## 10.2 Per Task Calculation
-
-```python
-# Task executed via COURIER (web platform)
-# Example: Gemini (courier) → Claude web (target)
-
-# What we actually paid
-courier_subscription = $20 / month
-tasks_this_month = 100
-actual_cost = courier_subscription / tasks_this_month  # $0.20 per task
-
-# What we WOULD have paid if using target's API
-target_api_rate_in = $3 / 1M tokens
-target_api_rate_out = $15 / 1M tokens
-theoretical_cost = (tokens_in / 1M * target_api_rate_in) + (tokens_out / 1M * target_api_rate_out)
-
-# ROI
-savings = theoretical_cost - actual_cost
-roi_percentage = (savings / theoretical_cost) * 100
+**Continuous Evaluation:**
+```
+┌─────────────────────────────────────────┐
+│  Send test tasks to all free platforms  │
+│  (ChatGPT, Claude, Gemini, Perplexity)  │
+└─────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│  Track: success, tokens, time, quality  │
+└─────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│  Analyze: Which performed best?         │
+│  Which saved most money?                │
+└─────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│  Route more tasks to winner             │
+│  Keep testing others at lower volume    │
+└─────────────────────────────────────────┘
+                    │
+                    ▼
+          (repeat forever — market changes, we adapt)
 ```
 
-## 10.3 Different Scenarios
+**Best Cheapest Most Effective Wins:**
+- Today: Gemini as courier
+- Tomorrow: Whoever is cheaper/better
+- Next Month: Something we haven't heard of yet
+- **Every model is swappable based on real performance data**
+
+## 10.2 Full Task Cost Tracking
+
+**A task's cost = ALL attempts until complete**
+
+```
+Task T001: "Implement user profile"
+
+Attempt 1: Assigned to DeepSeek API
+  - Tokens in: 8,000
+  - Tokens out: 4,000
+  - Result: FAILED (output didn't match spec)
+  - Cost: $0.017
+
+Attempt 2: Assigned to Claude web (via Gemini courier)
+  - Courier tokens: 2,000
+  - Claude tokens in: 8,000
+  - Claude tokens out: 6,000
+  - Result: FAILED (syntax errors)
+  - Cost: $0.20 (courier allocation)
+
+Decision: Split task into T001a and T001b
+
+Attempt 3 (T001a): Assigned to Kimi CLI
+  - Tokens in: 5,000
+  - Tokens out: 3,000
+  - Result: PASSED
+  - Cost: $0.10 (subscription allocation)
+
+Attempt 4 (T001b): Assigned to ChatGPT web (via Gemini courier)
+  - Courier tokens: 1,500
+  - ChatGPT tokens in: 4,000
+  - ChatGPT tokens out: 3,000
+  - Result: PASSED
+  - Cost: $0.15 (courier allocation)
+
+════════════════════════════════════════
+TOTAL TASK COST: $0.017 + $0.20 + $0.10 + $0.15 = $0.467
+TOTAL TOKENS: 44,500 (all attempts)
+THEORETICAL COST (if all via single API): $0.89
+SAVINGS: $0.423
+════════════════════════════════════════
+```
+
+**Dashboard shows:**
+- Per task: All attempts, all costs, final result
+- Per model: Success rate, avg cost per task type, total spend
+- Per project: Total actual cost, total theoretical cost, savings
+
+## 10.3 ROI Calculator (Live)
+
+**Always visible in dashboard. Always up to date.**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ROI CALCULATOR                           │
+├─────────────────────────────────────────────────────────────┤
+│  This Month                                                 │
+│  ─────────────────────────────────────────────────────────  │
+│  Tasks Completed:        47                                 │
+│  Tasks Failed:           3                                  │
+│  Total Attempts:         58 (avg 1.23 per task)             │
+│                                                             │
+│  Tokens Used:                                               │
+│  - Total In:             312K                               │
+│  - Total Out:            198K                               │
+│                                                             │
+│  Costs:                                                     │
+│  - Actual (subscriptions + API):    $12.40                  │
+│  - Theoretical (if all API):        $89.20                  │
+│  - Savings:                         $76.80                  │
+│  - ROI:                             86.1%                    │
+│                                                             │
+│  By Model:                                                  │
+│  ─────────────────────────────────────────────────────────  │
+│  Kimi CLI        22 tasks  95% success  $0.09/task          │
+│  DeepSeek API    8 tasks   75% success  $0.03/task          │
+│  ChatGPT web     12 tasks  92% success  $0.15/task          │
+│  Claude web      5 tasks   80% success  $0.18/task          │
+│                                                             │
+│  Recommendation: Route more to Kimi CLI (best cost/success) │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 10.4 Courier Cost Attribution
+
+**Courier model costs us subscription.** That cost is spread across all tasks the courier handles.
+
+```python
+courier_subscription_monthly = $X
+courier_tasks_this_month = N
+courier_cost_per_task = courier_subscription_monthly / N
+
+# Example:
+# Gemini subscription: $20/month
+# Tasks delivered: 150
+# Cost per task: $0.13
+```
+
+**Courier model is chosen by:**
+- Has native browser use (computer use API)
+- Is cheapest effective option available
+- Is swappable anytime something better emerges
+
+## 10.5 Different Execution Scenarios
 
 | Execution Type | Actual Cost | Theoretical Cost | Savings |
 |----------------|-------------|------------------|---------|
@@ -1135,35 +1253,40 @@ roi_percentage = (savings / theoretical_cost) * 100
 | Direct → DeepSeek API | Real money spent | Same as actual | $0 (visibility only) |
 | CLI → Kimi subscription | Kimi subscription ÷ tasks | Kimi API rates (if existed) | Variable |
 
-## 10.4 Why This Matters
+## 10.6 Why This Matters
 
-- **Courier choice:** Is Gemini subscription worth it? ROI tells us.
+- **Courier choice:** Which courier subscription is worth it? ROI tells us.
 - **Platform choice:** Which free web platforms save us most?
-- **Subscription decisions:** Renew Kimi? ROI vs DeepSeek API tells us.
+- **Subscription decisions:** Renew Kimi? ROI vs alternatives tells us.
 - **Hosting costs:** GCE vs Hetzner — total cost of ownership.
+- **Model performance:** Which models earn their keep?
 
-## 10.5 Per Project Aggregate
+## 10.7 Per Project Aggregate
 
 ```
 Project: Auth & RBAC
 Tasks completed: 47
+Total attempts: 58
 Total tokens: 847K
 
 Theoretical cost (if all via APIs): $127.40
-Actual cost (courier + subscriptions): $23.50
+Actual cost (all attempts, all models): $23.50
 Total savings: $103.90
 ROI: 81.6%
 ```
 
-## 10.6 Model Performance (Informs ROI)
+## 10.8 Model Performance (Informs Routing)
 
 - Success rate by task type
 - Average tokens per task type
 - Average runtime
 - Reliability score
+- **Cost per successful task** — Failed attempts count toward this
 - **Recommendation score** — Should we keep subscribing?
 
 ---
+
+# 11. Migration
 
 # 11. Migration
 
