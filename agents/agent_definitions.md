@@ -1962,34 +1962,281 @@ Every model finding MUST include:
 
 ---
 
-# AGENT 9: TASK RUNNER (Kimi)
+# AGENT 9: TASK RUNNERS
 
-## Identity
-**Name:** Task Runner - Kimi
-**Type:** Execution (performs actual work)
-**Default Model:** Kimi K2.5
-**Access:** Codebase (can read dependencies)
+## Runner Architecture
 
-## Purpose
-Execute atomic tasks via Kimi CLI. May see relevant codebase for dependencies.
+All runners share the same interface (input/output format) but differ in:
+- **Access**: CLI runners see codebase, API runners don't
+- **Cost**: Subscription vs pay-per-use vs free tier
+- **Context**: Different limits
+- **Best for**: Different task types
 
-## Skills
-| Skill | Description |
-|-------|-------------|
-| `code_generation` | Write new code |
-| `code_modification` | Modify existing code |
-| `test_writing` | Write tests |
-| `documentation` | Write docs |
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      RUNNER TYPES                                │
+│                                                                  │
+│  CLI RUNNERS (Codebase Access)          API RUNNERS (No Access) │
+│  ┌─────────────────────┐                ┌─────────────────────┐ │
+│  │ Kimi CLI            │                │ DeepSeek API        │ │
+│  │ - Subscription      │                │ - Pay per use       │ │
+│  │ - 128K context      │                │ - 128K context      │ │
+│  │ - Parallel/swarm    │                │ - Cache support     │ │
+│  └─────────────────────┘                └─────────────────────┘ │
+│  ┌─────────────────────┐                ┌─────────────────────┐ │
+│  │ OpenCode (GLM-5)    │                │ Gemini API          │ │
+│  │ - Subscription      │                │ - Free tier         │ │
+│  │ - 128K context      │                │ - 128K context      │ │
+│  │ - Governance role   │                │ - Rate limited      │ │
+│  └─────────────────────┘                └─────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-## Tools
-| Tool | Usage |
-|------|-------|
-| `file_read` | Read codebase, dependencies |
-| `file_write` | Create/modify files |
-| `terminal` | Run commands, tests |
-| `git_operations` | Branch, commit |
+---
 
-## Input Format
+## RUNNER 9A: Kimi CLI
+
+### Identity
+**Name:** Task Runner - Kimi CLI
+**Type:** CLI Execution (subscription)
+**Model:** Kimi K2.5
+**Access:** Full codebase access
+**Cost:** ~$10/month subscription (unlimited)
+
+### Purpose
+Primary parallel task executor. Handles complex tasks requiring codebase awareness. Swarm mode for wide parallel execution.
+
+### Specs
+| Attribute | Value |
+|-----------|-------|
+| Context limit | 128K |
+| Context effective | 100K |
+| Cost model | Subscription |
+| Rate limits | None |
+| Best for | Code generation, parallel tasks, long context |
+| Weakness | English reasoning (Chinese-optimized) |
+
+### Features
+- **Agent Swarm**: Can dispatch to multiple sub-agents for parallel work
+- **Web Browsing**: Can fetch web content if needed
+- **Long Context**: Handles large codebases
+
+### When to Route Here
+- Task requires codebase access
+- Task has 4+ code_context dependencies
+- Parallel execution beneficial
+- Complex multi-file changes
+
+---
+
+## RUNNER 9B: OpenCode (GLM-5)
+
+### Identity
+**Name:** Task Runner - OpenCode
+**Type:** CLI Execution (subscription)
+**Model:** GLM-5
+**Access:** Full codebase access
+**Cost:** Subscription (already paying)
+
+### Purpose
+Primary governance executor AND task executor. You are here now. Handles Consultant, Planner, Council, Supervisor roles AND can execute tasks.
+
+### Specs
+| Attribute | Value |
+|-----------|-------|
+| Context limit | 128K |
+| Context effective | 100K |
+| Cost model | Subscription |
+| Rate limits | None |
+| Best for | Governance, reasoning, planning, review, code |
+| Weakness | None significant |
+
+### Features
+- **Strong Reasoning**: Excellent for planning and review
+- **Code Generation**: Capable of production code
+- **Governance Native**: Built for Consultant/Planner/Council/Supervisor roles
+- **Bilingual**: Strong English and Chinese
+
+### When to Route Here
+- Governance tasks (Planner, Council, Supervisor)
+- Tasks requiring deep reasoning
+- Code review and validation
+- Complex architectural decisions
+- When Kimi unavailable
+
+### Dual Role
+```
+GLM-5 serves TWO purposes:
+1. GOVERNANCE: Consultant, Planner, Council, Supervisor
+   - These NEVER go to web platforms
+   - Always stay in-house
+   
+2. TASK EXECUTION: When Kimi busy or task suits GLM strengths
+   - Can execute any task type
+   - Fallback for Kimi
+```
+
+---
+
+## RUNNER 9C: DeepSeek API
+
+### Identity
+**Name:** Task Runner - DeepSeek API
+**Type:** API Execution (pay per use)
+**Model:** DeepSeek-V3.2 (deepseek-chat)
+**Access:** No codebase access (API only)
+**Cost:** $2 credit available
+
+### Purpose
+Cost-effective API runner for tasks that don't need codebase access. Use prompt caching for 90% savings.
+
+### Specs
+| Attribute | Value |
+|-----------|-------|
+| Context limit | 128K |
+| Context effective | 100K |
+| Cost (cache miss) | $0.28/1M input, $0.42/1M output |
+| Cost (cache hit) | $0.028/1M input (90% savings!) |
+| Credit available | $2.00 |
+| Rate limits | None (they serve all) |
+| Best for | Code generation, technical docs, reasoning |
+| Weakness | Less mature than GPT/Claude |
+
+### Features
+- **Prompt Caching**: 90% cost reduction on repeated context
+- **No Rate Limits**: They serve all requests
+- **Strong Coding**: Excellent for code tasks
+- **Low Latency**: Fast responses
+
+### When to Route Here
+- Task has NO codebase dependencies
+- Task packet is self-contained
+- Want to preserve CLI subscription capacity
+- Cache can be used (repeated context)
+
+### Cost Optimization
+```python
+# ALWAYS use caching when possible
+cached_context = [
+    "System prompt",
+    "VibePilot conventions",
+    "Shared patterns"
+]
+
+# Only pay for new tokens
+result = runner.execute(
+    prompt="Create user service",
+    cached_context=cached_context  # 90% cheaper!
+)
+```
+
+### Budget Management
+```
+$2 credit = approximately:
+- ~200 tasks (with caching)
+- ~50 tasks (without caching)
+
+PAUSE when credit < $0.50
+ALERT human when credit < $0.20
+```
+
+---
+
+## RUNNER 9D: Gemini API
+
+### Identity
+**Name:** Task Runner - Gemini API
+**Type:** API Execution (free tier)
+**Model:** Gemini 2.0 Flash
+**Access:** No codebase access (API only)
+**Cost:** FREE (within limits)
+
+### Purpose
+Free tier runner for research and simple tasks. Rate limited but costs nothing.
+
+### Specs
+| Attribute | Value |
+|-----------|-------|
+| Context limit | 128K (Flash) / 1M (Pro) |
+| Context effective | 100K / 800K |
+| Cost | $0 (free tier) |
+| Rate limits | 15 RPM, 1500 RPD, 1M tokens/day |
+| Best for | Research, multimodal, fast tasks |
+| Weakness | Rate limits can block |
+
+### Features
+- **Free Tier**: $0 cost within limits
+- **Multimodal**: Can process images
+- **Fast**: Flash model is very quick
+- **Research Native**: Excellent for web research
+
+### When to Route Here
+- Research tasks
+- Tasks with no codebase needed
+- Low priority (can wait if rate limited)
+- Multimodal tasks (images)
+- Preserving paid resources
+
+### Rate Limit Management
+```
+Track daily usage:
+- requests_today: N/1500
+- tokens_today: N/1,000,000
+
+WARN at 70%: "Gemini at 70% daily limit"
+STOP at 90%: "Gemini exhausted, use other runners"
+RESET: Midnight UTC
+```
+
+---
+
+## RUNNER SELECTION LOGIC
+
+```python
+def select_runner(task):
+    """
+    Select appropriate runner based on task requirements.
+    Priority: Preserve subscriptions, use free tier when possible.
+    """
+    
+    # 1. Governance tasks → GLM-5 (always)
+    if task.role in GOVERNANCE_ROLES:
+        return "opencode"
+    
+    # 2. Needs codebase → CLI runners
+    if task.requires_codebase:
+        # Prefer Kimi for parallel/complex, GLM-5 for reasoning
+        if task.parallel_execution:
+            return "kimi-cli"
+        return "opencode"
+    
+    # 3. Research → Gemini (free)
+    if task.type == "research":
+        if gemini_rate_limit_ok():
+            return "gemini-api"
+    
+    # 4. Simple code task → DeepSeek (with cache)
+    if task.type == "code" and not task.requires_codebase:
+        if deepseek_credit > 0.50:
+            return "deepseek-api"
+    
+    # 5. Fallback hierarchy
+    if gemini_rate_limit_ok():
+        return "gemini-api"
+    if deepseek_credit > 0.20:
+        return "deepseek-api"
+    
+    # 6. Last resort: CLI (preserves for complex tasks)
+    return "kimi-cli"
+```
+
+---
+
+## SHARED RUNNER INTERFACE
+
+All runners implement the same interface:
+
+### Input Format
 ```json
 {
   "task_id": "uuid",
@@ -1999,21 +2246,23 @@ Execute atomic tasks via Kimi CLI. May see relevant codebase for dependencies.
     {
       "task_id": "uuid",
       "type": "summary" | "code_context",
-      "content": "string (summary or file paths)"
+      "content": "string"
     }
   ],
   "branch_name": "task/T001-short-desc",
-  "expected_output": { ... }
+  "expected_output": { ... },
+  "cached_context": ["string"]  // For API runners
 }
 ```
 
-## Output Format
+### Output Format
 ```json
 {
   "task_id": "uuid",
   "task_number": "T001",
-  "model_name": "kimi-k2.5",
-  "status": "success" | "failed" | "blocked",
+  "model_name": "kimi-k2.5" | "glm-5" | "deepseek-chat" | "gemini-2.0-flash",
+  "runner_type": "cli" | "api",
+  "status": "success" | "failed" | "blocked" | "rate_limited",
   "result": {
     "files_created": ["path"],
     "files_modified": ["path"],
@@ -2021,53 +2270,30 @@ Execute atomic tasks via Kimi CLI. May see relevant codebase for dependencies.
     "tests_written": ["path"],
     "notes": "string"
   },
-  "chat_url": null,
+  "chat_url": null,  // Only couriers return chat URLs
   "error": "string (if failed)",
   "block_reason": "string (if blocked)",
   "tokens_used": 15000,
+  "tokens_cached": 5000,  // For API runners with cache
+  "cost": 0.007,  // Actual cost (0 for subscription/free)
   "execution_time_seconds": 45
 }
 ```
 
-## Process
-```
-1. RECEIVE task packet
-
-2. CREATE branch: task/T001-short-desc
-
-3. READ dependencies (if any):
-   - IF summary: Use as context
-   - IF code_context: Read specified files
-
-4. EXECUTE prompt packet:
-   - Follow instructions exactly
-   - Create specified files
-   - Modify specified files
-   - Write specified tests
-
-5. VERIFY against expected output:
-   - All files created?
-   - All files modified?
-   - No extra changes?
-
-6. COMMIT changes to branch
-
-7. OUTPUT result (JSON)
-```
-
-## Context Isolation
+### Context Isolation (All Runners)
 | Sees | Does NOT See |
 |------|--------------|
 | Task packet | Other tasks |
-| Dependency code (if needed) | Full PRD |
+| Dependency code (CLI only) | Full PRD |
 | Relevant files | Unrelated codebase |
 | Expected output | Other runners' outputs |
 
-## Constraints
+### Constraints (All Runners)
 - NEVER see full PRD
 - NEVER see other tasks
 - NEVER make changes outside task scope
 - Return result, NOT chat URL (that's courier)
+- Report tokens and cost accurately
 
 ---
 
