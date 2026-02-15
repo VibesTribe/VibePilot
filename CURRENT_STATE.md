@@ -1,15 +1,16 @@
 # VibePilot Current State
 
-**Required reading: TWO files**
+**Required reading: THREE files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
-2. **`CHANGELOG.md`** - History, changes, rollback commands
+2. **`docs/prd_v1.4.md`** - Complete system specification (NEW - read this)
+3. **`CHANGELOG.md`** - History, changes, rollback commands
 
-**Read both → Know everything → Do anything**
+**Read all three → Know everything → Do anything**
 
 ---
 
-**Last Updated:** 2026-02-14 21:35 UTC
-**Updated By:** GLM-5 (vault + migration prep)
+**Last Updated:** 2026-02-15 00:15 UTC
+**Updated By:** GLM-5 (PRD v1.4 comprehensive update)
 **Known Good Commit:** `46423d69` (vault + migration ready)
 
 ---
