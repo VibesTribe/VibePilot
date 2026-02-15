@@ -110,9 +110,14 @@ A sovereign AI execution engine that turns ideas into production code through co
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           ORCHESTRATOR                                   │
+│                           ORCHESTRATOR ("VIBES")                         │
 │                                                                          │
-│  NOT an executor. A dispatcher/monitor:                                  │
+│  NOT an executor. A dispatcher/monitor/optimizer.                       │
+│                                                                          │
+│  Name: Vibes                                                             │
+│  Role: Human's direct interface to VibePilot                             │
+│                                                                          │
+│  Core Functions:                                                         │
 │          - Watches task queue                                            │
 │          - Assigns tasks to available models                             │
 │          - Manages rate limits, timeouts, credits                        │
@@ -121,6 +126,29 @@ A sovereign AI execution engine that turns ideas into production code through co
 │            - Task requirements (codebase access, context needs)          │
 │            - Model availability and limits                               │
 │            - Historical performance per task type                        │
+│                                                                          │
+│  Continuous Improvement Goal:                                            │
+│          - Perpetually fine-tune ability to leverage best free tiers     │
+│          - Optimize model selection for internal agents                   │
+│          - Maximize VibePilot's efficiency                               │
+│          - Self-evolving with MEASURABLE improvement                     │
+│                                                                          │
+│  What Vibes Sees:                                                        │
+│          - All task results, all costs, all tokens                       │
+│          - Best performing models: today, this week, this month          │
+│          - ROI per model, per platform, per task type                    │
+│          - Subscription value analysis                                   │
+│                                                                          │
+│  Vibes Recommends:                                                       │
+│          - Which subscriptions to keep, drop, or add                     │
+│          - Which APIs need credit top-up                                 │
+│          - Which models to route more/less traffic to                    │
+│          - All backed by CLEAR VERIFIED METRICS                          │
+│                                                                          │
+│  Example Recommendation:                                                 │
+│          "Kimi CLI: 95% success, $0.09/task. Recommend keeping.          │
+│           DeepSeek API: 68% success, $0.14/task. Consider dropping.      │
+│           ChatGPT web: 91% success, $0.11/task. Route more here."        │
 │                                                                          │
 │  Routing Priority:                                                       │
 │          1. Web platforms (couriers) — until 80% limit                   │
@@ -143,7 +171,6 @@ A sovereign AI execution engine that turns ideas into production code through co
 │          - Tracks what failed and why                                    │
 │          - Analyzes patterns across hundreds of tasks                    │
 │          - Updates model performance scores                              │
-│          - Recommends subscriptions worth renewing                       │
 │                                                                          │
 │  If ALL platforms at 80%:                                               │
 │          - Default to CLI subscriptions                                  │
@@ -154,6 +181,7 @@ A sovereign AI execution engine that turns ideas into production code through co
 │          - Only agent human talks to directly                            │
 │          - Dashboard + daily summary email                               │
 │          - "Hey Vibes, what's the status?" → live response               │
+│          - "Hey Vibes, should I renew Kimi?" → data-backed answer        │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
