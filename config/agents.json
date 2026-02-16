@@ -1,0 +1,139 @@
+{
+  "version": "1.0",
+  "description": "Agent definitions. Each agent has scoped skills and tools. Change model with one edit.",
+  "agents": [
+    {
+      "id": "vibes",
+      "name": "Vibes",
+      "role": "Human consultation and project intelligence",
+      "description": "Your key agent for updates, briefings, ROI analysis, and strategic decisions. Has full visibility into project state.",
+      "model": "gemini-2.0-flash",
+      "skills": ["consult", "report", "research"],
+      "tools": ["supabase_query", "web_search", "file_read", "voice_stt", "voice_tts"],
+      "prompt": "prompts/vibes.md",
+      "channels": ["voice", "text", "email"],
+      "notes": "Sits above orchestrator. Human's primary interface to VibePilot."
+    },
+    {
+      "id": "orchestrator",
+      "name": "Orchestrator",
+      "role": "Strategic task routing and learning",
+      "description": "Routes tasks based on availability, historical performance, and learned patterns. Tracks success rates, costs, model strengths. Gets smarter every day.",
+      "model": "gemini-2.0-flash",
+      "skills": ["route"],
+      "tools": ["supabase_query", "supabase_write"],
+      "prompt": "prompts/orchestrator.md",
+      "notes": "Strategic brain. Works with Researcher to incorporate new intelligence."
+    },
+    {
+      "id": "researcher",
+      "name": "Researcher",
+      "role": "Continuous improvement and intelligence",
+      "description": "Monitors new models, approaches, platform changes. Feeds intelligence to Orchestrator. Weekly briefings to Vibes. Keeps VibePilot current.",
+      "model": "gemini-2.0-flash",
+      "skills": ["research"],
+      "tools": ["web_search"],
+      "prompt": "prompts/researcher.md",
+      "notes": "How VibePilot evolves. Works with Orchestrator for continuous improvement."
+    },
+    {
+      "id": "consultant",
+      "name": "Consultant",
+      "role": "Interactive PRD generation",
+      "description": "Works with human to clarify vision, gather requirements, and produce complete PRD.",
+      "model": "gemini-2.0-flash",
+      "skills": ["consult"],
+      "tools": ["web_search"],
+      "prompt": "prompts/consultant.md",
+      "notes": "Starts every project. May use courier platforms for free tier access."
+    },
+    {
+      "id": "planner",
+      "name": "Planner",
+      "role": "Task breakdown and dependency mapping",
+      "description": "Takes PRD and produces executable task graph with confidence scores.",
+      "model": "kimi-cli",
+      "skills": ["plan"],
+      "tools": ["file_read", "git"],
+      "prompt": "prompts/planner.md",
+      "notes": "Needs codebase access for accurate planning. Uses Kimi CLI subscription."
+    },
+    {
+      "id": "council",
+      "name": "Council",
+      "role": "Multi-perspective review",
+      "description": "Reviews proposed solutions from architecture, security, and maintenance perspectives.",
+      "model": "gemini-2.0-flash",
+      "skills": ["council_review"],
+      "tools": ["file_read", "web_search"],
+      "prompt": "prompts/council.md",
+      "notes": "Can approve, reject, or request changes. Uses courier platforms."
+    },
+    {
+      "id": "supervisor",
+      "name": "Supervisor",
+      "role": "Quality gate and merge control",
+      "description": "Verifies output matches prompt, sends to testers, handles pass/fail. Merge or reassign with WHY + WHAT TO FIX notes.",
+      "model": "gemini-2.0-flash",
+      "skills": ["supervise"],
+      "tools": ["supabase_query", "supabase_write", "git"],
+      "prompt": "prompts/supervisor.md",
+      "notes": "Quality gate. Orchestrator handles routing/limits. Supervisor handles output validation."
+    },
+    {
+      "id": "courier",
+      "name": "Courier",
+      "role": "Web platform execution",
+      "description": "Executes tasks on web AI platforms. Returns chat_url for future revisions.",
+      "model": "browser-use-gemini",
+      "skills": ["execute_courier"],
+      "tools": ["browser"],
+      "prompt": "prompts/courier.md",
+      "notes": "No codebase access. Only receives prompt packet. CORE execution method."
+    },
+    {
+      "id": "internal_cli",
+      "name": "Internal CLI",
+      "role": "CLI-based execution with codebase access",
+      "description": "Executes tasks via Kimi or OpenCode CLI. Has full codebase access.",
+      "model": "kimi-cli",
+      "skills": ["execute_internal_cli"],
+      "tools": ["cli", "file_read", "file_write", "git"],
+      "prompt": "prompts/internal_cli.md",
+      "notes": "For dependency-heavy tasks. Subscription-based."
+    },
+    {
+      "id": "internal_api",
+      "name": "Internal API",
+      "role": "API-based execution (emergency/special)",
+      "description": "Executes tasks via API. Has codebase access. Use sparingly.",
+      "model": "gemini-api",
+      "skills": ["execute_internal_api"],
+      "tools": ["file_read", "file_write"],
+      "prompt": "prompts/internal_api.md",
+      "notes": "API costs money. DeepSeek has $2 credit. Gemini API is free."
+    },
+    {
+      "id": "tester_code",
+      "name": "Code Tester",
+      "role": "Code validation",
+      "description": "Runs tests, lint, typecheck on generated code.",
+      "model": "opencode",
+      "skills": ["test_code"],
+      "tools": ["cli", "file_read"],
+      "prompt": "prompts/tester_code.md",
+      "notes": "Uses your OpenCode subscription. Fast and capable."
+    },
+    {
+      "id": "maintenance",
+      "name": "Maintenance",
+      "role": "System updates (ONLY agent allowed)",
+      "description": "ONLY agent that touches system files. Implements after Council + Supervisor approval. Sandbox tests everything. Exit-ready always.",
+      "model": "opencode",
+      "skills": ["system_update"],
+      "tools": ["cli", "file_read", "file_write", "git"],
+      "prompt": "prompts/maintenance.md",
+      "notes": "No approval = no change. Researcher suggests, Maintenance implements."
+    }
+  ]
+}

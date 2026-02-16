@@ -3,16 +3,16 @@
 **Required reading: FOUR files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
 2. **`docs/prd_v1.4.md`** - Complete system specification
-3. **`docs/core_philosophy.md`** - Strategic mindset and inviolable principles (NEW)
+3. **`docs/core_philosophy.md`** - Strategic mindset and inviolable principles
 4. **`CHANGELOG.md`** - History, changes, rollback commands
 
 **Read all four → Know everything → Do anything**
 
 ---
 
-**Last Updated:** 2026-02-15 06:30 UTC
-**Updated By:** GLM-5 (Agent definitions + prompts complete, tech stack documented)
-**Known Good Commit:** `07d5fd62` (Maintenance agent added)
+**Last Updated:** 2026-02-16 17:30 UTC
+**Updated By:** GLM-5 (Vendor lock-in fix, platform research, Vibeflow clone + Supabase branch started)
+**Known Good Commit:** Current (session not yet committed)
 
 ---
 
@@ -20,12 +20,30 @@
 
 Sovereign AI execution engine. Human provides idea → VibePilot executes with zero drift.
 
+**Core Principles (see docs/core_philosophy.md):**
+- Zero vendor lock-in - everything swappable
+- Modular & swappable - change one thing, nothing else breaks
+- Exit ready - pack up, hand over to anyone
+- Reversible - if it can't be undone, it can't be done
+- Always improving - new ideas evaluated daily
+
 **Core Rules:**
 - All state in Supabase
 - All code in GitHub
 - All changes via config (zero code edits for swaps)
 - Context isolation per agent (task agents see ONLY their task)
 - Council for PRDs/plans (iterative), system updates (one-shot vote)
+- Maintenance is ONLY agent that touches system files
+
+---
+
+# VIBEFLOW DASHBOARD (Reference)
+
+**Live Dashboard (Mock Data):** https://vibestribe.github.io/vibeflow/
+
+**GitHub Repo:** https://github.com/VibesTribe/vibeflow
+
+**Note:** These URLs have been provided multiple times. Check here first before asking.
 
 ---
 
@@ -76,17 +94,71 @@ git checkout aaabc5c5
 | Dual Orchestrator | Routes tasks to right model | `orchestrator.py` (legacy), `core/orchestrator.py` (NEW concurrent) |
 | Role System | Defines agent capabilities | `core/roles.py` + `config/vibepilot.yaml` |
 | **Vault** | Encrypted secret storage | `vault_manager.py` + Supabase `secrets_vault` |
-| **Agent Definitions** | Complete spec for all 11 agents | `agents/agent_definitions.md` |
-| **Agent Prompts** | Full prompts for all 10 agents | `prompts/*.md` (10 files - all complete) |
-| **Tech Stack Decisions** | Documented technology choices | `docs/tech_stack.md` |
-| **Supervisor Agent** | Reviews, approves, coordinates testing | `agents/supervisor.py` (NEW) |
-| **Concurrent Orchestrator** | Parallel task execution | `core/orchestrator.py` (NEW) |
-| **Dependency Manager** | Unlock tasks when deps complete | `core/orchestrator.py` (NEW) |
-| **Runner Pool** | Track available/used runners | `core/orchestrator.py` (NEW) |
-| **Telemetry** | OpenTelemetry observability | `core/telemetry.py` (NEW) |
-| **Loop Detector** | Detect stuck agents | `core/telemetry.py` (NEW) |
-| **Memory Interface** | Pluggable context storage | `core/memory.py` (NEW) |
-| **Dependency RPC** | Supabase functions for dep unlock | `docs/schema_dependency_rpc.sql` (NEW) |
+| **Telemetry** | OpenTelemetry observability | `core/telemetry.py` |
+| **Loop Detector** | Detect stuck agents | `core/telemetry.py` |
+| **Memory Interface** | Pluggable context storage | `core/memory.py` |
+| **Dependency RPC** | Supabase functions for dep unlock | `docs/schema_dependency_rpc.sql` |
+| **Base Runner** | Abstract class for contract enforcement | `runners/base_runner.py` |
+| **Contract Runners** | Kimi, DeepSeek, Gemini, Courier following interface | `runners/contract_runners.py` |
+| **Config Loader** | Central JSON config access | `core/config_loader.py` |
+| **Terminal Dashboard** | Real-time task/runner monitoring | `dashboard/terminal_dashboard.py` |
+| **Pipeline Test** | End-to-end task execution test | `tests/test_pipeline.py` |
+
+## NEW: Contract Layer (Previous Session)
+
+| Component | What It Is | Location |
+|-----------|------------|----------|
+| **Task Packet Schema** | JSON schema for task packets | `config/schemas/task_packet.schema.json` |
+| **Result Schema** | JSON schema for runner output | `config/schemas/result.schema.json` |
+| **Event Schema** | JSON schema for lifecycle events | `config/schemas/event.schema.json` |
+| **Run Feedback Schema** | JSON schema for task feedback + learning | `config/schemas/run_feedback.schema.json` |
+| **Runner Interface** | Contract every runner must follow | `config/RUNNER_INTERFACE.md` |
+| **Skills Registry** | 13 skills, declarative | `config/skills.json` |
+| **Tools Registry** | 10 tools | `config/tools.json` |
+| **Models Registry** | 9 models with costs/limits | `config/models.json` |
+| **Platforms Registry** | 4 web platforms | `config/platforms.json` |
+| **Agents Registry** | 12 agents with scoped skills/tools | `config/agents.json` |
+| **Agent Prompts** | 12 complete agent prompts | `config/prompts/*.md` |
+
+## Contract Runners (This Session)
+
+| Component | What It Is | Location |
+|-----------|------------|----------|
+| **Base Runner** | Abstract class enforcing RUNNER_INTERFACE | `runners/base_runner.py` |
+| **Contract Runners** | Kimi, DeepSeek, Gemini, Courier following interface | `runners/contract_runners.py` |
+| **Config Loader** | Central module for all JSON configs | `core/config_loader.py` |
+| **E2E Test** | Full contract layer test | `tests/test_contract_e2e.py` |
+| **Terminal Dashboard** | Real-time monitoring | `dashboard/terminal_dashboard.py` |
+| **Pipeline Test** | End-to-end task execution | `tests/test_pipeline.py` |
+
+**All runners now follow the contract:**
+- Input: JSON via stdin or --task flag
+- Output: JSON via stdout with exact schema
+- Exit codes: 0=success, 1=failure
+- `--probe` for health check
+
+**Config Loader provides:**
+- Cached access to skills, tools, models, platforms, agents
+- Agent resolution with skills/tools expanded
+- Config validation
+| **Agent Prompts** | 12 complete agent prompts | `config/prompts/*.md` |
+
+## Agent Prompts (Complete)
+
+| Agent | Role | Prompt File |
+|-------|------|-------------|
+| Vibes | Human interface, daily briefings | `config/prompts/vibes.md` |
+| Orchestrator | Strategic routing, learning | `config/prompts/orchestrator.md` |
+| Researcher | Daily research, suggests only | `config/prompts/researcher.md` |
+| Consultant | Zero ambiguity PRD | `config/prompts/consultant.md` |
+| Planner | Task breakdown from PRD | `config/prompts/planner.md` |
+| Council | Multi-model review | `config/prompts/council.md` |
+| Supervisor | Quality gate, merge control | `config/prompts/supervisor.md` |
+| Courier | Web platform execution | `config/prompts/courier.md` |
+| Internal CLI | CLI with codebase access | `config/prompts/internal_cli.md` |
+| Internal API | API execution (emergency) | `config/prompts/internal_api.md` |
+| Code Tester | Code validation | `config/prompts/tester_code.md` |
+| Maintenance | ONLY system updater | `config/prompts/maintenance.md` |
 
 ## Vault (Secret Management)
 
@@ -112,16 +184,44 @@ vault.ingest_secret('KEY_NAME', 'key_value')
 
 **Runners use vault automatically:** `get_api_key('DEEPSEEK_API_KEY')`
 
+## Models vs Platforms (Critical Distinction)
+
+**MODELS** (`config/models.json`) = What we HAVE direct access to:
+| Model | Type | Use |
+|-------|------|-----|
+| gemini-api | API | Drive browser-use, direct API calls |
+| deepseek-chat | API | Drive browser-use, direct API calls |
+| kimi-cli | CLI | Execute tasks directly |
+| opencode | CLI | Execute tasks directly |
+
+**PLATFORMS** (`config/platforms.json`) = Where couriers GO via browser:
+| Platform | Context | Free Limits | Auth | Best For |
+|----------|---------|-------------|------|----------|
+| Gemini | 1M | 1500/day, 1M tokens/day | Gmail | Long docs, best free tier |
+| Claude | 200K | ~10-20/day | Gmail | Coding, reasoning |
+| ChatGPT | 128K | 10/3hr ⚠️ attach=1/10th | Gmail | General |
+| Copilot | 128K | 30/session unlimited | Gmail | Free GPT-4 |
+| DeepSeek | 64K | Generous | Gmail | Cheapest API |
+| HuggingChat | Varies | Varies | Optional | Open source |
+
+**NOT USABLE (Chinese phone/Alipay required):** Kimi web, GLM, Qwen, Minimax
+
+**Courier LLM is model-agnostic:**
+```python
+# Swap LLM driving browser-use (one param)
+CourierContractRunner(platform='gemini', llm_model_id='gemini-api')
+CourierContractRunner(platform='gemini', llm_model_id='deepseek-chat')
+```
+
 ## Not Yet Built
 
 | Component | What It Will Do | Notes |
 |-----------|-----------------|-------|
-| Council RPC | Multi-model consensus | Schema ready, needs Python integration |
-| Courier Agent | Dispatch to web platforms | Definition + prompt ready (Phase 3) |
-| Dashboard | Visual monitoring | Frontend in Vibeflow, needs Supabase connection |
+| Orchestrator platform routing | Use platforms.json for courier limits | Config ready, needs wiring |
+| 80% limit tracking | Pause platforms at 80% usage | Data in platforms.json |
+| Courier browser test | Test browser-use with actual browser | Needs display or headless |
+| Web Dashboard | React-based visual monitoring | Vibeflow frontend ready |
 | Voice Interface | Talk to Vibes | Designed in `docs/voice_interface.md` |
-| Email Notifications | Daily summaries via Gmail | browser-use approach decided |
-| Consultant Prompt | User has notes to add | Stub in `prompts/consultant.md` |
 
 ---
 
@@ -129,38 +229,15 @@ vault.ingest_secret('KEY_NAME', 'key_value')
 
 ## Immediate (Next Session)
 
-**Before planning, we need:**
-1. **Task packet TEMPLATES** - Actual fill-in templates, not just schema
-2. **Skills registry** - Declarative, loaded from config, no hardcoded agents
-3. **Map existing code** - What's built, what's stub, what's missing
-4. **Courier clarification** - Document clearly what couriers do
-
-**Then:**
-5. Create VibePilot build plan with zero ambiguity
-
-## Near Term (After Planning)
-
-6. Dashboard connection (Vibeflow mockup → Supabase)
-7. Test concurrent execution with real tasks
-8. Courier Agent implementation
-9. Voice Interface (Deepgram + Kokoro via Cloudflare)
-
-## Session Notes
-
-- `SESSION_NOTES.md` - Mistakes made, lessons learned
-- `docs/vibeflow_review.md` - Vibeflow patterns to preserve
+1. **Wire orchestrator to platforms.json** - Use rate limits, context limits for routing
+2. **Implement 80% limit tracking** - Pause/resume platforms automatically
+3. **Courier browser test** - Run browser-use with headless Chrome
 
 ## Near Term
 
-5. **Kimi Swarm** - Add trigger to orchestrator (DEC-008)
-6. **Courier Agent** - Dispatch to web platforms
-7. ~~**Migration Prep** - Test setup.sh, prep for cheaper hosting~~ ✅ DONE (vault ready)
-8. **TypeScript Decision** - DEC-006 (migrate or not?)
-
-## Future
-
-8. **Voice Interface** - Talk to Vibes
-9. **Multi-Project** - Recipe app, finance app, VibePilot, legacy project
+4. Web Dashboard (Vibeflow → Supabase)
+5. Full PRD → Plan → Execute → Merge workflow
+6. Voice Interface (Deepgram + Kokoro)
 
 ---
 
@@ -168,17 +245,20 @@ vault.ingest_secret('KEY_NAME', 'key_value')
 
 | What to Swap | How | Time |
 |--------------|-----|------|
-| Add model | Edit `config/vibepilot.yaml` → add to `models:` section | 30s |
-| Remove model | Edit `config/vibepilot.yaml` → set `status: paused` | 30s |
-| Swap default model | Edit `config/vibepilot.yaml` → change `default_model` | 30s |
-| Add platform | Edit `config/vibepilot.yaml` → add to `platforms:` section | 30s |
-| Change threshold | Edit `config/vibepilot.yaml` → update `thresholds:` section | 30s |
-| Update prompt | Edit `config/vibepilot.yaml` → update `prompts:` section | 30s |
-| Add skill to role | Edit `config/vibepilot.yaml` → update `roles:` section | 30s |
+| Add model | Edit `config/models.json` → add to `models` array | 30s |
+| Remove model | Edit `config/models.json` → remove from array | 30s |
+| Add platform | Edit `config/platforms.json` | 30s |
+| Add skill | Edit `config/skills.json` → add to `skills` array | 30s |
+| Add tool | Edit `config/tools.json` → add to `tools` array | 30s |
+| Add agent | Edit `config/agents.json` → add to `agents` array | 30s |
+| Change agent's model | Edit `config/agents.json` → change `model` field | 30s |
+| Scope agent skills | Edit `config/agents.json` → change `skills` array | 30s |
+| Update prompt | Edit `config/prompts/[agent].md` | 30s |
+| Update limits | Edit `config/models.json` → change limit fields | 30s |
 
 **All swaps:**
-1. Edit `config/vibepilot.yaml`
-2. Save (hot-reloads)
+1. Edit the JSON file
+2. Save
 3. Update CHANGELOG.md
 4. Done
 
@@ -355,6 +435,21 @@ python -c "from vault_manager import VaultManager; v=VaultManager(); print(v.get
 
 **Connection:** `.env` → `SUPABASE_URL`, `SUPABASE_KEY`
 
+## Supabase Schema Updates (IMPORTANT)
+
+**AI sessions CANNOT directly modify Supabase.** Schema changes require manual execution.
+
+**Workflow:**
+1. AI creates/updates schema file in `docs/schema_*.sql`
+2. Commit to GitHub
+3. Human copies file content from GitHub
+4. Human pastes into Supabase SQL Editor and runs
+5. Verify with the SELECT statements at end of file
+
+**Current schema files:**
+- `docs/schema_v1_core.sql` — Base tables (tasks, models, task_runs, etc.)
+- `docs/schema_v1.1_routing.sql` — Adds slice_id, routing_flag, phase (RUN THIS NEXT)
+
 ## GitHub (All Code + Docs)
 
 | Path | What It Does | Update When |
@@ -397,66 +492,62 @@ python -c "from vault_manager import VaultManager; v=VaultManager(); print(v.get
 ├── CURRENT_STATE.md          # THIS FILE - start here
 ├── CHANGELOG.md              # Audit trail - rollback info
 ├── README.md                 # GitHub landing page
-├── TEMP_CRON_COMMANDS.md     # DELETE AFTER USE - cron setup
 ├── setup.sh                  # One-command setup for fresh machine
 ├── .env                      # Secrets (NOT in git)
-├── .env.example              # Secret template (in git) - COPY THIS
+├── .env.example              # Secret template (in git)
 ├── requirements.txt          # Python dependencies
 │
-├── config/
-│   └── vibepilot.yaml        # ALL runtime config (edit this for swaps)
-│
-├── .context/                 # Strategic docs
-│   ├── guardrails.md         # Pre-code gates
-│   ├── DECISION_LOG.md       # Full decision details
-│   ├── agent_protocol.md     # Agent coordination
-│   ├── quick_reference.md    # Cheat sheet
-│   └── ops_handbook.md       # Disaster recovery
+├── config/                   # ALL configuration (NEW)
+│   ├── schemas/              # JSON schemas (contracts)
+│   │   ├── task_packet.schema.json
+│   │   ├── result.schema.json
+│   │   ├── event.schema.json
+│   │   └── run_feedback.schema.json
+│   ├── skills.json           # 13 skills, declarative
+│   ├── tools.json            # 10 tools
+│   ├── models.json           # 8 models with costs/limits
+│   ├── platforms.json        # 4 web platforms
+│   ├── agents.json           # 12 agents with scoped skills/tools
+│   ├── prompts/              # 12 agent prompts
+│   │   ├── vibes.md
+│   │   ├── orchestrator.md
+│   │   ├── researcher.md
+│   │   ├── consultant.md
+│   │   ├── planner.md
+│   │   ├── council.md
+│   │   ├── supervisor.md
+│   │   ├── courier.md
+│   │   ├── internal_cli.md
+│   │   ├── internal_api.md
+│   │   ├── tester_code.md
+│   │   └── maintenance.md
+│   └── RUNNER_INTERFACE.md   # Contract every runner must follow
 │
 ├── docs/
-│   ├── MASTER_PLAN.md        # Full specification
-│   ├── SESSION_LOG.md        # Session history
-│   ├── UPDATE_CONSIDERATIONS.md  # Daily improvement input
-│   ├── prd_v1.4.md           # Product requirements v1.4
-│   ├── tech_stack.md         # Technology decisions (NEW)
-│   ├── schema_*.sql          # Database schemas (9 files)
-│   │   schema_v1_core.sql
-│   │   schema_safety_patches.sql
-│   │   schema_platforms.sql
-│   │   schema_project_tracking.sql
-│   │   schema_rls_fix.sql
-│   │   schema_reset.sql
-│   │   schema_timestamp_fixes.sql
-│   │   schema_council_rpc.sql
-│   │   └── scripts/          # Test/demo scripts
+│   ├── core_philosophy.md    # Strategic mindset + principles
+│   ├── prd_v1.4.md           # Product requirements
+│   ├── tech_stack.md         # Technology decisions
+│   ├── vibeflow_review.md    # Vibeflow patterns
+│   ├── vibeflow_adoption.md  # What we kept/discarded
+│   └── schema_*.sql          # Database schemas
 │
 ├── core/
+│   ├── orchestrator.py       # Concurrent orchestrator
+│   ├── telemetry.py          # OpenTelemetry
+│   ├── memory.py             # Memory interface
 │   └── roles.py              # Role definitions
 │
 ├── runners/
 │   ├── kimi_runner.py        # Kimi CLI integration
 │   └── api_runner.py         # API runner with caching
 │
-├── agents/
-│   └── agent_definitions.md  # Complete agent specs (NEW)
-│
-├── prompts/                  # Agent prompts (NEW)
-│   ├── planner.md
-│   ├── supervisor.md
-│   ├── council.md
-│   ├── orchestrator.md
-│   ├── testers.md
-│   ├── system_researcher.md
-│   ├── watcher.md
-│   ├── maintenance.md
-│   └── consultant.md (stub - awaiting user notes)
+├── agents/                   # Agent implementations
 │
 ├── scripts/
-│   ├── backup_supabase.sh    # Daily backup automation
+│   ├── backup_supabase.sh    # Daily backup
 │   └── prep_migration.sh     # Migration prep
 │
-├── venv/                     # Python venv (ignored)
-└── __pycache__/              # Cache (ignored)
+└── venv/                     # Python venv (ignored)
 ```
 
 ---
@@ -470,18 +561,17 @@ python -c "from vault_manager import VaultManager; v=VaultManager(); print(v.get
 | DEC-003 | Bounded Roles | ✅ | 2-3 skills max per role |
 | DEC-004 | Council Two-Process | ✅ | One-shot for updates, iterative for PRDs |
 | DEC-005 | Context Isolation | ✅ | Task agents see ONLY their task |
-| DEC-006 | TypeScript Migration | ⏳ | Pending decision |
-| DEC-007 | Prompt Caching | ⏳ | Add to API runners |
-| DEC-008 | Kimi Swarm | ⏳ | Trigger for wide tasks |
-| DEC-009 | Council Feedback Summary | ✅ | Supervisor summarizes to prevent bloat |
-| DEC-010 | Single Source of Truth | ✅ | CURRENT_STATE.md for context |
-| DEC-011 | Schema Senior Rules Audit | ⏳ | Apply senior engineer DB rules |
-
-Full details: `.context/DECISION_LOG.md`
-Daily input: `docs/UPDATE_CONSIDERATIONS.md`
-
-**Rejected/Simplified:**
-- DEC-012/013/014/015: Over-engineering. Solved by Must Preserve/Never Do sections above.
+| DEC-006 | Python for Now | ✅ | Stay Python (can't afford rewrite), but design for swap |
+| DEC-007 | Contract Layer | ✅ | JSON schemas + config files = zero code for swaps |
+| DEC-008 | Runner Interface | ✅ | stdin JSON → stdout JSON, language agnostic |
+| DEC-009 | Skills Registry | ✅ | Declarative skills.json, not hardcoded agents |
+| DEC-010 | Maintenance is ONLY System Updater | ✅ | No other agent touches system files |
+| DEC-011 | Researcher Suggests Only | ✅ | Finds, suggests. Does NOT implement. |
+| DEC-012 | Orchestrator + Researcher = Learning | ✅ | Orchestrator learns from feedback, Researcher finds improvements |
+| DEC-013 | 80% Limit Rule | ✅ | Pause platforms at 80% to prevent mid-task cutoff |
+| DEC-014 | Human Consulted For | ✅ | Credit/subscription, visual UI/UX, daily briefings |
+| DEC-015 | Exit Ready | ✅ | Pack up, hand over to anyone. All portable. |
+| DEC-016 | If It Can't Be Undone | ✅ | It can't be done. Every change reversible. |
 
 ---
 
@@ -521,24 +611,30 @@ Daily input: `docs/UPDATE_CONSIDERATIONS.md`
 ```
 NEW SESSION:
 1. Read CURRENT_STATE.md (this file)
-2. Read CHANGELOG.md (recent changes)
-3. Check "WHERE WE'RE GOING" for priorities
-4. Check "CURRENT ISSUES" for blockers
-5. Check "ACTIVE WORK" for in-progress tasks
+2. Read docs/core_philosophy.md (principles)
+3. Read CHANGELOG.md (recent changes)
+4. Check "WHERE WE'RE GOING" for priorities
+5. Check "CURRENT ISSUES" for blockers
 6. Start work
 7. Update this file and CHANGELOG.md when done
+
+MAKING A CHANGE:
+1. Can it be done via config edit? (config/*.json)
+   - Add model → models.json
+   - Add skill → skills.json
+   - Swap agent model → agents.json
+   - Edit prompt → prompts/*.md
+2. If yes → edit config, done
+3. If no → Check UPDATE RESPONSIBILITY MATRIX
+4. Make change
+5. Update required files
+6. Always update CHANGELOG.md
 
 SOMETHING BROKE:
 1. Check "KNOWN GOOD STATE" for rollback target
 2. Check CHANGELOG.md for recent changes
 3. Check "QUICK FIX GUIDE" for common issues
 4. Rollback if debugging takes > 10 min
-
-MAKING A CHANGE:
-1. Check "UPDATE RESPONSIBILITY MATRIX"
-2. Make change
-3. Update required files
-4. Always update CHANGELOG.md
 ```
 
 ---
@@ -547,15 +643,8 @@ MAKING A CHANGE:
 
 **After every session:**
 1. Update "Last Updated" timestamp
-2. Update "KNOWN GOOD STATE" if all tests pass
-3. Update "ACTIVE WORK" if starting/finishing task
-4. Update "WHERE WE ARE" if components changed
-5. Update "WHERE WE'RE GOING" if priorities changed
-6. Add new decisions to "KEY DECISIONS"
-7. Update "CURRENT ISSUES" as they arise/resolve
-8. **Always update CHANGELOG.md**
-
----
-
-*Token target: <4500 | Actual: ~4300*
-*Context restoration: TWO files (this + CHANGELOG)*
+2. Update "WHERE WE ARE" if components changed
+3. Update "WHERE WE'RE GOING" if priorities changed
+4. Add new decisions to "KEY DECISIONS"
+5. Update "CURRENT ISSUES" as they arise/resolve
+6. **Always update CHANGELOG.md**

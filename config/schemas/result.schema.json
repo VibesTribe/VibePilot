@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Runner Result",
+  "description": "Standard output format from all runners. Every runner MUST return this.",
+  "type": "object",
+  "required": ["task_id", "status", "output"],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Must match the task_id from input packet"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "failed", "needs_review", "partial", "dry_run"],
+      "description": "Execution status"
+    },
+    "output": {
+      "type": "string",
+      "description": "The actual output/result content"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "File paths or URLs of created artifacts"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "model": { "type": "string" },
+        "platform": { "type": "string" },
+        "chat_url": { "type": "string" },
+        "tokens_in": { "type": "integer" },
+        "tokens_out": { "type": "integer" },
+        "duration_seconds": { "type": "number" },
+        "runner_version": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

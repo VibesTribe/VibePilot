@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Lifecycle Event",
+  "description": "Events emitted during task execution for tracking and observability",
+  "type": "object",
+  "required": ["id", "task_id", "type", "timestamp"],
+  "properties": {
+    "id": { "type": "string" },
+    "task_id": { "type": "string" },
+    "type": {
+      "type": "string",
+      "enum": [
+        "task_created",
+        "task_started",
+        "task_progress",
+        "task_completed",
+        "task_failed",
+        "task_reassigned",
+        "limit_warning",
+        "limit_reached",
+        "model_swapped",
+        "skill_called",
+        "error"
+      ]
+    },
+    "details": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

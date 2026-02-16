@@ -1,0 +1,323 @@
+{
+  "version": "2.0",
+  "description": "Web platforms for courier execution. Only platforms with Gmail/email auth (no Chinese phone/Alipay required).",
+  "last_updated": "2026-02-16",
+  
+  "platforms": [
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "url": "https://gemini.google.com",
+      "new_chat_url": "https://gemini.google.com/app",
+      "provider": "google",
+      "models": ["gemini-2.5-flash", "gemini-pro"],
+      "status": "active",
+      "usable": true,
+      
+      "free_tier": {
+        "model": "gemini-2.5-flash",
+        "rate_limits": {
+          "requests_per_minute": 15,
+          "requests_per_day": 1500,
+          "tokens_per_day": 1000000
+        },
+        "context_limit": 1000000,
+        "attachment_penalty": "Files count toward context, no separate limit reduction"
+      },
+      
+      "auth": {
+        "methods": ["google"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "notes": "Requires Google account (Gmail)"
+      },
+      
+      "api_pricing": {
+        "gemini-2.5-flash": {
+          "input_per_1m": 0.30,
+          "output_per_1m": 2.50,
+          "context_limit": 1000000
+        },
+        "gemini-3-flash": {
+          "input_per_1m": 0.50,
+          "output_per_1m": 3.00,
+          "context_limit": 1000000
+        },
+        "gemini-3-pro": {
+          "input_per_1m": 2.00,
+          "output_per_1m": 12.00,
+          "context_limit": 1000000
+        }
+      },
+      
+      "capabilities": ["text", "code", "vision", "audio", "video", "file_upload", "web_search"],
+      "strengths": ["long_context", "multimodal", "vision"],
+      "notes": "BEST FREE TIER: 1M tokens/day, 1M context"
+    },
+    
+    {
+      "id": "claude",
+      "name": "Claude",
+      "url": "https://claude.ai",
+      "new_chat_url": "https://claude.ai/new",
+      "provider": "anthropic",
+      "models": ["claude-sonnet-4-5", "claude-haiku-4-5"],
+      "status": "active",
+      "usable": true,
+      
+      "free_tier": {
+        "model": "claude-sonnet-4-5",
+        "rate_limits": {
+          "messages_per_hour": "varies_by_demand",
+          "messages_per_day_approx": "10-20",
+          "reset_period_hours": "5-8"
+        },
+        "context_limit": 200000,
+        "attachment_penalty": "Files count toward context, no separate limit reduction"
+      },
+      
+      "auth": {
+        "methods": ["google", "email"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "notes": "Gmail/Google login fully supported"
+      },
+      
+      "api_pricing": {
+        "claude-haiku-4-5": {
+          "input_per_1m": 1.00,
+          "output_per_1m": 5.00,
+          "context_limit": 200000
+        },
+        "claude-sonnet-4-5": {
+          "input_per_1m": 3.00,
+          "output_per_1m": 15.00,
+          "context_limit": 200000
+        },
+        "claude-opus-4-6": {
+          "input_per_1m": 5.00,
+          "output_per_1m": 25.00,
+          "context_limit": 200000
+        }
+      },
+      
+      "capabilities": ["text", "code", "vision", "file_upload", "web_search", "artifacts"],
+      "strengths": ["coding", "reasoning", "honesty", "long_context"],
+      "notes": "Good for coding. Rate limits vary by system demand."
+    },
+    
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "url": "https://chat.openai.com",
+      "new_chat_url": "https://chat.openai.com/?model=auto",
+      "provider": "openai",
+      "models": ["gpt-4o-mini", "gpt-4o"],
+      "status": "active",
+      "usable": true,
+      
+      "free_tier": {
+        "model": "gpt-4o-mini",
+        "rate_limits": {
+          "messages_per_3_hours": 10,
+          "gpt4o_messages_per_3_hours": "limited"
+        },
+        "context_limit": 128000,
+        "attachment_penalty": "NEW: Attachments may reduce limits to ~1/10th"
+      },
+      
+      "auth": {
+        "methods": ["google", "microsoft", "apple", "email"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "notes": "Gmail/Google login fully supported"
+      },
+      
+      "api_pricing": {
+        "gpt-4o-mini": {
+          "input_per_1m": 0.15,
+          "output_per_1m": 0.60,
+          "context_limit": 128000
+        },
+        "gpt-4o": {
+          "input_per_1m": 2.50,
+          "output_per_1m": 10.00,
+          "context_limit": 128000
+        }
+      },
+      
+      "capabilities": ["text", "code", "vision", "file_upload", "web_search", "data_analysis"],
+      "strengths": ["reasoning", "coding", "general_tasks"],
+      "notes": "WARNING: Attachments may dramatically reduce free tier limits"
+    },
+    
+    {
+      "id": "copilot",
+      "name": "Microsoft Copilot",
+      "url": "https://copilot.microsoft.com",
+      "new_chat_url": "https://copilot.microsoft.com",
+      "provider": "microsoft",
+      "models": ["gpt-4o"],
+      "status": "active",
+      "usable": true,
+      
+      "free_tier": {
+        "model": "gpt-4o",
+        "rate_limits": {
+          "messages_per_session": 30,
+          "sessions_per_day": "unlimited"
+        },
+        "context_limit": 128000,
+        "attachment_penalty": "Files count toward context"
+      },
+      
+      "auth": {
+        "methods": ["microsoft", "google"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "notes": "Microsoft account can use Gmail as email"
+      },
+      
+      "api_pricing": {
+        "gpt-4o": {
+          "input_per_1m": 2.50,
+          "output_per_1m": 10.00,
+          "context_limit": 128000,
+          "notes": "Via Azure OpenAI"
+        }
+      },
+      
+      "capabilities": ["text", "code", "vision", "image_generation", "web_search"],
+      "strengths": ["free_gpt4_access", "web_search", "image_generation"],
+      "notes": "Free GPT-4 access. Session resets = fresh limits."
+    },
+    
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "url": "https://chat.deepseek.com",
+      "new_chat_url": "https://chat.deepseek.com",
+      "provider": "deepseek",
+      "models": ["deepseek-chat", "deepseek-r1"],
+      "status": "active",
+      "usable": true,
+      
+      "free_tier": {
+        "model": "deepseek-chat",
+        "rate_limits": {
+          "messages_per_day": "generous",
+          "notes": "Web version has generous free tier"
+        },
+        "context_limit": 64000,
+        "attachment_penalty": "Files count toward context"
+      },
+      
+      "auth": {
+        "methods": ["email", "phone"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "notes": "Email signup works (Gmail OK); phone optional"
+      },
+      
+      "api_pricing": {
+        "deepseek-chat": {
+          "input_per_1m": 0.28,
+          "input_per_1m_cached": 0.028,
+          "output_per_1m": 0.42,
+          "context_limit": 128000,
+          "notes": "Cache hits 90% cheaper"
+        },
+        "deepseek-reasoner": {
+          "input_per_1m": 0.28,
+          "input_per_1m_cached": 0.028,
+          "output_per_1m": 0.42,
+          "context_limit": 128000
+        }
+      },
+      
+      "capabilities": ["text", "code", "file_upload", "reasoning"],
+      "strengths": ["coding", "reasoning", "extremely_cheap_api"],
+      "notes": "CHEAPEST API. R1 model for reasoning tasks."
+    },
+    
+    {
+      "id": "huggingchat",
+      "name": "HuggingChat",
+      "url": "https://huggingface.co/chat",
+      "new_chat_url": "https://huggingface.co/chat",
+      "provider": "huggingface",
+      "models": ["llama", "qwen", "mistral", "128+_open_models"],
+      "status": "active",
+      "usable": true,
+      
+      "free_tier": {
+        "model": "varies",
+        "rate_limits": {
+          "messages_per_hour": "varies_by_model",
+          "notes": "Different limits per model; generally generous"
+        },
+        "context_limit": "varies_by_model",
+        "attachment_penalty": "Varies by model"
+      },
+      
+      "auth": {
+        "methods": ["email", "github", "google", "huggingface"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "notes": "HuggingFace account or social login; no login required for basic use"
+      },
+      
+      "api_pricing": {
+        "varies": {
+          "notes": "Many models free via Inference API; pricing varies"
+        }
+      },
+      
+      "capabilities": ["text", "code", "vision", "file_upload", "open_source_models"],
+      "strengths": ["open_source", "model_variety", "no_vendor_lockin"],
+      "notes": "128+ open source models. No auth required for basic use."
+    }
+  ],
+  
+  "unusable_platforms": [
+    {
+      "id": "kimi",
+      "name": "Kimi",
+      "url": "https://kimi.moonshot.cn",
+      "reason": "Requires Chinese phone number"
+    },
+    {
+      "id": "glm",
+      "name": "GLM (智谱清言)",
+      "url": "https://chatglm.cn",
+      "reason": "Requires Chinese phone number"
+    },
+    {
+      "id": "qwen",
+      "name": "Qwen (通义千问)",
+      "url": "https://tongyi.aliyun.com",
+      "reason": "Requires Alipay or Chinese phone"
+    },
+    {
+      "id": "minimax",
+      "name": "Minimax (海螺AI)",
+      "url": "https://hailuoai.com",
+      "reason": "Requires Chinese phone number"
+    }
+  ],
+  
+  "routing_hints": {
+    "coding": ["deepseek", "claude", "chatgpt"],
+    "long_documents": ["gemini", "claude"],
+    "research": ["copilot", "gemini"],
+    "reasoning": ["deepseek-r1", "claude"],
+    "vision": ["gemini", "chatgpt", "claude"],
+    "general": ["gemini", "chatgpt", "copilot"],
+    "no_auth_required": ["huggingchat"]
+  },
+  
+  "limit_policy": {
+    "pause_at_percent": 80,
+    "description": "Pause platform usage when reaching 80% of limits. Resume after reset period."
+  }
+}

@@ -64,16 +64,63 @@ class RunnerPool:
     """
     Manages available runners for task execution.
     Tracks which are busy, which have capacity.
+
+    Loads from config/models.json (primary) with database fallback.
     """
 
-    def __init__(self):
+    def __init__(self, use_config: bool = True):
         self.runners: Dict[str, Dict] = {}
         self.busy: Dict[str, str] = {}  # runner_id -> task_id
         self.lock = threading.Lock()
-        self._load_runners()
+        self._load_runners(use_config)
 
-    def _load_runners(self):
-        """Load active models/runners from database."""
+    def _load_runners(self, use_config: bool = True):
+        """Load active models/runners from config or database."""
+        if use_config:
+            self._load_from_config()
+        else:
+            self._load_from_database()
+
+        logger.info(f"Loaded {len(self.runners)} runners")
+
+    def _load_from_config(self):
+        """Load runners from config/models.json."""
+        from core.config_loader import get_config_loader
+
+        config = get_config_loader()
+        models = config.get_models()
+
+        for model in models:
+            status = model.get("status", "active")
+            if status != "active":
+                continue
+
+            model_id = model.get("id")
+            access_type = model.get("access_type", "api")
+
+            # Determine routing capabilities based on access type
+            # CLI/API runners have codebase access → can handle internal
+            # Web couriers have NO codebase access → only web-flagged tasks
+            if access_type in ("cli", "api", "cli_subscription"):
+                routing_capability = ["internal", "web", "mcp"]
+            else:
+                routing_capability = ["web"]
+
+            self.runners[model_id] = {
+                "id": model_id,
+                "name": model.get("name", model_id),
+                "platform": model.get("platform", model.get("provider", "unknown")),
+                "type": access_type,
+                "context_limit": model.get("context_limit", 32000),
+                "features": model.get("features", []),
+                "task_ratings": {},
+                "status": "active",
+                "routing_capability": routing_capability,
+                "config": model,
+            }
+
+    def _load_from_database(self):
+        """Load active models/runners from database (fallback)."""
         res = db.table("models").select("*").eq("status", "active").execute()
 
         for model in res.data or []:
@@ -86,8 +133,6 @@ class RunnerPool:
                 "task_ratings": model.get("task_ratings", {}),
                 "status": model.get("status", "active"),
             }
-
-        logger.info(f"Loaded {len(self.runners)} runners")
 
     def is_available(self, runner_id: str) -> bool:
         """Check if runner is available."""
@@ -118,18 +163,40 @@ class RunnerPool:
     def get_best_for_task(self, task: Dict) -> Optional[str]:
         """
         Select best available runner for task.
-        Uses router scoring formula from Vibeflow.
+
+        First filters by routing capability:
+        - internal (Q): Only CLI/API runners with codebase access
+        - web (W): Any runner
+        - mcp (M): Only MCP-capable runners
+
+        Then scores by performance and task type fit.
         """
         task_type = task.get("type", "feature")
         priority = task.get("priority", 5)
         dependencies = task.get("dependencies", [])
+        routing_flag = task.get("routing_flag", "web")  # Default to web-capable
 
         available = self.get_available()
         if not available:
             return None
 
-        scored = []
+        # Filter by routing capability
+        capable_runners = []
         for runner_id in available:
+            runner = self.runners.get(runner_id, {})
+            capability = runner.get("routing_capability", ["web"])
+            if routing_flag in capability:
+                capable_runners.append(runner_id)
+
+        if not capable_runners:
+            self.logger.warning(
+                f"No runners with routing_capability={routing_flag} for task"
+            )
+            return None
+
+        # Score remaining runners
+        scored = []
+        for runner_id in capable_runners:
             runner = self.runners[runner_id]
 
             ratings = runner.get("task_ratings", {}).get(task_type, {})
@@ -402,7 +469,45 @@ class ConcurrentOrchestrator:
             self._dispatch_task(task)
 
     def _get_available_tasks(self, limit: int) -> List[Dict]:
-        """Get available tasks with satisfied dependencies."""
+        """
+        Get available tasks with satisfied dependencies.
+
+        Uses the database function get_available_for_routing which
+        respects the current runner capabilities.
+
+        Falls back to simple query if function not available.
+        """
+        # Determine what routing flags our runners can handle
+        can_web = False
+        can_internal = False
+        can_mcp = False
+
+        for runner_id, runner in self.runners.items():
+            capability = runner.get("routing_capability", ["web"])
+            if "web" in capability:
+                can_web = True
+            if "internal" in capability:
+                can_internal = True
+            if "mcp" in capability:
+                can_mcp = True
+
+        try:
+            # Try using the RPC function first
+            res = db.rpc(
+                "get_available_for_routing",
+                {
+                    "p_can_web": can_web,
+                    "p_can_internal": can_internal,
+                    "p_can_mcp": can_mcp,
+                },
+            ).execute()
+
+            if res.data:
+                return res.data[:limit]
+        except Exception as e:
+            self.logger.debug(f"RPC get_available_for_routing not available: {e}")
+
+        # Fallback to simple query
         res = (
             db.table("tasks")
             .select("*")
@@ -415,7 +520,14 @@ class ConcurrentOrchestrator:
         tasks = []
         for task in res.data or []:
             if self.dependency_manager.can_run(task):
-                tasks.append(task)
+                # Also filter by routing capability
+                routing_flag = task.get("routing_flag", "web")
+                if routing_flag == "web" and can_web:
+                    tasks.append(task)
+                elif routing_flag == "internal" and can_internal:
+                    tasks.append(task)
+                elif routing_flag == "mcp" and can_mcp:
+                    tasks.append(task)
 
         return tasks
 
@@ -527,46 +639,46 @@ class ConcurrentOrchestrator:
             self.runner_pool.release(runner_id)
 
     def _call_runner(self, runner_id: str, prompt: str, task: Dict) -> Dict:
-        """Call the appropriate runner for the task."""
-        runner_info = self.runner_pool.runners.get(runner_id, {})
-        platform = runner_info.get("platform", "")
+        """Call the appropriate runner for the task using contract runners."""
+        from runners.contract_runners import get_runner
 
-        if "kimi" in platform.lower():
-            return self._call_kimi(prompt, task)
-        elif "deepseek" in platform.lower():
-            return self._call_deepseek(prompt, task)
-        elif "gemini" in platform.lower():
-            return self._call_gemini(prompt, task)
-        else:
-            return {"success": False, "error": f"Unknown platform: {platform}"}
+        task_packet = {
+            "task_id": task.get("id"),
+            "prompt": prompt,
+            "title": task.get("title", ""),
+            "constraints": {
+                "max_tokens": 4000,
+                "timeout_seconds": 300,
+            },
+            "runner_context": {
+                "work_dir": task.get("work_dir", os.getcwd()),
+            },
+        }
 
-    def _call_kimi(self, prompt: str, task: Dict) -> Dict:
-        """Call Kimi CLI runner."""
+        runner_type = runner_id
+        if "kimi" in runner_id.lower():
+            runner_type = "kimi"
+        elif "deepseek" in runner_id.lower():
+            runner_type = "deepseek"
+        elif "gemini" in runner_id.lower() and "api" in runner_id.lower():
+            runner_type = "gemini"
+        elif "gemini" in runner_id.lower():
+            runner_type = "gemini"
+
         try:
-            from runners.kimi_runner import KimiRunner
-
-            runner = KimiRunner()
-            return runner.execute_code_task(prompt)
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-
-    def _call_deepseek(self, prompt: str, task: Dict) -> Dict:
-        """Call DeepSeek API runner."""
-        try:
-            from runners.api_runner import DeepSeekRunner
-
-            runner = DeepSeekRunner()
-            return runner.execute(prompt)
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-
-    def _call_gemini(self, prompt: str, task: Dict) -> Dict:
-        """Call Gemini API runner."""
-        try:
-            from runners.api_runner import GeminiRunner
-
-            runner = GeminiRunner()
-            return runner.execute(prompt)
+            runner = get_runner(runner_type)
+            result = runner.execute(task_packet)
+            return {
+                "success": result.get("status") == "success",
+                "output": result.get("output"),
+                "error": result.get("errors", [{}])[0].get("message")
+                if result.get("errors")
+                else None,
+                "tokens": result.get("metadata", {}).get("tokens_in", 0)
+                + result.get("metadata", {}).get("tokens_out", 0),
+                "prompt_tokens": result.get("metadata", {}).get("tokens_in", 0),
+                "completion_tokens": result.get("metadata", {}).get("tokens_out", 0),
+            }
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -594,7 +706,7 @@ class ConcurrentOrchestrator:
         """Get current orchestrator status."""
         return {
             "running": self.running,
-            "max_workers": self.max_workers,
+            "max_workers": self._get_max_workers(),
             "active_tasks": len(self.active_tasks),
             "available_runners": len(self.runner_pool.get_available()),
             "total_runners": len(self.runner_pool.runners),

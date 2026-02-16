@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Run Feedback",
+  "description": "Feedback from completed/failed tasks that Orchestrator uses to learn and improve routing. Tracks costs even on failures.",
+  "type": "object",
+  "required": ["task_id", "status", "model", "runner_type", "tokens_used"],
+  "properties": {
+    "task_id": { "type": "string" },
+    "attempt_number": { 
+      "type": "integer",
+      "description": "Which attempt is this? 1 = first try, 2+ = reassignment"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "failed", "partial", "timeout"]
+    },
+    "model": { "type": "string" },
+    "platform": { "type": "string" },
+    "runner_type": {
+      "type": "string",
+      "enum": ["courier", "internal_cli", "internal_api"]
+    },
+    "task_type": { "type": "string" },
+    "duration_seconds": { "type": "number" },
+    "tokens_used": { 
+      "type": "integer",
+      "description": "Tokens consumed, even if failed. Used for ROI and cost tracking."
+    },
+    "virtual_cost": {
+      "type": "number",
+      "description": "What this would have cost via API. Tracked even for free web platforms."
+    },
+    "cumulative_tokens": {
+      "type": "integer",
+      "description": "Total tokens across all attempts for this task"
+    },
+    "cumulative_virtual_cost": {
+      "type": "number",
+      "description": "Total virtual cost across all attempts"
+    },
+    "failure_reason": {
+      "type": "string",
+      "enum": [
+        "resource_limit_exceeded",
+        "platform_down", 
+        "timeout",
+        "output_mismatch",
+        "test_failed",
+        "context_limit_exceeded",
+        "auth_expired",
+        "rate_limited",
+        "no_result_returned",
+        "unknown"
+      ]
+    },
+    "failure_details": { "type": "string" },
+    "output_matched_prompt": { "type": "boolean" },
+    "tests_passed": { "type": "boolean" },
+    "reassigned_from": {
+      "type": "string",
+      "description": "Previous model/platform if this is a reassignment"
+    },
+    "reassignment_count": {
+      "type": "integer",
+      "description": "How many times has this task been reassigned?"
+    },
+    "escalation_triggered": {
+      "type": "boolean",
+      "description": "True if max reassignments reached, triggering escalation"
+    },
+    "escalation_action": {
+      "type": "string",
+      "enum": ["go_internal", "split_task", "reprompt", "pause_for_human", "abort"],
+      "description": "What to do after max failures"
+    },
+    "suggested_next_step": {
+      "type": "string",
+      "enum": ["retry_same", "retry_different_model", "retry_different_platform", "split_task", "go_internal", "reprompt", "escalate", "pause"]
+    },
+    "chat_url": { "type": "string" },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
