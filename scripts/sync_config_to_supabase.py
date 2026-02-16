@@ -121,15 +121,11 @@ def sync_platforms(db):
     for platform in platforms:
         platform_id = platform.get("id")
 
-        # Prepare row data
+        # Prepare row data using only columns that exist in the table
         row = {
             "id": platform_id,
-            "name": platform.get("name", platform_id),
-            "vendor": platform.get("vendor", "Unknown"),
             "type": platform.get("type", "web"),
-            "context_limit": platform.get("context_limit", 32000),
-            "request_limit": platform.get("request_limit"),
-            "logo_url": get_logo_url(platform.get("name", ""), platform.get("vendor")),
+            "url": platform.get("url", ""),
             "status": platform.get("status", "active"),
             "updated_at": datetime.utcnow().isoformat(),
         }
@@ -151,15 +147,15 @@ def verify(db):
     print("\nVerifying...")
 
     models = db.table("models").select("id, name, status").execute()
-    platforms = db.table("platforms").select("id, name, status").execute()
+    platforms = db.table("platforms").select("id, status").execute()
 
     print(f"  Models in DB: {len(models.data or [])}")
     for m in models.data or []:
-        print(f"    - {m['id']}: {m['name']} ({m['status']})")
+        print(f"    - {m['id']}: {m.get('name', m['id'])} ({m['status']})")
 
     print(f"  Platforms in DB: {len(platforms.data or [])}")
     for p in platforms.data or []:
-        print(f"    - {p['id']}: {p['name']} ({p['status']})")
+        print(f"    - {p['id']} ({p['status']})")
 
 
 def main():
