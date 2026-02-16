@@ -98,13 +98,21 @@ def import_platforms(db):
     for platform in platforms:
         platform_id = platform.get("id")
 
+        # Handle context_limit - may be string like "varies_by_model"
+        context_limit_raw = platform.get("free_tier", {}).get("context_limit")
+        context_limit = None
+        if isinstance(context_limit_raw, int):
+            context_limit = context_limit_raw
+        elif isinstance(context_limit_raw, str) and context_limit_raw.isdigit():
+            context_limit = int(context_limit_raw)
+
         row = {
             "id": platform_id,
             "name": platform.get("name", platform_id),
             "vendor": platform.get("provider", "Unknown"),
             "type": platform.get("type", "web"),
             "url": platform.get("url", ""),
-            "context_limit": platform.get("free_tier", {}).get("context_limit"),
+            "context_limit": context_limit,
             "status": platform.get("status", "active"),
             "config": platform,  # Store full config as JSONB
             "updated_at": datetime.utcnow().isoformat(),
