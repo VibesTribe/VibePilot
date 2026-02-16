@@ -6,6 +6,43 @@
 
 ---
 
+# 2026-02-16
+
+## Session Summary
+
+### What Was Built
+- **Kimi Swarm Test (DEC-008)** - ✅ SUCCESS - 3 tasks in 12.53s, parallel execution confirmed
+- **Task Packet Schema** - Created `contracts/task_packet.schema.json`
+- **Vibeflow Deep Review** - Documented in `docs/vibeflow_review.md`
+
+### What Was Caught (Type 1 Errors Prevented)
+- Hardcoding agent counts, worker counts, phase counts
+- Task packet schema without templates
+- Courier confusion (thought fallback, actually primary for web)
+- Planning before understanding
+
+### Key Learnings from Vibeflow
+1. Task packets need TEMPLATES, not just schemas
+2. Skills loaded from registry.json (no hardcoded agents)
+3. Visual execution = couriers (browser-use to AI studios)
+4. Each task self-verifiable with acceptance criteria
+5. OK probes verify skills work
+
+### Files Created
+- `SESSION_NOTES.md` - Mistakes documented
+- `docs/vibeflow_review.md` - Full Vibeflow analysis
+- `contracts/task_packet.schema.json` - Schema (templates TODO)
+- `plans/vibepilot_prd.json` - Draft (needs revision)
+- `plans/vibepilot_plan.json` - Draft (needs revision)
+
+### Next Session
+1. Create task packet TEMPLATES
+2. Create skills registry
+3. Map existing code to skills
+4. THEN create plan with zero ambiguity
+
+---
+
 # 2026-02-15
 
 ## 15:30 UTC - GLM-5 (Autonomous)
