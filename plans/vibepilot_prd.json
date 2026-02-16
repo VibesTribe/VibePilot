@@ -1,0 +1,274 @@
+{
+  "prd": {
+    "version": "1.0",
+    "title": "VibePilot - Self-Build",
+    "overview": "Complete VibePilot system build. VibePilot is a sovereign AI execution engine that transforms user ideas into production applications through multi-agent coordination.",
+    
+    "project_type": "business",
+    "existing_infrastructure": {
+      "schema": "Supabase tables: tasks, task_packets, task_runs, models, platforms, projects, secrets_vault, council_reviews",
+      "runners": "Kimi CLI (with swarm), API runners (DeepSeek, Gemini, OpenRouter)",
+      "core": "ConcurrentOrchestrator, SupervisorAgent, TaskManager, VaultManager",
+      "telemetry": "OpenTelemetry with fallback, LoopDetector",
+      "memory": "Pluggable interface (FileBackend, SupabaseBackend)",
+      "dependency_rpc": "Supabase functions for atomic task unlock"
+    },
+    
+    "objectives": [
+      "Complete all agent implementations (Consultant, Planner, Council, Tester)",
+      "Connect dashboard to live Supabase data",
+      "Enable full task lifecycle: create → assign → execute → review → test → merge",
+      "Implement Courier agents for web platform delivery",
+      "Add voice interface for hands-free operation"
+    ],
+    
+    "success_criteria": [
+      "User can submit app idea through Consultant → get complete PRD",
+      "Planner generates atomic task plan from PRD",
+      "Tasks execute in parallel, visible on dashboard",
+      "Supervisor reviews and approves outputs",
+      "Complete app delivered to user repo",
+      "Voice commands control VibePilot operations"
+    ],
+    
+    "features": {
+      "p0_critical": [
+        {
+          "name": "Consultant Agent Implementation",
+          "description": "Full implementation of Consultant Research Agent - interactive idea to PRD conversion",
+          "acceptance_criteria": [
+            "User can submit app idea (text)",
+            "Agent asks clarifying questions naturally (no forms)",
+            "Researches competitors and gaps",
+            "Produces complete PRD with tech stack recommendation",
+            "PRD approved by user before handoff"
+          ],
+          "existing": "Prompt exists at prompts/consultant.md"
+        },
+        {
+          "name": "Planner Agent Implementation",
+          "description": "Full implementation of Planner Agent - PRD to atomic task plan",
+          "acceptance_criteria": [
+            "Accepts PRD JSON input",
+            "Produces atomic tasks with prompt packets",
+            "Each task 95%+ confidence score",
+            "Dependencies mapped correctly",
+            "Vertical slicing (not horizontal)"
+          ],
+          "existing": "Prompt exists at prompts/planner.md"
+        },
+        {
+          "name": "Council Member Implementation",
+          "description": "Full implementation of Council review - 3 independent lenses",
+          "acceptance_criteria": [
+            "Three lenses: User Alignment, Technical, Feasibility",
+            "Each member reviews independently",
+            "Produces vote and actionable feedback",
+            "Consensus or revision loop"
+          ],
+          "existing": "Prompt exists at prompts/council.md"
+        },
+        {
+          "name": "Code Tester Implementation",
+          "description": "Full implementation of Code Tester Agent",
+          "acceptance_criteria": [
+            "Runs pytest on completed tasks",
+            "Reports pass/fail with details",
+            "Updates task status based on results"
+          ],
+          "existing": "Prompt exists at prompts/testers.md"
+        },
+        {
+          "name": "Dashboard Live Connection",
+          "description": "Connect Vibeflow dashboard to Supabase for real-time data",
+          "acceptance_criteria": [
+            "Shows live task counts by status",
+            "Shows active runners",
+            "Shows recent task runs",
+            "Updates without page refresh"
+          ],
+          "existing": "Static mockup exists"
+        },
+        {
+          "name": "Orchestrator API Endpoints",
+          "description": "REST API for dashboard and external control",
+          "acceptance_criteria": [
+            "GET /api/status - system status",
+            "GET /api/tasks - list tasks",
+            "POST /api/tasks - create task",
+            "GET /api/runners - runner status",
+            "GET /api/roi - ROI report"
+          ]
+        }
+      ],
+      
+      "p1_important": [
+        {
+          "name": "Visual Tester Implementation",
+          "description": "Browser-based visual testing using browser-use",
+          "acceptance_criteria": [
+            "Takes screenshots of UI changes",
+            "Compares to baseline",
+            "Reports visual diffs",
+            "Routes to human for UI/UX tasks"
+          ]
+        },
+        {
+          "name": "Watcher Agent Implementation",
+          "description": "Proactive prevention and monitoring",
+          "acceptance_criteria": [
+            "Uses LoopDetector for stuck detection",
+            "Monitors context usage",
+            "Prevents unauthorized file changes",
+            "Escalates issues to Supervisor"
+          ]
+        },
+        {
+          "name": "System Researcher Implementation",
+          "description": "Continuous research for improvements",
+          "acceptance_criteria": [
+            "Finds new models and pricing",
+            "Finds new tools and patterns",
+            "Logs findings to UPDATE_CONSIDERATIONS.md",
+            "Triggers Maintenance when needed"
+          ]
+        },
+        {
+          "name": "Maintenance Agent Implementation",
+          "description": "VibePilot self-improvement",
+          "acceptance_criteria": [
+            "Applies approved patches",
+            "Updates dependencies",
+            "Adds new models to registry",
+            "Maintains rollback capability"
+          ]
+        },
+        {
+          "name": "CLI Interface",
+          "description": "Command-line interface for VibePilot",
+          "acceptance_criteria": [
+            "vibepilot start - start orchestrator",
+            "vibepilot status - show status",
+            "vibepilot task create - create task",
+            "vibepilot task list - list tasks"
+          ]
+        }
+      ],
+      
+      "p2_nice_to_have": [
+        {
+          "name": "Courier Agent (Web Platforms)",
+          "description": "Deliver to ChatGPT, Claude, Gemini web interfaces",
+          "acceptance_criteria": [
+            "Logs into platform via browser-use",
+            "Executes task via web interface",
+            "Screenshots for verification",
+            "Handles auth and sessions"
+          ]
+        },
+        {
+          "name": "Voice Interface",
+          "description": "Hands-free VibePilot control",
+          "acceptance_criteria": [
+            "Speech-to-text for commands",
+            "Text-to-speech for responses",
+            "Wake word activation",
+            "Natural language task creation"
+          ]
+        },
+        {
+          "name": "Email Notifications",
+          "description": "Gmail integration for notifications",
+          "acceptance_criteria": [
+            "Sends completion emails",
+            "Sends escalation alerts",
+            "Uses browser-use for Gmail"
+          ]
+        }
+      ]
+    },
+    
+    "architecture": {
+      "existing_components": [
+        "core/orchestrator.py - ConcurrentOrchestrator, RunnerPool, DependencyManager",
+        "core/telemetry.py - Telemetry, LoopDetector",
+        "core/memory.py - Memory interface with backends",
+        "agents/supervisor.py - SupervisorAgent",
+        "task_manager.py - TaskManager",
+        "vault_manager.py - VaultManager",
+        "runners/kimi_runner.py - KimiRunner with swarm",
+        "runners/api_runner.py - DeepSeek, Gemini, OpenRouter runners"
+      ],
+      "needed_components": [
+        "api/server.py - FastAPI REST endpoints",
+        "agents/consultant.py - Consultant implementation",
+        "agents/planner.py - Planner implementation",
+        "agents/council.py - Council implementation",
+        "agents/tester_code.py - Code tester implementation",
+        "agents/tester_visual.py - Visual tester implementation",
+        "agents/watcher.py - Watcher implementation",
+        "agents/researcher.py - System researcher implementation",
+        "agents/maintenance.py - Maintenance implementation",
+        "agents/courier.py - Courier (Phase 3)",
+        "voice/interface.py - Voice control (Phase 3)",
+        "cli/vibepilot.py - CLI tool"
+      ],
+      "data_flow": "User → Consultant → PRD → Planner → Tasks → Council → Orchestrator → Runners → Supervisor → Tester → Merge → User Repo"
+    },
+    
+    "tech_stack": {
+      "language": "python",
+      "framework": "fastapi",
+      "database": "supabase",
+      "testing": "pytest",
+      "frontend": "react + typescript (dashboard)",
+      "browser_automation": "browser-use",
+      "voice": "whisper + elevenlabs (future)"
+    },
+    
+    "security_requirements": [
+      "All secrets in vault (never in code)",
+      "API endpoints require auth",
+      "Rate limiting on all endpoints",
+      "No secrets in logs or telemetry"
+    ],
+    
+    "edge_cases": [
+      "Task fails after max attempts → escalate to human",
+      "Runner unavailable → try next best",
+      "Context limit hit → graceful degradation",
+      "Supabase connection lost → retry with backoff"
+    ],
+    
+    "out_of_scope": [
+      "Mobile app for VibePilot",
+      "Multi-tenant (one user for now)",
+      "Payment processing"
+    ]
+  },
+  
+  "system_context": {
+    "existing_codebase": "~/vibepilot/",
+    "model_constraints": [
+      {
+        "model_id": "glm-5",
+        "context_effective": 100000,
+        "strengths": ["reasoning", "planning", "review", "governance"],
+        "role": "primary_governance"
+      },
+      {
+        "model_id": "kimi-k2.5",
+        "context_effective": 100000,
+        "strengths": ["code", "parallel", "web_browsing"],
+        "role": "parallel_executor"
+      },
+      {
+        "model_id": "gemini-flash",
+        "context_effective": 32000,
+        "strengths": ["research", "fast"],
+        "role": "researcher"
+      }
+    ],
+    "project_id": "vibepilot-self-build"
+  }
+}
