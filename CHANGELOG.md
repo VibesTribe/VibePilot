@@ -6,7 +6,403 @@
 
 ---
 
-# 2026-02-16
+# 2026-02-16 (Session 7)
+
+## Session Summary
+
+### Major Architectural Decisions
+
+1. **Slices First** — Planner now outputs modular vertical slices (not just phases)
+2. **Routing Flags** — Tasks get Q/W/M based on complexity, not destination
+3. **Dashboard Contract** — Mock data shape is sacred, adapter transforms VibePilot → Dashboard
+4. **Lamp Metaphor** — Agent = lamp (swappable shade/bulb/base/outlet)
+
+### Routing Flag Thresholds
+
+| Condition | Flag | Why |
+|-----------|------|-----|
+| 0-1 dependencies | W | Safe for web free tier |
+| 2+ dependencies | Q | Internal required |
+| Touches existing file | Q | Needs codebase |
+| Touches 2+ existing files | RED FLAG | Council audit |
+
+### Files Created/Updated
+
+```
+docs/
+└── schema_v1.1_routing.sql (NEW)
+    - Adds: slice_id, phase, task_number, routing_flag, routing_flag_reason
+    - Functions: get_tasks_by_slice, get_slice_summary, get_available_for_routing
+    - Updated: claim_next_task with routing constraint
+
+config/prompts/
+└── planner.md (MAJOR UPDATE)
+    - Isolation-first principle
+    - Slice-based output structure
+    - Routing flags with thresholds
+    - Multi-file red flag escalation
+    - Dependency types with slice boundary rules
+
+core/
+└── orchestrator.py (UPDATED)
+    - RunnerPool tracks routing_capability per runner
+    - get_best_for_task filters by routing_flag
+    - _get_available_tasks respects runner capabilities
+    - CLI/API runners can handle internal, web couriers only web
+
+CURRENT_STATE.md (UPDATED)
+    - Added Supabase schema update workflow note
+```
+
+### What Needs Manual Action
+
+**Supabase Schema Update Required:**
+1. Go to GitHub → `docs/schema_v1.1_routing.sql`
+2. Copy entire file
+3. Paste into Supabase SQL Editor
+4. Run
+5. Verify columns added
+
+### Remaining Work
+
+- [ ] Run schema migration on Supabase
+- [ ] E2E test with new routing logic
+- [ ] Vibeflow adapter (Supabase → Dashboard shape)
+
+---
+
+# 2026-02-16 (Session 6)
+
+## Session Summary
+
+### What Was Fixed
+- Removed langchain-google-genai bloat (installed without asking)
+- Courier runner now model-agnostic (LLM from config, swap = one param)
+
+### What Was Researched
+- 10 web AI platforms researched for rate limits, context limits, auth, API pricing
+- 6 usable (Gmail auth): Gemini, Claude, ChatGPT, Copilot, DeepSeek, HuggingChat
+- 4 blocked (Chinese phone/Alipay): Kimi web, GLM, Qwen, Minimax
+
+### What Was Clarified
+- **Q** = Quality internal (supervisor, testing, review)
+- **W** = Web courier (browser automation)
+- **M** = MCP-connected (future, for external IDE/CLI)
+- Kimi CLI and OpenCode are **internal**, not M-tier
+
+### Files Updated
+```
+config/
+├── models.json (v1.1) - 4 models we HAVE (2 API, 2 CLI)
+└── platforms.json (v2.0) - 6 usable platforms with full limits/pricing
+
+runners/
+└── contract_runners.py - Courier is model-agnostic
+
+docs/
+└── vibeflow_dashboard_analysis.md - Dashboard structure documented
+```
+
+### Vibeflow Work Started
+- Cloned ~/vibeflow from github.com/VibesTribe/vibeflow
+- Created branch `feature/vibepilot-supabase` from `feature/admin-control-center-ui`
+- Installed @supabase/supabase-js
+- Created apps/dashboard/lib/supabase.ts
+- Started modifying useMissionData.ts (in progress, NOT complete)
+
+**Confirmed baseline:** https://vibeflow-dashboard-git-feature-admi-1e8c37-vibestribes-projects.vercel.app/
+
+### Visual Testing Workflow (Discussed, Not Built)
+- Visual test agent visits Vercel preview
+- Tests layout, style, functionality against task context
+- Pass → Review queue for human
+- Fail → Back to dev agent
+
+### Next Session
+1. Complete Supabase connection in Vibeflow useMissionData.ts
+2. Push branch to GitHub → Vercel preview
+3. Human reviews before any merge
+4. DO NOT BREAK FRONTEND
+
+---
+
+# 2026-02-16 (Session 5)
+
+## Session Summary
+
+### What Was Fixed (Vendor Lock-in)
+**Problem:** Courier runner had Gemini hardcoded, langchain bloat installed without asking.
+
+**Solution:**
+1. Removed langchain-google-genai, langchain-core, langsmith (bloat)
+2. Rewrote courier runner to be model-agnostic
+3. LLM for browser-use now comes from config/models.json
+
+**Swap Example:**
+```python
+# Before: hardcoded Gemini
+# After: read from config
+CourierContractRunner(platform='gemini', llm_model_id='gemini-api')  # or 'deepseek-chat'
+```
+
+### What Was Researched
+**Platform Registry - 10 platforms researched for:**
+- Rate limits (per minute, hour, day)
+- Context limits (free tier, not paid)
+- Attachment penalties (ChatGPT = 1/10th limits!)
+- Auth methods (Gmail OK? Chinese phone = out)
+- API pricing (for virtual ROI calculator)
+
+**Results:**
+- 6 USABLE: Gemini, Claude, ChatGPT, Copilot, DeepSeek, HuggingChat
+- 4 NOT USABLE: Kimi web, GLM, Qwen, Minimax (require Chinese phone/Alipay)
+
+### Files Updated
+```
+config/
+├── models.json (v1.1) - Only what we HAVE (4 models: 2 API, 2 CLI)
+└── platforms.json (v2.0) - Where we GO (6 usable, 4 blocked, full limits/pricing)
+
+runners/
+└── contract_runners.py - Courier now model-agnostic, factory pattern
+
+CURRENT_STATE.md - Added Models vs Platforms section
+CHANGELOG.md - This entry
+```
+
+### Dependencies Removed
+- langchain-google-genai (bloat)
+- langchain-core (bloat)
+- langsmith (bloat)
+
+### Key Decisions
+1. **Models ≠ Platforms** - models.json is what we have, platforms.json is where we go
+2. **Gmail-only auth** - Platforms requiring Chinese phone/Alipay are blocked
+3. **80% limit policy** - Orchestrator will pause platforms at 80% of limits
+4. **Cheapest API = DeepSeek** - $0.28/1M input, $0.42/1M output
+5. **Best free tier = Gemini** - 1M tokens/day, 1M context
+
+### Platform Quick Reference
+| Platform | Context | Free Limits | API $/1M | Auth |
+|----------|---------|-------------|----------|------|
+| Gemini | 1M | 1500/day, 1M tok/day | $0.30/$2.50 | Gmail |
+| Claude | 200K | ~10-20/day | $1.00/$5.00 | Gmail |
+| ChatGPT | 128K | 10/3hr ⚠️attach=1/10 | $0.15/$0.60 | Gmail |
+| Copilot | 128K | 30/sess unlimited | $2.50/$10.00 | Gmail |
+| DeepSeek | 64K | Generous | $0.28/$0.42 | Gmail |
+| HuggingChat | Varies | Varies | Free | Optional |
+
+### Next Session
+1. Wire orchestrator to use platforms.json for routing
+2. Implement 80% limit tracking with auto-pause/resume
+3. Test courier with headless browser
+
+---
+
+# 2026-02-16 (Session 4)
+
+## Session Summary
+
+### What Was Built
+**Dashboard + Pipeline Test:**
+- `dashboard/terminal_dashboard.py` - Terminal-based real-time dashboard
+- `tests/test_pipeline.py` - End-to-end pipeline test
+
+**Courier Runner Enhanced:**
+- `runners/contract_runners.py` - Added browser-use integration with Gemini adapter
+
+### What Was Tested
+```
+Pipeline Test:
+1. Created task in Supabase
+2. Created task packet
+3. Dispatched to Kimi runner
+4. Result: success in 15.31s, 49 tokens
+5. Task marked merged
+6. Task run logged
+
+✓ PIPELINE TEST PASSED
+```
+
+### Dashboard Features
+- Task status counts
+- Active tasks list
+- Recent runs with success/fail icons
+- Available models from config
+- `--watch` mode for auto-refresh
+
+### Files Created
+```
+dashboard/
+└── terminal_dashboard.py
+
+tests/
+└── test_pipeline.py
+```
+
+### Files Updated
+- `runners/contract_runners.py` - Courier runner with browser-use
+- `core/orchestrator.py` - Uses contract runners, loads from config
+- `config/models.json` - Added browser-use-gemini model
+- `CURRENT_STATE.md` - Updated components
+
+### Dependencies Added
+- browser-use (browser automation)
+- google-genai (Google AI SDK)
+
+**NOTE:** langchain-google-genai was added here but removed in Session 5 (bloat).
+
+### Next Session
+1. Web-based dashboard (React/Vibeflow)
+2. Courier runner browser test (needs display)
+3. Voice interface (Deepgram + Kokoro)
+
+---
+
+# 2026-02-16 (Session 3)
+
+## Session Summary
+
+### What Was Built
+**Contract Runners (Complete):**
+- `runners/base_runner.py` - Abstract base class enforcing RUNNER_INTERFACE contract
+- `runners/contract_runners.py` - Kimi, DeepSeek, Gemini, Courier runners following interface
+- `core/config_loader.py` - Central module for loading all JSON configs
+- `tests/test_contract_e2e.py` - End-to-end test for contract layer
+
+**Orchestrator Integration:**
+- RunnerPool now loads from config/models.json (not database)
+- _call_runner uses contract runners with proper task packet format
+- All 9 runners loaded and validated
+
+### What Was Tested
+```
+=== Testing Config Loader ===
+✓ Config valid (13 skills, 10 tools, 9 models, 12 agents, 4 platforms)
+
+=== Testing Runner Probes ===
+✓ kimi: OK
+✓ gemini: OK  
+✓ deepseek: OK
+
+=== Testing Contract Runner Execution ===
+✓ Task completed successfully (9.75s, 18 tokens)
+
+=== Testing Result Schema ===
+✓ All required fields present
+
+=== Testing Invalid Input Handling ===
+✓ Invalid input rejected correctly
+
+RESULTS: 5 passed, 0 failed
+```
+
+### Files Created
+```
+runners/
+├── base_runner.py (abstract base class)
+└── contract_runners.py (Kimi, DeepSeek, Gemini, Courier)
+
+core/
+└── config_loader.py (JSON config loader)
+
+tests/
+└── test_contract_e2e.py (E2E test)
+```
+
+### Files Updated
+- `config/models.json` - Added browser-use-gemini model
+- `core/orchestrator.py` - Wired to config loader, uses contract runners
+- `CURRENT_STATE.md` - Updated with new components
+
+### Key Features Implemented
+1. **Contract Enforcement** - stdin JSON → stdout JSON with exact schema
+2. **Health Checks** - `--probe` flag for all runners
+3. **Config Caching** - Single load, cached access
+4. **Agent Resolution** - Skills/tools expanded when loading agents
+5. **Validation** - Config consistency checked at startup
+
+### Next Session
+1. Dashboard connection (Vibeflow mockup → Supabase)
+2. Courier runner implementation (browser-use integration)
+3. First real task through full pipeline
+
+---
+
+# 2026-02-16 (Session 2)
+
+## Session Summary
+
+### What Was Built
+**Contract Layer (Complete):**
+- 4 JSON schemas (task_packet, result, event, run_feedback)
+- 1 runner interface document (RUNNER_INTERFACE.md)
+- 5 config files (skills.json, tools.json, models.json, platforms.json, agents.json)
+- 12 agent prompts in config/prompts/
+
+**Key Architectural Decisions:**
+- Researcher suggests only, does NOT implement
+- Maintenance is ONLY agent that touches system
+- Orchestrator + Researcher = learning brain
+- 80% limit rule (pause before cutoff)
+- If it can't be undone, it can't be done
+
+### What Was Caught (Type 1 Errors Prevented)
+- "We're invested in Python" circular reasoning
+- Supervisor doing routing (that's orchestrator's job)
+- Pausing for human after 3 failures (lazy - should diagnose)
+- Researcher implementing things (suggests only)
+- Exit ready meaning just "reversible" not "portable to anyone"
+
+### Files Created
+```
+config/
+├── schemas/
+│   ├── task_packet.schema.json
+│   ├── result.schema.json
+│   ├── event.schema.json
+│   └── run_feedback.schema.json
+├── skills.json (13 skills)
+├── tools.json (10 tools)
+├── models.json (8 models)
+├── platforms.json (4 platforms)
+├── agents.json (12 agents)
+├── prompts/
+│   ├── vibes.md
+│   ├── orchestrator.md
+│   ├── researcher.md
+│   ├── consultant.md
+│   ├── planner.md
+│   ├── council.md
+│   ├── supervisor.md
+│   ├── courier.md
+│   ├── internal_cli.md
+│   ├── internal_api.md
+│   ├── tester_code.md
+│   └── maintenance.md
+└── RUNNER_INTERFACE.md
+```
+
+### Files Updated
+- `docs/core_philosophy.md` - Added "If it can't be undone", clarified exit ready
+- `CURRENT_STATE.md` - Complete rewrite for new structure
+
+### Key Principles Clarified
+1. Zero vendor lock-in - everything swappable
+2. Modular & swappable - change one, nothing else breaks
+3. Exit ready - pack up, hand over to ANYONE
+4. Reversible - if it can't be undone, it can't be done
+5. Always improving - daily research, weekly evaluation
+
+### Next Session
+1. Create runner skeletons (follow RUNNER_INTERFACE.md)
+2. Test config loading
+3. Wire orchestrator to new config files
+4. First end-to-end test
+
+---
+
+# 2026-02-16 (Session 1)
 
 ## Session Summary
 

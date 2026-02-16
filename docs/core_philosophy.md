@@ -129,30 +129,72 @@ These never change. Every decision must align with these.
 ### Exit Ready
 
 **What it means:**
+- Pack up and hand over to anyone - new host, new owner, anyone
+- Export everything, import anywhere
 - VibePilot could shut down tomorrow and projects survive
 - Code lives in GitHub, state in Supabase, all portable
-- No proprietary lock-in
+- No proprietary lock-in, no hostage data
 
 **How we ensure it:**
 - All code in user's repo, not VibePilot's
 - Standard technologies, not custom frameworks
 - Complete documentation with every project
+- Export format for all data
+- One-command migration to new infrastructure
 
-**The test:** Delete VibePilot. Can the project still run and evolve? If no, refactor.
+**The test:** Can someone else take over tomorrow with zero friction? If no, refactor.
+
+---
+
+### If It Can't Be Undone, It Can't Be Done
+
+**What it means:**
+- Every change is reversible
+- Rollback plan before implementation
+- No one-way doors
+
+**How we ensure it:**
+- Config change? Old version saved
+- Dependency update? Rollback command ready
+- System swap? Migration export available
+- Data migration? Backup exists
+
+**The test:** Can you revert this in 5 minutes? If no, don't do it.
+
+---
+
+### Agnostic, Modular, Swappable
+
+**What it means:**
+- No vendor is permanent
+- No model is permanent  
+- No tool is permanent
+- No platform is permanent
+- Change one thing, nothing else breaks
+
+**How we ensure it:**
+- Abstract interfaces, concrete implementations
+- Config-driven selection, not code-locked
+- Document swap strategy for every component
+- Components don't know each other's internals
+
+**The test:** Can we swap [X] by changing one config line? If no, refactor.
 
 ---
 
 ### Always Improving
 
 **What it means:**
-- System Research finds new approaches daily
+- Researcher finds new approaches daily
 - Council evaluates applicability to our context
 - Better options adopted, not ignored
+- Never stop learning, never stop evolving
 
 **How we ensure it:**
-- Continuous research feed
+- Daily research feed
 - Critical evaluation (not just adoption)
 - Incremental improvement, not rewrites
+- Maintenance implements after approval
 
 **The test:** Did we consider a better way? If no, do the homework.
 
@@ -187,11 +229,14 @@ These never change. Every decision must align with these.
 - Every change has a rollback
 - Every swap is tested
 - Never break the principles
+- If it can't be undone, it can't be done
+- No approval = no change
 
-### For System Research
+### For Researcher
 - Find the new, the better, the different
 - Evaluate against OUR context specifically
 - Present options with trade-offs
+- Suggest only. Do NOT implement.
 
 ---
 
@@ -213,13 +258,16 @@ The destination matters more than any single path.
 ## SUMMARY
 
 ```
-BACKWARDS PLANNING    → Dream to first step
-OPTIONS THINKING      → Many paths, always alternatives
-PREPARATION           → Every scenario, resources created
-ZERO LOCK-IN          → Everything swappable
-MODULAR               → Changes don't cascade
-EXIT READY            → Survives without us
-ALWAYS IMPROVING      → New ideas evaluated
+BACKWARDS PLANNING      → Dream to first step
+OPTIONS THINKING        → Many paths, always alternatives
+PREPARATION             → Every scenario, resources created
+
+THE INVIOLABLE PRINCIPLES:
+ZERO VENDOR LOCK-IN     → Everything swappable
+MODULAR & SWAPPABLE     → Change one, nothing else breaks
+EXIT READY              → Pack up, hand over to anyone
+REVERSIBLE              → If it can't be undone, it can't be done
+ALWAYS IMPROVING        → New ideas evaluated daily
 ```
 
 These aren't rules to follow. They're how VibePilot thinks.

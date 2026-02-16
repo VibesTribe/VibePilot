@@ -1,0 +1,56 @@
+{
+  "version": "1.1",
+  "description": "Models we have direct access to (API or CLI). Web platforms are in platforms.json.",
+  "models": [
+    {
+      "id": "gemini-api",
+      "name": "Gemini API",
+      "provider": "google",
+      "access_type": "api",
+      "api_key_ref": "GEMINI_API_KEY",
+      "context_limit": 1000000,
+      "cost_input_per_1k": 0,
+      "cost_output_per_1k": 0,
+      "notes": "Free tier API. Can drive browser-use."
+    },
+    {
+      "id": "deepseek-chat",
+      "name": "DeepSeek Chat",
+      "provider": "deepseek",
+      "access_type": "api",
+      "api_key_ref": "DEEPSEEK_API_KEY",
+      "context_limit": 64000,
+      "cost_input_per_1k": 0.00014,
+      "cost_output_per_1k": 0.00028,
+      "credit_remaining": 2.00,
+      "credit_used": 0,
+      "notes": "API access. $2 credit remaining. Can drive browser-use."
+    },
+    {
+      "id": "kimi-cli",
+      "name": "Kimi CLI",
+      "provider": "moonshot",
+      "access_type": "cli_subscription",
+      "subscription_status": "active",
+      "subscription_ends": "2026-03-15",
+      "subscription_cost": 0.99,
+      "context_limit": 200000,
+      "notes": "CLI subscription. Executes tasks directly."
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode (GLM-5)",
+      "provider": "zhipu",
+      "access_type": "cli_subscription",
+      "subscription_status": "active",
+      "subscription_ends": "2026-04-30",
+      "subscription_cost": 45.00,
+      "context_limit": 128000,
+      "notes": "CLI subscription. Executes tasks directly."
+    }
+  ],
+  "limit_policy": {
+    "pause_at_percent": 80,
+    "description": "Pause usage when reaching 80% of limits to prevent cutoff mid-task."
+  }
+}
