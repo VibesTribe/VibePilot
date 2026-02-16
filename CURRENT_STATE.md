@@ -129,10 +129,26 @@ vault.ingest_secret('KEY_NAME', 'key_value')
 
 ## Immediate (Next Session)
 
-1. ~~**Schema Audit + Validation Script** - Check existing schema, create auto-validator (DEC-011)~~ ✅ DONE
-2. ~~**Prompt Caching** - Add to runners, 75% cost savings on Council (DEC-007)~~ ✅ DONE
-3. ~~**Apply Schema Fixes** - Run `docs/schema_timestamp_fixes.sql` in Supabase~~ ✅ DONE
-4. ~~**Test Council RPC** - Run `docs/schema_council_rpc.sql`, test functions~~ ✅ DONE
+**Before planning, we need:**
+1. **Task packet TEMPLATES** - Actual fill-in templates, not just schema
+2. **Skills registry** - Declarative, loaded from config, no hardcoded agents
+3. **Map existing code** - What's built, what's stub, what's missing
+4. **Courier clarification** - Document clearly what couriers do
+
+**Then:**
+5. Create VibePilot build plan with zero ambiguity
+
+## Near Term (After Planning)
+
+6. Dashboard connection (Vibeflow mockup → Supabase)
+7. Test concurrent execution with real tasks
+8. Courier Agent implementation
+9. Voice Interface (Deepgram + Kokoro via Cloudflare)
+
+## Session Notes
+
+- `SESSION_NOTES.md` - Mistakes made, lessons learned
+- `docs/vibeflow_review.md` - Vibeflow patterns to preserve
 
 ## Near Term
 
