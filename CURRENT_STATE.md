@@ -10,9 +10,10 @@
 
 ---
 
-**Last Updated:** 2026-02-17 18:15 UTC
-**Updated By:** GLM-5 (Session 10: Config architecture refactor, courier browser automation)
-**Known Good Commit:** `ff40a4f2`
+**Last Updated:** 2026-02-17 22:30 UTC
+**Updated By:** GLM-5 (Session 10: Config refactor, courier works, Kimi team activated)
+**Known Good Commit:** `cf2cbfcb`
+**Kimi Subscription:** $0.99/mo expires Feb 27 → $19/mo (MAXIMIZE USAGE UNTIL THEN)
 
 ---
 
@@ -64,9 +65,33 @@ git checkout aaabc5c5
 
 # ACTIVE WORK
 
+## GLM-5 + Kimi Team (Feb 17-27, 2025)
+
+**Kimi subscription jumps from $0.99 → $19 on Feb 27. MAXIMIZE USAGE.**
+
+| Role | Agent | Job |
+|------|-------|-----|
+| Architect/Vetter | GLM-5 | Think, analyze gaps, ensure principles, ask before acting |
+| Executor | Kimi | Research, code, parallel tasks, post to branches |
+| Maintenance | GLM-5 | ONLY agent that touches system files (after full understanding) |
+| Supervisor | GLM-5 | Quality gate, nothing to main without human approval |
+| Final Gate | Human | Approve before anything hits main |
+
+**Workflow:**
+```
+Human → GLM-5 (analyze/plan) → Kimi (execute to branch) → GLM-5 (review) → Human (approve) → Main
+```
+
+**Kimi Tasks (until Feb 27):**
+- Research repos → post to UPDATE_CONSIDERATIONS.md (on branch)
+- Parallel courier tasks
+- Browser automation with screenshots
+- Any heavy lifting
+
 | Task | Status | Agent | Started | Notes |
 |------|--------|-------|---------|-------|
-| None | - | - | - | Ready for next session |
+| Orchestrator update | pending | GLM-5 | - | Read new config structure |
+| Kimi research review | pending | GLM-5 | - | Branch: kimi-research-2026-02-17 |
 
 ---
 

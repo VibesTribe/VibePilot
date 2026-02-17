@@ -3,9 +3,28 @@
   "description": "Routing strategy configuration. How VibePilot decides WHERE to send tasks. Fully configurable per user preference.",
   "last_updated": "2026-02-17",
 
-  "current_strategy": "web_first",
+  "current_strategy": "kimi_priority",
 
   "strategies": {
+    "kimi_priority": {
+      "id": "kimi_priority",
+      "name": "Kimi Priority (Until Feb 27)",
+      "description": "Maximize Kimi subscription usage before $0.99 promo ends. Expires Feb 27, then $19/mo.",
+      "priority_order": ["cli"], 
+      "cli_priority": ["kimi", "opencode"],
+      "within_type_priority": {
+        "cli": ["kimi", "opencode"],
+        "web": ["duckai-web", "deepseek-web", "perchance-web"],
+        "api_free": ["gemini-api"],
+        "api_credit": ["deepseek-api"]
+      },
+      "rationale": [
+        "Kimi subscription: $0.99 until Feb 27, then $19",
+        "Maximize quota while cheap",
+        "Kimi has built-in browser + screenshots",
+        "262K context, multimodal"
+      ]
+    },
     "web_first": {
       "id": "web_first",
       "name": "Web First (Strategic Intelligence)",
