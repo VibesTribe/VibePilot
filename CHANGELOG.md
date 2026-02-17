@@ -15,7 +15,8 @@
 1. **ROI Calculator v1** — Full ROI tracking in dashboard
    - Enhanced RoiPanel with real data from Supabase
    - USD/CAD toggle with live exchange rate fetch
-   - Slice-level ROI breakdown
+   - Slice-level ROI breakdown (clickable to show tasks)
+   - Model-level ROI breakdown (clickable to show tasks per model)
    - Subscription tracking with renewal recommendations
 
 2. **Schema v1.4** — Enhanced ROI fields
@@ -26,6 +27,11 @@
    - `slice_roi` view for slice-level rollup
    - `get_subscription_roi()` and `get_full_roi_report()` functions
    - `exchange_rates` table for CAD conversion
+
+3. **Model ROI Calculation** — Calculate ROI per model
+   - Models track: executor runs, courier runs, or both
+   - Each model shows: total tokens, theoretical cost, actual cost, savings
+   - Click to expand: all task runs with that model's contribution
 
 ### Cost Model
 
@@ -57,22 +63,27 @@ vibeflow/apps/dashboard/
 │   - VibePilotTaskRun: added ROI fields
 │   - VibePilotModel: added subscription fields
 │   - VibePilotPlatform: added cost fields
-│   - ROI types: SliceROI, SubscriptionROI, ProjectROI, ROITotals
-│   - calculateROI(), calculateSliceROI(), calculateSubscriptionROI()
+│   - ROI types: SliceROI, SubscriptionROI, ProjectROI, ROITotals, ModelROI, TaskRunROI
+│   - calculateROI(), calculateSliceROI(), calculateSubscriptionROI(), calculateModelROI()
 │
 ├── hooks/useMissionData.ts (UPDATED)
-│   - Exposes roi data from adapter
+│   - Exposes roi data from adapter (includes ModelROI)
 │
 └── components/modals/MissionModals.tsx (UPDATED)
     - RoiPanel: enhanced with real data
     - USD/CAD toggle
-    - Slice breakdown
+    - By Slice breakdown (clickable to expand)
+    - By Model breakdown (clickable to show tasks)
     - Subscription tracking with recommendations
     - Removed 404 link to roi-calculator.html
+
+├── styles.css (UPDATED)
+│   - New styles for model list, task list, expand icons
 ```
 
 ### Remaining Work
 
+- Add cost/savings to model cards in main dashboard
 - Admin Panel forms → Supabase
 - Vibes → Maintenance handoff
 - Test ROI with real task runs
