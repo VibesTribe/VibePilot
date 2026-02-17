@@ -10,9 +10,9 @@
 
 ---
 
-**Last Updated:** 2026-02-17 16:00 UTC
-**Updated By:** GLM-5 (Session 9: ROI Panel UX fixes - currency toggle visibility, slice/model section clarity)
-**Known Good Commit:** `d0c012a8`
+**Last Updated:** 2026-02-17 18:15 UTC
+**Updated By:** GLM-5 (Session 10: Config architecture refactor, courier browser automation)
+**Known Good Commit:** `ff40a4f2`
 
 ---
 
@@ -168,6 +168,33 @@ git checkout aaabc5c5
 - Agent resolution with skills/tools expanded
 - Config validation
 | **Agent Prompts** | 12 complete agent prompts | `config/prompts/*.md` |
+
+## Config Architecture (Session 10 - NEW)
+
+| File | Purpose | Version |
+|------|---------|---------|
+| `destinations.json` | WHERE tasks execute (cli/web/api) | v1.1 |
+| `roles.json` | WHAT job is done (13 roles) | v2.0 |
+| `models.json` | WHO provides intelligence (10 LLMs) | v2.0 |
+| `routing.json` | WHY/strategy (web_first, throttle, credit protection) | v1.0 |
+| `tools.json` | HOW execution happens (browser-use, etc) | v2.0 |
+| `WHAT_WHERE.md` | Project navigation guide | NEW |
+
+**Three LEGO pieces (swappable independently):**
+- DESTINATION (where) + ROLE (what) + MODEL (who)
+
+**Old files (deprecated but kept for transition):**
+- `agents.json` → replaced by `roles.json`
+- `platforms.json` → replaced by `destinations.json`
+
+## Courier Runner (Session 10 - In Progress)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Playwright/Chromium | ✅ Installed | Browser automation ready |
+| Browser navigation | ✅ Works | Tested chatgate.ai, deepseek.com |
+| No-auth platforms | ✅ Identified | chatgate.ai (ChatGPT), deepseek.com |
+| LLM adapter | ⚠️ Needs fix | browser-use interface compatibility |
 
 ## Agent Prompts (Complete)
 
