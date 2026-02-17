@@ -202,12 +202,27 @@ Record what was removed/cleaned up to avoid re-investigating.
 | asyncio | REMOVED from requirements.txt | Built into Python, unnecessary |
 | browser-use | ADDED to requirements.txt | Already in venv, needed for courier |
 | google-genai | ADDED to requirements.txt | Already in venv, needed for courier |
+| playwright | INSTALLED in venv | Browser automation for courier |
+| langchain-openai | INSTALLED in venv | LLM interface for browser-use |
+| langchain-google-genai | INSTALLED in venv | Alternative Gemini interface |
 | test_*.py in root | Ignored via .gitignore | Messy test scripts, kept out of git |
 
 **Investigated but kept:**
 - `venv/` - Contains browser-use v0.11.9, google-genai v1.63.0, all needed packages
 - `agents.json` - Kept as deprecated, roles.json replaces
 - `platforms.json` - Kept as deprecated, destinations.json replaces
+
+### Courier Status (2026-02-17)
+
+**Working:**
+- Playwright/Chromium installed and launches
+- Browser navigates to web platforms
+- No-auth platform URLs identified: chatgate.ai (ChatGPT), chat.deepseek.com
+
+**Remaining:**
+- LLM adapter for browser-use needs correct interface
+- browser-use 0.11.x expects specific model interface (provider, ainvoke, etc.)
+- LangChain models work but need Pydantic v2 compatibility fix
 
 ---
 
