@@ -432,9 +432,10 @@ class CourierContractRunner(BaseRunner):
             "no_auth": True,
         },
         "chatgpt": {
-            "url": "https://chat.openai.com",
-            "new_chat_url": "https://chat.openai.com/?model=auto",
+            "url": "https://chatgate.ai",
+            "new_chat_url": "https://chatgate.ai",
             "name": "ChatGPT",
+            "no_auth": True,
         },
         "claude": {
             "url": "https://claude.ai",
@@ -450,6 +451,7 @@ class CourierContractRunner(BaseRunner):
             "url": "https://chat.deepseek.com",
             "new_chat_url": "https://chat.deepseek.com",
             "name": "DeepSeek",
+            "no_auth": True,
         },
         "copilot": {
             "url": "https://copilot.microsoft.com",
@@ -458,10 +460,10 @@ class CourierContractRunner(BaseRunner):
         },
     }
 
-    def __init__(self, platform: str = "gemini", llm_model_id: str = None):
+    def __init__(self, platform: str = "huggingchat", llm_model_id: str = None):
         super().__init__(runner_id=f"courier-{platform}")
         self.platform = platform
-        self.llm_model_id = llm_model_id or "gemini-api"
+        self.llm_model_id = llm_model_id or "gemini-2.0-flash"
         self._llm = None
 
     def _get_llm(self):
@@ -482,16 +484,15 @@ class CourierContractRunner(BaseRunner):
             return None
 
         provider = model_config.get("provider", "")
-        access_type = model_config.get("access_type", "")
+        api_key_ref = model_config.get("api_key_ref")
 
-        if access_type != "api":
+        if not api_key_ref:
             self.logger.error(
-                f"Model {self.llm_model_id} is not API-accessible (type: {access_type})"
+                f"Model {self.llm_model_id} has no api_key_ref - not API-accessible"
             )
             return None
 
-        api_key_ref = model_config.get("api_key_ref")
-        api_key = get_api_key(api_key_ref) if api_key_ref else None
+        api_key = get_api_key(api_key_ref)
 
         if not api_key:
             self.logger.error(f"No API key for {self.llm_model_id}")
@@ -510,40 +511,23 @@ class CourierContractRunner(BaseRunner):
             return None
 
     def _create_gemini_adapter(self, api_key: str, model_config: dict):
-        """Create browser-use compatible Gemini adapter."""
+        """Create browser-use compatible Gemini adapter using OpenAI-compatible API."""
         try:
-            from google import genai
-            from browser_use.llm.messages import UserMessage, AssistantMessage
+            from langchain_openai import ChatOpenAI
 
-            model_name = model_config.get("id", "gemini-api")
-            if model_name == "gemini-api":
-                model_name = "gemini-2.0-flash"
+            model_name = model_config.get("id", "gemini-2.0-flash")
 
-            class GeminiAdapter:
-                def __init__(self, api_key, model_name):
-                    self.client = genai.Client(api_key=api_key)
-                    self.model_name = model_name
-                    self.name = model_name
-                    self.provider = "google"
+            class BrowserUseChatOpenAI(ChatOpenAI):
+                @property
+                def provider(self):
+                    return "google"
 
-                async def ainvoke(self, messages):
-                    contents = []
-                    for msg in messages:
-                        role = "user" if isinstance(msg, UserMessage) else "model"
-                        content = (
-                            msg.content
-                            if isinstance(msg.content, str)
-                            else str(msg.content)
-                        )
-                        contents.append({"role": role, "parts": [content]})
-
-                    response = self.client.models.generate_content(
-                        model=self.model_name,
-                        contents=contents,
-                    )
-                    return AssistantMessage(content=response.text)
-
-            self._llm = GeminiAdapter(api_key, model_name)
+            # Use Gemini's OpenAI-compatible endpoint
+            self._llm = BrowserUseChatOpenAI(
+                model=model_name,
+                api_key=api_key,
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai",
+            )
             return self._llm
 
         except Exception as e:
@@ -563,10 +547,11 @@ class CourierContractRunner(BaseRunner):
                     self.api_key = api_key
                     self.base_url = base_url.rstrip("/")
                     self.model_name = model_id
+                    self.model = model_id  # browser-use expects this
                     self.name = model_id
                     self.provider = "openai-compatible"
 
-                async def ainvoke(self, messages):
+                async def ainvoke(self, messages, *args, **kwargs):
                     formatted = []
                     for msg in messages:
                         role = "user" if isinstance(msg, UserMessage) else "assistant"
