@@ -13,12 +13,12 @@ VALUES (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Sample tasks with slice_id
-INSERT INTO tasks (id, title, status, slice_id, project_id, priority) VALUES
-  ('550e8400-e29b-41d4-a716-446655440101', 'Setup authentication', 'merged', 'auth', '550e8400-e29b-41d4-a716-446655440001', 1),
-  ('550e8400-e29b-41d4-a716-446655440102', 'Create user model', 'merged', 'auth', '550e8400-e29b-41d4-a716-446655440001', 2),
-  ('550e8400-e29b-41d4-a716-446655440103', 'Add login UI', 'merged', 'ui', '550e8400-e29b-41d4-a716-446655440001', 3),
-  ('550e8400-e29b-41d4-a716-446655440104', 'Build API endpoints', 'in_progress', 'api', '550e8400-e29b-41d4-a716-446655440001', 2),
-  ('550e8400-e29b-41d4-a716-446655440105', 'Write tests', 'pending', 'testing', '550e8400-e29b-41d4-a716-446655440001', 4)
+INSERT INTO tasks (id, title, type, status, slice_id, project_id, priority) VALUES
+  ('550e8400-e29b-41d4-a716-446655440101', 'Setup authentication', 'code', 'merged', 'auth', '550e8400-e29b-41d4-a716-446655440001', 1),
+  ('550e8400-e29b-41d4-a716-446655440102', 'Create user model', 'code', 'merged', 'auth', '550e8400-e29b-41d4-a716-446655440001', 2),
+  ('550e8400-e29b-41d4-a716-446655440103', 'Add login UI', 'code', 'merged', 'ui', '550e8400-e29b-41d4-a716-446655440001', 3),
+  ('550e8400-e29b-41d4-a716-446655440104', 'Build API endpoints', 'code', 'in_progress', 'api', '550e8400-e29b-41d4-a716-446655440001', 2),
+  ('550e8400-e29b-41d4-a716-446655440105', 'Write tests', 'code', 'pending', 'testing', '550e8400-e29b-41d4-a716-446655440001', 4)
 ON CONFLICT (id) DO NOTHING;
 
 -- Sample task_runs with ROI data
