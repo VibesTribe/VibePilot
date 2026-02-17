@@ -158,33 +158,20 @@ WEB_PLATFORMS = {
 
 ## Database Schemas
 
-**Location:** `docs/schema_*.sql`
+**Location:** `supabase/migrations/`
 
 | File | What It Adds |
 |------|--------------|
 | `schema_v1_core.sql` | Core tables (models, tasks, task_runs) |
 | `schema_v1.1_routing.sql` | routing_flag, slice_id, task_number |
 | `schema_v1.4_roi_enhanced.sql` | tokens_in/out, courier tracking, ROI functions |
-| `schema_intelligence.sql` | Model/platform intelligence, weekly reports (NEW) |
-| `schema_performance_fix.sql` | Index fixes for Supabase warnings (NEW) |
+| `schema_intelligence.sql` | Model/platform intelligence, weekly reports |
+| `schema_performance_fix.sql` | Index fixes for Supabase warnings |
 
-**To apply schemas:**
-1. Go to https://supabase.com/dashboard
-2. Select your project
-3. Click "SQL Editor" in left sidebar
-4. Click "New query"
-5. Copy content from schema file in GitHub
-6. Paste and click "Run"
-7. Verify with SELECT statements at end of file
-
-**Order to apply:**
-1. schema_v1_core.sql (if new database)
-2. schema_v1.1_routing.sql
-3. schema_v1.2_platforms.sql
-4. schema_v1.3_config_jsonb.sql
-5. schema_v1.4_roi_enhanced.sql
-6. schema_intelligence.sql (NEW)
-7. schema_performance_fix.sql (NEW - addresses security warnings)
+**To apply:**
+1. Go to Supabase → SQL Editor
+2. Copy from GitHub: `supabase/migrations/schema_*.sql`
+3. Paste and Run
 
 ---
 
