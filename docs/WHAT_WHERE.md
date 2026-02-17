@@ -166,8 +166,25 @@ WEB_PLATFORMS = {
 | `schema_v1.1_routing.sql` | routing_flag, slice_id, task_number |
 | `schema_v1.4_roi_enhanced.sql` | tokens_in/out, courier tracking, ROI functions |
 | `schema_intelligence.sql` | Model/platform intelligence, weekly reports (NEW) |
+| `schema_performance_fix.sql` | Index fixes for Supabase warnings (NEW) |
 
-**To run migrations:** Copy SQL to Supabase SQL editor and execute
+**To apply schemas:**
+1. Go to https://supabase.com/dashboard
+2. Select your project
+3. Click "SQL Editor" in left sidebar
+4. Click "New query"
+5. Copy content from schema file in GitHub
+6. Paste and click "Run"
+7. Verify with SELECT statements at end of file
+
+**Order to apply:**
+1. schema_v1_core.sql (if new database)
+2. schema_v1.1_routing.sql
+3. schema_v1.2_platforms.sql
+4. schema_v1.3_config_jsonb.sql
+5. schema_v1.4_roi_enhanced.sql
+6. schema_intelligence.sql (NEW)
+7. schema_performance_fix.sql (NEW - addresses security warnings)
 
 ---
 
@@ -195,6 +212,30 @@ git log --oneline -10
 ## Cleanup Log
 
 Record what was removed/cleaned up to avoid re-investigating.
+
+### Courier API Call Reality (2026-02-17)
+
+**CRITICAL: browser-use is NOT 1 API call per task.**
+
+Each browser-use step = 1 LLM API call. A simple task takes 4-8 calls:
+1. Navigate to URL → 1 call
+2. Find input element → 1 call  
+3. Type prompt → 1 call
+4. Submit → 1 call
+5. Wait for response → 1-2 calls
+6. Extract answer → 1 call
+
+**Impact on free tier limits:**
+
+| Platform | Limit | Courier Tasks/Hour (est) |
+|----------|-------|--------------------------|
+| Gemini API | 15 req/min, 1500/day | ~2-3/min, ~200/day |
+| DeepSeek API | Credit-based | Depends on credit |
+
+**Recommendation:**
+- Simple queries → Use internal API (1 call)
+- Complex/long tasks → Use courier (worth 4-8 calls)
+- Research tasks → Courier to web platform (free access to best models)
 
 ### 2026-02-17 Session
 
