@@ -6,6 +6,39 @@
 
 ---
 
+### Remaining Work
+
+1. Fix LLM adapter for browser-use (interface compatibility)
+2. Update orchestrator to use new config structure
+3. Wire courier → orchestrator routing
+4. Test full task execution via courier
+5. Apply schema_intelligence.sql to Supabase
+6. Implement credit sync after API calls
+
+### No-Auth Platform URLs
+
+| Platform | URL | Notes |
+|----------|-----|-------|
+| Duck.ai | https://duck.ai | GPT-4o, Claude, DeepSeek, Llama - anonymous |
+| NoteGPT | https://notegpt.io | DeepSeek R1 optimized |
+| Perchance | https://perchance.org/ai-chat | 100% free, open source |
+| ChatGate | https://chatgate.ai | ChatGPT proxy |
+| DeepSeek | https://chat.deepseek.com | Works without login |
+
+### OpenRouter Safety
+
+- Always use `:free` suffix on model IDs (e.g., `deepseek/deepseek-r1:free`)
+- Set spending limit to $0 in OpenRouter dashboard as hard circuit breaker
+- Never use base model IDs that can fallback to paid
+
+### Kimi as Courier Driver
+
+- Kimi K2.5 can run up to 100 parallel sub-agents
+- Subscription sitting unused - could be leveraged for courier work
+- Moonshot API is ~95% cheaper than subscription ($0.60/1M tokens)
+
+---
+
 # 2026-02-17 (Session 10)
 
 ## Session Summary

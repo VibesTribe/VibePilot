@@ -42,10 +42,11 @@ cd ~/vibepilot
 | File | Purpose | Status |
 |------|---------|--------|
 | `destinations.json` | WHERE tasks execute (cli/web/api) | NEW v1.1 |
-| `roles.json` | WHAT job is done (courier, planner, etc) | NEW v2.0 |
+| `roles.json` | WHAT job is done (13 roles) | NEW v2.0 |
 | `models.json` | WHO provides intelligence (LLMs) | v2.0 |
 | `routing.json` | WHY/strategy (web_first, priorities, throttle) | NEW v1.0 |
 | `tools.json` | HOW execution happens (browser-use, etc) | v2.0 |
+| `routing_contract.json` | Routing decision schema | NEW v1.0 |
 | `skills.json` | Skill definitions | v1.0 |
 | `agents.json` | OLD - replaced by roles.json | DEPRECATED |
 | `platforms.json` | OLD - replaced by destinations.json | DEPRECATED |
@@ -164,6 +165,7 @@ WEB_PLATFORMS = {
 | `schema_v1_core.sql` | Core tables (models, tasks, task_runs) |
 | `schema_v1.1_routing.sql` | routing_flag, slice_id, task_number |
 | `schema_v1.4_roi_enhanced.sql` | tokens_in/out, courier tracking, ROI functions |
+| `schema_intelligence.sql` | Model/platform intelligence, weekly reports (NEW) |
 
 **To run migrations:** Copy SQL to Supabase SQL editor and execute
 
