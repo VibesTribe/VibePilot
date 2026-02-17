@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "description": "WHERE tasks execute. CLI, Web platforms, API endpoints. All swappable.",
   "last_updated": "2026-02-17",
 
@@ -8,6 +8,8 @@
       "id": "opencode",
       "name": "OpenCode",
       "type": "cli",
+      "destination_type": "cli",
+      "cost_category": "subscription_sunk",
       "command": "opencode",
       "status": "active",
       "models_available": ["*"],
@@ -17,12 +19,18 @@
         "ends_at": "2026-04-30",
         "status": "active"
       },
-      "notes": "CLI tool. Can run many models. Currently using GLM-5 via subscription."
+      "throttle": {
+        "strategy": "none",
+        "reason": "Subscription already paid, unlimited use"
+      },
+      "notes": "CLI tool. Can run many models. Currently using GLM-5 via subscription. PRIORITY: Use freely, already paid."
     },
     {
       "id": "kimi",
       "name": "Kimi CLI",
       "type": "cli",
+      "destination_type": "cli",
+      "cost_category": "subscription_sunk",
       "command": "kimi",
       "status": "active",
       "models_available": ["kimi-internal"],
@@ -32,35 +40,82 @@
         "ends_at": "2026-03-15",
         "status": "active"
       },
-      "notes": "CLI subscription. Uses Moonshot's model internally."
+      "throttle": {
+        "strategy": "none",
+        "reason": "Subscription already paid, unlimited use"
+      },
+      "notes": "CLI subscription. Uses Moonshot's model internally. PRIORITY: Use freely, already paid."
     },
     {
       "id": "gemini-api",
       "name": "Gemini API",
       "type": "api",
+      "destination_type": "api_free",
+      "cost_category": "free",
       "provider": "google",
       "endpoint": "https://generativelanguage.googleapis.com/v1beta",
       "api_key_ref": "GEMINI_API_KEY",
       "status": "active",
       "models_available": ["gemini-2.0-flash", "gemini-2.5-flash"],
-      "notes": "Free tier API. Direct model access."
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_day": 1000000
+      },
+      "throttle": {
+        "strategy": "pace",
+        "at_percent": 80,
+        "per_minute_delay_seconds": 4
+      },
+      "notes": "Free tier API. Direct model access. PRIORITY: Use freely, generous free tier."
     },
     {
       "id": "deepseek-api",
       "name": "DeepSeek API",
       "type": "api",
+      "destination_type": "api_credit",
+      "cost_category": "credit_burn",
       "provider": "deepseek",
       "endpoint": "https://api.deepseek.com/v1",
       "api_key_ref": "DEEPSEEK_API_KEY",
       "status": "active",
       "models_available": ["deepseek-chat", "deepseek-reasoner"],
-      "credit_remaining_usd": 2.00,
-      "notes": "API access with $2 credit. Extremely cheap."
+      "credit_remaining_usd": 6.23,
+      "credit_warning_at_usd": 5.00,
+      "credit_pause_at_usd": 1.00,
+      "throttle": {
+        "strategy": "protect",
+        "reason": "Credit-based, use sparingly"
+      },
+      "notes": "API access with credit remaining. PROTECT: Skip if alternatives exist. Log every use."
+    },
+    {
+      "id": "openrouter-api",
+      "name": "OpenRouter API",
+      "type": "api",
+      "destination_type": "api_credit",
+      "cost_category": "credit_burn",
+      "provider": "openrouter",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "models_available": ["*"],
+      "credit_remaining_usd": 6.00,
+      "credit_warning_at_usd": 5.00,
+      "credit_pause_at_usd": 1.00,
+      "priority_tier": 99,
+      "throttle": {
+        "strategy": "protect",
+        "reason": "LAST RESORT - burned $10 before on free model fallback"
+      },
+      "notes": "LAST RESORT ONLY. Free models unreliable, serves paid if unavailable. PROTECT: Only use if everything else fails."
     },
     {
       "id": "chatgpt-web",
       "name": "ChatGPT Web",
       "type": "web",
+      "destination_type": "web",
+      "cost_category": "free",
       "url": "https://chat.openai.com",
       "new_chat_url": "https://chat.openai.com/?model=auto",
       "provider": "openai",
@@ -78,17 +133,24 @@
         },
         "context_limit": 128000
       },
+      "throttle": {
+        "strategy": "pace",
+        "at_percent": 80,
+        "per_message_delay_seconds": 18
+      },
       "theoretical_cost": {
         "gpt-4o-mini": { "input_per_1m": 0.15, "output_per_1m": 0.60 },
         "gpt-4o": { "input_per_1m": 2.50, "output_per_1m": 10.00 }
       },
       "capabilities": ["text", "code", "vision", "file_upload", "web_search"],
-      "notes": "WARNING: Attachments may reduce limits to ~1/10th"
+      "notes": "WARNING: Attachments may reduce limits to ~1/10th. PRIORITY: Test GPT-4o, gather intelligence."
     },
     {
       "id": "claude-web",
       "name": "Claude Web",
       "type": "web",
+      "destination_type": "web",
+      "cost_category": "free",
       "url": "https://claude.ai",
       "new_chat_url": "https://claude.ai/new",
       "provider": "anthropic",
@@ -107,18 +169,25 @@
         },
         "context_limit": 200000
       },
+      "throttle": {
+        "strategy": "pace",
+        "at_percent": 80,
+        "per_message_delay_seconds": 30
+      },
       "theoretical_cost": {
         "claude-haiku-4-5": { "input_per_1m": 1.00, "output_per_1m": 5.00 },
         "claude-sonnet-4-5": { "input_per_1m": 3.00, "output_per_1m": 15.00 }
       },
       "capabilities": ["text", "code", "vision", "file_upload", "web_search", "artifacts"],
       "strengths": ["coding", "reasoning", "honesty"],
-      "notes": "Good for coding. Rate limits vary by demand."
+      "notes": "Good for coding. PRIORITY: Test Claude, gather intelligence on coding performance."
     },
     {
       "id": "gemini-web",
       "name": "Gemini Web",
       "type": "web",
+      "destination_type": "web",
+      "cost_category": "free",
       "url": "https://gemini.google.com",
       "new_chat_url": "https://gemini.google.com/app",
       "provider": "google",
@@ -138,17 +207,24 @@
         },
         "context_limit": 1000000
       },
+      "throttle": {
+        "strategy": "pace",
+        "at_percent": 80,
+        "per_minute_delay_seconds": 4
+      },
       "theoretical_cost": {
         "gemini-2.5-flash": { "input_per_1m": 0.30, "output_per_1m": 2.50 }
       },
       "capabilities": ["text", "code", "vision", "audio", "video", "file_upload", "web_search"],
       "strengths": ["long_context", "multimodal", "vision"],
-      "notes": "BEST FREE TIER: 1M tokens/day, 1M context"
+      "notes": "BEST FREE TIER: 1M tokens/day, 1M context. PRIORITY: Heavy use OK, gather intelligence."
     },
     {
       "id": "deepseek-web",
       "name": "DeepSeek Web",
       "type": "web",
+      "destination_type": "web",
+      "cost_category": "free",
       "url": "https://chat.deepseek.com",
       "new_chat_url": "https://chat.deepseek.com",
       "provider": "deepseek",
@@ -166,17 +242,23 @@
         },
         "context_limit": 64000
       },
+      "throttle": {
+        "strategy": "pace",
+        "at_percent": 80
+      },
       "theoretical_cost": {
         "deepseek-chat": { "input_per_1m": 0.28, "output_per_1m": 0.42 }
       },
       "capabilities": ["text", "code", "file_upload", "reasoning"],
       "strengths": ["coding", "reasoning", "extremely_cheap_api"],
-      "notes": "CHEAPEST API. R1 model for reasoning tasks."
+      "notes": "CHEAPEST API. R1 for reasoning. PRIORITY: Test reasoning, compare to Claude."
     },
     {
       "id": "copilot-web",
       "name": "Microsoft Copilot",
       "type": "web",
+      "destination_type": "web",
+      "cost_category": "free",
       "url": "https://copilot.microsoft.com",
       "new_chat_url": "https://copilot.microsoft.com",
       "provider": "microsoft",
@@ -195,17 +277,23 @@
         },
         "context_limit": 128000
       },
+      "throttle": {
+        "strategy": "pace",
+        "at_percent": 80
+      },
       "theoretical_cost": {
         "gpt-4o": { "input_per_1m": 2.50, "output_per_1m": 10.00 }
       },
       "capabilities": ["text", "code", "vision", "image_generation", "web_search"],
       "strengths": ["free_gpt4_access", "web_search"],
-      "notes": "Free GPT-4 access. Session resets = fresh limits."
+      "notes": "Free GPT-4 access. Session resets = fresh limits. PRIORITY: GPT-4o for free, test reasoning."
     },
     {
       "id": "huggingchat-web",
       "name": "HuggingChat",
       "type": "web",
+      "destination_type": "web",
+      "cost_category": "free",
       "url": "https://huggingface.co/chat",
       "new_chat_url": "https://huggingface.co/chat",
       "provider": "huggingface",
@@ -224,9 +312,13 @@
         },
         "context_limit": "varies_by_model"
       },
+      "throttle": {
+        "strategy": "pace",
+        "at_percent": 80
+      },
       "capabilities": ["text", "code", "vision", "file_upload", "open_source_models"],
       "strengths": ["open_source", "model_variety", "no_vendor_lockin", "no_auth_required"],
-      "notes": "128+ open source models. NO AUTH REQUIRED for basic use. Good for testing."
+      "notes": "128+ open source models. NO AUTH REQUIRED. PRIORITY: Test courier here first (no login needed)."
     }
   ],
 
@@ -252,18 +344,20 @@
   ],
 
   "routing_hints": {
-    "coding": ["deepseek-web", "claude-web", "chatgpt-web"],
+    "coding": ["claude-web", "deepseek-web", "chatgpt-web"],
     "long_documents": ["gemini-web", "claude-web"],
     "research": ["copilot-web", "gemini-web"],
-    "reasoning": ["deepseek-web", "claude-web"],
+    "reasoning": ["claude-web", "deepseek-web"],
     "vision": ["gemini-web", "chatgpt-web", "claude-web"],
     "general": ["gemini-web", "chatgpt-web", "copilot-web"],
     "no_auth_required": ["huggingchat-web"],
     "testing_first": ["huggingchat-web"]
   },
 
-  "limit_policy": {
-    "pause_at_percent": 80,
-    "description": "Pause destination usage when reaching 80% of limits. Resume after reset period."
-  }
+  "notes": [
+    "destination_type maps to routing.json strategies: web, cli, api_free, api_credit",
+    "cost_category: free, subscription_sunk, credit_burn",
+    "throttle.strategy: pace (slow down), protect (skip if alternatives), none (unlimited)",
+    "credit_pause_at_usd: pause destination when credit drops below this"
+  ]
 }

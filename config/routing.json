@@ -1,0 +1,196 @@
+{
+  "version": "1.0",
+  "description": "Routing strategy configuration. How VibePilot decides WHERE to send tasks. Fully configurable per user preference.",
+  "last_updated": "2026-02-17",
+
+  "current_strategy": "web_first",
+
+  "strategies": {
+    "web_first": {
+      "id": "web_first",
+      "name": "Web First (Strategic Intelligence)",
+      "description": "Prioritize web platforms for free access + model intelligence gathering. Learns real-world model performance. Advises on subscriptions.",
+      "priority_order": ["web", "cli", "api_free", "api_credit"],
+      "within_type_priority": {
+        "web": ["huggingchat-web", "gemini-web", "claude-web", "chatgpt-web", "deepseek-web", "copilot-web"],
+        "cli": ["opencode", "kimi"],
+        "api_free": ["gemini-api"],
+        "api_credit": ["deepseek-api"]
+      },
+      "credit_threshold_usd": 1.00,
+      "credit_skip_if_alternatives": true,
+      "rationale": [
+        "Best models free on web platforms",
+        "New models available immediately for testing",
+        "Real-world performance data informs subscription decisions",
+        "VibePilot learns actual model strengths/weaknesses",
+        "ROI: does free web + cheap API key beat subscriptions?"
+      ]
+    },
+
+    "subscription_first": {
+      "id": "subscription_first",
+      "name": "Subscription First",
+      "description": "Use paid subscriptions exclusively. Web and API as fallback only. Maximizes sunk value.",
+      "priority_order": ["cli", "web", "api_free", "api_credit"],
+      "within_type_priority": {
+        "cli": ["opencode", "kimi"],
+        "web": ["gemini-web", "claude-web", "chatgpt-web"],
+        "api_free": ["gemini-api"],
+        "api_credit": ["deepseek-api"]
+      },
+      "rationale": [
+        "Already paid for subscriptions, use them",
+        "Consistent model behavior",
+        "No rate limit surprises"
+      ]
+    },
+
+    "api_first": {
+      "id": "api_first",
+      "name": "API First",
+      "description": "Direct API access preferred. Maximum control, no browser automation overhead.",
+      "priority_order": ["api_free", "api_credit", "cli", "web"],
+      "within_type_priority": {
+        "api_free": ["gemini-api"],
+        "api_credit": ["deepseek-api"],
+        "cli": ["opencode", "kimi"],
+        "web": ["gemini-web", "claude-web", "chatgpt-web"]
+      },
+      "rationale": [
+        "Direct API = faster, more reliable",
+        "Full control over parameters",
+        "No browser automation complexity"
+      ]
+    },
+
+    "rotate": {
+      "id": "rotate",
+      "name": "Rotate All",
+      "description": "Round-robin through all available destinations. Maximum variety, spreads load, gathers intelligence on all.",
+      "priority_order": null,
+      "mode": "round_robin",
+      "rationale": [
+        "Test all platforms regularly",
+        "Spread load across all resources",
+        "Never hit any single rate limit"
+      ]
+    },
+
+    "cost_optimize": {
+      "id": "cost_optimize",
+      "name": "Cost Optimize",
+      "description": "Always choose the cheapest option that can do the task. Pure cost minimization.",
+      "priority_order": ["api_free", "web", "cli", "api_credit"],
+      "cost_ranking": {
+        "free": ["gemini-api", "gemini-web", "claude-web", "chatgpt-web", "copilot-web", "huggingchat-web", "deepseek-web"],
+        "subscription_sunk": ["opencode", "kimi"],
+        "credit_burn": ["deepseek-api", "openrouter-api"]
+      },
+      "rationale": [
+        "Minimize ongoing costs",
+        "Use what's already paid for",
+        "Protect credit balances"
+      ]
+    },
+
+    "custom": {
+      "id": "custom",
+      "name": "Custom Per Task Type",
+      "description": "Different routing for different task types. Fine-grained control.",
+      "by_task_type": {
+        "coding": ["claude-web", "deepseek-web", "opencode"],
+        "reasoning": ["claude-web", "deepseek-web"],
+        "research": ["gemini-web", "copilot-web", "chatgpt-web"],
+        "long_document": ["gemini-web", "claude-web"],
+        "vision": ["gemini-web", "chatgpt-web", "claude-web"],
+        "testing": ["opencode", "kimi"],
+        "maintenance": ["opencode"]
+      },
+      "fallback": "web_first"
+    }
+  },
+
+  "destination_type_definitions": {
+    "web": {
+      "description": "Web platforms via courier. Free access to best models. Rate-limited but generous.",
+      "cost": "free",
+      "requires": "courier role + browser_control model"
+    },
+    "cli": {
+      "description": "CLI subscriptions. Already paid. Unlimited or generous limits.",
+      "cost": "subscription_sunk"
+    },
+    "api_free": {
+      "description": "Free API tiers. Direct access, no browser overhead.",
+      "cost": "free"
+    },
+    "api_credit": {
+      "description": "Paid API credits. Use sparingly. Track burn rate.",
+      "cost": "credit_burn",
+      "protect": true
+    }
+  },
+
+  "throttle_defaults": {
+    "strategy": "pace",
+    "at_percent": 80,
+    "description": "Pace requests at 80% of rate limit. Don't hard pause, just slow down.",
+    "per_limit_type": {
+      "per_minute": {
+        "action": "delay",
+        "delay_calculation": "60 / limit * 1.1"
+      },
+      "per_hour": {
+        "action": "delay",
+        "delay_calculation": "3600 / limit * 1.1"
+      },
+      "per_day": {
+        "action": "pause",
+        "until": "next_day"
+      }
+    }
+  },
+
+  "credit_protection": {
+    "warning_at_usd": 5.00,
+    "pause_at_usd": 1.00,
+    "skip_if_alternatives": true,
+    "log_every_use": true
+  },
+
+  "intelligence_gathering": {
+    "enabled": true,
+    "track_per_model": [
+      "success_rate",
+      "failure_reasons",
+      "avg_duration",
+      "task_types_succeeded",
+      "task_types_failed",
+      "context_limit_observed",
+      "confusion_detected_at_tokens"
+    ],
+    "report_frequency": "weekly",
+    "subscription_advisor": {
+      "enabled": true,
+      "min_samples": 10,
+      "recommend_threshold": 0.85
+    }
+  },
+
+  "fallback_chain": {
+    "web_unavailable": ["cli", "api_free"],
+    "cli_unavailable": ["web", "api_free"],
+    "api_unavailable": ["web", "cli"],
+    "all_unavailable": "pause_and_alert"
+  },
+
+  "notes": [
+    "Routing strategy is fully configurable per user preference.",
+    "web_first is default for VibePilot philosophy: learn, optimize, advise.",
+    "Intelligence gathered from web platforms informs all future decisions.",
+    "Credit protection prevents accidental burn.",
+    "Throttling paces requests rather than hard-pausing when possible.",
+    "All routing decisions logged for ROI analysis."
+  ]
+}
