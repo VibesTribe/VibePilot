@@ -10,9 +10,9 @@
 
 ---
 
-**Last Updated:** 2026-02-17 18:00 UTC
-**Updated By:** GLM-5 (Session 8: ROI Calculator, enhanced cost tracking, USD/CAD toggle)
-**Known Good Commit:** `64be3a52`
+**Last Updated:** 2026-02-17 04:00 UTC
+**Updated By:** GLM-5 (Session 8: ROI Calculator with model/slice breakdowns, model cards, agent details)
+**Known Good Commit:** `aabbf6a5`
 
 ---
 
@@ -146,7 +146,10 @@ git checkout aaabc5c5
 - Tokens split into in/out (output costs more)
 - Courier cost tracking
 - Theoretical vs actual cost
-- Slice-level rollup
+- Slice-level rollup (clickable to show tasks)
+- Model-level rollup (clickable to show tasks per model)
+- Model cards: cost/savings under "Tokens used"
+- Agent details: "ROI Summary" section with total runs, role, costs
 - Subscription tracking with renewal recommendations
 - USD/CAD toggle with live exchange rate
 | **Config Loader** | Central module for all JSON configs | `core/config_loader.py` |
@@ -294,6 +297,23 @@ python scripts/sync_config_to_supabase.py --export
 4. ✅ **Slice ROI** — Per-slice cost breakdown
 5. ✅ **Subscription Tracking** — Renewal recommendations based on metrics
 
+## Done This Session (2026-02-17 Session 8)
+
+1. ✅ **ROI Schema v1.4** — Enhanced cost tracking (tokens_in/out, courier costs, subscriptions)
+2. ✅ **ROI Calculator** — Full dashboard panel with real data
+3. ✅ **USD/CAD Toggle** — Live exchange rate fetch
+4. ✅ **Slice ROI** — Per-slice cost breakdown (clickable)
+5. ✅ **Model ROI** — Per-model cost breakdown (clickable to show tasks)
+6. ✅ **Model cards** — Cost/savings shown under "Tokens used"
+7. ✅ **Agent details** — "ROI Summary" section with total runs, role, costs
+8. ✅ **Subscription Tracking** — Renewal recommendations
+
+## Immediate (Next Session)
+
+1. **Wire Admin Panel** — Forms to add/edit models, platforms, skills
+2. **Wire Vibes → Maintenance** — "Add X" requests flow to Maintenance
+3. **Test ROI with real courier runs** — Once courier is working
+
 ## Done Previous Session (2026-02-16/17 Session 7)
 
 1. ✅ **Slice-based planning** — Planner outputs modular vertical slices
@@ -306,18 +326,11 @@ python scripts/sync_config_to_supabase.py --export
 8. ✅ **80% usage tracking** — CooldownManager + UsageTracker in orchestrator
 9. ✅ **Cooldown countdown** — Dashboard shows cooldown with time remaining
 
-## Immediate (Next Session)
-
-1. **Wire Admin Panel** — Forms to add/edit models, platforms, skills
-2. **Wire Vibes → Maintenance** — "Add X" requests flow to Maintenance
-3. **Test ROI with real task runs** — Populate sample data, verify calculations
-4. **Run schema v1.4 migration** — Apply schema_v1.4_roi_enhanced.sql to Supabase
-
 ## Near Term
 
-4. Full PRD → Plan → Execute → Merge workflow
-5. Voice Interface (Deepgram + Kokoro)
-6. Hetzner migration (cost reduction)
+1. Full PRD → Plan → Execute → Merge workflow
+2. Voice Interface (Deepgram + Kokoro)
+3. Hetzner migration (cost reduction)
 
 ---
 
