@@ -6,6 +6,79 @@
 
 ---
 
+# 2026-02-17 (Session 8)
+
+## Session Summary
+
+### Major Work
+
+1. **ROI Calculator v1** — Full ROI tracking in dashboard
+   - Enhanced RoiPanel with real data from Supabase
+   - USD/CAD toggle with live exchange rate fetch
+   - Slice-level ROI breakdown
+   - Subscription tracking with renewal recommendations
+
+2. **Schema v1.4** — Enhanced ROI fields
+   - `tokens_in` / `tokens_out` (split for accurate costing)
+   - `courier_model_id`, `courier_tokens`, `courier_cost_usd`
+   - `platform_theoretical_cost_usd`, `total_actual_cost_usd`, `total_savings_usd`
+   - Subscription fields on models (cost, start/end dates, status)
+   - `slice_roi` view for slice-level rollup
+   - `get_subscription_roi()` and `get_full_roi_report()` functions
+   - `exchange_rates` table for CAD conversion
+
+### Cost Model
+
+| Access Type | Actual Cost | Theoretical Cost |
+|-------------|-------------|------------------|
+| Free API | $0 | tokens × API rate |
+| Pay-per-use API | tokens × rate | tokens × rate (same) |
+| CLI Subscription | prorated (sub_cost / days × days_used) | tokens × equivalent API rate |
+
+### Files Created/Updated
+
+```
+vibepilot/
+├── docs/schema_v1.4_roi_enhanced.sql (NEW)
+│   - task_runs: tokens_in/out, courier fields, cost fields
+│   - models: subscription tracking, input/output cost split
+│   - platforms: theoretical cost fields
+│   - slice_roi view
+│   - calculate_enhanced_task_roi(), get_subscription_roi()
+│   - exchange_rates table
+
+vibeflow/apps/dashboard/
+├── lib/roiCalculator.ts (NEW)
+│   - Exchange rate fetch (Supabase → exchangerate-api fallback)
+│   - Currency formatting utilities
+│   - ROI aggregation helpers
+│
+├── lib/vibepilotAdapter.ts (UPDATED)
+│   - VibePilotTaskRun: added ROI fields
+│   - VibePilotModel: added subscription fields
+│   - VibePilotPlatform: added cost fields
+│   - ROI types: SliceROI, SubscriptionROI, ProjectROI, ROITotals
+│   - calculateROI(), calculateSliceROI(), calculateSubscriptionROI()
+│
+├── hooks/useMissionData.ts (UPDATED)
+│   - Exposes roi data from adapter
+│
+└── components/modals/MissionModals.tsx (UPDATED)
+    - RoiPanel: enhanced with real data
+    - USD/CAD toggle
+    - Slice breakdown
+    - Subscription tracking with recommendations
+    - Removed 404 link to roi-calculator.html
+```
+
+### Remaining Work
+
+- Admin Panel forms → Supabase
+- Vibes → Maintenance handoff
+- Test ROI with real task runs
+
+---
+
 # 2026-02-16/17 (Session 7)
 
 ## Session Summary
