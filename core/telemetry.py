@@ -41,7 +41,7 @@ try:
     OPENTELEMETRY_AVAILABLE = True
 except ImportError:
     OPENTELEMETRY_AVAILABLE = False
-    logger.warning("OpenTelemetry not installed. Using fallback logging.")
+    logger.debug("OpenTelemetry not installed. Using fallback logging.")
 
 
 class FallbackSpan:
