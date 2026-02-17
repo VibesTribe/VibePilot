@@ -10,9 +10,9 @@
 
 ---
 
-**Last Updated:** 2026-02-17 04:00 UTC
-**Updated By:** GLM-5 (Session 8: ROI Calculator with model/slice breakdowns, model cards, agent details)
-**Known Good Commit:** `aabbf6a5`
+**Last Updated:** 2026-02-17 16:00 UTC
+**Updated By:** GLM-5 (Session 9: ROI Panel UX fixes - currency toggle visibility, slice/model section clarity)
+**Known Good Commit:** `d0c012a8`
 
 ---
 

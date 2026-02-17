@@ -6,6 +6,44 @@
 
 ---
 
+# 2026-02-17 (Session 9)
+
+## Bug Fixes: ROI Panel UX
+
+**Problem:** 
+1. USD/CAD toggle not visible/obvious
+2. Slice section had expand icon but nothing to expand (confusing UX)
+3. Model section expand behavior unclear
+
+**Solution:**
+1. Made currency toggle more prominent with "Currency:" label and exchange rate display
+2. Removed misleading expand icon from slice section (no expanded content exists)
+3. Improved model section with dynamic hint "(click to expand/collapse)" and empty state handling
+
+**Files Changed:**
+```
+vibeflow/apps/dashboard/
+├── components/modals/MissionModals.tsx
+│   - Removed unused expandedSlice state
+│   - Removed misleading expand icon from slice items
+│   - Added Currency: label to toggle
+│   - Added exchange rate display when CAD selected
+│   - Always show task list when model expanded (with empty state)
+│
+└── styles.css
+    - Added .roi-panel__currency-label
+    - Added .roi-panel__exchange-rate
+    - Added .roi-panel__task-item--empty
+    - Made toggle buttons larger and more prominent
+```
+
+**Rollback:**
+```bash
+git checkout HEAD~1 -- vibeflow/apps/dashboard/components/modals/MissionModals.tsx vibeflow/apps/dashboard/styles.css
+```
+
+---
+
 # 2026-02-17 (Session 8)
 
 ## Session Summary
