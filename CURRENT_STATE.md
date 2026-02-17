@@ -10,9 +10,9 @@
 
 ---
 
-**Last Updated:** 2026-02-16 17:30 UTC
-**Updated By:** GLM-5 (Vendor lock-in fix, platform research, Vibeflow clone + Supabase branch started)
-**Known Good Commit:** Current (session not yet committed)
+**Last Updated:** 2026-02-17 02:00 UTC
+**Updated By:** GLM-5 (Session 7: Slice-based planning, routing flags, Supabase live config, 80% cooldown)
+**Known Good Commit:** `64be3a52`
 
 ---
 
@@ -86,9 +86,14 @@ git checkout aaabc5c5
 
 | Component | What It Does | Location |
 |-----------|--------------|----------|
-| Core Schema | Stores all state | Supabase: tasks, task_packets, models, platforms, projects, task_runs |
-| Model Registry | Tracks available AI models | Supabase `models` table + `config/vibepilot.yaml` |
-| Platform Registry | Tracks web AI platforms | Supabase `platforms` table |
+| Core Schema | Stores all state | Supabase: tasks, task_packets, models, platforms, projects, task_runs, skills, prompts, tools |
+| Model Registry | Tracks available AI models with full config | Supabase `models` table (config JSONB) |
+| Platform Registry | Tracks web AI platforms with rate limits | Supabase `platforms` table (config JSONB) |
+| **Config Sync** | Bidirectional sync JSON ↔ Supabase | `scripts/sync_config_to_supabase.py` |
+| **Routing Flags** | Q/W/M task routing | `tasks.routing_flag` + orchestrator respects it |
+| **Slice Architecture** | Modular vertical slices | `tasks.slice_id` + Planner outputs slices |
+| **Usage Tracking** | Track requests/tokens, 80% cooldown | `core/orchestrator.py` (CooldownManager, UsageTracker) |
+| **Dashboard Adapter** | Supabase → Dashboard shape | `~/vibeflow/apps/dashboard/lib/vibepilotAdapter.ts` |
 | Kimi CLI Runner | Executes tasks via Kimi | `runners/kimi_runner.py` |
 | API Runner with Caching | DeepSeek, Gemini, OpenRouter | `runners/api_runner.py` |
 | Dual Orchestrator | Routes tasks to right model | `orchestrator.py` (legacy), `core/orchestrator.py` (NEW concurrent) |
@@ -103,6 +108,7 @@ git checkout aaabc5c5
 | **Config Loader** | Central JSON config access | `core/config_loader.py` |
 | **Terminal Dashboard** | Real-time task/runner monitoring | `dashboard/terminal_dashboard.py` |
 | **Pipeline Test** | End-to-end task execution test | `tests/test_pipeline.py` |
+| **Routing Tests** | Verify routing logic | `tests/test_routing_logic.py` |
 
 ## NEW: Contract Layer (Previous Session)
 
@@ -206,38 +212,86 @@ vault.ingest_secret('KEY_NAME', 'key_value')
 
 **NOT USABLE (Chinese phone/Alipay required):** Kimi web, GLM, Qwen, Minimax
 
-**Courier LLM is model-agnostic:**
-```python
-# Swap LLM driving browser-use (one param)
-CourierContractRunner(platform='gemini', llm_model_id='gemini-api')
-CourierContractRunner(platform='gemini', llm_model_id='deepseek-chat')
+## Vibeflow Dashboard (Connected to Supabase)
+
+**Live Dashboard:** https://vibeflow-dashboard.vercel.app/
+
+**GitHub Repo:** https://github.com/VibesTribe/vibeflow
+
+**Adapter:** `~/vibeflow/apps/dashboard/lib/vibepilotAdapter.ts`
+
+**How it works:**
+1. Dashboard queries Supabase (tasks, task_runs, models, platforms)
+2. Adapter transforms to dashboard shape (TaskSnapshot, AgentSnapshot, SliceCatalog)
+3. Shows live data: progress, status, tokens, cooldown countdown
+
+**What shows:**
+- Slices with task counts (from tasks.slice_id or keyword inference)
+- Agents with Q/W/M tier badges (Q=internal, W=web, M=MCP)
+- Cooldown countdown when model hits 80% usage
+- Completed tasks vanish from orbit
+
+## Config Sync Workflow
+
+**Import (JSON → Supabase):**
+```bash
+cd ~/vibepilot
+source venv/bin/activate
+python scripts/sync_config_to_supabase.py
 ```
+
+**Export (Supabase → JSON):**
+```bash
+python scripts/sync_config_to_supabase.py --export
+```
+
+**When to use:**
+- Import: Initial setup, recovery, after editing JSON files
+- Export: Backup, before major changes, periodic
+
+**What syncs:**
+- models.json → models table (full config in JSONB)
+- platforms.json → platforms table (full config in JSONB)
+- skills.json → skills table (if exists)
+- tools.json → tools table (if exists)
+- prompts/*.md → prompts table (if exists)
 
 ## Not Yet Built
 
 | Component | What It Will Do | Notes |
 |-----------|-----------------|-------|
-| Orchestrator platform routing | Use platforms.json for courier limits | Config ready, needs wiring |
-| 80% limit tracking | Pause platforms at 80% usage | Data in platforms.json |
-| Courier browser test | Test browser-use with actual browser | Needs display or headless |
-| Web Dashboard | React-based visual monitoring | Vibeflow frontend ready |
+| Admin Panel forms | Add/edit models, platforms, skills via UI | UI exists, not wired to Supabase |
+| Vibes → Maintenance | "Add X" requests flow to Maintenance agent | Handoff not wired |
 | Voice Interface | Talk to Vibes | Designed in `docs/voice_interface.md` |
+| Hetzner migration | Cost reduction | Ready, just needs execution |
 
 ---
 
 # WHERE WE'RE GOING
 
+## Done This Session (2026-02-16/17)
+
+1. ✅ **Slice-based planning** — Planner outputs modular vertical slices
+2. ✅ **Routing flags** — Q/W/M for task routing constraints
+3. ✅ **Orchestrator respects routing** — Internal tasks never go to web
+4. ✅ **Full config in Supabase** — JSONB stores complete model/platform config
+5. ✅ **Bidirectional sync** — Import (JSON→DB) and Export (DB→JSON)
+6. ✅ **Dashboard connected** — Live Supabase data, no hardcoding
+7. ✅ **Completed tasks vanish** — No agent shown on merged tasks
+8. ✅ **80% usage tracking** — CooldownManager + UsageTracker in orchestrator
+9. ✅ **Cooldown countdown** — Dashboard shows cooldown with time remaining
+
 ## Immediate (Next Session)
 
-1. **Wire orchestrator to platforms.json** - Use rate limits, context limits for routing
-2. **Implement 80% limit tracking** - Pause/resume platforms automatically
-3. **Courier browser test** - Run browser-use with headless Chrome
+1. **Wire Admin Panel** — Forms to add/edit models, platforms, skills
+2. **Wire Vibes → Maintenance** — "Add X" requests flow to Maintenance
+3. **Test cooldown** — Simulate 80% usage, verify cooldown triggers
 
 ## Near Term
 
-4. Web Dashboard (Vibeflow → Supabase)
-5. Full PRD → Plan → Execute → Merge workflow
-6. Voice Interface (Deepgram + Kokoro)
+4. Full PRD → Plan → Execute → Merge workflow
+5. Voice Interface (Deepgram + Kokoro)
+6. Hetzner migration (cost reduction)
 
 ---
 
@@ -448,7 +502,12 @@ python -c "from vault_manager import VaultManager; v=VaultManager(); print(v.get
 
 **Current schema files:**
 - `docs/schema_v1_core.sql` — Base tables (tasks, models, task_runs, etc.)
-- `docs/schema_v1.1_routing.sql` — Adds slice_id, routing_flag, phase (RUN THIS NEXT)
+- `docs/schema_v1.1_routing.sql` — slice_id, routing_flag, phase, task_number on tasks
+- `docs/schema_v1.2_platforms.sql` — platforms table + display columns
+- `docs/schema_v1.2.1_platforms_fix.sql` — Adds missing columns to existing platforms
+- `docs/schema_v1.3_config_jsonb.sql` — config JSONB, live stats, skills/prompts/tools tables, cooldown_expires_at
+
+**All v1.x schemas should be applied to Supabase.**
 
 ## GitHub (All Code + Docs)
 
@@ -572,6 +631,11 @@ python -c "from vault_manager import VaultManager; v=VaultManager(); print(v.get
 | DEC-014 | Human Consulted For | ✅ | Credit/subscription, visual UI/UX, daily briefings |
 | DEC-015 | Exit Ready | ✅ | Pack up, hand over to anyone. All portable. |
 | DEC-016 | If It Can't Be Undone | ✅ | It can't be done. Every change reversible. |
+| DEC-017 | Supabase is Runtime Truth | ✅ | JSON files are backup/seed, Supabase is live source |
+| DEC-018 | Routing Flags | ✅ | Q=internal only, W=web capable, M=MCP only |
+| DEC-019 | Slices Before Phases | ✅ | Planner outputs vertical slices first, phases within slices |
+| DEC-020 | 2+ Dependencies = Q | ✅ | Tasks with 2+ deps cannot go to web (guaranteed failure) |
+| DEC-021 | Lamp Metaphor | ✅ | Agent = lamp (swappable shade/bulb/base/outlet) |
 
 ---
 
