@@ -23,7 +23,7 @@ SELECT
         COUNT(*) FILTER (WHERE status = 'success')::DECIMAL / 
         NULLIF(COUNT(*), 0) * 100, 2
     ) as success_rate_pct,
-    AVG(duration_seconds) as avg_duration_seconds,
+    AVG(EXTRACT(EPOCH FROM (completed_at - started_at))) as avg_duration_seconds,
     SUM(tokens_in) as total_tokens_in,
     SUM(tokens_out) as total_tokens_out,
     
@@ -69,19 +69,19 @@ SELECT
         COUNT(*) FILTER (WHERE status = 'success')::DECIMAL / 
         NULLIF(COUNT(*), 0) * 100, 2
     ) as success_rate_pct,
-    AVG(duration_seconds) as avg_duration_seconds,
+    AVG(EXTRACT(EPOCH FROM (completed_at - started_at))) as avg_duration_seconds,
     
-    -- Rate limit encounters
-    COUNT(*) FILTER (WHERE error_code = 'RATE_LIMITED') as rate_limit_hits,
+    -- Rate limit encounters (check error field for rate limit messages)
+    COUNT(*) FILTER (WHERE error ILIKE '%rate%limit%' OR error ILIKE '%429%') as rate_limit_hits,
     
     -- Auth issues
-    COUNT(*) FILTER (WHERE error_code LIKE '%auth%' OR error_code LIKE '%login%') as auth_failures,
+    COUNT(*) FILTER (WHERE error ILIKE '%auth%' OR error ILIKE '%login%') as auth_failures,
     
     -- Task type fit
     MODE() WITHIN GROUP (ORDER BY task_type) as best_for_task_type,
     
     -- Last successful run
-    MAX(created_at) FILTER (WHERE status = 'success') as last_successful_at,
+    MAX(started_at) FILTER (WHERE status = 'success') as last_successful_at,
     
     -- Recommendation
     CASE 
