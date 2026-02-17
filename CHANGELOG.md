@@ -6,6 +6,100 @@
 
 ---
 
+# 2026-02-17 (Session 10)
+
+## Session Summary
+
+### Major Work
+
+1. **Config Architecture Refactor** — Three LEGO pieces, all swappable
+   - `destinations.json` — WHERE (cli/web/api platforms)
+   - `roles.json` — WHAT (13 roles including courier, tester_visual)
+   - `models.json` — WHO (10 LLMs with capabilities)
+   - `routing.json` — WHY (web_first strategy, throttle, credit protection)
+   - `tools.json` — HOW (browser-use with OpenClaw alternative noted)
+
+2. **Routing Strategy System**
+   - 6 configurable strategies: web_first, subscription_first, api_first, rotate, cost_optimize, custom
+   - Smart throttling (pace at 80%, don't hard pause)
+   - Credit protection (warn at $5, pause at $1, skip if alternatives)
+   - Intelligence gathering for model evaluation
+
+3. **Courier Browser Automation** — Progress toward working courier
+   - Playwright/Chromium installed
+   - Browser navigation works
+   - No-auth platforms identified: chatgate.ai (ChatGPT), deepseek.com
+   - LLM adapter needs browser-use interface fix (remaining)
+
+4. **Project Documentation**
+   - `WHAT_WHERE.md` — Navigation guide for finding things
+   - Cleanup: removed streamlit from requirements.txt
+   - Added langchain-openai, langchain-google-genai dependencies
+
+### Key Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Web platforms = Priority 1 | Free best models, intelligence gathering, subscription advisor |
+| Config swappable at all layers | No vendor lock-in, exit-ready |
+| Browser-use → OpenClaw-style | OpenClaw acquired by OpenAI, evaluate monthly |
+| Three LEGO pieces | Destination + Role + Model = independent swaps |
+
+### Files Created/Updated
+
+```
+vibepilot/
+├── config/
+│   ├── destinations.json (NEW v1.1) - 10 destinations with routing metadata
+│   ├── roles.json (NEW v2.0) - 13 roles with capability requirements
+│   ├── models.json (UPDATED v2.0) - 10 LLMs with capabilities
+│   ├── routing.json (NEW v1.0) - strategy, throttle, intelligence
+│   └── tools.json (UPDATED) - browser-use + OpenClaw notes
+├── docs/
+│   └── WHAT_WHERE.md (NEW) - project navigation guide
+├── runners/
+│   └── contract_runners.py (UPDATED) - platform URLs, LLM adapter progress
+├── core/
+│   └── telemetry.py (UPDATED) - suppressed warning to debug level
+└── requirements.txt (UPDATED) - cleanup, added dependencies
+```
+
+### Commits
+
+```
+73418880 Refactor config architecture: separate destinations/roles/models/tools
+9ddd1446 Add routing.json with configurable routing strategies
+6b467aa3 Add WHAT_WHERE.md project navigation guide, cleanup requirements.txt
+ef4b6b6f Add huggingchat, deepseek, copilot to courier WEB_PLATFORMS
+445ae121 Progress on courier: browser automation works, LLM adapter needs fixing
+ff40a4f2 Update WHAT_WHERE.md with courier status
+```
+
+### Courier Status
+
+| Component | Status |
+|-----------|--------|
+| Playwright/Chromium | ✅ Installed |
+| Browser navigation | ✅ Works |
+| No-auth platforms | ✅ chatgate.ai, deepseek.com |
+| LLM adapter | ⚠️ Needs browser-use interface fix |
+
+### Remaining Work
+
+1. Fix LLM adapter for browser-use (interface compatibility)
+2. Update orchestrator to use new config structure
+3. Wire courier → orchestrator routing
+4. Test full task execution via courier
+
+### No-Auth Platform URLs
+
+| Platform | URL | Notes |
+|----------|-----|-------|
+| ChatGPT | https://chatgate.ai | Proxy, works without login |
+| DeepSeek | https://chat.deepseek.com | Works without login |
+
+---
+
 # 2026-02-17 (Session 9)
 
 ## Incident: Dashboard Broken by CSS Cleanup
