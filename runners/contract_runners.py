@@ -425,6 +425,12 @@ class CourierContractRunner(BaseRunner):
     RUNNER_TYPE = "courier"
 
     WEB_PLATFORMS = {
+        "huggingchat": {
+            "url": "https://huggingface.co/chat",
+            "new_chat_url": "https://huggingface.co/chat",
+            "name": "HuggingChat",
+            "no_auth": True,
+        },
         "chatgpt": {
             "url": "https://chat.openai.com",
             "new_chat_url": "https://chat.openai.com/?model=auto",
@@ -439,6 +445,16 @@ class CourierContractRunner(BaseRunner):
             "url": "https://gemini.google.com",
             "new_chat_url": "https://gemini.google.com/app",
             "name": "Gemini",
+        },
+        "deepseek": {
+            "url": "https://chat.deepseek.com",
+            "new_chat_url": "https://chat.deepseek.com",
+            "name": "DeepSeek",
+        },
+        "copilot": {
+            "url": "https://copilot.microsoft.com",
+            "new_chat_url": "https://copilot.microsoft.com",
+            "name": "Copilot",
         },
     }
 
@@ -712,9 +728,12 @@ RUNNER_REGISTRY = {
     "gemini": GeminiContractRunner,
     "gemini-api": GeminiContractRunner,
     "courier": CourierContractRunner,
+    "courier-huggingchat": lambda: CourierContractRunner("huggingchat"),
     "courier-chatgpt": lambda: CourierContractRunner("chatgpt"),
     "courier-claude": lambda: CourierContractRunner("claude"),
     "courier-gemini": lambda: CourierContractRunner("gemini"),
+    "courier-deepseek": lambda: CourierContractRunner("deepseek"),
+    "courier-copilot": lambda: CourierContractRunner("copilot"),
 }
 
 
