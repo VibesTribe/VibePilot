@@ -1,56 +1,142 @@
 {
-  "version": "1.1",
-  "description": "Models we have direct access to (API or CLI). Web platforms are in platforms.json.",
+  "version": "2.0",
+  "description": "WHO provides intelligence. Actual LLM models with their capabilities and access points.",
+  "last_updated": "2026-02-17",
+
   "models": [
     {
-      "id": "gemini-api",
-      "name": "Gemini API",
+      "id": "gemini-2.0-flash",
+      "name": "Gemini 2.0 Flash",
       "provider": "google",
-      "access_type": "api",
-      "api_key_ref": "GEMINI_API_KEY",
       "context_limit": 1000000,
-      "cost_input_per_1k": 0,
-      "cost_output_per_1k": 0,
-      "notes": "Free tier API. Can drive browser-use."
+      "cost_input_per_1k_usd": 0,
+      "cost_output_per_1k_usd": 0,
+      "capabilities": ["text", "code", "vision", "browser_control"],
+      "access_via": ["gemini-api", "gemini-web"],
+      "api_key_ref": "GEMINI_API_KEY",
+      "notes": "Free via API. Best for browser-use driver. Also available on web."
+    },
+    {
+      "id": "gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "provider": "google",
+      "context_limit": 1000000,
+      "cost_input_per_1k_usd": 0,
+      "cost_output_per_1k_usd": 0,
+      "capabilities": ["text", "code", "vision", "browser_control"],
+      "access_via": ["gemini-api", "gemini-web"],
+      "api_key_ref": "GEMINI_API_KEY",
+      "notes": "Newer version. Same free tier."
     },
     {
       "id": "deepseek-chat",
       "name": "DeepSeek Chat",
       "provider": "deepseek",
-      "access_type": "api",
-      "api_key_ref": "DEEPSEEK_API_KEY",
-      "context_limit": 64000,
-      "cost_input_per_1k": 0.00014,
-      "cost_output_per_1k": 0.00028,
-      "credit_remaining": 2.00,
-      "credit_used": 0,
-      "notes": "API access. $2 credit remaining. Can drive browser-use."
-    },
-    {
-      "id": "kimi-cli",
-      "name": "Kimi CLI",
-      "provider": "moonshot",
-      "access_type": "cli_subscription",
-      "subscription_status": "active",
-      "subscription_ends": "2026-03-15",
-      "subscription_cost": 0.99,
-      "context_limit": 200000,
-      "notes": "CLI subscription. Executes tasks directly."
-    },
-    {
-      "id": "opencode",
-      "name": "OpenCode (GLM-5)",
-      "provider": "zhipu",
-      "access_type": "cli_subscription",
-      "subscription_status": "active",
-      "subscription_ends": "2026-04-30",
-      "subscription_cost": 45.00,
       "context_limit": 128000,
-      "notes": "CLI subscription. Executes tasks directly."
+      "cost_input_per_1k_usd": 0.00028,
+      "cost_output_per_1k_usd": 0.00042,
+      "cost_input_per_1k_cached_usd": 0.000028,
+      "capabilities": ["text", "code", "reasoning", "browser_control"],
+      "access_via": ["deepseek-api", "deepseek-web"],
+      "api_key_ref": "DEEPSEEK_API_KEY",
+      "notes": "Extremely cheap API. Cache hits 90% cheaper. Can drive browser-use."
+    },
+    {
+      "id": "deepseek-reasoner",
+      "name": "DeepSeek R1",
+      "provider": "deepseek",
+      "context_limit": 128000,
+      "cost_input_per_1k_usd": 0.00028,
+      "cost_output_per_1k_usd": 0.00042,
+      "capabilities": ["text", "reasoning"],
+      "access_via": ["deepseek-api", "deepseek-web"],
+      "api_key_ref": "DEEPSEEK_API_KEY",
+      "notes": "Reasoning model. Good for complex analysis."
+    },
+    {
+      "id": "glm-5",
+      "name": "GLM-5",
+      "provider": "zhipu",
+      "context_limit": 128000,
+      "capabilities": ["text", "code"],
+      "access_via": ["opencode"],
+      "notes": "Available via OpenCode subscription. No separate API key."
+    },
+    {
+      "id": "kimi-internal",
+      "name": "Kimi (Moonshot)",
+      "provider": "moonshot",
+      "context_limit": 200000,
+      "capabilities": ["text", "code"],
+      "access_via": ["kimi"],
+      "notes": "Available via Kimi CLI subscription. No separate API key."
+    },
+    {
+      "id": "gpt-4o-mini",
+      "name": "GPT-4o Mini",
+      "provider": "openai",
+      "context_limit": 128000,
+      "cost_input_per_1k_usd": 0.00015,
+      "cost_output_per_1k_usd": 0.00060,
+      "capabilities": ["text", "code", "vision"],
+      "access_via": ["chatgpt-web"],
+      "notes": "Web only (no API key). Free tier on ChatGPT."
+    },
+    {
+      "id": "gpt-4o",
+      "name": "GPT-4o",
+      "provider": "openai",
+      "context_limit": 128000,
+      "cost_input_per_1k_usd": 0.0025,
+      "cost_output_per_1k_usd": 0.01,
+      "capabilities": ["text", "code", "vision"],
+      "access_via": ["chatgpt-web", "copilot-web"],
+      "notes": "Web only. Free via Copilot with session limits."
+    },
+    {
+      "id": "claude-sonnet-4-5",
+      "name": "Claude Sonnet 4.5",
+      "provider": "anthropic",
+      "context_limit": 200000,
+      "cost_input_per_1k_usd": 0.003,
+      "cost_output_per_1k_usd": 0.015,
+      "capabilities": ["text", "code", "vision", "reasoning"],
+      "access_via": ["claude-web"],
+      "notes": "Web only (no API key). Excellent for coding."
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "name": "Claude Haiku 4.5",
+      "provider": "anthropic",
+      "context_limit": 200000,
+      "cost_input_per_1k_usd": 0.001,
+      "cost_output_per_1k_usd": 0.005,
+      "capabilities": ["text", "code"],
+      "access_via": ["claude-web"],
+      "notes": "Web only. Faster, cheaper than Sonnet."
     }
   ],
+
+  "capability_definitions": {
+    "text": "Can process and generate text",
+    "code": "Can write and understand code",
+    "vision": "Can process images/screenshots",
+    "reasoning": "Strong at complex logical reasoning",
+    "browser_control": "Can drive browser-use for web automation"
+  },
+
+  "browser_control_capable": ["gemini-2.0-flash", "gemini-2.5-flash", "deepseek-chat"],
+
   "limit_policy": {
     "pause_at_percent": 80,
     "description": "Pause usage when reaching 80% of limits to prevent cutoff mid-task."
-  }
+  },
+
+  "notes": [
+    "Models are LLMs. Destinations (CLI/Web/API) are in destinations.json.",
+    "access_via links models to their available destinations.",
+    "browser_control capability required for courier driver model.",
+    "API costs are theoretical for web-only models (used in ROI calculations).",
+    "Subscription costs are in destinations.json, not here."
+  ]
 }

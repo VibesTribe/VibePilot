@@ -1,0 +1,269 @@
+{
+  "version": "1.0",
+  "description": "WHERE tasks execute. CLI, Web platforms, API endpoints. All swappable.",
+  "last_updated": "2026-02-17",
+
+  "destinations": [
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "type": "cli",
+      "command": "opencode",
+      "status": "active",
+      "models_available": ["*"],
+      "subscription": {
+        "cost_usd": 45.00,
+        "started_at": "2025-12-01",
+        "ends_at": "2026-04-30",
+        "status": "active"
+      },
+      "notes": "CLI tool. Can run many models. Currently using GLM-5 via subscription."
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi CLI",
+      "type": "cli",
+      "command": "kimi",
+      "status": "active",
+      "models_available": ["kimi-internal"],
+      "subscription": {
+        "cost_usd": 0.99,
+        "started_at": "2026-01-15",
+        "ends_at": "2026-03-15",
+        "status": "active"
+      },
+      "notes": "CLI subscription. Uses Moonshot's model internally."
+    },
+    {
+      "id": "gemini-api",
+      "name": "Gemini API",
+      "type": "api",
+      "provider": "google",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta",
+      "api_key_ref": "GEMINI_API_KEY",
+      "status": "active",
+      "models_available": ["gemini-2.0-flash", "gemini-2.5-flash"],
+      "notes": "Free tier API. Direct model access."
+    },
+    {
+      "id": "deepseek-api",
+      "name": "DeepSeek API",
+      "type": "api",
+      "provider": "deepseek",
+      "endpoint": "https://api.deepseek.com/v1",
+      "api_key_ref": "DEEPSEEK_API_KEY",
+      "status": "active",
+      "models_available": ["deepseek-chat", "deepseek-reasoner"],
+      "credit_remaining_usd": 2.00,
+      "notes": "API access with $2 credit. Extremely cheap."
+    },
+    {
+      "id": "chatgpt-web",
+      "name": "ChatGPT Web",
+      "type": "web",
+      "url": "https://chat.openai.com",
+      "new_chat_url": "https://chat.openai.com/?model=auto",
+      "provider": "openai",
+      "status": "active",
+      "models_available": ["gpt-4o-mini", "gpt-4o"],
+      "auth": {
+        "methods": ["google", "microsoft", "apple", "email"],
+        "gmail_ok": true,
+        "phone_required": false
+      },
+      "free_tier": {
+        "default_model": "gpt-4o-mini",
+        "rate_limits": {
+          "messages_per_3_hours": 10
+        },
+        "context_limit": 128000
+      },
+      "theoretical_cost": {
+        "gpt-4o-mini": { "input_per_1m": 0.15, "output_per_1m": 0.60 },
+        "gpt-4o": { "input_per_1m": 2.50, "output_per_1m": 10.00 }
+      },
+      "capabilities": ["text", "code", "vision", "file_upload", "web_search"],
+      "notes": "WARNING: Attachments may reduce limits to ~1/10th"
+    },
+    {
+      "id": "claude-web",
+      "name": "Claude Web",
+      "type": "web",
+      "url": "https://claude.ai",
+      "new_chat_url": "https://claude.ai/new",
+      "provider": "anthropic",
+      "status": "active",
+      "models_available": ["claude-sonnet-4-5", "claude-haiku-4-5"],
+      "auth": {
+        "methods": ["google", "email"],
+        "gmail_ok": true,
+        "phone_required": false
+      },
+      "free_tier": {
+        "default_model": "claude-sonnet-4-5",
+        "rate_limits": {
+          "messages_per_day_approx": "10-20",
+          "reset_period_hours": "5-8"
+        },
+        "context_limit": 200000
+      },
+      "theoretical_cost": {
+        "claude-haiku-4-5": { "input_per_1m": 1.00, "output_per_1m": 5.00 },
+        "claude-sonnet-4-5": { "input_per_1m": 3.00, "output_per_1m": 15.00 }
+      },
+      "capabilities": ["text", "code", "vision", "file_upload", "web_search", "artifacts"],
+      "strengths": ["coding", "reasoning", "honesty"],
+      "notes": "Good for coding. Rate limits vary by demand."
+    },
+    {
+      "id": "gemini-web",
+      "name": "Gemini Web",
+      "type": "web",
+      "url": "https://gemini.google.com",
+      "new_chat_url": "https://gemini.google.com/app",
+      "provider": "google",
+      "status": "active",
+      "models_available": ["gemini-2.5-flash"],
+      "auth": {
+        "methods": ["google"],
+        "gmail_ok": true,
+        "phone_required": false
+      },
+      "free_tier": {
+        "default_model": "gemini-2.5-flash",
+        "rate_limits": {
+          "requests_per_minute": 15,
+          "requests_per_day": 1500,
+          "tokens_per_day": 1000000
+        },
+        "context_limit": 1000000
+      },
+      "theoretical_cost": {
+        "gemini-2.5-flash": { "input_per_1m": 0.30, "output_per_1m": 2.50 }
+      },
+      "capabilities": ["text", "code", "vision", "audio", "video", "file_upload", "web_search"],
+      "strengths": ["long_context", "multimodal", "vision"],
+      "notes": "BEST FREE TIER: 1M tokens/day, 1M context"
+    },
+    {
+      "id": "deepseek-web",
+      "name": "DeepSeek Web",
+      "type": "web",
+      "url": "https://chat.deepseek.com",
+      "new_chat_url": "https://chat.deepseek.com",
+      "provider": "deepseek",
+      "status": "active",
+      "models_available": ["deepseek-chat", "deepseek-r1"],
+      "auth": {
+        "methods": ["email", "phone"],
+        "gmail_ok": true,
+        "phone_required": false
+      },
+      "free_tier": {
+        "default_model": "deepseek-chat",
+        "rate_limits": {
+          "messages_per_day": "generous"
+        },
+        "context_limit": 64000
+      },
+      "theoretical_cost": {
+        "deepseek-chat": { "input_per_1m": 0.28, "output_per_1m": 0.42 }
+      },
+      "capabilities": ["text", "code", "file_upload", "reasoning"],
+      "strengths": ["coding", "reasoning", "extremely_cheap_api"],
+      "notes": "CHEAPEST API. R1 model for reasoning tasks."
+    },
+    {
+      "id": "copilot-web",
+      "name": "Microsoft Copilot",
+      "type": "web",
+      "url": "https://copilot.microsoft.com",
+      "new_chat_url": "https://copilot.microsoft.com",
+      "provider": "microsoft",
+      "status": "active",
+      "models_available": ["gpt-4o"],
+      "auth": {
+        "methods": ["microsoft", "google"],
+        "gmail_ok": true,
+        "phone_required": false
+      },
+      "free_tier": {
+        "default_model": "gpt-4o",
+        "rate_limits": {
+          "messages_per_session": 30,
+          "sessions_per_day": "unlimited"
+        },
+        "context_limit": 128000
+      },
+      "theoretical_cost": {
+        "gpt-4o": { "input_per_1m": 2.50, "output_per_1m": 10.00 }
+      },
+      "capabilities": ["text", "code", "vision", "image_generation", "web_search"],
+      "strengths": ["free_gpt4_access", "web_search"],
+      "notes": "Free GPT-4 access. Session resets = fresh limits."
+    },
+    {
+      "id": "huggingchat-web",
+      "name": "HuggingChat",
+      "type": "web",
+      "url": "https://huggingface.co/chat",
+      "new_chat_url": "https://huggingface.co/chat",
+      "provider": "huggingface",
+      "status": "active",
+      "models_available": ["*"],
+      "auth": {
+        "methods": ["email", "github", "google", "huggingface", "none"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "no_auth_available": true
+      },
+      "free_tier": {
+        "default_model": "varies",
+        "rate_limits": {
+          "messages_per_hour": "varies_by_model"
+        },
+        "context_limit": "varies_by_model"
+      },
+      "capabilities": ["text", "code", "vision", "file_upload", "open_source_models"],
+      "strengths": ["open_source", "model_variety", "no_vendor_lockin", "no_auth_required"],
+      "notes": "128+ open source models. NO AUTH REQUIRED for basic use. Good for testing."
+    }
+  ],
+
+  "unusable": [
+    {
+      "id": "kimi-web",
+      "name": "Kimi Web",
+      "url": "https://kimi.moonshot.cn",
+      "reason": "Requires Chinese phone number"
+    },
+    {
+      "id": "glm-web",
+      "name": "GLM Chat",
+      "url": "https://chatglm.cn",
+      "reason": "Requires Chinese phone number"
+    },
+    {
+      "id": "qwen-web",
+      "name": "Qwen",
+      "url": "https://tongyi.aliyun.com",
+      "reason": "Requires Alipay or Chinese phone"
+    }
+  ],
+
+  "routing_hints": {
+    "coding": ["deepseek-web", "claude-web", "chatgpt-web"],
+    "long_documents": ["gemini-web", "claude-web"],
+    "research": ["copilot-web", "gemini-web"],
+    "reasoning": ["deepseek-web", "claude-web"],
+    "vision": ["gemini-web", "chatgpt-web", "claude-web"],
+    "general": ["gemini-web", "chatgpt-web", "copilot-web"],
+    "no_auth_required": ["huggingchat-web"],
+    "testing_first": ["huggingchat-web"]
+  },
+
+  "limit_policy": {
+    "pause_at_percent": 80,
+    "description": "Pause destination usage when reaching 80% of limits. Resume after reset period."
+  }
+}

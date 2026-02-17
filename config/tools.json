@@ -5,9 +5,16 @@
     {
       "id": "browser",
       "name": "Web Browser",
-      "description": "Navigate websites, fill forms, click, extract content. Used by courier skill.",
+      "description": "Navigate websites, fill forms, click, extract content. Used by courier role.",
       "type": "external",
-      "requires": ["browser-use"]
+      "current_implementation": "browser-use",
+      "implementation_notes": {
+        "browser-use": "Model-driven. LLM sees page, decides actions via vision/reasoning. Flexible, model-agnostic.",
+        "playwright-cdp": "Deterministic. Snapshot returns refs, model picks ref, Playwright executes. More reliable but requires CDP setup. OpenClaw uses this approach."
+      },
+      "requires": ["browser-use"],
+      "swap_evaluated": "2026-02-17",
+      "swap_notes": "browser-use chosen for flexibility. Playwright+CDP (OpenClaw style) is viable alternative. Evaluate monthly as landscape evolves rapidly."
     },
     {
       "id": "file_read",
