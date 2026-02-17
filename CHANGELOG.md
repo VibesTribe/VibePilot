@@ -8,43 +8,48 @@
 
 # 2026-02-17 (Session 9)
 
-## Bug Fixes: ROI Panel UX
+## Incident: Dashboard Broken by CSS Cleanup
 
-**Problem:** 
-1. USD/CAD toggle not visible/obvious
-2. By Slice and By Model sections always expanded (cluttered view)
-3. Model section expand behavior unclear
+### What Was Attempted
+1. Fix USD/CAD toggle visibility
+2. Make By Slice and By Model sections collapsible (collapsed by default)
+3. Fix visual bleed in model list
 
-**Solution:**
-1. Made currency toggle more prominent with "Currency:" label, background, and exchange rate display
-2. Made By Slice and By Model sections collapsible (collapsed by default, click header to expand)
-3. Added +/- toggle icons on section headers
+### What Went Wrong
+- Deleted duplicate CSS definitions that appeared redundant
+- **This broke the entire dashboard** - blank white page, unformatted
+- Cause: The "duplicates" weren't duplicates - removing them cascaded and broke layout
+- **Pushed directly to main** - which auto-deploys to Vercel
 
-**Files Changed:**
+### How It Was Fixed
+- Force pushed rollback to `a0bb8997` (before today's changes)
+- Dashboard restored to working state
+
+### Final State (After Rollback)
+- USD/CAD toggle: visible and working
+- By Slice: collapsible, works correctly
+- By Model: collapsible, works correctly
+- Visual bleed: resolved after rollback (was likely caused by CSS cleanup attempt)
+
+### Lessons Learned
+1. **NEVER push to main directly** - always use feature branches
+2. **Never delete CSS that looks duplicate** without verifying it's truly unused
+3. **Always ensure changes can be undone** before making them
+4. Human must approve before any merge to main
+
+### Commits Made Then Rolled Back
+- `d0c012a8` - Fix ROI panel: make USD/CAD toggle more visible
+- `0d678d97` - Make By Slice and By Model sections collapsible
+- `5227fd91` - Fix visual bleed in model list
+- `a56d4167` - Clean up duplicate CSS definitions (THIS BROKE EVERYTHING)
+
+### Current Good State
 ```
-vibeflow/apps/dashboard/
-├── components/modals/MissionModals.tsx
-│   - Added showSlices and showModels state (default: false = collapsed)
-│   - Wrapped section titles in clickable headers with toggle icons
-│   - Content only renders when section is expanded
-│
-└── styles.css
-    - Added .roi-panel__section-header (clickable header row)
-    - Added .roi-panel__section-toggle (+/- icon)
-    - Enhanced .roi-panel__currency-toggle with background/border
-```
-│   - Always show task list when model expanded (with empty state)
-│
-└── styles.css
-    - Added .roi-panel__currency-label
-    - Added .roi-panel__exchange-rate
-    - Added .roi-panel__task-item--empty
-    - Made toggle buttons larger and more prominent
-```
-
-**Rollback:**
-```bash
-git checkout HEAD~1 -- vibeflow/apps/dashboard/components/modals/MissionModals.tsx vibeflow/apps/dashboard/styles.css
+Commit: a0bb8997 "Trigger Vercel redeploy"
+- Dashboard functional
+- USD/CAD visible
+- Collapsible sections work
+- No visual bleed
 ```
 
 ---
