@@ -7,6 +7,7 @@ Multi-agent task dispatcher with:
 - Runner pool management
 - ROI tracking
 - Model performance learning
+- Usage tracking with 80% cooldown
 
 This replaces the single-threaded orchestrator.py
 """
@@ -18,7 +19,7 @@ import logging
 import threading
 import yaml
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 from supabase import create_client
 from dotenv import load_dotenv
@@ -44,6 +45,174 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 db = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Default cooldown duration when hitting 80%
+COOLDOWN_MINUTES = 60
+
+
+class CooldownManager:
+    """
+    Tracks cooldowns for runners based on usage limits.
+    When a runner hits 80% of its limits, it enters cooldown.
+    """
+
+    def __init__(self):
+        self.cooldowns: Dict[str, datetime] = {}  # runner_id -> cooldown_expires_at
+        self.lock = threading.Lock()
+        self.logger = logging.getLogger("VibePilot.Cooldown")
+
+    def is_in_cooldown(self, runner_id: str) -> bool:
+        """Check if runner is in cooldown."""
+        with self.lock:
+            if runner_id not in self.cooldowns:
+                return False
+
+            expires_at = self.cooldowns[runner_id]
+            if datetime.utcnow() >= expires_at:
+                # Cooldown expired
+                del self.cooldowns[runner_id]
+                self.logger.info(f"Cooldown expired for {runner_id}")
+                return False
+
+            return True
+
+    def get_cooldown_remaining(self, runner_id: str) -> Optional[int]:
+        """Get seconds remaining in cooldown, or None if not in cooldown."""
+        with self.lock:
+            if runner_id not in self.cooldowns:
+                return None
+
+            expires_at = self.cooldowns[runner_id]
+            remaining = (expires_at - datetime.utcnow()).total_seconds()
+            if remaining <= 0:
+                del self.cooldowns[runner_id]
+                return None
+
+            return int(remaining)
+
+    def set_cooldown(
+        self, runner_id: str, minutes: int = COOLDOWN_MINUTES, reason: str = ""
+    ):
+        """Put runner in cooldown."""
+        with self.lock:
+            expires_at = datetime.utcnow() + timedelta(minutes=minutes)
+            self.cooldowns[runner_id] = expires_at
+
+            # Also update database for dashboard visibility
+            try:
+                db.table("models").update(
+                    {
+                        "status": "paused",
+                        "status_reason": f"Cooldown: {reason}",
+                        "cooldown_expires_at": expires_at.isoformat(),
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                ).eq("id", runner_id).execute()
+            except Exception as e:
+                self.logger.warning(f"Could not update cooldown in DB: {e}")
+
+            self.logger.info(
+                f"Runner {runner_id} in cooldown for {minutes}min: {reason}"
+            )
+
+    def clear_cooldown(self, runner_id: str):
+        """Clear cooldown for a runner."""
+        with self.lock:
+            if runner_id in self.cooldowns:
+                del self.cooldowns[runner_id]
+
+            try:
+                db.table("models").update(
+                    {
+                        "status": "active",
+                        "status_reason": None,
+                        "cooldown_expires_at": None,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                ).eq("id", runner_id).execute()
+            except Exception as e:
+                self.logger.warning(f"Could not clear cooldown in DB: {e}")
+
+
+class UsageTracker:
+    """
+    Tracks usage per runner and triggers cooldown at 80%.
+    Reads limits from Supabase models table (config JSONB).
+    """
+
+    PAUSE_THRESHOLD = 0.80  # 80%
+
+    def __init__(self, cooldown_manager: CooldownManager):
+        self.cooldown_manager = cooldown_manager
+        self.usage: Dict[str, Dict] = {}  # runner_id -> {requests, tokens}
+        self.lock = threading.Lock()
+        self.logger = logging.getLogger("VibePilot.Usage")
+
+    def get_limits(self, runner_id: str) -> Dict:
+        """Get limits for a runner from Supabase."""
+        try:
+            result = (
+                db.table("models")
+                .select("config, request_limit, token_limit")
+                .eq("id", runner_id)
+                .execute()
+            )
+            if result.data:
+                row = result.data[0]
+                config = row.get("config", {})
+                return {
+                    "request_limit": row.get("request_limit")
+                    or config.get("request_limit"),
+                    "token_limit": row.get("token_limit") or config.get("token_limit"),
+                    "rate_limits": config.get("rate_limits", {}),
+                }
+        except Exception as e:
+            self.logger.warning(f"Could not get limits for {runner_id}: {e}")
+
+        return {}
+
+    def record_usage(self, runner_id: str, requests: int = 1, tokens: int = 0):
+        """Record usage and check if cooldown needed."""
+        with self.lock:
+            if runner_id not in self.usage:
+                self.usage[runner_id] = {"requests": 0, "tokens": 0}
+
+            self.usage[runner_id]["requests"] += requests
+            self.usage[runner_id]["tokens"] += tokens
+
+        # Check limits
+        limits = self.get_limits(runner_id)
+        self._check_threshold(runner_id, limits)
+
+    def _check_threshold(self, runner_id: str, limits: Dict):
+        """Check if usage hit 80% threshold."""
+        request_limit = limits.get("request_limit")
+        token_limit = limits.get("token_limit")
+
+        with self.lock:
+            usage = self.usage.get(runner_id, {"requests": 0, "tokens": 0})
+
+        # Check request limit
+        if request_limit:
+            request_pct = usage["requests"] / request_limit
+            if request_pct >= self.PAUSE_THRESHOLD:
+                pct = int(request_pct * 100)
+                self.cooldown_manager.set_cooldown(
+                    runner_id,
+                    reason=f"Request usage at {pct}% ({usage['requests']}/{request_limit})",
+                )
+                return
+
+        # Check token limit
+        if token_limit:
+            token_pct = usage["tokens"] / token_limit
+            if token_pct >= self.PAUSE_THRESHOLD:
+                pct = int(token_pct * 100)
+                self.cooldown_manager.set_cooldown(
+                    runner_id,
+                    reason=f"Token usage at {pct}% ({usage['tokens']}/{token_limit})",
+                )
+                return
+
 
 def load_config() -> Dict:
     """Load orchestrator config from vibepilot.yaml."""
@@ -63,15 +232,18 @@ def load_config() -> Dict:
 class RunnerPool:
     """
     Manages available runners for task execution.
-    Tracks which are busy, which have capacity.
+    Tracks which are busy, which have capacity, and cooldown status.
 
     Loads from config/models.json (primary) with database fallback.
     """
 
-    def __init__(self, use_config: bool = True):
+    def __init__(
+        self, use_config: bool = True, cooldown_manager: CooldownManager = None
+    ):
         self.runners: Dict[str, Dict] = {}
         self.busy: Dict[str, str] = {}  # runner_id -> task_id
         self.lock = threading.Lock()
+        self.cooldown_manager = cooldown_manager
         self._load_runners(use_config)
 
     def _load_runners(self, use_config: bool = True):
@@ -135,9 +307,18 @@ class RunnerPool:
             }
 
     def is_available(self, runner_id: str) -> bool:
-        """Check if runner is available."""
+        """Check if runner is available (not busy and not in cooldown)."""
         with self.lock:
-            return runner_id in self.runners and runner_id not in self.busy
+            if runner_id not in self.runners:
+                return False
+            if runner_id in self.busy:
+                return False
+
+        # Check cooldown
+        if self.cooldown_manager and self.cooldown_manager.is_in_cooldown(runner_id):
+            return False
+
+        return True
 
     def acquire(self, runner_id: str, task_id: str) -> bool:
         """Acquire a runner for a task."""
@@ -292,6 +473,7 @@ class ConcurrentOrchestrator:
     - Supervisor integration
     - Telemetry
     - ROI tracking
+    - Usage tracking with 80% cooldown
 
     Concurrency is dynamic - scales based on available runners and tasks.
     """
@@ -304,7 +486,9 @@ class ConcurrentOrchestrator:
             max_workers: Maximum concurrent tasks. None = from config or auto
             config_path: Path to config file for settings
         """
-        self.runner_pool = RunnerPool()
+        self.cooldown_manager = CooldownManager()
+        self.usage_tracker = UsageTracker(self.cooldown_manager)
+        self.runner_pool = RunnerPool(cooldown_manager=self.cooldown_manager)
         self.dependency_manager = DependencyManager()
         self.supervisor = SupervisorAgent()
         self.task_manager = TaskManager()

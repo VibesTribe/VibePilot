@@ -19,7 +19,8 @@ ALTER TABLE models
   ADD COLUMN IF NOT EXISTS tasks_completed INT DEFAULT 0,
   ADD COLUMN IF NOT EXISTS tasks_failed INT DEFAULT 0,
   ADD COLUMN IF NOT EXISTS success_rate DECIMAL(5,2) DEFAULT 0.00,
-  ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS cooldown_expires_at TIMESTAMPTZ;
 
 -- Add live stats to platforms
 ALTER TABLE platforms
