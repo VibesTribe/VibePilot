@@ -52,12 +52,20 @@ ALTER TABLE platforms ADD COLUMN IF NOT EXISTS theoretical_cost_output_per_1k_us
 
 -- ============================================
 -- SLICE ROI VIEW
+-- Note: Slices are derived from tasks.slice_id, no separate table needed
 -- ============================================
 
 CREATE OR REPLACE VIEW slice_roi AS
 SELECT 
   t.slice_id,
-  COALESCE(s.name, t.slice_id, 'general') as slice_name,
+  COALESCE(
+    CASE 
+      WHEN t.slice_id IS NOT NULL THEN 
+        UPPER(SUBSTRING(t.slice_id, 1, 1)) || LOWER(SUBSTRING(t.slice_id FROM 2))
+      ELSE 'General'
+    END,
+    'General'
+  ) as slice_name,
   COUNT(DISTINCT t.id) as total_tasks,
   COUNT(DISTINCT CASE WHEN t.status = 'merged' THEN t.id END) as completed_tasks,
   COALESCE(SUM(r.tokens_in), 0) as total_tokens_in,
@@ -73,8 +81,7 @@ SELECT
   END as completion_pct
 FROM tasks t
 LEFT JOIN task_runs r ON r.task_id = t.id
-LEFT JOIN slices s ON s.id = t.slice_id
-GROUP BY t.slice_id, s.name;
+GROUP BY t.slice_id;
 
 -- ============================================
 -- FUNCTION: Calculate enhanced task ROI
