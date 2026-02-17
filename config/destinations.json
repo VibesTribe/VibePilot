@@ -319,6 +319,130 @@
       "capabilities": ["text", "code", "vision", "file_upload", "open_source_models"],
       "strengths": ["open_source", "model_variety", "no_vendor_lockin", "no_auth_required"],
       "notes": "128+ open source models. NO AUTH REQUIRED. PRIORITY: Test courier here first (no login needed)."
+    },
+    {
+      "id": "duckai-web",
+      "name": "Duck.ai",
+      "type": "web",
+      "destination_type": "web",
+      "cost_category": "free",
+      "url": "https://duck.ai",
+      "new_chat_url": "https://duck.ai",
+      "provider": "duckduckgo",
+      "status": "active",
+      "models_available": ["gpt-4o", "claude-3.5", "deepseek-chat", "llama-3.1"],
+      "auth": {
+        "methods": ["none"],
+        "no_auth_available": true
+      },
+      "free_tier": {
+        "default_model": "varies",
+        "rate_limits": {
+          "messages_per_day": "generous"
+        },
+        "context_limit": "varies"
+      },
+      "throttle": {
+        "strategy": "pace",
+        "at_percent": 80
+      },
+      "capabilities": ["text", "code", "web_search"],
+      "strengths": ["anonymous", "privacy_proxy", "multi_model", "no_auth_required"],
+      "notes": "Anonymous aggregator. GPT-4o, Claude, DeepSeek, Llama all free. NO AUTH. Privacy-focused proxy."
+    },
+    {
+      "id": "notegpt-web",
+      "name": "NoteGPT",
+      "type": "web",
+      "destination_type": "web",
+      "cost_category": "free",
+      "url": "https://notegpt.io",
+      "new_chat_url": "https://notegpt.io/chat",
+      "provider": "notegpt",
+      "status": "active",
+      "models_available": ["deepseek-r1", "deepseek-v3", "gpt-4o", "gemini-2.5"],
+      "auth": {
+        "methods": ["none"],
+        "no_auth_available": true
+      },
+      "free_tier": {
+        "default_model": "deepseek-r1",
+        "rate_limits": {
+          "messages_per_day": "unlimited_claimed"
+        },
+        "context_limit": "varies"
+      },
+      "throttle": {
+        "strategy": "pace",
+        "at_percent": 80
+      },
+      "capabilities": ["text", "code", "reasoning"],
+      "strengths": ["deepseek_optimized", "no_auth_required", "unlimited_claimed"],
+      "notes": "Optimized for DeepSeek R1 reasoning. Claims unlimited free. NO AUTH. Some ads/upsells."
+    },
+    {
+      "id": "perchance-web",
+      "name": "Perchance AI",
+      "type": "web",
+      "destination_type": "web",
+      "cost_category": "free",
+      "url": "https://perchance.org/ai-chat",
+      "new_chat_url": "https://perchance.org/ai-chat",
+      "provider": "perchance",
+      "status": "active",
+      "models_available": ["qwen-2.5", "llama-3.1", "mistral", "open_source_variety"],
+      "auth": {
+        "methods": ["none"],
+        "no_auth_available": true
+      },
+      "free_tier": {
+        "default_model": "varies",
+        "rate_limits": {
+          "messages_per_day": "unlimited"
+        },
+        "context_limit": "varies"
+      },
+      "throttle": {
+        "strategy": "pace",
+        "at_percent": 80
+      },
+      "capabilities": ["text", "code", "experimental_models"],
+      "strengths": ["100_percent_free", "no_auth_required", "community_driven", "experimental"],
+      "notes": "Community-run, 100% free. Open source models. NO AUTH. Good for testing variety."
+    },
+    {
+      "id": "chatgate-web",
+      "name": "ChatGate (ChatGPT Proxy)",
+      "type": "web",
+      "destination_type": "web",
+      "cost_category": "free",
+      "url": "https://chatgate.ai",
+      "new_chat_url": "https://chatgate.ai",
+      "provider": "chatgate",
+      "status": "active",
+      "models_available": ["gpt-4o-mini", "gpt-4o"],
+      "auth": {
+        "methods": ["none"],
+        "no_auth_available": true
+      },
+      "free_tier": {
+        "default_model": "gpt-4o-mini",
+        "rate_limits": {
+          "messages_per_day": "generous"
+        },
+        "context_limit": 128000
+      },
+      "throttle": {
+        "strategy": "pace",
+        "at_percent": 80
+      },
+      "theoretical_cost": {
+        "gpt-4o-mini": { "input_per_1m": 0.15, "output_per_1m": 0.60 },
+        "gpt-4o": { "input_per_1m": 2.50, "output_per_1m": 10.00 }
+      },
+      "capabilities": ["text", "code", "vision"],
+      "strengths": ["chatgpt_access", "no_auth_required", "proxy"],
+      "notes": "ChatGPT proxy. Works without login. NO AUTH. Use for GPT-4o access free."
     }
   ],
 
@@ -344,20 +468,23 @@
   ],
 
   "routing_hints": {
-    "coding": ["claude-web", "deepseek-web", "chatgpt-web"],
+    "coding": ["claude-web", "deepseek-web", "chatgpt-web", "notegpt-web"],
     "long_documents": ["gemini-web", "claude-web"],
-    "research": ["copilot-web", "gemini-web"],
-    "reasoning": ["claude-web", "deepseek-web"],
+    "research": ["copilot-web", "gemini-web", "duckai-web"],
+    "reasoning": ["claude-web", "deepseek-web", "notegpt-web"],
     "vision": ["gemini-web", "chatgpt-web", "claude-web"],
-    "general": ["gemini-web", "chatgpt-web", "copilot-web"],
-    "no_auth_required": ["huggingchat-web"],
-    "testing_first": ["huggingchat-web"]
+    "general": ["gemini-web", "chatgpt-web", "copilot-web", "duckai-web"],
+    "no_auth_required": ["huggingchat-web", "duckai-web", "notegpt-web", "perchance-web", "chatgate-web", "deepseek-web"],
+    "testing_first": ["duckai-web", "chatgate-web", "deepseek-web"],
+    "open_source": ["huggingchat-web", "perchance-web"]
   },
 
   "notes": [
     "destination_type maps to routing.json strategies: web, cli, api_free, api_credit",
     "cost_category: free, subscription_sunk, credit_burn",
     "throttle.strategy: pace (slow down), protect (skip if alternatives), none (unlimited)",
-    "credit_pause_at_usd: pause destination when credit drops below this"
+    "credit_pause_at_usd: pause destination when credit drops below this",
+    "no_auth_available: TRUE means courier can use without login",
+    "2026-02-17: Added Duck.ai, NoteGPT, Perchance, ChatGate from Gemini research"
   ]
 }

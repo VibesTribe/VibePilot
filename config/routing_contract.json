@@ -1,0 +1,76 @@
+{
+  "version": "1.0",
+  "description": "Routing decision contract - what orchestrator returns when routing a task",
+  "last_updated": "2026-02-17",
+
+  "routing_decision_schema": {
+    "required_fields": {
+      "task_id": "string - the task being routed",
+      "destination_id": "string - WHERE to execute (from destinations.json)",
+      "destination_type": "string - cli/web/api",
+      "role_id": "string - WHAT job (from roles.json)",
+      "model_id": "string - WHO provides intelligence (from models.json)",
+      "reason": "string - human-readable explanation of routing decision",
+      "timestamp": "ISO8601 - when decision was made"
+    },
+
+    "optional_fields": {
+      "driver_model_id": "string - for courier/visual_tester, the model driving browser-use",
+      "throttle_wait_seconds": "integer - seconds to wait before executing (if rate limited)",
+      "fallback_chain": "array - ordered list of alternative destinations if primary fails",
+      "credit_check": "object - credit remaining if using credit-based API",
+      "routing_strategy_used": "string - which strategy from routing.json was applied"
+    },
+
+    "example_success": {
+      "task_id": "task-001",
+      "destination_id": "chatgate.ai",
+      "destination_type": "web",
+      "role_id": "courier",
+      "model_id": "gemini-2.0-flash",
+      "driver_model_id": "gemini-2.0-flash",
+      "reason": "web task, web_first strategy, chatgate.ai has no auth, gemini has browser_control",
+      "timestamp": "2026-02-17T18:30:00Z",
+      "throttle_wait_seconds": 0,
+      "fallback_chain": ["deepseek-web", "opencode"],
+      "routing_strategy_used": "web_first"
+    },
+
+    "example_throttled": {
+      "task_id": "task-002",
+      "destination_id": "gemini-api",
+      "destination_type": "api",
+      "role_id": "internal_api",
+      "model_id": "gemini-2.0-flash",
+      "reason": "API task, but gemini-api at 85% usage, throttling",
+      "timestamp": "2026-02-17T18:31:00Z",
+      "throttle_wait_seconds": 45,
+      "fallback_chain": ["kimi", "opencode"]
+    },
+
+    "example_credit_protected": {
+      "task_id": "task-003",
+      "destination_id": "deepseek-api",
+      "destination_type": "api",
+      "role_id": "internal_api",
+      "model_id": "deepseek-chat",
+      "reason": "DeepSeek API has $0.50 remaining, below $1.00 threshold. Skipping.",
+      "timestamp": "2026-02-17T18:32:00Z",
+      "credit_check": {
+        "credit_remaining_usd": 0.50,
+        "credit_threshold_usd": 1.00,
+        "action": "skip",
+        "alternatives_available": ["kimi", "opencode", "gemini-api"]
+      },
+      "fallback_chain": ["gemini-api", "kimi"]
+    }
+  },
+
+  "fallback_rules": {
+    "web_unavailable": "Try next web destination, then cli, then api_free",
+    "cli_unavailable": "Try next cli destination, then web, then api_free",
+    "api_credit_low": "Skip credit-based APIs, use subscriptions or free tier",
+    "all_throttled": "Queue task, wait for first available, alert human if queue > 5 min",
+    "browser_failure": "Retry with different driver model, then different platform"
+  }
+}
