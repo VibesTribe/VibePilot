@@ -79,9 +79,17 @@ vibeflow/apps/dashboard/
 
 ├── styles.css (UPDATED)
 │   - New styles for model list, task list, expand icons
+│   - Model card ROI display
+│   - Agent details ROI summary
 ```
 
-### Remaining Work
+### Completed Tonight
+
+- Model cards: Show cost/savings alongside "Tokens used"
+- Agent details: New "ROI Summary" section with total runs, role, cost, theoretical, savings
+- ROI Panel: By Model section with clickable task breakdown
+
+### Remaining Work (Tomorrow)
 
 - Add cost/savings to model cards in main dashboard
 - Admin Panel forms → Supabase
