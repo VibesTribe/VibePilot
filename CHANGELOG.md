@@ -12,22 +12,27 @@
 
 **Problem:** 
 1. USD/CAD toggle not visible/obvious
-2. Slice section had expand icon but nothing to expand (confusing UX)
+2. By Slice and By Model sections always expanded (cluttered view)
 3. Model section expand behavior unclear
 
 **Solution:**
-1. Made currency toggle more prominent with "Currency:" label and exchange rate display
-2. Removed misleading expand icon from slice section (no expanded content exists)
-3. Improved model section with dynamic hint "(click to expand/collapse)" and empty state handling
+1. Made currency toggle more prominent with "Currency:" label, background, and exchange rate display
+2. Made By Slice and By Model sections collapsible (collapsed by default, click header to expand)
+3. Added +/- toggle icons on section headers
 
 **Files Changed:**
 ```
 vibeflow/apps/dashboard/
 ├── components/modals/MissionModals.tsx
-│   - Removed unused expandedSlice state
-│   - Removed misleading expand icon from slice items
-│   - Added Currency: label to toggle
-│   - Added exchange rate display when CAD selected
+│   - Added showSlices and showModels state (default: false = collapsed)
+│   - Wrapped section titles in clickable headers with toggle icons
+│   - Content only renders when section is expanded
+│
+└── styles.css
+    - Added .roi-panel__section-header (clickable header row)
+    - Added .roi-panel__section-toggle (+/- icon)
+    - Enhanced .roi-panel__currency-toggle with background/border
+```
 │   - Always show task list when model expanded (with empty state)
 │
 └── styles.css
