@@ -6,7 +6,7 @@
 
 ---
 
-# 2026-02-16 (Session 7)
+# 2026-02-16/17 (Session 7)
 
 ## Session Summary
 
@@ -16,6 +16,8 @@
 2. **Routing Flags** — Tasks get Q/W/M based on complexity, not destination
 3. **Dashboard Contract** — Mock data shape is sacred, adapter transforms VibePilot → Dashboard
 4. **Lamp Metaphor** — Agent = lamp (swappable shade/bulb/base/outlet)
+5. **Supabase is Runtime Truth** — JSON files are backup/seed, Supabase is live source
+6. **80% Cooldown** — Models/platforms pause at 80% usage with countdown timer
 
 ### Routing Flag Thresholds
 
@@ -30,44 +32,101 @@
 
 ```
 docs/
-└── schema_v1.1_routing.sql (NEW)
-    - Adds: slice_id, phase, task_number, routing_flag, routing_flag_reason
-    - Functions: get_tasks_by_slice, get_slice_summary, get_available_for_routing
-    - Updated: claim_next_task with routing constraint
+├── schema_v1.1_routing.sql (NEW)
+│   - Adds: slice_id, phase, task_number, routing_flag, routing_flag_reason
+│   - Functions: get_tasks_by_slice, get_slice_summary, get_available_for_routing
+│
+├── schema_v1.2_platforms.sql (NEW)
+│   - platforms table + display columns
+│   - get_dashboard_agents() function
+│
+├── schema_v1.2.1_platforms_fix.sql (NEW)
+│   - Adds missing columns to existing platforms table
+│
+└── schema_v1.3_config_jsonb.sql (NEW)
+    - config JSONB column on models/platforms (stores full config)
+    - Live stats: tokens_used, success_rate, last_run_at
+    - cooldown_expires_at for 80% tracking
+    - skills, prompts, tools tables
+    - Functions: update_model_stats, update_platform_stats
 
 config/prompts/
 └── planner.md (MAJOR UPDATE)
     - Isolation-first principle
     - Slice-based output structure
-    - Routing flags with thresholds
+    - Routing flags with thresholds (2+ deps = Q)
     - Multi-file red flag escalation
     - Dependency types with slice boundary rules
 
 core/
-└── orchestrator.py (UPDATED)
-    - RunnerPool tracks routing_capability per runner
-    - get_best_for_task filters by routing_flag
-    - _get_available_tasks respects runner capabilities
-    - CLI/API runners can handle internal, web couriers only web
+└── orchestrator.py (MAJOR UPDATE)
+    - CooldownManager: tracks cooldowns per runner
+    - UsageTracker: monitors requests/tokens, triggers cooldown at 80%
+    - RunnerPool checks cooldown before assigning tasks
+    - routing_capability per runner (CLI/API = internal+web+mcp)
 
-CURRENT_STATE.md (UPDATED)
-    - Added Supabase schema update workflow note
+scripts/
+└── sync_config_to_supabase.py (REWRITTEN)
+    - Bidirectional: import (JSON→DB) and export (DB→JSON)
+    - Stores full config in JSONB column
+    - Handles skills, tools, prompts tables
+
+tests/
+└── test_routing_logic.py (NEW)
+    - Verifies routing flag thresholds
+    - Tests orchestrator task filtering
+    - Tests slice grouping
+
+CURRENT_STATE.md (MAJOR UPDATE)
+    - Full documentation of new architecture
+    - Vibeflow dashboard section
+    - Config sync workflow
+    - New key decisions (DEC-017 to DEC-021)
 ```
 
-### What Needs Manual Action
+### Vibeflow Dashboard (Connected)
 
-**Supabase Schema Update Required:**
-1. Go to GitHub → `docs/schema_v1.1_routing.sql`
-2. Copy entire file
-3. Paste into Supabase SQL Editor
-4. Run
-5. Verify columns added
+```
+~/vibeflow/apps/dashboard/
+├── lib/
+│   ├── supabase.ts (NEW) — Supabase client with config check
+│   └── vibepilotAdapter.ts (NEW) — Transforms Supabase → Dashboard shape
+│       - Reads config JSONB for full model/platform details
+│       - Shows cooldown countdown from cooldown_expires_at
+│       - Completed tasks have no owner (vanish from orbit)
+│
+├── hooks/
+│   └── useMissionData.ts (UPDATED)
+│       - Queries tasks, task_runs, models, platforms from Supabase
+│       - Falls back to mock data if not configured
+│
+└── .env.example (NEW)
+    - VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+```
+
+**Live at:** https://vibeflow-dashboard.vercel.app/
+
+### What Was Done Manually
+
+1. Run schema v1.1, v1.2.1, v1.3 on Supabase
+2. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to Vercel environment
+
+### Completed
+
+- [x] Run schema migrations on Supabase (v1.1, v1.2.1, v1.3)
+- [x] E2E test with new routing logic
+- [x] Vibeflow adapter (Supabase → Dashboard shape)
+- [x] Dashboard connected to live Supabase
+- [x] Completed tasks vanish from orbit
+- [x] Full config in JSONB (rate limits, context limits, notes)
+- [x] 80% usage tracking with cooldown
+- [x] Cooldown countdown in dashboard
 
 ### Remaining Work
 
-- [ ] Run schema migration on Supabase
-- [ ] E2E test with new routing logic
-- [ ] Vibeflow adapter (Supabase → Dashboard shape)
+- [ ] Wire Admin Panel forms to Supabase
+- [ ] Wire Vibes → Maintenance for "add X" requests
+- [ ] Test cooldown with real usage
 
 ---
 
