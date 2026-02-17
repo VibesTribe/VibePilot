@@ -511,27 +511,24 @@ class CourierContractRunner(BaseRunner):
             return None
 
     def _create_gemini_adapter(self, api_key: str, model_config: dict):
-        """Create browser-use compatible Gemini adapter using OpenAI-compatible API."""
+        """Create browser-use compatible Gemini adapter using browser-use's built-in ChatGoogle."""
         try:
-            from langchain_openai import ChatOpenAI
+            from browser_use.llm.google import ChatGoogle
 
             model_name = model_config.get("id", "gemini-2.0-flash")
 
-            class BrowserUseChatOpenAI(ChatOpenAI):
-                @property
-                def provider(self):
-                    return "google"
-
-            # Use Gemini's OpenAI-compatible endpoint
-            self._llm = BrowserUseChatOpenAI(
+            self._llm = ChatGoogle(
                 model=model_name,
                 api_key=api_key,
-                base_url="https://generativelanguage.googleapis.com/v1beta/openai",
             )
+            self.logger.info(f"Created browser-use ChatGoogle adapter for {model_name}")
             return self._llm
 
         except Exception as e:
             self.logger.error(f"Failed to create Gemini adapter: {e}")
+            import traceback
+
+            self.logger.error(traceback.format_exc())
             return None
 
     def _create_openai_compatible_adapter(
