@@ -65,33 +65,54 @@ git checkout aaabc5c5
 
 # ACTIVE WORK
 
-## GLM-5 + Kimi Team (Feb 17-27, 2025)
+## GLM-5 + Kimi Team (Feb 17-27, 2026)
 
 **Kimi subscription jumps from $0.99 → $19 on Feb 27. MAXIMIZE USAGE.**
 
 | Role | Agent | Job |
 |------|-------|-----|
 | Architect/Vetter | GLM-5 | Think, analyze gaps, ensure principles, ask before acting |
-| Executor | Kimi | Research, code, parallel tasks, post to branches |
 | Maintenance | GLM-5 | ONLY agent that touches system files (after full understanding) |
 | Supervisor | GLM-5 | Quality gate, nothing to main without human approval |
+| Executor | Kimi | Research, code, parallel tasks, post to branches |
 | Final Gate | Human | Approve before anything hits main |
 
-**Workflow:**
+---
+
+## Branch Workflow (Zero Drift Quality Control)
+
 ```
-Human → GLM-5 (analyze/plan) → Kimi (execute to branch) → GLM-5 (review) → Human (approve) → Main
+TASK BRANCH (task/[name])
+- Contains ONLY files changed for this task
+- Clean, no inherited files from main
+                                ↓
+REVIEW (based on task type)
+- New platform/model: No approval, just tell human it works
+- Architecture/Security: Council review → Human decides
+- Paid stuff/dependencies: Human approval
+- Visual/UI: Human tests → Approve
+                                ↓
+MERGE TO MAIN → DELETE BRANCH
 ```
 
-**Kimi Tasks (until Feb 27):**
-- Research repos → post to UPDATE_CONSIDERATIONS.md (on branch)
+---
+
+## Kimi Usage (Until Feb 27)
+
+- Research → Report findings (not verdicts)
 - Parallel courier tasks
-- Browser automation with screenshots
-- Any heavy lifting
+- Browser automation + screenshots
+- Heavy lifting
 
-| Task | Status | Agent | Started | Notes |
-|------|--------|-------|---------|-------|
-| Orchestrator update | pending | GLM-5 | - | Read new config structure |
-| Kimi research review | pending | GLM-5 | - | Branch: kimi-research-2026-02-17 |
+---
+
+## Current Priorities
+
+| Task | Status | Agent |
+|------|--------|-------|
+| Orchestrator update | pending | GLM-5 |
+| SQL schemas | done | Human |
+| Courier E2E test | pending | GLM-5 |
 
 ---
 

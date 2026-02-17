@@ -377,18 +377,33 @@ score = w1*priority + w2*confidence + w3*provider_success_rate
 
 **From:** [Source - video, article, research agent]
 
-**Proposal:**
-[What the suggestion is]
+**Summary:** [What it is in 2-3 sentences]
 
-**VibePilot Fit:** ✅/❌/⚠️ [Good fit / Not right / Partial fit]
+**Relevance to VibePilot:** [How might we use this?]
 
-**Reasoning:**
-[Why it does or doesn't fit our specific system]
+**Pros:**
+- Pro 1
 
-**Decision:** DEC-XXX (Accepted/Rejected/Pending) - [One line summary]
+**Cons:**
+- Con 1
+
+**Dev Feedback (not benchmarks):** [What do actual developers say?]
+
+**Recommendation:** Consider / Skip / Reconsider Later / Add Now
+
+**Why:** [Reasons for recommendation]
+
+**Review Path:**
+- New platform/model → No approval needed, just test and add
+- Architecture/Security → Council review
+- Paid/Dependencies → Human approval
+
+**For Council (if applicable):**
+- [Key questions council should consider]
 ```
 
 ---
 
-*File cleared after processing. Archive in DECISION_LOG.md*
-*Next update: Research agent or human input*
+*Research agents: Report facts, not verdicts. Let human decide.*
+*Council: Review, debate, recommend. Human decides.*
+*Maintenance: Implements after approval. Sandbox tests.*
