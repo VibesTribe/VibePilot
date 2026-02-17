@@ -10,8 +10,8 @@
 
 ---
 
-**Last Updated:** 2026-02-17 02:00 UTC
-**Updated By:** GLM-5 (Session 7: Slice-based planning, routing flags, Supabase live config, 80% cooldown)
+**Last Updated:** 2026-02-17 18:00 UTC
+**Updated By:** GLM-5 (Session 8: ROI Calculator, enhanced cost tracking, USD/CAD toggle)
 **Known Good Commit:** `64be3a52`
 
 ---
@@ -132,6 +132,23 @@ git checkout aaabc5c5
 |-----------|------------|----------|
 | **Base Runner** | Abstract class enforcing RUNNER_INTERFACE | `runners/base_runner.py` |
 | **Contract Runners** | Kimi, DeepSeek, Gemini, Courier following interface | `runners/contract_runners.py` |
+
+## NEW: ROI Calculator (Session 8)
+
+| Component | What It Is | Location |
+|-----------|------------|----------|
+| **ROI Schema** | Enhanced cost tracking fields | `docs/schema_v1.4_roi_enhanced.sql` |
+| **ROI Adapter** | Calculate ROI from task_runs | `~/vibeflow/apps/dashboard/lib/vibepilotAdapter.ts` |
+| **ROI Calculator** | Currency formatting, exchange rates | `~/vibeflow/apps/dashboard/lib/roiCalculator.ts` |
+| **ROI Panel** | Dashboard panel with live data | `~/vibeflow/apps/dashboard/components/modals/MissionModals.tsx` |
+
+**ROI Features:**
+- Tokens split into in/out (output costs more)
+- Courier cost tracking
+- Theoretical vs actual cost
+- Slice-level rollup
+- Subscription tracking with renewal recommendations
+- USD/CAD toggle with live exchange rate
 | **Config Loader** | Central module for all JSON configs | `core/config_loader.py` |
 | **E2E Test** | Full contract layer test | `tests/test_contract_e2e.py` |
 | **Terminal Dashboard** | Real-time monitoring | `dashboard/terminal_dashboard.py` |
@@ -269,7 +286,15 @@ python scripts/sync_config_to_supabase.py --export
 
 # WHERE WE'RE GOING
 
-## Done This Session (2026-02-16/17)
+## Done This Session (2026-02-17 Session 8)
+
+1. ✅ **ROI Schema v1.4** — Enhanced cost tracking (tokens_in/out, courier costs, subscription fields)
+2. ✅ **ROI Calculator** — Full dashboard panel with real data
+3. ✅ **USD/CAD Toggle** — Live exchange rate fetch
+4. ✅ **Slice ROI** — Per-slice cost breakdown
+5. ✅ **Subscription Tracking** — Renewal recommendations based on metrics
+
+## Done Previous Session (2026-02-16/17 Session 7)
 
 1. ✅ **Slice-based planning** — Planner outputs modular vertical slices
 2. ✅ **Routing flags** — Q/W/M for task routing constraints
@@ -285,7 +310,8 @@ python scripts/sync_config_to_supabase.py --export
 
 1. **Wire Admin Panel** — Forms to add/edit models, platforms, skills
 2. **Wire Vibes → Maintenance** — "Add X" requests flow to Maintenance
-3. **Test cooldown** — Simulate 80% usage, verify cooldown triggers
+3. **Test ROI with real task runs** — Populate sample data, verify calculations
+4. **Run schema v1.4 migration** — Apply schema_v1.4_roi_enhanced.sql to Supabase
 
 ## Near Term
 
@@ -506,6 +532,7 @@ python -c "from vault_manager import VaultManager; v=VaultManager(); print(v.get
 - `docs/schema_v1.2_platforms.sql` — platforms table + display columns
 - `docs/schema_v1.2.1_platforms_fix.sql` — Adds missing columns to existing platforms
 - `docs/schema_v1.3_config_jsonb.sql` — config JSONB, live stats, skills/prompts/tools tables, cooldown_expires_at
+- `docs/schema_v1.4_roi_enhanced.sql` — ROI tracking (tokens_in/out, courier costs, subscriptions, exchange rates)
 
 **All v1.x schemas should be applied to Supabase.**
 
