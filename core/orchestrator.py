@@ -248,11 +248,15 @@ class RunnerPool:
         self._load_runners(use_config)
 
     def _load_runners(self, use_config: bool = True):
-        """Load active models/runners from config or database."""
-        if use_config:
-            self._load_from_config()
-        else:
-            self._load_from_database()
+        """Load active runners - try new access table first, then fallback."""
+        self._load_from_database()
+
+        if not self.runners:
+            logger.info("No runners from access table, trying config...")
+            if use_config:
+                self._load_from_config()
+            else:
+                self._load_from_database_legacy()
 
         logger.info(f"Loaded {len(self.runners)} runners")
 
@@ -342,18 +346,120 @@ class RunnerPool:
             )
 
     def _load_from_database(self):
-        """Load active models/runners from database (fallback)."""
+        """Load active access methods from new access table."""
+        try:
+            res = (
+                db.table("access")
+                .select(
+                    "id, model_id, tool_id, platform_id, method, priority, status, "
+                    "requests_per_minute, requests_per_day, tokens_per_day, "
+                    "requests_today, tokens_today, total_tasks, successful_tasks, "
+                    "models_new(name, provider, capabilities, context_limit, cost_input_per_1k_usd, cost_output_per_1k_usd), "
+                    "tools(name, type, has_codebase_access, has_browser_control, runner_class)"
+                )
+                .eq("status", "active")
+                .order("priority")
+                .execute()
+            )
+
+            for access in res.data or []:
+                access_id = access["id"]
+                model = access.get("models_new") or {}
+                tool = access.get("tools") or {}
+
+                model_id = access["model_id"]
+                tool_id = access["tool_id"]
+                method = access["method"]
+                priority = access["priority"]
+
+                capabilities = model.get("capabilities", []) or []
+                has_browser = tool.get("has_browser_control", False) or False
+                has_codebase = tool.get("has_codebase_access", False) or False
+
+                if has_codebase and has_browser:
+                    routing_capability = ["internal", "web", "mcp"]
+                elif has_codebase:
+                    routing_capability = ["internal", "mcp"]
+                else:
+                    routing_capability = ["web"]
+
+                total = access.get("total_tasks", 0) or 0
+                successful = access.get("successful_tasks", 0) or 0
+                success_rate = successful / total if total > 0 else 0.5
+
+                task_ratings = {}
+                if total > 0:
+                    task_ratings["default"] = {
+                        "success": successful,
+                        "fail": total - successful,
+                        "count": total,
+                    }
+
+                runner_key = f"{model_id}:{tool_id}"
+
+                self.runners[runner_key] = {
+                    "id": runner_key,
+                    "access_id": access_id,
+                    "model_id": model_id,
+                    "tool_id": tool_id,
+                    "platform_id": access.get("platform_id"),
+                    "name": model.get("name", model_id),
+                    "provider": model.get("provider", "unknown"),
+                    "type": tool.get("type", "unknown"),
+                    "method": method,
+                    "context_limit": model.get("context_limit", 32000),
+                    "capabilities": capabilities,
+                    "has_browser": has_browser,
+                    "has_codebase": has_codebase,
+                    "cost_priority": priority,
+                    "routing_capability": routing_capability,
+                    "task_ratings": task_ratings,
+                    "success_rate": success_rate,
+                    "status": "active",
+                    "rate_limits": {
+                        "rpm": access.get("requests_per_minute"),
+                        "rpd": access.get("requests_per_day"),
+                        "tpd": access.get("tokens_per_day"),
+                    },
+                    "current_usage": {
+                        "requests_today": access.get("requests_today", 0) or 0,
+                        "tokens_today": access.get("tokens_today", 0) or 0,
+                    },
+                    "runner_class": tool.get("runner_class"),
+                }
+
+                logger.debug(
+                    f"Loaded {runner_key}: method={method}, pri={priority}, routing={routing_capability}"
+                )
+
+            logger.info(
+                f"Loaded {len(self.runners)} active access methods from new schema"
+            )
+
+        except Exception as e:
+            logger.warning(
+                f"Could not load from access table: {e}, falling back to old models table"
+            )
+            self._load_from_database_legacy()
+
+    def _load_from_database_legacy(self):
+        """Legacy fallback: Load active models/runners from old models table."""
         res = db.table("models").select("*").eq("status", "active").execute()
 
         for model in res.data or []:
-            self.runners[model["id"]] = {
-                "id": model["id"],
+            model_id = model["id"]
+            self.runners[model_id] = {
+                "id": model_id,
+                "model_id": model_id,
+                "tool_id": model_id,
                 "platform": model.get("platform", "unknown"),
                 "type": model.get("type", "runner"),
                 "context_limit": model.get("context_limit", 32000),
                 "strengths": model.get("strengths", []),
                 "task_ratings": model.get("task_ratings", {}),
                 "status": model.get("status", "active"),
+                "routing_capability": ["web"],
+                "cost_priority": 2,
             }
 
     def is_available(self, runner_id: str) -> bool:
