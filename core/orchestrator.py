@@ -872,6 +872,10 @@ class ConcurrentOrchestrator:
         if unlocked:
             self.logger.info(f"Unlocked {len(unlocked)} tasks")
 
+        pending_plans = self.supervisor.get_pending_plans()
+        if pending_plans:
+            self._process_pending_plans()
+
         pending_reviews = len(self.supervisor.get_pending_reviews())
         if pending_reviews > 0:
             self._process_reviews()
@@ -884,6 +888,42 @@ class ConcurrentOrchestrator:
 
         for task in tasks:
             self._dispatch_task(task)
+
+    def _process_pending_plans(self):
+        """Process pending plan tasks - review and approve."""
+        pending = self.supervisor.get_pending_plans()
+        if not pending:
+            return
+
+        self.logger.info(f"Processing {len(pending)} pending plan tasks")
+
+        review = self.supervisor.review_plan()
+
+        if not review["approved"]:
+            self.logger.warning(f"Plan review failed: {review['issues']}")
+            return
+
+        if review.get("warnings"):
+            for warning in review["warnings"]:
+                self.logger.info(f"Plan warning: {warning}")
+
+        if review["task_count"] > 0:
+            council_result = self.supervisor.call_council(
+                project_id=pending[0].get("project_id")
+            )
+
+            if council_result.get("concerns"):
+                for concern in council_result["concerns"]:
+                    self.logger.info(f"Council concern: {concern}")
+
+        result = self.supervisor.approve_plan()
+
+        if result.get("success"):
+            self.logger.info(
+                f"Approved {result.get('approved_count', 0)} tasks for execution"
+            )
+        else:
+            self.logger.error(f"Plan approval failed: {result.get('error')}")
 
     def _get_available_tasks(self, limit: int) -> List[Dict]:
         """

@@ -217,7 +217,6 @@ class SupervisorAgent:
         db.table("tasks").update(
             {
                 "status": "testing",
-                
                 "updated_at": datetime.utcnow().isoformat(),
             }
         ).eq("id", task_id).execute()
@@ -227,7 +226,6 @@ class SupervisorAgent:
         return {
             "success": True,
             "task_id": task_id,
-            
             "next": f"tester_{test_type}",
         }
 
@@ -378,6 +376,182 @@ class SupervisorAgent:
         """Get all tasks awaiting supervisor review."""
         res = db.table("tasks").select("*").eq("status", "review").execute()
         return res.data if res.data else []
+
+    def get_pending_plans(self) -> List[Dict]:
+        """Get all tasks awaiting plan approval (pre-execution)."""
+        res = db.table("tasks").select("*").eq("status", "pending").execute()
+        return res.data if res.data else []
+
+    def review_plan(self, project_id: str = None) -> Dict:
+        """
+        Review pending plan tasks before execution.
+
+        This is the pre-execution gate. Supervisor checks:
+        - Tasks have complete prompt packets
+        - Dependencies are valid
+        - No obvious issues
+
+        Returns:
+            {"approved": bool, "issues": [...], "task_count": int}
+        """
+        query = db.table("tasks").select("*").eq("status", "pending")
+        if project_id:
+            query = query.eq("project_id", project_id)
+
+        res = query.execute()
+        pending_tasks = res.data or []
+
+        if not pending_tasks:
+            return {
+                "approved": True,
+                "issues": [],
+                "task_count": 0,
+                "message": "No pending tasks",
+            }
+
+        issues = []
+        warnings = []
+
+        for task in pending_tasks:
+            task_id = task["id"][:8]
+            title = task.get("title", "")
+
+            if not task.get("routing_flag"):
+                issues.append(f"Task {task_id} missing routing_flag")
+
+            if not task.get("title"):
+                warnings.append(f"Task {task_id} has no title")
+
+            deps = task.get("dependencies") or []
+            if deps:
+                for dep_id in deps:
+                    dep_check = (
+                        db.table("tasks").select("id").eq("id", dep_id).execute()
+                    )
+                    if not dep_check.data:
+                        issues.append(
+                            f"Task {task_id} has invalid dependency: {dep_id[:8]}"
+                        )
+
+        if issues:
+            self.logger.warning(f"Plan review found {len(issues)} issues")
+            return {
+                "approved": False,
+                "issues": issues,
+                "warnings": warnings,
+                "task_count": len(pending_tasks),
+            }
+
+        self.logger.info(f"Plan review passed for {len(pending_tasks)} tasks")
+        return {
+            "approved": True,
+            "issues": [],
+            "warnings": warnings,
+            "task_count": len(pending_tasks),
+        }
+
+    def call_council(self, project_id: str, plan_summary: str = None) -> Dict:
+        """
+        Call Council to review the plan.
+
+        For now, this is a simplified check. Full implementation would
+        dispatch to three different models for independent review.
+
+        Returns:
+            {"approved": bool, "concerns": [...], "rounds": int}
+        """
+        pending = self.get_pending_plans()
+
+        if not pending:
+            return {
+                "approved": True,
+                "concerns": [],
+                "message": "No pending tasks to review",
+            }
+
+        concerns = []
+
+        task_types = [t.get("type", "unknown") for t in pending]
+        has_security = "security" in task_types or any(
+            "auth" in (t.get("title") or "").lower() for t in pending
+        )
+        has_db_change = any(
+            "database" in (t.get("title") or "").lower()
+            or "schema" in (t.get("title") or "").lower()
+            for t in pending
+        )
+
+        if has_security:
+            concerns.append(
+                "Plan includes security-related tasks - ensure security review"
+            )
+
+        if has_db_change:
+            concerns.append("Plan includes database changes - ensure migration safety")
+
+        high_priority = [t for t in pending if t.get("priority", 5) <= 2]
+        if len(high_priority) > 5:
+            concerns.append(
+                f"Many high-priority tasks ({len(high_priority)}) - check resource allocation"
+            )
+
+        if len(concerns) == 0:
+            self.logger.info(f"Council review passed for {len(pending)} tasks")
+            return {
+                "approved": True,
+                "concerns": [],
+                "rounds": 1,
+                "task_count": len(pending),
+            }
+
+        self.logger.info(
+            f"Council review raised {len(concerns)} concerns (auto-approved for now)"
+        )
+        return {
+            "approved": True,
+            "concerns": concerns,
+            "rounds": 1,
+            "task_count": len(pending),
+        }
+
+    def approve_plan(self, project_id: str = None) -> Dict:
+        """
+        Approve pending plan and transition tasks to available.
+
+        This is called after:
+        1. Supervisor reviews plan
+        2. Council vets plan (if needed)
+
+        Transitions: status "pending" → "available"
+        """
+        review = self.review_plan(project_id)
+        if not review["approved"]:
+            return {
+                "success": False,
+                "error": "Plan has issues",
+                "issues": review["issues"],
+            }
+
+        if review["task_count"] == 0:
+            return {"success": True, "approved_count": 0, "message": "No pending tasks"}
+
+        query = (
+            db.table("tasks")
+            .update(
+                {"status": "available", "updated_at": datetime.utcnow().isoformat()}
+            )
+            .eq("status", "pending")
+        )
+
+        if project_id:
+            query = query.eq("project_id", project_id)
+
+        result = query.execute()
+
+        approved_count = len(result.data) if result.data else 0
+        self.logger.info(f"Approved plan: {approved_count} tasks now available")
+
+        return {"success": True, "approved_count": approved_count}
 
     def get_pending_approvals(self) -> List[Dict]:
         """Get all tasks awaiting final approval."""
