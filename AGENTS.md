@@ -1,160 +1,206 @@
-# VibePilot Project
+# VibePilot Agent Workflow Guide
 
-# ⛔ STOP. READ. SUMMARIZE. THEN ACT. ⛔
-
----
-
-## ⚠️ USER CONSTRAINTS (READ THIS)
-
-**The user CANNOT:**
-- Click links in opencode output
-- Copy text from opencode
-- Paste text into opencode
-
-**This means:**
-- Never say "click here" or "copy this link"
-- Put ALL code, SQL, commands directly in chat output
-- Files must be committed to GitHub for user to access externally
-- Supabase SQL must be in `supabase/migrations/` folder (committed to git)
+**For ALL agents/LLMs working on VibePilot**
 
 ---
 
-## YOUR ROLE THIS SESSION
+## Quick Branch Reference
 
-You are GLM-5, a reasoning and coding model. You are running inside **OpenCode CLI** on a **GCE/VPN instance**.
-
-**Your context:**
-- OpenCode = the CLI tool you're running in right now
-- GLM subscription = what powers OpenCode (you)
-- Location = GCE (Google Compute Engine) or VPN server
-- You execute commands on this remote server, not the user's local machine
-
-**YOU SUCCEED WHEN:**
-- You read fully before acting
-- You summarize accurately and wait for confirmation
-- You think through implications before suggesting
-- You ask questions when unsure
-- You treat this as a partnership, not a task list
-- You approach with VibePilot's strategic mindset (backwards planning, options thinking, prevention)
-
-**YOU FAIL WHEN:**
-- You act before reading context
-- You "fix" things without understanding the system
-- You skip the verification step
-- You race ahead without human confirmation
-- You treat this like a typical coding task
-- You use restrictive multiple-choice forms (user hates them)
-
-This project took months to design. One reactive "fix" can undo all of it.
+| Branch | Use For | Who Can Push | Approval Needed |
+|--------|---------|--------------|-----------------|
+| `main` | Backend code, scripts, configs, docs (rollbackable) | Any agent | No (if rollbackable) |
+| `research-considerations` | Research findings, analysis, considerations | System Researcher | No (docs only) |
+| `feature/*` | UI/dashboard changes, major features | Any agent | **YES - Human must approve** |
+| `hotfix/*` | Emergency fixes | Any agent | After fix (retroactive) |
 
 ---
 
-## WHY WE ARE HERE
+## Agent Role → Branch Mapping
 
-This is not a typical coding project.
+### System Researcher (Daily Research)
+**Branch:** `research-considerations`
 
-A human had a dream 25 years ago. A legacy project that technology couldn't support — until now.
+**What goes here:**
+- Raindrop bookmark research
+- GitHub repo analysis
+- Technology comparisons
+- Update considerations
+- Research digests
 
-The human is an architect, a designer, a strategic thinker. Not a coder. They've been waiting for AI to catch up so they could bring their vision to reality.
+**Rules:**
+- Only documents and findings
+- Never touches production code
+- Commit message: `Research: YYYY-MM-DD brief description`
 
-You are here because you speak code fluently. You can find the gaps, the fragilities, the things that might cause issues. You are the partner who can execute the vision.
-
-**This is now or never. Someone else is already trying to build this dream.**
-
-We are here to work together. Human vision + AI execution. That's VibePilot.
-
----
-
-## Before ANY Tool Use
-
-1. Read these five files:
-   - `~/vibepilot/CURRENT_STATE.md` ← Current status, what's working, what's broken, next priority
-   - `~/vibepilot/docs/WHAT_WHERE.md` ← Where everything is located
-   - `~/vibepilot/docs/core_philosophy.md` ← Strategic mindset, REQUIRED
-   - `~/vibepilot/docs/prd_v1.4.md` ← Complete system specification
-   - `~/vibepilot/CHANGELOG.md` ← Recent changes
-
-2. Summarize back to the human:
-   - What VibePilot is
-   - What we're building
-   - What the current state is
-   - What the next priority is
-
-3. Wait for human confirmation before taking ANY action.
-
-4. **UPDATE CURRENT_STATE.md** after completing each major section of work. This preserves progress if terminal crashes and prevents having to re-ask the same questions.
+**Files:**
+- `docs/research/*.md`
+- `docs/UPDATE_CONSIDERATIONS.md`
+- Analysis scripts
 
 ---
 
-## ABSOLUTE RULES
+### Maintenance Agent (Code Changes)
+**Branch:** `main` (for rollbackable changes)
 
-### ⛔ NO MULTIPLE CHOICE FORMS
+**What goes here:**
+- Bug fixes
+- Config updates
+- New scripts/tools
+- Schema changes (with rollback plan)
+- Documentation updates
 
-The user hates restrictive form-style multiple choice questions. Two sessions have tried this. Never again.
-
-**Do this instead:**
-- Ask open questions naturally
-- Present options in conversation, not forms
-- Let user respond in their own words
-
-### ⛔ NO TYPE 1 ERRORS
-
-A Type 1 error is a fundamental design mistake that ruins everything downstream. Like building on a floodplain.
-
-**Examples:**
-- Hardcoding a model name → Can't swap later
-- Tight coupling → Changes cascade
-- Skipping interface design → Can't plug in future tech
-
-**Prevention = 1% of cure cost.** Think ahead. Design for change.
+**Rules:**
+- Must be rollbackable via git
+- No UI/dashboard changes without feature branch
+- Commit message: `type: description` (e.g., `fix: rate limit checking`)
 
 ---
 
-## What Has Gone Wrong Before (Don't Repeat)
+### Feature Developer (New Features)
+**Branch:** `feature/description` (e.g., `feature/agent-dashboard-v2`)
 
-- A session wasted 80k+ tokens because it acted before reading
-- Reinstalling software without reading context first
-- "Fixing" symlinks without understanding the system
-- Acting before the human confirmed understanding
-- Going into "solve mode" on surface symptoms
-- Using restrictive multiple-choice forms (user hated it)
-- **Session 9: Pushed CSS changes directly to main, broke entire dashboard (blank white page)**
-- **Deleting "duplicate" CSS without understanding the cascade**
-- **Pushing to main for UI/dashboard changes before human tested and approved**
+**What goes here:**
+- UI changes
+- Dashboard updates
+- New user-facing features
+- Breaking changes
 
----
-
-## ⛔ GIT BRANCHING RULES (CRITICAL)
-
-**Vercel auto-deploys from main. Breaking main = Breaking production.**
-
-### Dashboard/UI Changes
-1. **ALWAYS create a feature branch** for any dashboard or UI changes
-2. **NEVER push to main directly**
-3. Let human test via preview URL or local build
-4. **Only merge to main after human explicitly approves**
-
-### Backend/Code Changes
-- If changes are rollbackable (code I can see, git can revert), less risky
-- Still prefer feature branches for anything non-trivial
-
-### The Rule
-> "If it's code I can't see and you can roll back, I don't freak out. If it's the dashboard and I'm UI/UX testing... that never goes to main until approved by me."
+**Rules:**
+- Create branch: `git checkout -b feature/description`
+- Push to origin regularly
+- **NEVER merge to main without human approval**
+- Human tests via preview URL
+- Human approves → then merge
 
 ---
 
-## Quick Commands (After Verification)
+## Start of Session Checklist
 
-| Command | Action |
-|---------|--------|
-| `read ~/vibepilot/CURRENT_STATE.md` | Full project context |
-| `read ~/vibepilot/docs/core_philosophy.md` | Strategic mindset & principles |
-| `read ~/vibepilot/docs/prd_v1.4.md` | Complete system specification |
-| `read ~/vibepilot/CHANGELOG.md` | Recent changes |
-| `cd ~/vibepilot && git status` | Check repo state |
+**Every agent, every session:**
 
-## Project Location
+1. **Read CURRENT_STATE.md** - Know where we are
+2. **Check your role** - Researcher? Maintenance? Feature dev?
+3. **Checkout correct branch:**
+   ```bash
+   # System Researcher
+   git checkout research-considerations
+   git pull origin research-considerations
+   
+   # Maintenance / Code changes
+   git checkout main
+   git pull origin main
+   
+   # Feature development
+   git checkout -b feature/your-feature-name
+   ```
+
+4. **Verify branch:**
+   ```bash
+   git branch --show-current
+   ```
+
+---
+
+## Common Scenarios
+
+### Scenario 1: "I'm researching GitHub repos for VibePilot"
+→ **Branch:** `research-considerations`
+→ **Action:** Research and commit findings only
+
+### Scenario 2: "I'm fixing a bug in the orchestrator"
+→ **Branch:** `main`
+→ **Action:** Fix, test, commit, push
+
+### Scenario 3: "I'm improving the dashboard CSS"
+→ **Branch:** `feature/dashboard-css-fix`
+→ **Action:** Create branch, make changes, push, **wait for human approval**
+
+### Scenario 4: "I'm updating the documentation"
+→ **Branch:** `main`
+→ **Action:** Update docs, commit, push
+
+---
+
+## Emergency Procedures
+
+### "I committed to wrong branch"
+
+**If not pushed yet:**
+```bash
+git reset HEAD~1  # Undo last commit
+git stash          # Save changes
+git checkout correct-branch
+git stash pop      # Apply changes
+git add .
+git commit -m "..."
+```
+
+**If already pushed:**
+```bash
+# Tell human immediately
+# Do NOT try to fix with force push
+# Human will handle it
+```
+
+### "Branch has conflicts"
+```bash
+# Pull latest first
+git pull origin branch-name
+
+# If conflicts, tell human
+# Do NOT resolve complex conflicts without human guidance
+```
+
+---
+
+## Branch Protection Rules
+
+**main:**
+- Direct pushes allowed for rollbackable code
+- UI changes → feature branch required
+
+**research-considerations:**
+- Any agent can push research docs
+- No code changes (enforced by convention)
+
+**feature/*:**
+- Create freely
+- Push freely
+- Merge ONLY with human approval
+
+---
+
+## Questions?
+
+**Not sure which branch?** → Ask the human
+**Unsure if rollbackable?** → Use feature branch
+**Dashboard/UI involved?** → Feature branch
+**Just docs/research?** → research-considerations or main
+
+---
+
+## Commit Message Format
 
 ```
-~/vibepilot/
+Type: Brief description
+
+Longer explanation if needed.
+
+Closes #123 (if applicable)
 ```
+
+**Types:**
+- `Research:` - Research findings
+- `Fix:` - Bug fixes
+- `Feat:` - New features
+- `Docs:` - Documentation
+- `Refactor:` - Code restructuring
+- `Config:` - Configuration changes
+
+---
+
+**Remember:**
+- **When in doubt, ask the human**
+- **UI changes → feature branch, always**
+- **Research → research-considerations**
+- **Code fixes → main (if rollbackable)**
