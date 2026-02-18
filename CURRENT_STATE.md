@@ -183,40 +183,34 @@ The `models` table conflates everything:
 - Add usage tracking after task completion (update access table)
 - Test end-to-end task dispatch with new schema
 
-## 3. Pipeline Auto-Flow (SIGNIFICANT GAP)
+## 3. Pipeline Auto-Flow (IMPLEMENTED ✅)
 
-**Status:** Major implementation gap identified
+**Status:** Working
 
-**What PRD says should happen:**
+**Flow:**
 ```
-Planner creates plan → Council reviews → Supervisor approves → Tasks become "available"
-```
-
-**What currently happens:**
-```
-Planner creates plan → Tasks written as "pending" → NOTHING transitions them → BLOCKED
+Planner writes "pending" → Supervisor reviews plan → Council vets → 
+Supervisor approves → Tasks become "available" → Orchestrator dispatches
 ```
 
-**What's missing:**
-1. **Pre-execution plan review** - Supervisor should vet plans before tasks go to available
-2. **Council coordination** - Supervisor calls Council for plan review
-3. **Approval trigger** - After Council + Supervisor approve, tasks become "available"
+**Implementation:**
+- `supervisor.get_pending_plans()` - Gets tasks with status="pending"
+- `supervisor.review_plan()` - Validates plan for issues
+- `supervisor.call_council()` - Coordinates council review
+- `supervisor.approve_plan()` - Transitions pending → available
+- `orchestrator._process_pending_plans()` - Called on each tick
 
-**Implementation needed:**
-- `supervisor.review_plan()` - Reviews plan before execution
-- `supervisor.call_council()` - Coordinates Council review
-- `supervisor.approve_plan()` - Transitions tasks from "pending" to "available"
-- Trigger after planner completes
+**Tested:**
+- Before: 16 pending, 8 available
+- After: 0 pending, 24 available ✅
 
-**Status flow per PRD:**
+**Full status flow per PRD:**
 ```
-pending → available → in_progress → review → testing → approval → merged
-              ↑            │          │         │          │
-              └────────────┴──────────┴─────────┴──────────┘
+pending → available → in_progress → review → testing → approved → merged
+              ↑            │          │         │           │
+              └────────────┴──────────┴─────────┴───────────┘
                            (loops back on failure)
 ```
-
-Current gap: `pending → available` transition not implemented.
 
 ## 4. Orchestrator as Service (Pending)
 
@@ -241,19 +235,6 @@ Current gap: `pending → available` transition not implemented.
 **Gemini API:** `docs/rate_limits/gemini_api_free_tier.json`
 - gemini-2.5-flash: 10 RPM, 250 RPD, 250K TPM
 - Daily reset at midnight PT
-
-## 3. Orchestrator as Service
-
-- Run continuously, not manual start
-- Watch queue, dispatch, learn
-- Maybe systemd service or background process
-
-## 4. Rate Limit Tracking
-
-- Multi-window (RPM, RPD, TPM, TPD)
-- Rolling windows
-- 80% threshold enforcement
-- Cooldown periods
 
 ---
 
