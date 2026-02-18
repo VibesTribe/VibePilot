@@ -1,0 +1,89 @@
+{
+  "provider": "Moonshot AI (Kimi)",
+  "research_date": "2026-02-18",
+  "rate_limits": {
+    "type": "tier_based",
+    "description": "Rate limits are based on account tier, which is determined by usage and payment history.",
+    "tier_1": {
+      "rpm": 100,
+      "tpm": 100000,
+      "concurrent_requests": 5
+    },
+    "tier_2": {
+      "rpm": 1000,
+      "tpm": 1000000,
+      "concurrent_requests": 20
+    },
+    "tier_3": {
+      "rpm": 5000,
+      "tpm": 5000000,
+      "concurrent_requests": 50
+    },
+    "tier_4": {
+      "rpm": 10000,
+      "tpm": 10000000,
+      "concurrent_requests": 100
+    },
+    "tier_5": {
+      "description": "Custom limits available",
+      "contact": "Enterprise sales team"
+    },
+    "notes": [
+      "Tier upgrades are automatic based on usage volume",
+      "New accounts start at Tier 1",
+      "Rate limit headers included in API responses"
+    ]
+  },
+  "pricing": {
+    "free_tier": {
+      "description": "Limited free tier available for testing",
+      "restrictions": "Lower rate limits, may not include all models"
+    },
+    "models": {
+      "moonshot-v1-8k": {
+        "input_price_per_1m": 0.60,
+        "output_price_per_1m": 0.60,
+        "context_window": "8K tokens",
+        "currency": "USD"
+      },
+      "moonshot-v1-32k": {
+        "input_price_per_1m": 1.20,
+        "output_price_per_1m": 1.20,
+        "context_window": "32K tokens",
+        "currency": "USD"
+      },
+      "moonshot-v1-128k": {
+        "input_price_per_1m": 2.40,
+        "output_price_per_1m": 2.40,
+        "context_window": "128K tokens",
+        "currency": "USD"
+      },
+      "kimi-k1.5": {
+        "input_price_per_1m": 1.00,
+        "output_price_per_1m": 1.00,
+        "description": "Latest Kimi model with enhanced capabilities",
+        "currency": "USD"
+      },
+      "kimi-k1.5-long": {
+        "input_price_per_1m": 2.00,
+        "output_price_per_1m": 2.00,
+        "description": "Long context version of Kimi K1.5",
+        "context_window": "2M tokens",
+        "currency": "USD"
+      }
+    },
+    "batch_api": {
+      "description": "Batch API available for bulk processing",
+      "discount": "50% discount on batch processing"
+    }
+  },
+  "activation": {
+    "minimum_deposit": "$5 USD minimum to activate production API access",
+    "payment_method_required": true,
+    "verification": "Phone verification required",
+    "notes": "Free tier available for testing, but requires minimum deposit to unlock full API capabilities and higher rate limits"
+  },
+  "documentation_url": "https://platform.moonshot.cn/",
+  "api_base_url": "https://api.moonshot.cn/v1",
+  "notes": "Moonshot AI (Kimi) offers competitive long-context capabilities. Tier-based system provides predictable scaling. Minimum deposit requirement ensures serious usage."
+}
