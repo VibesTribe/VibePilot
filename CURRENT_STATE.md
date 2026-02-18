@@ -212,15 +212,47 @@ pending → available → in_progress → review → testing → approved → me
                            (loops back on failure)
 ```
 
-## 4. Orchestrator as Service (Pending)
+## 4. Orchestrator as Service (NOT IMPLEMENTED)
 
-**Status:** Not yet implemented
+**Status:** Still requires manual `orch.start()` call
 
-- Run continuously, not manual start
+**Needed:**
+- Run continuously as background process
 - Watch queue, dispatch, learn
-- Maybe systemd service or background process
+- systemd service or screen/tmux session
+- Auto-restart on failure
 
-## 5. Rate Limit Data Collected
+## 5. Full Council Implementation (NOT IMPLEMENTED)
+
+**Status:** Simplified placeholder only
+
+**Current:** `call_council()` does basic checks, auto-approves
+
+**Needed:**
+- 3 independent model reviews (different models, different hats)
+- User Alignment hat
+- Architecture hat
+- Feasibility hat
+- Iterative consensus (up to 4 rounds)
+- Real voting mechanism
+
+## 6. Data Cleanup Needed
+
+**Token Issues:**
+- Some task_runs have hardcoded test token values (9000, 4900, etc.)
+- Dashboard shows 24K tokens - includes bad test data
+- Need to audit and clean task_runs table
+
+**Tasks to Clean Up:**
+- Old test tasks with status issues
+- Duplicate task_runs from infinite retry bug (fixed now)
+- Tasks stuck in invalid states
+
+**Orphaned Data:**
+- task_runs referencing benched models
+- task_history records pointing to old access IDs
+
+## 7. Rate Limit Data Collected
 
 **DeepSeek API:** `docs/rate_limits/deepseek_api.json`
 - No fixed rate limits (dynamic throttling)
