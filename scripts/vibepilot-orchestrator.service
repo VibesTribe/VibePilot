@@ -1,0 +1,27 @@
+[Unit]
+Description=VibePilot Orchestrator Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mjlockboxsocial
+Group=mjlockboxsocial
+WorkingDirectory=/home/mjlockboxsocial/vibepilot
+Environment="PATH=/home/mjlockboxsocial/vibepilot/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/home/mjlockboxsocial/vibepilot/.env
+
+ExecStart=/home/mjlockboxsocial/vibepilot/venv/bin/python /home/mjlockboxsocial/vibepilot/run_orchestrator.py
+
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vibepilot-orchestrator
+
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
