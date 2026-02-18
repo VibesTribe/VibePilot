@@ -129,32 +129,27 @@ The `models` table conflates everything:
 
 # NEXT STEPS (In Order)
 
-## 1. Data Model Redesign (Awaiting User Action)
+## 1. Data Model Redesign (COMPLETE)
 
-**Status:** SQL written, committed to GitHub, waiting for user to run in Supabase
-
-**File:** `docs/supabase-schema/001_data_model_redesign.sql`
-
-**To Apply:**
-1. Open GitHub: VibePilot repo → docs/supabase-schema/ → 001_data_model_redesign.sql
-2. Copy SQL content
-3. Supabase Dashboard → SQL Editor → Paste → Run
-4. Confirm to GLM that tables created
+**Status:** Tables created, populated, verified
 
 **New Tables:**
-```
-models_new (AI capabilities only)
-tools (interfaces: opencode, kimi-cli, courier)
-access (how we reach models, limits, usage, learning)
-task_history (learning from every task)
-```
+- `models_new`: 10 models (AI capabilities only)
+- `tools`: 4 tools (opencode, kimi-cli, direct-api, courier)
+- `access`: 15 access records (links models to tools with limits, usage)
+- `task_history`: Ready for learning data
 
-**After Tables Created:**
-- Run `python scripts/populate_new_schema.py` to fill from config files
-- Update orchestrator to use new schema
-- Test routing works
+**Active Access (by priority):**
+| Priority | Model | Tool | Method |
+|----------|-------|------|--------|
+| 0 | kimi-internal | kimi-cli | subscription |
+| 0 | glm-5 | opencode | subscription |
+| 1 | gpt-4o, claude-* | courier | web_free_tier |
+| paused | gemini-*, deepseek-* | direct-api | api |
 
-## 2. Pipeline Auto-Flow
+**Next:** Update orchestrator to query new `access` table for routing decisions
+
+## 2. Update Orchestrator (In Progress)
 
 Wire the transitions:
 - pending → supervisor_review (trigger after planner)
