@@ -463,18 +463,77 @@ class RunnerPool:
             }
 
     def is_available(self, runner_id: str) -> bool:
-        """Check if runner is available (not busy and not in cooldown)."""
+        """Check if runner is available (not busy, not in cooldown, under rate limits)."""
         with self.lock:
             if runner_id not in self.runners:
                 return False
             if runner_id in self.busy:
                 return False
 
-        # Check cooldown
         if self.cooldown_manager and self.cooldown_manager.is_in_cooldown(runner_id):
             return False
 
+        if not self._check_rate_limits(runner_id):
+            return False
+
         return True
+
+    def _check_rate_limits(self, runner_id: str) -> bool:
+        """Check if runner is under 80% of rate limits."""
+        runner = self.runners.get(runner_id, {})
+        rate_limits = runner.get("rate_limits", {})
+        current_usage = runner.get("current_usage", {})
+
+        if not rate_limits:
+            return True
+
+        rpd = rate_limits.get("rpd")
+        tpd = rate_limits.get("tpd")
+
+        if rpd:
+            requests_today = current_usage.get("requests_today", 0)
+            if requests_today >= rpd * 0.8:
+                self.logger.debug(
+                    f"{runner_id} at {requests_today}/{rpd} requests (80% threshold)"
+                )
+                return False
+
+        if tpd:
+            tokens_today = current_usage.get("tokens_today", 0)
+            if tokens_today >= tpd * 0.8:
+                self.logger.debug(
+                    f"{runner_id} at {tokens_today}/{tpd} tokens (80% threshold)"
+                )
+                return False
+
+        return True
+
+    def record_usage(self, runner_id: str, tokens_in: int, tokens_out: int):
+        """Record token usage for a runner."""
+        runner = self.runners.get(runner_id)
+        if not runner:
+            return
+
+        access_id = runner.get("access_id")
+        if not access_id:
+            return
+
+        total_tokens = (tokens_in or 0) + (tokens_out or 0)
+
+        try:
+            db.rpc(
+                "increment_access_usage",
+                {"p_access_id": access_id, "p_tokens": total_tokens, "p_success": True},
+            ).execute()
+
+            current = runner.get("current_usage", {})
+            current["requests_today"] = current.get("requests_today", 0) + 1
+            current["tokens_today"] = current.get("tokens_today", 0) + total_tokens
+            runner["current_usage"] = current
+
+            self.logger.debug(f"Recorded {total_tokens} tokens for {runner_id}")
+        except Exception as e:
+            self.logger.warning(f"Could not record usage: {e}")
 
     def acquire(self, runner_id: str, task_id: str) -> bool:
         """Acquire a runner for a task."""
@@ -971,6 +1030,12 @@ class ConcurrentOrchestrator:
 
                 duration_ms = (time.time() - start_time) * 1000
 
+                self.runner_pool.record_usage(
+                    runner_id,
+                    result.get("prompt_tokens", 0),
+                    result.get("completion_tokens", 0),
+                )
+
                 self.telemetry.record_task_execution(
                     task_id=task_id,
                     task_type=task.get("type", "unknown"),
@@ -982,17 +1047,21 @@ class ConcurrentOrchestrator:
 
                 runner_info = self.runner_pool.runners.get(runner_id, {})
                 runner_type = runner_info.get("type", "api")
+                model_id = runner_info.get(
+                    "model_id",
+                    runner_id.split(":")[0] if ":" in runner_id else runner_id,
+                )
+                access_id = runner_info.get("access_id")
 
                 run_insert = (
                     db.table("task_runs")
                     .insert(
                         {
                             "task_id": task_id,
-                            "model_id": runner_id,
-                            "courier": runner_id.split("-")[0]
-                            if "-" in runner_id
-                            else runner_id,
-                            "platform": runner_info.get("platform", "unknown"),
+                            "model_id": model_id,
+                            "courier": runner_info.get("tool_id", "unknown"),
+                            "platform": runner_info.get("platform_id")
+                            or runner_info.get("provider", "unknown"),
                             "status": "success" if result.get("success") else "failed",
                             "result": result,
                             "tokens_in": result.get("prompt_tokens", 0),
@@ -1002,6 +1071,29 @@ class ConcurrentOrchestrator:
                     )
                     .execute()
                 )
+
+                if access_id:
+                    try:
+                        db.table("task_history").insert(
+                            {
+                                "task_id": task_id,
+                                "access_id": access_id,
+                                "task_type": task.get("type", "unknown"),
+                                "actual_tokens_in": result.get("prompt_tokens", 0),
+                                "actual_tokens_out": result.get("completion_tokens", 0),
+                                "actual_requests": 1,
+                                "success": result.get("success", False),
+                                "failure_reason": result.get("error")
+                                if not result.get("success")
+                                else None,
+                                "failure_code": result.get("error_code")
+                                if not result.get("success")
+                                else None,
+                                "duration_ms": int(duration_ms),
+                            }
+                        ).execute()
+                    except Exception as hist_err:
+                        self.logger.debug(f"Task history log skipped: {hist_err}")
 
                 # Calculate ROI for this run
                 if run_insert.data:

@@ -1,0 +1,58 @@
+{
+  "metadata": {
+    "last_verified": "2026-02-18",
+    "source": "Kimi research via official DeepSeek docs",
+    "important_notes": [
+      "DeepSeek has NO fixed rate limits - dynamic throttling only",
+      "Free tier: 5M tokens for new users",
+      "90% cache discount available"
+    ]
+  },
+  "rate_limits": {
+    "note": "DeepSeek API does NOT enforce explicit rate limit quotas (no fixed RPM, RPD, TPM, TPD)",
+    "behavior": "Dynamic throttling during high traffic. Requests slowed, not rejected.",
+    "connection_timeout": "30 minutes"
+  },
+  "models": {
+    "deepseek-chat": {
+      "model_version": "DeepSeek-V3.2 (Non-thinking Mode)",
+      "rpm": null,
+      "rpd": null,
+      "tpm": null,
+      "tpd": null,
+      "context_limit": 128000,
+      "max_output_tokens": 8000,
+      "default_output_tokens": 4000,
+      "features": ["JSON Output", "Tool Calls", "Chat Prefix Completion"]
+    },
+    "deepseek-reasoner": {
+      "model_version": "DeepSeek-V3.2 (Thinking Mode)",
+      "rpm": null,
+      "rpd": null,
+      "tpm": null,
+      "tpd": null,
+      "context_limit": 128000,
+      "max_output_tokens": 64000,
+      "default_output_tokens": 32000,
+      "max_cot_tokens": 32000,
+      "features": ["JSON Output", "Tool Calls", "Chain-of-Thought Reasoning"]
+    }
+  },
+  "pricing_usd": {
+    "deepseek-chat": {
+      "input_per_1m_cache_hit": 0.028,
+      "input_per_1m_cache_miss": 0.28,
+      "output_per_1m": 0.42
+    },
+    "deepseek-reasoner": {
+      "input_per_1m_cache_hit": 0.028,
+      "input_per_1m_cache_miss": 0.28,
+      "output_per_1m": 0.42
+    }
+  },
+  "free_tier": {
+    "tokens": 5000000,
+    "credit_card_required": false
+  },
+  "cache_discount": "90% on input tokens when cache hit ($0.028 vs $0.28 per 1M)"
+}
