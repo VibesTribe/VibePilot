@@ -1126,3 +1126,393 @@ VibePilot's scope is broader (full SDLC), governance is stronger (Council), and 
 ---
 
 *This detailed comparison shows that VibePilot is architecturally sound while identifying specific improvements from Dan's implementation.*
+---
+
+## ADDENDUM: Token Efficiency Deep Dive & Future Vision
+
+### User Clarification on VibePilot's Direction
+
+**Current State:** Building core infrastructure  
+**Future State (95% Confidence Goal):**
+- One-shot success on weakest models with lowest limits
+- Internal models (Kimi CLI, OpenCode/GLM) for complex, codebase-aware tasks
+- Courier for web platform tasks
+- Agents are **ephemeral** - active only during task execution
+- Branch-per-task → Slice branch → Main workflow
+- Task delivered → Agent goes inactive (not destroyed, just dormant)
+
+**Target Audience:** Non-devs AND devs (broader than Dan's dev-only focus)
+
+---
+
+### Token Efficiency: Dan's Approach vs. VibePilot Opportunities
+
+**Dan's Method (Accessibility Tree vs. Vision):**
+
+```
+Traditional Vision Approach (What VibePilot Courier Might Do):
+- Screenshot of page (100KB+ image)
+- OCR or vision model processes image
+- LLM decides action based on visual
+- Token cost: ~2,000-5,000 tokens per step
+
+Dan's Accessibility Tree Approach:
+- Browser exposes DOM structure as text
+- LLM sees: "button[ref=e21] 'Submit'"
+- LLM decides: "click e21"
+- Token cost: ~100-300 tokens per step
+
+Efficiency Gain: 10-50x reduction in tokens
+```
+
+**How Dan Does It (Playwright CLI):**
+```bash
+# Get accessibility tree (not screenshot)
+playwright-cli snapshot
+
+# Returns structured text:
+# [e21] button "Submit"
+# [e22] input "username"
+# [e23] link "Forgot password?"
+
+# LLM reasons on text, not image
+# Much cheaper, often more reliable
+```
+
+**VibePilot Application:**
+
+| Current Approach | Proposed Approach | Impact |
+|-----------------|-------------------|--------|
+| Vision + browser-use | Accessibility tree + Playwright CLI | 10-50x token reduction |
+| Full page context | CLI command results | Faster, cheaper |
+| Screenshot analysis | Text-based DOM traversal | More reliable |
+
+**Implementation for Courier:**
+
+```yaml
+# Current: Vision-based
+task: C001
+courier:
+  platform: chatgpt-web
+  method: vision
+  steps:
+    - screenshot
+    - analyze_image: "find input field"
+    - click_coordinates: [x, y]
+  estimated_tokens: 5000 per step
+
+# Proposed: Accessibility tree
+task: C001
+courier:
+  platform: chatgpt-web
+  method: accessibility_tree
+  steps:
+    - snapshot: get DOM structure
+    - analyze_text: "button[ref=e21] 'New chat'"
+    - click: e21
+  estimated_tokens: 200 per step
+```
+
+**ROI Impact:**
+
+If courier processes 100 tasks/day:
+- Vision approach: 100 × 10 steps × 5,000 tokens = 5M tokens/day
+- Tree approach: 100 × 10 steps × 200 tokens = 200K tokens/day
+- **Savings: 4.8M tokens/day = ~$1.44/day (DeepSeek pricing)**
+- Annual savings: ~$525
+
+Plus: Faster execution (no image encoding/decoding).
+
+---
+
+### Ephemeral Agents Architecture
+
+**User's Vision (Clarified):**
+
+```
+Task Lifecycle:
+1. Task created (Planner)
+2. Agent spawned (Runner/Courier)
+3. Task executed → Output delivered
+4. Agent goes INACTIVE (not destroyed)
+5. Supervisor validates output
+6. Tester tests output
+7. Merge to slice branch
+8. Agent remains dormant for potential fixes
+
+If task needs revision:
+- Reactivate same agent
+- Already has context
+- Faster than cold start
+
+Key: Agents aren't destroyed, just inactive
+```
+
+**Benefits of This Approach:**
+
+1. **Resource Efficiency:**
+   - Agent process/container suspended when inactive
+   - No compute cost during dormant period
+   - Reactivation faster than cold start
+
+2. **Context Preservation:**
+   - Agent remembers task context
+   - Revisions don't need full re-explanation
+   - Branch state preserved
+
+3. **Debugging:**
+   - Can inspect inactive agent state
+   - Understand why task failed
+   - Resume from exact point of failure
+
+4. **Cost Optimization:**
+   - Pay only for active execution time
+   - Storage cost minimal vs. compute
+
+**Implementation Pattern:**
+
+```python
+class EphemeralAgent:
+    def __init__(self, task_id):
+        self.task_id = task_id
+        self.state = 'spawning'
+        self.context = load_task_context(task_id)
+    
+    def execute(self):
+        self.state = 'active'
+        result = self.run_task()
+        self.state = 'inactive'  # Not destroyed!
+        return result
+    
+    def reactivate_for_revision(self, feedback):
+        self.state = 'active'
+        result = self.revise(feedback)
+        self.state = 'inactive'
+        return result
+    
+    def hibernate(self):
+        """Save state, release compute resources"""
+        checkpoint_state()
+        release_compute()
+        self.state = 'dormant'
+    
+    def wake(self):
+        """Restore from checkpoint"""
+        restore_compute()
+        load_checkpoint()
+        self.state = 'inactive'  # Ready for activation
+```
+
+**Contrast with Dan's Approach:**
+
+| Aspect | Dan's Agents | VibePilot (Future) |
+|--------|--------------|-------------------|
+| **Lifetime** | Single story execution | Task + revision cycles |
+| **State** | Destroyed after | Inactive/dormant |
+| **Reactivation** | Full respawn | Warm resume |
+| **Context** | Lost | Preserved |
+| **Resource** | Released immediately | Suspended, can wake |
+
+---
+
+### Branch Strategy: Task → Slice → Main
+
+**User's Workflow:**
+
+```
+Task Execution Flow:
+1. Task T001 created
+2. Branch: feature/T001-task-name
+3. Agent executes → Output delivered
+4. Supervisor validates output vs. expected
+5. Tester tests output only (not whole system)
+6. If pass: Merge to slice branch (e.g., auth-module)
+7. When all tasks in slice complete: Test module
+8. If module tests pass: Merge to main
+```
+
+**Benefits:**
+
+1. **Isolation:**
+   - Task branch = isolated changes
+   - Slice branch = integrated module
+   - Main = always stable
+
+2. **Parallel Development:**
+   - Multiple tasks in same slice can proceed in parallel
+   - No blocking until module integration
+
+3. **Early Testing:**
+   - Task-level testing (fast)
+   - Module-level testing (comprehensive)
+   - Main always passes
+
+4. **Rollback Granularity:**
+   - Can revert single task
+   - Can revert entire slice
+   - Main never broken
+
+**Implementation:**
+
+```bash
+# Task branch
+git checkout -b task/T001-add-login-form
+# ... work ...
+git commit -m "T001: Add login form"
+
+# Merge to slice when task passes
+git checkout slice/auth-module
+git merge task/T001-add-login-form
+
+# When all auth tasks done, test slice
+git checkout slice/auth-module
+npm test  # module-level tests
+
+# Merge to main when slice passes
+git checkout main
+git merge slice/auth-module
+```
+
+---
+
+### 95% Confidence Strategy
+
+**User's Goal:** One-shot success on weakest models with lowest limits
+
+**How to Achieve This:**
+
+1. **Task Decomposition (Planner):**
+   ```
+   Big task (low confidence):
+   "Build auth system"
+   
+   Decomposed (high confidence):
+   - T001: Create login form UI
+   - T002: Implement password validation
+   - T003: Create session management
+   - T004: Add logout functionality
+   ```
+
+2. **Prompt Engineering:**
+   - Zero ambiguity
+   - Explicit file names
+   - Expected output defined
+   - "DO NOT" list (scope boundaries)
+
+3. **Context Isolation:**
+   - Task agent sees ONLY relevant code
+   - No full codebase (confuses weak models)
+   - Dependency summaries, not full files
+
+4. **Simple Tasks for Weak Models:**
+   ```
+   Weak model (Gemini Flash free tier):
+   - "Create a button with label 'Submit'"
+   - Confidence: 99%
+   
+   Strong model (Kimi/GLM):
+   - "Refactor auth module for better security"
+   - Confidence: 95%
+   ```
+
+5. **Internal Routing:**
+   ```
+   Routing Logic:
+   IF task.has_code_dependencies(4+):
+       route_to = internal_cli  # Kimi/GLM
+   ELSE IF task.is_simple_web_task:
+       route_to = courier  # Free web platform
+   ELSE:
+       route_to = cheapest_available
+   ```
+
+**Token Cost Optimization:**
+
+| Model | RPM | Cost/1M tokens | Use For |
+|-------|-----|----------------|---------|
+| Gemini Flash (free) | 10 | $0 | Simple web tasks |
+| GPT-4o web (free) | - | $0 | Complex reasoning |
+| Kimi CLI | ∞ | $0.02* | Code tasks |
+| GLM (OpenCode) | ∞ | $0 | Internal governance |
+
+*Kimi promo price
+
+---
+
+### Audio/Notification System (Dan's Feature)
+
+**Dan's Implementation:**
+- Agent has audio output
+- Updates user on progress
+- "Task complete, 3 files created"
+
+**VibePilot Application:**
+
+Since target includes non-devs, audio notifications make sense:
+
+```python
+class VibesNotifications:
+    def on_task_complete(self, task):
+        message = f"Task {task.id} complete. {task.files_created} files created."
+        self.speak(message)  # TTS
+        self.send_digest_email()
+    
+    def on_council_decision(self, decision):
+        if decision.requires_human:
+            self.speak("Council needs your input on project direction.")
+            self.send_urgent_notification()
+```
+
+**Implementation Options:**
+1. **Browser TTS:** Web Speech API
+2. **Mobile Push:** PWA notifications
+3. **Email:** Daily digest + urgent alerts
+4. **SMS:** Critical only
+
+---
+
+### Summary: Key Learnings from Dan
+
+**For VibePilot's Future:**
+
+1. **Token Efficiency (Critical):**
+   - Adopt accessibility tree for courier
+   - 10-50x token reduction
+   - Faster execution
+   - Fits ROI optimization goal
+
+2. **Ephemeral Agents:**
+   - Agents inactive (not destroyed) after task
+   - Fast reactivation for revisions
+   - Context preserved
+   - Resource efficient
+
+3. **Branch Strategy:**
+   - Task branch → Slice branch → Main
+   - Parallel development
+   - Always-stable main
+   - Granular rollback
+
+4. **95% Confidence:**
+   - Decompose to atomic tasks
+   - Zero-ambiguity prompts
+   - Context isolation
+   - Route simple tasks to weak models
+
+5. **Notifications:**
+   - Audio updates (for non-devs)
+   - Multi-channel (email, push, SMS)
+   - Progress awareness without dashboard
+
+**Differentiation from Dan:**
+- Dan = Dev tool (CLI, audio for devs)
+- VibePilot = Universal tool (Web for everyone, audio for accessibility)
+- Dan = Testing focus
+- VibePilot = Full development lifecycle
+
+**Complementary Use:**
+VibePilot can USE Dan's Bowser for courier layer while maintaining broader orchestration and governance.
+
+---
+
+*This addendum incorporates user's clarifications about VibePilot's future direction and extracts actionable learnings from Dan's implementation.*
