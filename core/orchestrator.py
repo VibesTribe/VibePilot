@@ -787,7 +787,7 @@ class ConcurrentOrchestrator:
                         "result": result,
                         "tokens_in": result.get("prompt_tokens", 0),
                         "tokens_out": result.get("completion_tokens", 0),
-                        "tokens_total": result.get("tokens", 0),
+                        "tokens_used": result.get("tokens", 0),
                     }
                 ).execute()
 
