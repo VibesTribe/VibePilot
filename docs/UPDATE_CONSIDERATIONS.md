@@ -12,7 +12,121 @@
 
 ---
 
-# 2026-02-15 Considerations (New)
+# 2026-02-18 Considerations (New)
+
+**Source:** Kimi research of YouTube video "Qwen 3.5" (https://www.youtube.com/watch?v=X6mL3cdPiCg)
+
+---
+
+## Consideration 17: Qwen 3.5 Visual Agentic Courier Driver
+
+**From:** Qwen 3.5 release video analysis (Kimi research, 2026-02-18)
+
+**Summary:**
+Qwen 3.5 (Alibaba, Feb 16 2026) has native visual agentic capabilities - can see screens, click elements, execute multi-step workflows. 397B params, 17B active (MoE), Apache 2.0 license.
+
+**Key Features:**
+- Native multimodal: text, images, video, UI screenshots in one model
+- Visual agentic: recognizes on-screen elements, executes workflows
+- 60% cheaper, 8.6x faster than predecessor
+- 1M token context (Plus version)
+- Apache 2.0 open source
+
+**Relevance to VibePilot:**
+- Could solve courier's biggest challenge: robust UI interaction
+- Screenshots become first-class input, not debugging aid
+- Eliminates fragile selectors - model SEE the button, not finds by CSS
+
+**Impact on Courier:**
+- Current approach: browser-use with Gemini/DeepSeek driver
+- With Qwen 3.5: Native screenshot understanding, click-by-vision
+- Task: "Go to ChatGPT, find the input box visually, paste prompt, wait, copy response"
+
+**Pros:**
+- Directly addresses courier robustness
+- Open source = no vendor lock-in
+- Apache 2.0 = commercial use OK
+- Could run locally or via API
+
+**Cons:**
+- New model, needs evaluation
+- May require API setup (Qwen via Alibaba Cloud or OpenRouter)
+- Visual understanding needs testing on actual web platforms
+
+**Priority:** HIGH - Directly solves courier LLM driver issue
+
+**Decision:** PENDING - Evaluate Qwen 3.5 API access, test visual capabilities
+
+---
+
+## Consideration 18: Dual Thinking Modes for Routing
+
+**From:** Qwen 3.5 video - explicit "thinking" vs "fast" modes
+
+**Summary:**
+Qwen 3.5 has explicit modes: thinking (reasoning), fast (quick response), auto (adaptive).
+
+**Relevance to VibePilot:**
+- Tasks could specify depth: research gets thinking mode, simple gets fast mode
+- Cost optimization: fast mode = cheaper
+- Extends Q/W/M routing to include depth dimension
+
+**Impact:**
+- `tasks.routing_flag` could extend: `Q-fast`, `Q-reasoning`, `W-fast`, `W-reasoning`
+- Orchestrator routes simple tasks to fast mode, complex to thinking
+
+**Priority:** MEDIUM - Cost optimization, not critical path
+
+**Decision:** PENDING - Consider when adding Qwen 3.5 to model registry
+
+---
+
+## Consideration 19: MoE Cost Model for ROI
+
+**From:** Qwen 3.5 video - Mixture-of-Experts architecture
+
+**Summary:**
+Qwen 3.5 uses 397B total params but only activates 17B per token. Large-model intelligence at small-model cost.
+
+**Relevance to VibePilot:**
+- ROI tracking should weight by ACTIVE parameters, not total
+- Routing could prefer MoE models for cost-sensitive tasks
+- New metric: "intelligence per dollar" based on active params
+
+**Impact:**
+- `config/models.json`: Add `active_params` field
+- ROI calculator: Weight cost by active params
+- Orchestrator: Prefer MoE for cost efficiency
+
+**Priority:** MEDIUM - Enhances ROI tracking
+
+**Decision:** PENDING - Add when implementing model metadata v3
+
+---
+
+## Consideration 20: Native MCP Support
+
+**From:** Qwen 3.5 video - built-in MCP tool use
+
+**Summary:**
+Qwen 3.5 has native MCP (Model Context Protocol) support for tool use.
+
+**Relevance to VibePilot:**
+- VibePilot has M (MCP-only) routing flag - Qwen 3.5 could be first native M-tier model
+- No wrapper logic needed
+- Task packets already support tool specifications
+
+**Impact:**
+- Add Qwen 3.5 to `config/models.json` with `mcp_native: true`
+- Eligible for M-tier tasks immediately
+
+**Priority:** MEDIUM - Adds capable model, validates M-tier architecture
+
+**Decision:** PENDING - Test MCP capabilities when API available
+
+---
+
+# 2026-02-15 Considerations (Processed)
 
 **Source 1:** Vibeflow prototype review (github.com/VibesTribe/vibeflow)
 **Source 2:** Surya's "Agent Engineering 2026" video via Gemini analysis

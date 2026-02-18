@@ -8,12 +8,25 @@
 
 ### Remaining Work
 
-1. Fix LLM adapter for browser-use (interface compatibility)
+1. ~~Fix LLM adapter for browser-use~~ ✅ DONE - Interface works, quota is the issue
 2. Update orchestrator to use new config structure
 3. Wire courier → orchestrator routing
-4. Test full task execution via courier
+4. Test full task execution via courier (needs LLM driver quota)
 5. Apply schema_intelligence.sql to Supabase
 6. Implement credit sync after API calls
+7. Evaluate Qwen 3.5 as visual agentic courier driver (Consideration 17)
+
+### Courier Status (Updated 2026-02-18)
+
+| Component | Status |
+|-----------|--------|
+| Browser automation | ✅ Works |
+| browser-use Agent | ✅ Works |
+| LLM adapter (ChatGoogle) | ✅ Works |
+| Gemini driver | ⚠️ Quota exhausted |
+| DeepSeek driver | ⚠️ Needs credit |
+
+**Courier is WORKING** - only blocker is LLM driver quota.
 
 ### No-Auth Platform URLs
 
@@ -36,6 +49,57 @@
 - Kimi K2.5 can run up to 100 parallel sub-agents
 - Subscription sitting unused - could be leveraged for courier work
 - Moonshot API is ~95% cheaper than subscription ($0.60/1M tokens)
+
+---
+
+# 2026-02-18 (Session 11)
+
+## Session Summary
+
+### Major Work
+
+1. **Kimi Video Research** — Analyzed Qwen 3.5 video for VibePilot insights
+   - Discovered visual agentic capabilities (HIGH priority for courier)
+   - Dual thinking modes for routing optimization
+   - MoE cost model for ROI tracking
+   - Native MCP support validates M-tier architecture
+
+2. **Courier Verification** — Confirmed courier is technically working
+   - Browser automation: ✅ Navigates to chatgate.ai
+   - browser-use Agent: ✅ Starts, loads pages
+   - LLM adapter: ✅ ChatGoogle creates successfully
+   - Blocker: LLM driver quota (Gemini exhausted, DeepSeek needs credit)
+
+3. **New Considerations Added** (docs/UPDATE_CONSIDERATIONS.md)
+   - Consideration 17: Qwen 3.5 Visual Agentic Courier Driver (HIGH)
+   - Consideration 18: Dual Thinking Modes for Routing (MEDIUM)
+   - Consideration 19: MoE Cost Model for ROI (MEDIUM)
+   - Consideration 20: Native MCP Support (MEDIUM)
+
+### Key Findings
+
+| Finding | Impact |
+|---------|--------|
+| Courier code works | No adapter fix needed, just quota |
+| Gemini quota exhausted | Wait tomorrow or use different driver |
+| DeepSeek needs credit | $5 would last long time at $0.28/1M |
+| Qwen 3.5 has visual agentic | Could solve courier robustness |
+
+### Files Updated
+
+```
+vibepilot/
+├── CURRENT_STATE.md (UPDATED) - Courier status section
+├── CHANGELOG.md (UPDATED) - This entry
+└── docs/UPDATE_CONSIDERATIONS.md (UPDATED) - Added 4 new considerations
+```
+
+### Next Session Priorities
+
+1. Add credit to DeepSeek OR wait for Gemini quota reset
+2. Test courier end-to-end with working driver
+3. Update orchestrator to use new config structure
+4. Evaluate Qwen 3.5 API for courier driver
 
 ---
 
