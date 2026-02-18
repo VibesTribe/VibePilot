@@ -797,6 +797,22 @@ class ConcurrentOrchestrator:
         """Dispatch a task to an available runner."""
         task_id = task["id"]
 
+        attempts = task.get("attempts", 0)
+        max_attempts = task.get("max_attempts", 3)
+        if attempts >= max_attempts:
+            self.logger.warning(
+                f"Task {task_id[:8]} at max attempts ({attempts}/{max_attempts}), skipping dispatch"
+            )
+            if task.get("status") != "escalated":
+                db.table("tasks").update(
+                    {
+                        "status": "escalated",
+                        "assigned_to": None,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                ).eq("id", task_id).execute()
+            return False
+
         runner_id = self.runner_pool.get_best_for_task(task)
         if not runner_id:
             self.logger.warning(f"No runner available for task {task_id[:8]}")
