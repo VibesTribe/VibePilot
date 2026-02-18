@@ -802,10 +802,17 @@ class ConcurrentOrchestrator:
                         }
                     ).eq("id", task_id).execute()
                 else:
+                    error_code = result.get("error_code")
+                    if error_code in ["QUOTA_EXHAUSTED", "CREDIT_NEEDED"]:
+                        self._handle_runner_error(
+                            runner_id,
+                            error_code,
+                            retry_after_seconds=result.get("retry_after_seconds"),
+                        )
                     self.task_manager.handle_failure(
                         task_id,
                         result.get("error", "Unknown error"),
-                        error_code=result.get("error_code"),
+                        error_code=error_code,
                     )
 
                 return result
@@ -852,19 +859,75 @@ class ConcurrentOrchestrator:
         try:
             runner = get_runner(runner_type)
             result = runner.execute(task_packet)
+            errors = result.get("errors", [])
+            error_info = errors[0] if errors else {}
             return {
                 "success": result.get("status") == "success",
                 "output": result.get("output"),
-                "error": result.get("errors", [{}])[0].get("message")
-                if result.get("errors")
-                else None,
+                "error": error_info.get("message") if errors else None,
+                "error_code": error_info.get("code") if errors else None,
+                "retry_after_seconds": result.get("metadata", {}).get(
+                    "retry_after_seconds"
+                ),
                 "tokens": result.get("metadata", {}).get("tokens_in", 0)
                 + result.get("metadata", {}).get("tokens_out", 0),
                 "prompt_tokens": result.get("metadata", {}).get("tokens_in", 0),
                 "completion_tokens": result.get("metadata", {}).get("tokens_out", 0),
             }
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": str(e), "error_code": "RUNNER_EXCEPTION"}
+
+    def _handle_runner_error(
+        self, runner_id: str, error_code: str, retry_after_seconds: int = None
+    ):
+        """
+        Handle runner errors that require status changes.
+
+        - QUOTA_EXHAUSTED (429): Set cooldown with countdown timer
+        - CREDIT_NEEDED (402): Pause and flag for review ($ icon)
+        """
+        if error_code == "QUOTA_EXHAUSTED":
+            retry_minutes = (retry_after_seconds or 3600) // 60
+            reason = "quota_exhausted"
+
+            if self.cooldown_manager:
+                self.cooldown_manager.set_cooldown(
+                    runner_id, minutes=retry_minutes, reason=reason
+                )
+
+            try:
+                expires_at = datetime.utcnow() + timedelta(minutes=retry_minutes)
+                db.table("models").update(
+                    {
+                        "status": "paused",
+                        "status_reason": reason,
+                        "cooldown_expires_at": expires_at.isoformat(),
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                ).eq("id", runner_id).execute()
+                self.logger.info(
+                    f"Model {runner_id} paused for quota exhaustion, resumes in {retry_minutes}m"
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to update model status: {e}")
+
+        elif error_code == "CREDIT_NEEDED":
+            reason = "credit_needed"
+
+            try:
+                db.table("models").update(
+                    {
+                        "status": "paused",
+                        "status_reason": reason,
+                        "cooldown_expires_at": None,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                ).eq("id", runner_id).execute()
+                self.logger.warning(
+                    f"Model {runner_id} paused - CREDIT NEEDED (flagged for review)"
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to update model status: {e}")
 
     def _check_completed_futures(self):
         """Check for completed task futures."""
