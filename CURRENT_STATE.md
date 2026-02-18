@@ -11,9 +11,12 @@
 
 ---
 
-**Last Updated:** 2026-02-18 20:00 UTC
+**Last Updated:** 2026-02-18 20:30 UTC
 **Updated By:** GLM-5 (Session 14: Foundation redesign)
 **Session Focus:** Fixing the entire foundation - data model, pipeline flow, orchestrator
+
+**Schema Location:** `docs/supabase-schema/` (all SQL files)
+**Awaiting:** User to run `001_data_model_redesign.sql` in Supabase SQL Editor
 
 ---
 
@@ -96,12 +99,15 @@ The `models` table conflates everything:
 |----------|---------|
 | `docs/DATA_MODEL_REDESIGN.md` | Full schema redesign plan |
 | `docs/rate_limits/gemini_api_free_tier.json` | Gemini limits researched by Kimi |
+| `docs/supabase-schema/001_data_model_redesign.sql` | NEW - SQL for new tables |
+| `scripts/populate_new_schema.py` | Script to populate tables from config |
 
 ## What We Cleaned Up
 
-- Benched ghost models not in RUNNER_REGISTRY (gpt-4o, claude-*, opencode, glm-5, deepseek-reasoner, etc.)
-- Unbenched kimi-k2.5 (the actual Kimi model, should be active)
-- Updated AGENTS.md to include WHAT_WHERE.md
+- Benched ghost models not in RUNNER_REGISTRY
+- Unbenched kimi-k2.5 (the actual Kimi model)
+- Updated AGENTS.md: user constraints (no click/copy/paste), OpenCode context
+- Consolidated schema files: removed duplicate `supabase/migrations/`, kept `docs/supabase-schema/`
 
 ---
 
@@ -123,27 +129,30 @@ The `models` table conflates everything:
 
 # NEXT STEPS (In Order)
 
-## 1. Data Model Redesign (In Progress)
+## 1. Data Model Redesign (Awaiting User Action)
 
-**Status:** Design complete, implementation pending
+**Status:** SQL written, committed to GitHub, waiting for user to run in Supabase
 
-See `docs/DATA_MODEL_REDESIGN.md` for full plan.
+**File:** `docs/supabase-schema/001_data_model_redesign.sql`
+
+**To Apply:**
+1. Open GitHub: VibePilot repo → docs/supabase-schema/ → 001_data_model_redesign.sql
+2. Copy SQL content
+3. Supabase Dashboard → SQL Editor → Paste → Run
+4. Confirm to GLM that tables created
 
 **New Tables:**
 ```
-models (AI capabilities only)
+models_new (AI capabilities only)
 tools (interfaces: opencode, kimi-cli, courier)
 access (how we reach models, limits, usage, learning)
-platforms (web destinations - keep existing)
 task_history (learning from every task)
 ```
 
-**Migration:**
-1. Create new tables (keep old as backup)
-2. Populate from config files
-3. Update orchestrator
-4. Wire pipeline flow
-5. Test end-to-end
+**After Tables Created:**
+- Run `python scripts/populate_new_schema.py` to fill from config files
+- Update orchestrator to use new schema
+- Test routing works
 
 ## 2. Pipeline Auto-Flow
 
