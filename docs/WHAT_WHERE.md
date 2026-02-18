@@ -158,7 +158,17 @@ WEB_PLATFORMS = {
 
 ## Database Schemas
 
-**Location:** `supabase/migrations/`
+**Location:** `supabase/migrations/` (committed to GitHub)
+
+**TO APPLY SCHEMAS:**
+1. Wait for file to be committed to GitHub
+2. Open GitHub: https://github.com/VibesTribe/VibePilot/tree/main/supabase/migrations
+3. Copy SQL content from file
+4. Go to Supabase Dashboard → SQL Editor
+5. Paste and Run
+
+**DO NOT:** Try to click links in opencode output (user cannot click)
+**ALWAYS:** Commit schema files to git so user can access from GitHub
 
 | File | What It Adds |
 |------|--------------|
@@ -167,11 +177,7 @@ WEB_PLATFORMS = {
 | `schema_v1.4_roi_enhanced.sql` | tokens_in/out, courier tracking, ROI functions |
 | `schema_intelligence.sql` | Model/platform intelligence, weekly reports |
 | `schema_performance_fix.sql` | Index fixes for Supabase warnings |
-
-**To apply:**
-1. Go to Supabase → SQL Editor
-2. Copy from GitHub: `supabase/migrations/schema_*.sql`
-3. Paste and Run
+| `001_data_model_redesign.sql` | NEW: models_new, tools, access, task_history tables |
 
 ---
 
