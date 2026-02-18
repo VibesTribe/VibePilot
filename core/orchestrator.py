@@ -666,7 +666,7 @@ class ConcurrentOrchestrator:
         can_internal = False
         can_mcp = False
 
-        for runner_id, runner in self.runners.items():
+        for runner_id, runner in self.runner_pool.runners.items():
             capability = runner.get("routing_capability", ["web"])
             if "web" in capability:
                 can_web = True
@@ -788,7 +788,6 @@ class ConcurrentOrchestrator:
                         "tokens_in": result.get("prompt_tokens", 0),
                         "tokens_out": result.get("completion_tokens", 0),
                         "tokens_total": result.get("tokens", 0),
-                        "duration_seconds": int(duration_ms / 1000),
                     }
                 ).execute()
 

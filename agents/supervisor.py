@@ -217,7 +217,7 @@ class SupervisorAgent:
         db.table("tasks").update(
             {
                 "status": "testing",
-                "test_type": test_type,
+                
                 "updated_at": datetime.utcnow().isoformat(),
             }
         ).eq("id", task_id).execute()
@@ -227,7 +227,7 @@ class SupervisorAgent:
         return {
             "success": True,
             "task_id": task_id,
-            "test_type": test_type,
+            
             "next": f"tester_{test_type}",
         }
 
