@@ -1,92 +1,60 @@
 #!/usr/bin/env python3
-"""Get Raindrop OAuth token - run this first, then visit the URL."""
+"""Get Raindrop OAuth token - uses correct API endpoint and JSON format."""
 
-import http.server
-import socketserver
-import json
-from urllib.parse import urlparse, parse_qs
-from pathlib import Path
 import requests
+import json
+from pathlib import Path
 
 CLIENT_ID = "6995298e703bf1e11e73890a"
 CLIENT_SECRET = "4b698b0b-6ce6-469d-aa4f-aff29a75f0ec"
 TOKEN_FILE = Path(__file__).parent / '.raindrop_token.json'
 
-class Handler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        parsed = urlparse(self.path)
-        query = parse_qs(parsed.query)
-        
-        if 'code' in query:
-            code = query['code'][0]
-            print(f"\n[OK] Got authorization code: {code[:20]}...")
-            
-            # Exchange for token
-            print("[...] Exchanging for access token...")
-            resp = requests.post(
-                'https://api.raindrop.io/rest/v1/oauth/access_token',
-                data={
-                    'grant_type': 'authorization_code',
-                    'client_id': CLIENT_ID,
-                    'client_secret': CLIENT_SECRET,
-                    'code': code,
-                    'redirect_uri': 'http://localhost:8080/callback'
-                }
-            )
-            
-            if resp.ok:
-                data = resp.json()
-                token_data = {
-                    'access_token': data['access_token'],
-                    'refresh_token': data.get('refresh_token'),
-                    'expires': data.get('expires', 'never'),
-                    'saved_at': json.dumps({})
-                }
-                
-                with open(TOKEN_FILE, 'w') as f:
-                    json.dump(token_data, f, indent=2)
-                
-                print(f"[OK] Token saved to {TOKEN_FILE}")
-                print(f"[OK] Access token: {data['access_token'][:30]}...")
-                
-                # Success response
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(b"""
-                    <html><body style="font-family: Arial; text-align: center; padding: 50px;">
-                    <h1>SUCCESS!</h1>
-                    <p>Authorization complete. Token saved.</p>
-                    <p>You can close this window and return to the terminal.</p>
-                    </body></html>
-                """)
-            else:
-                print(f"[ERROR] Token exchange failed: {resp.text}")
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(f"Error: {resp.text}".encode())
-        else:
-            self.send_response(400)
-            self.end_headers()
-            self.wfile.write(b"No code received")
+print("="*60)
+print("Raindrop Token Exchange")
+print("="*60)
+print()
+print("IMPORTANT: The authorization code expires in ~60 seconds!")
+print("Paste the code immediately after getting it from the browser.")
+print()
+
+code = input("Authorization code from URL: ").strip()
+
+if not code:
+    print("Error: No code provided")
+    exit(1)
+
+print("\n[...] Exchanging code for token...")
+
+# Use the correct v1 endpoint with JSON format
+resp = requests.post(
+    "https://api.raindrop.io/v1/oauth/access_token",
+    headers={"Content-Type": "application/json"},
+    json={
+        "code": code,
+        "client_id": CLIENT_ID,
+        "redirect_uri": "https://vibestribe.github.io/vibeflow/",
+        "client_secret": CLIENT_SECRET,
+        "grant_type": "authorization_code"
+    }
+)
+
+print(f"\nStatus: {resp.status_code}")
+
+if resp.ok:
+    data = resp.json()
     
-    def log_message(self, format, *args):
-        pass
-
-print("="*60)
-print("Raindrop OAuth Token Generator")
-print("="*60)
-print()
-print("Step 1: Visit this URL in your browser:")
-print()
-print("https://raindrop.io/oauth/authorize?client_id=6995298e703bf1e11e73890a&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fcallback&response_type=code")
-print()
-print("Step 2: Authorize the app")
-print("Step 3: Token will be saved automatically")
-print()
-print("Waiting for authorization...")
-print("(Server running on http://localhost:8080)")
-print()
-
-with socketserver.TCPServer(("", 8080), Handler) as httpd:
-    httpd.serve_forever()
+    # Save token
+    with open(TOKEN_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+    
+    print(f"\n[OK] Token saved to {TOKEN_FILE}")
+    print(f"Access token: {data['access_token'][:30]}...")
+    print(f"Expires in: {data.get('expires_in', 'unknown')} seconds")
+    print(f"\nNext step:")
+    print("  python scripts/research/raindrop_oauth.py --collection 59987361 --days 7")
+else:
+    print(f"\n[ERROR] Failed: {resp.text}")
+    print("\nCommon causes:")
+    print("  - Code expired (get a fresh one)")
+    print("  - Code already used (get a fresh one)")
+    print("  - Wrong redirect_uri in app settings")
