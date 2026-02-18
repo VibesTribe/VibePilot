@@ -527,3 +527,602 @@ The research shows successful agent systems converge on similar patterns: layeri
 ---
 
 *Research conducted with focus on learning patterns rather than binary adoption decisions.*
+
+
+---
+
+## APPENDIX: Detailed Comparison - VibePilot vs. Indy Dev Dan
+
+### Why This Comparison Matters
+
+Indy Dev Dan's Bowser and VibePilot converged on similar 4-layer architectures independently. This comparison examines:
+1. Where we're architecturally aligned (validation)
+2. Where we differ (trade-offs)
+3. What we can learn from each other
+
+---
+
+### High-Level Architecture Comparison
+
+| Aspect | Indy Dev Dan (Bowser) | VibePilot | Implication |
+|--------|----------------------|-----------|-------------|
+| **Primary Use Case** | Browser automation & UI testing | Full software development lifecycle | VibePilot broader scope |
+| **Target User** | Developer (CLI-focused) | Developer + Stakeholder (web-focused) | VibePilot more accessible |
+| **Human Interface** | CLI commands | Natural language + Dashboard | VibePilot lower barrier |
+| **Execution Model** | Immediate (YAML stories) | Planned (PRD → Tasks) | Different workflows |
+| **State Backend** | Git + Temporal | Supabase + Git branches | VibePilot more queryable |
+| **Learning System** | None | Model performance tracking | VibePilot adaptive |
+| **Governance** | None | Council review | VibePilot safer |
+
+---
+
+### Layer-by-Layer Detailed Analysis
+
+#### Layer 1: Capability Layer
+
+**Dan's "Skills":**
+```yaml
+# Example: Playwright skill
+name: playwright-bowser
+description: Drive browser via CLI
+commands:
+  - playwright-cli open {url}
+  - playwright-cli click {ref}
+  - playwright-cli screenshot
+lines_of_code: ~20
+testable: Yes (run commands directly)
+```
+
+**VibePilot's "Runners":**
+```python
+# Example: Kimi CLI Runner
+class KimiCLIRunner:
+    def execute(self, task_packet):
+        # Full codebase access
+        # File operations
+        # Git operations
+        # Return structured result
+        pass
+    
+# Standardized interface for ALL runners
+interface Runner:
+    execute(task_packet) -> Result
+    health_check() -> Status
+lines_of_code: ~200+ per runner
+testable: Yes (via probe mode)
+```
+
+**Detailed Comparison:**
+
+| Attribute | Dan's Skills | VibePilot Runners |
+|-----------|--------------|-------------------|
+| **Complexity** | Simple (~20 LOC) | Complex (~200+ LOC) |
+| **Scope** | Single capability | Full execution environment |
+| **Context** | Minimal | Full (codebase, dependencies) |
+| **State** | Stateless | Stateful (branches, DB) |
+| **Interface** | CLI commands | Python class + contract |
+| **Isolation** | Process (browser session) | Git branch + context isolation |
+| **Examples** | Browser automation | Code gen, testing, research, browser |
+
+**Trade-offs:**
+
+**Dan Wins On:**
+- Simplicity: Easier to understand and modify
+- Speed: Faster to test and iterate
+- Focus: Does one thing extremely well
+
+**VibePilot Wins On:**
+- Generality: Handles any task type
+- Context: Full codebase awareness
+- Standardization: Same interface for all runners
+
+**What VibePilot Should Adopt:**
+Dan's skill definition is cleaner. We could simplify our runner interface:
+```python
+# Current - Complex
+runner.execute(task_packet, context, dependencies, vault)
+
+# Proposed - Simpler (Dan-style)
+runner.execute(task_yaml)  # Self-contained task definition
+```
+
+---
+
+#### Layer 2: Scale Layer
+
+**Dan's "Subagents":**
+```yaml
+# Example: QA Subagent
+name: bowser-qa-agent
+skill: playwright-bowser
+story_format: yaml
+steps:
+  - open: {url}
+  - execute: {actions}
+  - screenshot
+  - report
+isolation: Browser session + temp dir
+parallel: Yes (one agent per story)
+checkpoint: Screenshot after each step
+lifetime: Single story execution
+```
+
+**VibePilot's "Task Agents":**
+```python
+# Task Agent (via Runner)
+task_packet = {
+    "task_id": "T001",
+    "title": "Implement auth",
+    "prompt": "...",
+    "dependencies": ["T000"],
+    "expected_output": {...},
+    "routing_flag": "Q"  # internal only
+}
+
+# Execution
+runner.execute(task_packet)
+
+isolation: Git branch + context window
+parallel: Yes (orchestrator dispatches multiple)
+checkpoint: Git commits on branch
+lifetime: Through review cycle (execute → review → test → merge)
+```
+
+**Detailed Comparison:**
+
+| Attribute | Dan's Subagents | VibePilot Task Agents |
+|-----------|-----------------|----------------------|
+| **Definition** | YAML config | Task packet (JSON/YAML) |
+| **Complexity** | Simple (20 LOC) | Complex (full prompt packet) |
+| **Dependencies** | None | Explicit dependency chain |
+| **State** | Ephemeral (temp dir) | Durable (Git branch) |
+| **Review** | None (automated) | Human + Supervisor review |
+| **Retry** | None | 3 attempts with escalation |
+| **Parallelism** | Per story | Per task (when deps allow) |
+
+**Trade-offs:**
+
+**Dan Wins On:**
+- Speed: No planning or review overhead
+- Simplicity: Just spawn and run
+- Volume: Can run hundreds of stories quickly
+
+**VibePilot Wins On:**
+- Quality: Human review catches errors
+- Dependencies: Handles task chains
+- Resilience: Retry and escalation
+- Traceability: Full audit trail
+
+**Key Insight:**
+Dan optimizes for **testing speed** (run many tests fast).
+VibePilot optimizes for **development quality** (build right, not fast).
+
+**What VibePilot Should Adopt:**
+Dan's YAML story format for courier tasks:
+```yaml
+# Proposed: Courier task story
+task_id: C001
+platform: chatgpt-web
+story:
+  - navigate: https://chat.openai.com
+  - wait_for: login_status
+  - if_not_logged_in:
+      - error: "Platform requires auth"
+  - input: "{task_prompt}"
+  - submit
+  - wait: 30s
+  - capture: 
+      type: text
+      selector: ".response-content"
+      fallback: full_page
+```
+
+---
+
+#### Layer 3: Orchestration Layer
+
+**Dan's "Commands":**
+```bash
+# Example: /ui-review command
+function ui_review() {
+    stories = discover_yaml_stories("./stories")
+    results = []
+    
+    # Fan out
+    for story in stories:
+        agent = spawn_subagent("bowser-qa-agent", story)
+        results.append(agent.result)
+    
+    # Aggregate
+    report = aggregate_results(results)
+    return report
+}
+
+# Key characteristics:
+# - Single responsibility: Orchestrate browser tests
+# - No planning: Stories already defined
+# - Stateless: Reads YAML, spawns agents, collects
+# - Simple fan-out: One agent per story
+```
+
+**VibePilot's Split Orchestration:**
+```python
+# PLANNER (separate agent)
+def plan(prd):
+    """Break PRD into atomic tasks"""
+    tasks = []
+    for feature in prd.features:
+        subtasks = decompose(feature)
+        tasks.extend(subtasks)
+    
+    # Add dependencies
+    for task in tasks:
+        task.dependencies = identify_deps(task, tasks)
+        task.confidence = calculate_confidence(task)
+    
+    return Plan(tasks=tasks)
+
+# ORCHESTRATOR (Vibes)
+def orchestrate():
+    """Watch queue, route tasks, track performance"""
+    while True:
+        available_tasks = get_available_tasks()
+        
+        for task in available_tasks:
+            # Smart routing
+            runner = select_best_runner(
+                task=task,
+                model_performance=historical_data,
+                rate_limits=current_limits,
+                cost_budget=budget
+            )
+            
+            dispatch(task, runner)
+            
+        # Learn from results
+        update_model_performance()
+        sleep(60)
+
+# Key characteristics:
+# - Planning: Automatic task breakdown
+# - Intelligence: Learns which models work best
+# - Governance: Routes based on flags (Q/W/M)
+# - Resilience: Handles failures, retries
+# - Optimization: Cost/quality trade-offs
+```
+
+**Detailed Comparison:**
+
+| Attribute | Dan's Commands | VibePilot Planner+Orchestrator |
+|-----------|----------------|--------------------------------|
+| **Components** | Single command | Planner + Orchestrator (split) |
+| **Planning** | None (predefined YAML) | Automatic PRD → task breakdown |
+| **Intelligence** | None | Learns from success/failure |
+| **Governance** | None | Council review, routing flags |
+| **Routing** | Simple round-robin | Smart (performance-based) |
+| **Retry** | None | 3 attempts + escalation |
+| **Cost tracking** | None | ROI per model, per task type |
+| **Human involvement** | CLI invocation | Natural language interface |
+
+**Trade-offs:**
+
+**Dan Wins On:**
+- Simplicity: One orchestrator vs. two
+- Speed: No planning overhead
+- Predictability: Same execution every time
+
+**VibePilot Wins On:**
+- Autonomy: Plans from high-level goals
+- Adaptation: Gets smarter over time
+- Safety: Multiple review gates
+- Resilience: Handles edge cases
+
+**The Fundamental Difference:**
+
+Dan's workflow:
+```
+Human writes YAML story → Command spawns agent → Result
+
+Time: Minutes
+Planning: Manual (human writes YAML)
+Flexibility: Low (must follow story)
+```
+
+VibePilot workflow:
+```
+Human describes goal → Planner creates tasks → Council reviews → 
+Orchestrator dispatches → Agent executes → Supervisor validates → Merge
+
+Time: Hours/days
+Planning: Automatic
+Flexibility: High (handles unknowns)
+```
+
+**What This Means:**
+
+Dan is for **known, repeatable tasks** (test these 50 UI scenarios).
+VibePilot is for **unknown, creative tasks** (build this new feature).
+
+**What VibePilot Should Adopt:**
+
+For courier specifically (known web platforms), Dan's simpler orchestration might work better:
+```python
+# Proposed: Simplified courier orchestration
+def courier_orchestrate(task_stories):
+    """Dan-style for courier (known platforms)"""
+    results = []
+    for story in task_stories:
+        courier = spawn_courier(story.platform)
+        result = courier.execute(story.steps)
+        results.append(result)
+    return aggregate(results)
+```
+
+Keep complex orchestration for code tasks (unknown complexity).
+
+---
+
+#### Layer 4: Reusability Layer
+
+**Dan's "Justfile":**
+```justfile
+# CLI recipes
+ui-review:
+    claude /ui-review
+
+test-skill:
+    claude /playwright-bowser
+
+test-agent:
+    claude spawn bowser-qa-agent
+
+# Usage:
+# $ just ui-review
+# $ just test-skill
+
+Pros:
+- Fast for developers
+- Scriptable
+- Version controlled
+- Works in any terminal
+
+Cons:
+- Requires CLI comfort
+- No visual feedback
+- No historical tracking
+- No real-time updates
+```
+
+**VibePilot's "Vibes/Dashboard":**
+```
+Web interface:
+- Real-time task status
+- Model performance charts
+- ROI tracking
+- Natural language: "Hey Vibes, what's the status?"
+- Historical metrics (90 days)
+- Alerts and notifications
+
+Pros:
+- Accessible (web browser)
+- Real-time visibility
+- Non-technical friendly
+- Historical learning
+- Rich visualizations
+
+Cons:
+- Web stack complexity
+- Slower than CLI
+- Requires browser
+```
+
+**Detailed Comparison:**
+
+| Attribute | Dan's Justfile | VibePilot Dashboard |
+|-----------|----------------|---------------------|
+| **Interface** | CLI (terminal) | Web UI + Chat |
+| **Speed** | Fast (keyboard) | Medium (mouse/typing) |
+| **Accessibility** | Developers only | Anyone with browser |
+| **Real-time** | No (polls/logs) | Yes (WebSocket/SSE) |
+| **Historical** | No | Yes (90 days) |
+| **Natural language** | No | Yes |
+| **Mobile** | SSH only | Responsive web |
+| **Learning** | Static | Adaptive |
+
+**Trade-offs:**
+
+**Dan Wins On:**
+- Speed: CLI is faster for power users
+- Simplicity: No web stack to maintain
+- Scriptability: Easy to chain commands
+
+**VibePilot Wins On:**
+- Accessibility: Non-developers can use
+- Visibility: Rich real-time data
+- Learning: Adapts to usage patterns
+
+**What VibePilot Should Keep:**
+Our web-based approach is correct for broader audience.
+
+**What VibePilot Could Add:**
+CLI companion for power users:
+```bash
+$ vibepilot status          # Quick status check
+$ vibepilot task list       # List active tasks
+$ vibepilot task logs T001  # Tail task logs
+$ vibepilot models          # Show model performance
+```
+
+---
+
+### State Management Deep Dive
+
+**Dan's Approach (Git + Temporal + Filesystem):**
+
+```
+State Storage:
+- Git commits: Checkpoint after each agent step
+- Temporal: Durable workflow state
+- Filesystem: Screenshots, logs
+
+Query: "Show me results from yesterday"
+→ Search git log
+→ Look at timestamped directories
+→ Manual inspection
+
+Pros:
+- Simple to understand
+- Git = familiar
+- No external dependencies (except Temporal)
+
+Cons:
+- Hard to query
+- Git repo grows large
+- No analytics
+- Temporal adds complexity
+```
+
+**VibePilot Approach (Supabase + Git):**
+
+```
+State Storage:
+- Supabase: All task state, metrics, history
+- Git: Code changes only
+
+Query: "Show me all failed tasks this week"
+→ SQL: SELECT * FROM tasks WHERE status='failed' AND date > now() - 7 days
+
+Pros:
+- Queryable (SQL)
+- Scalable
+- Analytics built-in
+- Rich metrics
+
+Cons:
+- Network dependency
+- Database complexity
+```
+
+**Verdict:**
+
+VibePilot's approach is better for **observability and learning**.
+Dan's approach is better for **simplicity and offline use**.
+
+For production software development (VibePilot's goal), queryable state is essential.
+
+---
+
+### Where VibePilot Is Clearly Ahead
+
+1. **Autonomous Planning**
+   - Dan: Requires human-written YAML stories
+   - VibePilot: Breaks down high-level goals automatically
+   - Impact: VibePilot scales to unknown problems
+
+2. **Multi-Modal Support**
+   - Dan: Browser automation only
+   - VibePilot: Code, research, browser, testing
+   - Impact: VibePilot handles full SDLC
+
+3. **Governance & Safety**
+   - Dan: No review gates
+   - VibePilot: Council review, Supervisor validation
+   - Impact: VibePilot safer for production
+
+4. **Adaptive Learning**
+   - Dan: Static configuration
+   - VibePilot: Learns which models work best
+   - Impact: VibePilot improves over time
+
+5. **Human Interface**
+   - Dan: CLI (developer-only)
+   - VibePilot: Natural language + web (anyone)
+   - Impact: VibePilot accessible to stakeholders
+
+6. **Dependency Management**
+   - Dan: Independent stories
+   - VibePilot: Complex dependency chains
+   - Impact: VibePilot handles real projects
+
+---
+
+### Where Dan Is Clearly Ahead
+
+1. **Simplicity**
+   - Fewer moving parts
+   - Easier to debug
+   - Faster to set up
+
+2. **Token Efficiency**
+   - Accessibility tree > vision
+   - CLI commands > full context
+   - We should adopt this for courier
+
+3. **Speed for Known Tasks**
+   - No planning overhead
+   - Immediate execution
+   - Better for testing scenarios
+
+4. **Focus**
+   - Does browser automation extremely well
+   - Purpose-built tooling
+   - No scope creep
+
+5. **CLI Power**
+   - Fast for power users
+   - Easy to script
+   - Terminal-native
+
+---
+
+### Synthesis: The Sweet Spot
+
+**Dan and VibePilot serve different use cases:**
+
+| Use Case | Best Tool |
+|----------|-----------|
+| "Test these 50 UI scenarios" | Dan/Bowser |
+| "Build this new feature" | VibePilot |
+| "Automate my browser workflows" | Dan/Bowser |
+| "Develop a complete application" | VibePilot |
+| "Run daily regression tests" | Dan/Bowser |
+| "Ship a product from idea" | VibePilot |
+
+**They converge on architecture because both solve "how to orchestrate AI agents":**
+- Layer 1: Capability (do things)
+- Layer 2: Scale (do things in parallel)
+- Layer 3: Orchestrate (coordinate)
+- Layer 4: Interface (human interaction)
+
+**VibePilot should adopt from Dan:**
+1. Token efficiency (accessibility tree for courier)
+2. YAML story format for courier tasks
+3. CLI companion for power users
+
+**Dan would struggle with VibePilot's use case:**
+- No planning = can't handle "build me a feature"
+- No governance = risky for production code
+- No learning = doesn't improve over time
+
+---
+
+### Final Assessment
+
+**Validation:**
+Dan's architecture validates VibePilot's approach. When two independent systems converge on similar patterns, the patterns are likely sound.
+
+**Differentiation:**
+VibePilot's scope is broader (full SDLC), governance is stronger (Council), and interface is more accessible (natural language + web).
+
+**Learning Opportunities:**
+1. Courier implementation: Adopt Dan's token-efficient approach
+2. Task definition: Simplify with YAML stories where appropriate
+3. CLI companion: Add for power users
+
+**The architectures are complementary:**
+- Use Dan's approach for courier (browser automation)
+- Use VibePilot's approach for everything else (planning, governance, learning)
+
+---
+
+*This detailed comparison shows that VibePilot is architecturally sound while identifying specific improvements from Dan's implementation.*
