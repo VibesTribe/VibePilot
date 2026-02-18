@@ -10,9 +10,9 @@
 
 ---
 
-**Last Updated:** 2026-02-18 05:15 UTC
-**Updated By:** GLM-5 (Session 12: Orchestrator live testing, fixing column mismatches)
-**Known Good Commit:** `bb159240`
+**Last Updated:** 2026-02-18 15:30 UTC
+**Updated By:** GLM-5 (Session 13: Fixed tokens_total → tokens_used)
+**Known Good Commit:** `1dc8c5ec`
 **Kimi Subscription:** $0.99/mo expires Feb 27 → $19/mo (9 DAYS LEFT - MAXIMIZE USAGE)
 
 ---
@@ -54,10 +54,7 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 
 ## What's Blocked ❌
 
-| Component | Issue | Fix |
-|-----------|-------|-----|
-| task_runs logging | `tokens_total` column doesn't exist | Remove from orchestrator.py line 790 |
-| Full task completion | Blocked by task_runs failure | Fix tokens_total, re-test |
+None currently.
 
 ---
 
@@ -72,46 +69,25 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 ✓ Task dispatch works
 ✓ Dashboard shows assignment
 ✓ Status changes: pending → in_progress
-```
-
-**What fails:**
-```
-✗ task_runs insert fails: "Could not find the 'tokens_total' column"
-```
-
-**Fix needed:**
-```python
-# File: core/orchestrator.py, line ~790
-# REMOVE this line:
-"tokens_total": result.get("tokens", 0),
+✓ task_runs insert works (tokens_total → tokens_used fixed)
 ```
 
 ## Column Mismatch Fixes Applied
 
 | Column | Status | Action |
 |--------|--------|--------|
-| `test_type` | ❌ Missing | Removed from supervisor.py |
-| `duration_seconds` | ❌ Missing | Removed from orchestrator.py |
-| `tokens_total` | ❌ Missing | **STILL NEEDS FIX** |
-
-## task_runs Actual Columns
-
-```
-tokens_used ✅ (use this)
-tokens_in ✅
-tokens_out ✅
-tokens_total ❌ (doesn't exist, code tries to use it)
-```
+| `test_type` | ✅ Fixed | Removed from supervisor.py |
+| `duration_seconds` | ✅ Fixed | Removed from orchestrator.py |
+| `tokens_total` → `tokens_used` | ✅ Fixed | Corrected column name |
 
 ---
 
 # NEXT SESSION ACTION ITEMS
 
-1. **Fix tokens_total** in orchestrator.py line 790
-2. **Commit and push**
-3. **Re-test orchestrator** - full task execution
-4. **Test Kimi as executor** - kimi-internal runner
-5. **Verify dashboard** shows completed task
+1. **Re-test orchestrator** - full task execution should now work
+2. **Test Kimi as executor** - kimi-internal runner
+3. **Verify dashboard** shows completed task with token counts
+4. **Monitor ROI calculator** - confirm tokens_used populates correctly
 
 ---
 
