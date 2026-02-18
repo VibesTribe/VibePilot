@@ -745,10 +745,13 @@ Return a JSON object with:
 RUNNER_REGISTRY = {
     "kimi": KimiContractRunner,
     "kimi-cli": KimiContractRunner,
+    "kimi-internal": KimiContractRunner,
     "deepseek": DeepSeekContractRunner,
     "deepseek-chat": DeepSeekContractRunner,
     "gemini": GeminiContractRunner,
     "gemini-api": GeminiContractRunner,
+    "gemini-2.0-flash": GeminiContractRunner,
+    "gemini-2.5-flash": GeminiContractRunner,
     "courier": CourierContractRunner,
     "courier-huggingchat": lambda: CourierContractRunner("huggingchat"),
     "courier-chatgpt": lambda: CourierContractRunner("chatgpt"),

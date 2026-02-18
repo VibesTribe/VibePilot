@@ -57,19 +57,23 @@
       "id": "glm-5",
       "name": "GLM-5",
       "provider": "zhipu",
+      "access_type": "cli_subscription",
       "context_limit": 128000,
       "capabilities": ["text", "code"],
       "access_via": ["opencode"],
-      "notes": "Available via OpenCode subscription. No separate API key."
+      "strengths": ["reasoning", "planning", "architecture"],
+      "notes": "Available via OpenCode subscription. Text only, no browser. Good for internal tasks."
     },
     {
       "id": "kimi-internal",
       "name": "Kimi (Moonshot)",
       "provider": "moonshot",
+      "access_type": "cli_subscription",
       "context_limit": 200000,
-      "capabilities": ["text", "code"],
+      "capabilities": ["text", "code", "vision", "browser_control", "computer_use"],
       "access_via": ["kimi"],
-      "notes": "Available via Kimi CLI subscription. No separate API key."
+      "strengths": ["research", "code", "large_context", "multimodal", "parallel_agents"],
+      "notes": "CLI subscription. Multimodal with browser/computer use. Can run 100 parallel subagents. PRIORITY: Maximize usage, only 9 days left at $0.99."
     },
     {
       "id": "gpt-4o-mini",

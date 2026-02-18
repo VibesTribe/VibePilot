@@ -256,27 +256,69 @@ class RunnerPool:
         logger.info(f"Loaded {len(self.runners)} runners")
 
     def _load_from_config(self):
-        """Load runners from config/models.json."""
+        """
+        Load runners from config/models.json merged with database status.
+
+        Database is source of truth for: status, cooldown, pause reason
+        Config is source of truth for: capabilities, routing, cost type
+        """
         from core.config_loader import get_config_loader
 
         config = get_config_loader()
         models = config.get_models()
 
+        # Get database status for all models
+        db_status = {}
+        try:
+            res = (
+                db.table("models")
+                .select("id, status, status_reason, cooldown_expires_at, strengths")
+                .execute()
+            )
+            for m in res.data or []:
+                db_status[m["id"]] = m
+        except Exception as e:
+            logger.warning(f"Could not load model status from database: {e}")
+
         for model in models:
-            status = model.get("status", "active")
-            if status != "active":
+            model_id = model.get("id")
+
+            # Check database status first (overrides config)
+            db_info = db_status.get(model_id, {})
+            db_status_val = db_info.get("status", "active")
+
+            # Skip if database says paused/benched
+            if db_status_val in ("paused", "benched", "offline"):
+                reason = db_info.get("status_reason", "unknown")
+                logger.info(
+                    f"Skipping {model_id}: database status={db_status_val}, reason={reason}"
+                )
                 continue
 
-            model_id = model.get("id")
             access_type = model.get("access_type", "api")
+            capabilities = model.get("capabilities", [])
 
-            # Determine routing capabilities based on access type
+            # Determine routing capabilities
             # CLI/API runners have codebase access → can handle internal
-            # Web couriers have NO codebase access → only web-flagged tasks
-            if access_type in ("cli", "api", "cli_subscription"):
+            # Some internal runners ALSO have browser_control (Kimi) → can handle web
+            has_browser = "browser_control" in capabilities or "vision" in capabilities
+            has_codebase = access_type in ("cli", "api", "cli_subscription")
+
+            if has_codebase and has_browser:
                 routing_capability = ["internal", "web", "mcp"]
+            elif has_codebase:
+                routing_capability = ["internal", "mcp"]
             else:
                 routing_capability = ["web"]
+
+            # Determine cost category for scoring
+            # Subscription (sunk cost) > Free API > Paid API
+            if access_type == "cli_subscription":
+                cost_priority = 0  # Best - already paid, unlimited
+            elif model.get("cost_input_per_1k_usd", 0) == 0:
+                cost_priority = 1  # Free API
+            else:
+                cost_priority = 2  # Paid API - use sparingly
 
             self.runners[model_id] = {
                 "id": model_id,
@@ -284,12 +326,19 @@ class RunnerPool:
                 "platform": model.get("platform", model.get("provider", "unknown")),
                 "type": access_type,
                 "context_limit": model.get("context_limit", 32000),
-                "features": model.get("features", []),
+                "capabilities": capabilities,
+                "has_browser": has_browser,
+                "cost_priority": cost_priority,
                 "task_ratings": {},
                 "status": "active",
                 "routing_capability": routing_capability,
                 "config": model,
+                "strengths": db_info.get("strengths", model.get("strengths", [])),
             }
+
+            logger.debug(
+                f"Loaded {model_id}: routing={routing_capability}, browser={has_browser}, cost_priority={cost_priority}"
+            )
 
     def _load_from_database(self):
         """Load active models/runners from database (fallback)."""
@@ -376,6 +425,7 @@ class RunnerPool:
             return None
 
         # Score remaining runners
+        # Priority: browser capability (for web) > cost priority > success rate > strengths
         scored = []
         for runner_id in capable_runners:
             runner = self.runners[runner_id]
@@ -386,11 +436,28 @@ class RunnerPool:
                 total = ratings["success"] + ratings["fail"]
                 success_rate = ratings["success"] / total if total > 0 else 0.5
 
-            w1, w2, w3 = 0.3, 0.3, 0.4
+            # Cost priority: 0=subscription (best), 1=free API, 2=paid API
+            cost_priority = runner.get("cost_priority", 2)
+            cost_score = 1.0 - (cost_priority * 0.3)  # 1.0, 0.7, 0.4
+
+            # Browser capability bonus for web tasks
+            browser_bonus = 0.0
+            if routing_flag == "web" and runner.get("has_browser"):
+                browser_bonus = 0.5
+
+            # Strengths match
+            strengths = runner.get("strengths", [])
+            strength_score = 1.0 if task_type in strengths else 0.5
+
+            # Final score: weighted combination
+            # Browser capability for web > cost > success rate > strengths
+            w1, w2, w3, w4, w5 = 0.1, 0.3, 0.25, 0.15, 0.2
             score = (
                 w1 * (priority / 10)
-                + w2 * success_rate
-                + w3 * (1 if task_type in runner.get("strengths", []) else 0.5)
+                + w2 * cost_score
+                + w3 * success_rate
+                + w4 * strength_score
+                + w5 * (1.0 + browser_bonus)
             )
 
             scored.append((runner_id, score))
@@ -675,6 +742,11 @@ class ConcurrentOrchestrator:
             if "mcp" in capability:
                 can_mcp = True
 
+        self.logger.debug(
+            f"Runner capabilities: web={can_web}, internal={can_internal}, mcp={can_mcp}"
+        )
+        self.logger.debug(f"Active runners: {list(self.runner_pool.runners.keys())}")
+
         try:
             # Try using the RPC function first
             res = db.rpc(
@@ -704,13 +776,17 @@ class ConcurrentOrchestrator:
         tasks = []
         for task in res.data or []:
             if self.dependency_manager.can_run(task):
-                # Also filter by routing capability
                 routing_flag = task.get("routing_flag", "web")
+
                 if routing_flag == "web" and can_web:
                     tasks.append(task)
                 elif routing_flag == "internal" and can_internal:
                     tasks.append(task)
                 elif routing_flag == "mcp" and can_mcp:
+                    tasks.append(task)
+                elif routing_flag == "web" and can_internal:
+                    # FALLBACK: No courier available, use internal with browser capability
+                    # Kimi (subscription, multimodal) should pick up web tasks
                     tasks.append(task)
 
         return tasks
@@ -776,27 +852,45 @@ class ConcurrentOrchestrator:
                     tokens=result.get("tokens", 0),
                 )
 
-                db.table("task_runs").insert(
-                    {
-                        "task_id": task_id,
-                        "model_id": runner_id,
-                        "platform": self.runner_pool.runners.get(runner_id, {}).get(
-                            "platform"
-                        ),
-                        "status": "success" if result.get("success") else "failed",
-                        "result": result,
-                        "tokens_in": result.get("prompt_tokens", 0),
-                        "tokens_out": result.get("completion_tokens", 0),
-                        "tokens_used": result.get("tokens", 0),
-                    }
-                ).execute()
+                runner_info = self.runner_pool.runners.get(runner_id, {})
+                runner_type = runner_info.get("type", "api")
+
+                run_insert = (
+                    db.table("task_runs")
+                    .insert(
+                        {
+                            "task_id": task_id,
+                            "model_id": runner_id,
+                            "courier": runner_id.split("-")[0]
+                            if "-" in runner_id
+                            else runner_id,
+                            "platform": runner_info.get("platform", "unknown"),
+                            "status": "success" if result.get("success") else "failed",
+                            "result": result,
+                            "tokens_in": result.get("prompt_tokens", 0),
+                            "tokens_out": result.get("completion_tokens", 0),
+                            "tokens_used": result.get("tokens", 0),
+                        }
+                    )
+                    .execute()
+                )
+
+                # Calculate ROI for this run
+                if run_insert.data:
+                    run_id = run_insert.data[0].get("id")
+                    if run_id:
+                        try:
+                            db.rpc(
+                                "calculate_enhanced_task_roi", {"p_run_id": run_id}
+                            ).execute()
+                        except Exception as roi_err:
+                            self.logger.debug(f"ROI calculation skipped: {roi_err}")
 
                 if result.get("success"):
                     db.table("tasks").update(
                         {
                             "status": "review",
                             "result": result,
-                            "tokens_used": result.get("tokens", 0),
                             "updated_at": datetime.utcnow().isoformat(),
                         }
                     ).eq("id", task_id).execute()
