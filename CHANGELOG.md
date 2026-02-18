@@ -6,6 +6,37 @@
 
 ---
 
+# 2026-02-18 (Session 13)
+
+## Summary
+
+Fixed dashboard ROI display issues, smart orchestrator routing, and token tracking.
+
+### Dashboard Fixes (vibeflow repo)
+- **Header button** now shows `Tokens 24K` and `ROI $0.001661` (was just "ROI" text)
+- **ROI precision** - 6 decimals for values < $0.01 (was $0.00)
+- **Adapter fix** - removed `Math.round()` that destroyed precision
+- **Collapsible sections** - By Slice / By Model collapsed by default
+- **Model list CSS** - improved readability with flex layout
+
+### Orchestrator Improvements (vibepilot repo)
+- **Database status merge** - runners load paused/active from DB
+- **Subscription priority** - Kimi (subscription) > Free API > Paid API
+- **Web fallback** - web tasks go to internal agents with browser capability
+- **ROI calculation** - automatic after task_run insert
+- **Platform rates** - populated theoretical costs in platforms table
+
+### Commits
+- `647f1b69` - Fix ROI panel: collapsible sections, better model display
+- `cf33921c` - Fix: add roi prop to MissionHeader, preserve precision
+- `d590ddac` - Orchestrator: smart routing with DB status, subscription priority
+
+### Known Issues
+- USD/CAD toggle may need visibility check
+- Model list display could still need refinement
+
+---
+
 ### Remaining Work
 
 1. ~~Fix LLM adapter for browser-use~~ ✅ DONE - Interface works, quota is the issue
