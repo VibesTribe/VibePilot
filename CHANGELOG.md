@@ -1886,3 +1886,70 @@ source venv/bin/activate  # If venv exists, or recreate
 
 *Last updated: 2026-02-14 17:35 UTC*
 *Next entry: After next change*
+
+---
+
+# 2026-02-18 (Session 11-12)
+
+## Session Summary
+
+### Major Accomplishments
+
+1. **Planner Rewritten** - Full implementation using config/prompts/planner.md
+   - Analyzes PRD for slice boundaries
+   - Creates atomic tasks with full prompt_packets
+   - Validates prompt_packet is not empty (rejects if <200 chars)
+   - Auto-generates missing prompt_packets
+   - Writes to Supabase with correct structure
+
+2. **Dashboard Research Slice** - Deployed to main
+   - Research slices: Daily Research, Inquiry Research, Output Integration, Cost Tracking
+   - prompt_packet mapping: task.result.prompt_packet → packet.prompt
+   - Dashboard now shows full prompt content in task details
+
+3. **Orchestrator Testing** - Live dispatch working
+   - Tasks picked up from available queue
+   - Dispatched to gemini, deepseek, glm-5
+   - Dashboard shows live assignment
+
+### Issues Found and Fixed
+
+| Issue | Fix | Commit |
+|-------|-----|--------|
+| self.runners undefined | → self.runner_pool.runners | bb159240 |
+| test_type column missing | Removed from supervisor | bb159240 |
+| duration_seconds column missing | Removed from task_runs insert | bb159240 |
+
+### Issues Still To Fix
+
+| Issue | Fix |
+|-------|-----|
+| tokens_total column missing | Remove from orchestrator.py line 790 |
+
+### Token Counting
+
+- API models: Tracked via tokens_in, tokens_out
+- Web platforms: No token reporting (leave blank or estimate)
+
+### Files Created
+
+```
+vibepilot/
+├── SESSION_NOTES_2026-02-18.md (NEW)
+├── kimi_usage_log.md (NEW)
+├── config/researcher_context.md (NEW)
+├── config/templates/research_packet.json (NEW)
+└── research-considerations/ (branch - research output)
+```
+
+### Branch Status
+
+- vibepilot/main: Up to date
+- vibeflow/main: Has research slices + prompt_packet fix
+- feature/research-slice: Deleted (merged)
+
+### Next Session
+
+1. Fix tokens_total in orchestrator.py
+2. Test full task execution end-to-end
+3. Verify Kimi as research executor
