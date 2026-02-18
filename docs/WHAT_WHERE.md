@@ -158,17 +158,17 @@ WEB_PLATFORMS = {
 
 ## Database Schemas
 
-**Location:** `supabase/migrations/` (committed to GitHub)
+**Location:** `docs/supabase-schema/` (committed to GitHub)
 
 **TO APPLY SCHEMAS:**
 1. Wait for file to be committed to GitHub
-2. Open GitHub: https://github.com/VibesTribe/VibePilot/tree/main/supabase/migrations
+2. Open GitHub: `VibePilot/tree/main/docs/supabase-schema/`
 3. Copy SQL content from file
 4. Go to Supabase Dashboard → SQL Editor
 5. Paste and Run
 
 **DO NOT:** Try to click links in opencode output (user cannot click)
-**ALWAYS:** Commit schema files to git so user can access from GitHub
+**ALWAYS:** Commit schema files to `docs/supabase-schema/` so user can access from GitHub
 
 | File | What It Adds |
 |------|--------------|
