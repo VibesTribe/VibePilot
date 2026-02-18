@@ -927,10 +927,15 @@ class ConcurrentOrchestrator:
         if not self.runner_pool.acquire(runner_id, task_id):
             return False
 
+        runner_info = self.runner_pool.runners.get(runner_id, {})
+        model_id = runner_info.get(
+            "model_id", runner_id.split(":")[0] if ":" in runner_id else runner_id
+        )
+
         db.table("tasks").update(
             {
                 "status": "in_progress",
-                "assigned_to": runner_id,
+                "assigned_to": model_id,
                 "updated_at": datetime.utcnow().isoformat(),
             }
         ).eq("id", task_id).execute()
@@ -1062,15 +1067,26 @@ class ConcurrentOrchestrator:
             },
         }
 
-        runner_type = runner_id
-        if "kimi" in runner_id.lower():
+        runner_info = self.runner_pool.runners.get(runner_id, {})
+        tool_id = runner_info.get("tool_id", runner_id)
+        model_id = runner_info.get("model_id", runner_id)
+
+        if tool_id == "kimi-cli" or "kimi" in tool_id.lower():
             runner_type = "kimi"
-        elif "deepseek" in runner_id.lower():
-            runner_type = "deepseek"
-        elif "gemini" in runner_id.lower() and "api" in runner_id.lower():
-            runner_type = "gemini"
-        elif "gemini" in runner_id.lower():
-            runner_type = "gemini"
+        elif tool_id == "opencode":
+            runner_type = "kimi"
+        elif tool_id == "direct-api":
+            if "deepseek" in model_id.lower():
+                runner_type = "deepseek"
+            elif "gemini" in model_id.lower():
+                runner_type = "gemini"
+            else:
+                runner_type = model_id
+        elif tool_id == "courier":
+            platform_id = runner_info.get("platform_id", "chatgpt")
+            runner_type = f"courier-{platform_id}"
+        else:
+            runner_type = tool_id
 
         try:
             runner = get_runner(runner_type)
@@ -1089,6 +1105,8 @@ class ConcurrentOrchestrator:
                 + result.get("metadata", {}).get("tokens_out", 0),
                 "prompt_tokens": result.get("metadata", {}).get("tokens_in", 0),
                 "completion_tokens": result.get("metadata", {}).get("tokens_out", 0),
+                "model_id": model_id,
+                "tool_id": tool_id,
             }
         except Exception as e:
             return {"success": False, "error": str(e), "error_code": "RUNNER_EXCEPTION"}
