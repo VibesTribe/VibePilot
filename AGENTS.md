@@ -46,11 +46,12 @@ We are here to work together. Human vision + AI execution. That's VibePilot.
 
 ## Before ANY Tool Use
 
-1. Read these four files:
-   - `~/vibepilot/CURRENT_STATE.md`
+1. Read these five files:
+   - `~/vibepilot/CURRENT_STATE.md` ← Current status, what's working, what's broken, next priority
+   - `~/vibepilot/docs/WHAT_WHERE.md` ← Where everything is located
    - `~/vibepilot/docs/core_philosophy.md` ← Strategic mindset, REQUIRED
-   - `~/vibepilot/docs/prd_v1.4.md`
-   - `~/vibepilot/CHANGELOG.md`
+   - `~/vibepilot/docs/prd_v1.4.md` ← Complete system specification
+   - `~/vibepilot/CHANGELOG.md` ← Recent changes
 
 2. Summarize back to the human:
    - What VibePilot is
@@ -59,6 +60,8 @@ We are here to work together. Human vision + AI execution. That's VibePilot.
    - What the next priority is
 
 3. Wait for human confirmation before taking ANY action.
+
+4. **UPDATE CURRENT_STATE.md** after completing each major section of work. This preserves progress if terminal crashes and prevents having to re-ask the same questions.
 
 ---
 
