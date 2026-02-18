@@ -11,12 +11,12 @@
 
 ---
 
-**Last Updated:** 2026-02-18 20:30 UTC
+**Last Updated:** 2026-02-18 21:00 UTC
 **Updated By:** GLM-5 (Session 14: Foundation redesign)
 **Session Focus:** Fixing the entire foundation - data model, pipeline flow, orchestrator
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Awaiting:** User to run `001_data_model_redesign.sql` in Supabase SQL Editor
+**Progress:** Data model redesign COMPLETE, orchestrator updated to use new schema
 
 ---
 
@@ -151,10 +151,44 @@ The `models` table conflates everything:
 
 ## 2. Update Orchestrator (In Progress)
 
+**Status:** RunnerPool loads from new access table
+
+**Done:**
+- `RunnerPool._load_from_database()` queries `access` table with joins
+- Runners keyed as `model_id:tool_id` (e.g., `kimi-internal:kimi-cli`)
+- Loads rate limits, capabilities, priority from new schema
+
+**Current runners (from new schema):**
+| Priority | Runner Key | Method | Routing |
+|----------|------------|--------|---------|
+| 0 | kimi-internal:kimi-cli | subscription | internal, web, mcp |
+| 0 | glm-5:opencode | subscription | internal, mcp |
+| 1 | gpt-4o:courier | web_free_tier | web |
+| 1 | claude-sonnet-4-5:courier | web_free_tier | web |
+| 1 | claude-haiku-4-5:courier | web_free_tier | web |
+| 1 | gpt-4o-mini:courier | web_free_tier | web |
+
+**Next:**
+- Add rate limit checking before dispatch (check 80% threshold)
+- Add usage tracking after task completion (update access table)
+- Test end-to-end task dispatch with new schema
+
+## 3. Pipeline Auto-Flow (Pending)
+
+**Status:** Not yet implemented
+
 Wire the transitions:
 - pending → supervisor_review (trigger after planner)
 - supervisor_review → council_review (supervisor calls council)
 - council_review → available (on approval)
+
+## 4. Orchestrator as Service (Pending)
+
+**Status:** Not yet implemented
+
+- Run continuously, not manual start
+- Watch queue, dispatch, learn
+- Maybe systemd service or background process
 
 ## 3. Orchestrator as Service
 
