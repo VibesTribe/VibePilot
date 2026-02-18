@@ -10,9 +10,9 @@
 
 ---
 
-**Last Updated:** 2026-02-18 06:22 UTC
-**Updated By:** GLM-5 (Session 13: Smart routing, ROI calculation)
-**Known Good Commit:** `891aa2d7`
+**Last Updated:** 2026-02-18 08:30 UTC
+**Updated By:** GLM-5 (Session 13: Dashboard ROI display fixes, collapsible sections)
+**Known Good Commit:** `647f1b69`
 **Kimi Subscription:** $0.99/mo expires Feb 27 → $19/mo (9 DAYS LEFT - MAXIMIZE USAGE)
 
 ---
@@ -54,6 +54,10 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 | ROI calculation | ✅ Working | Automatic after task_run insert |
 | Token tracking | ✅ Working | tokens_in, tokens_out, tokens_used |
 | Cost tracking | ✅ Working | theoretical vs actual, savings calculated |
+| Dashboard header button | ✅ Working | Shows Tokens 24K and ROI $0.001661 |
+| ROI panel precision | ✅ Working | 6 decimals for small values |
+| Collapsible sections | ✅ Working | By Slice / By Model collapsed by default |
+| USD/CAD toggle | ⚠️ Needs check | May need CSS adjustment for visibility |
 
 ## What's Blocked ❌
 
@@ -105,10 +109,10 @@ None currently.
 
 # NEXT SESSION ACTION ITEMS
 
-1. **Re-test orchestrator** - full task execution should now work
-2. **Test Kimi as executor** - kimi-internal runner
-3. **Verify dashboard** shows completed task with token counts
-4. **Monitor ROI calculator** - confirm tokens_used populates correctly
+1. **Verify USD/CAD toggle** - check if visible in ROI panel
+2. **Test model list display** - ensure rows are readable
+3. **Run more tasks** - accumulate token data and ROI
+4. **Maximize Kimi usage** - 9 days left on $0.99 subscription
 
 ---
 
