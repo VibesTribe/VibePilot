@@ -259,10 +259,30 @@ class DeepSeekContractRunner(BaseRunner):
                     tokens_out=tokens_out,
                     duration_seconds=duration,
                 )
+            elif response.status_code == 429:
+                error_code = "QUOTA_EXHAUSTED"
+                error_msg = f"Rate limit exhausted: {response.text[:200]}"
+                retry_after = response.headers.get("Retry-After")
+                return self.build_failure_result(
+                    task_id=task_id,
+                    error_code=error_code,
+                    error_message=error_msg,
+                    suggested_next_step="wait",
+                    retry_after_seconds=int(retry_after) if retry_after else None,
+                )
+            elif response.status_code == 402:
+                error_code = "CREDIT_NEEDED"
+                error_msg = f"Payment required: {response.text[:200]}"
+                return self.build_failure_result(
+                    task_id=task_id,
+                    error_code=error_code,
+                    error_message=error_msg,
+                    suggested_next_step="flag_for_review",
+                )
             else:
                 error_msg = f"API error {response.status_code}: {response.text[:200]}"
                 suggested = (
-                    "reassign" if response.status_code in [401, 403, 429] else "retry"
+                    "reassign" if response.status_code in [401, 403] else "retry"
                 )
                 return self.build_failure_result(
                     task_id=task_id,
@@ -382,10 +402,30 @@ class GeminiContractRunner(BaseRunner):
                     tokens_out=tokens_out,
                     duration_seconds=duration,
                 )
+            elif response.status_code == 429:
+                error_code = "QUOTA_EXHAUSTED"
+                error_msg = f"Rate limit exhausted: {response.text[:200]}"
+                retry_after = response.headers.get("Retry-After")
+                return self.build_failure_result(
+                    task_id=task_id,
+                    error_code=error_code,
+                    error_message=error_msg,
+                    suggested_next_step="wait",
+                    retry_after_seconds=int(retry_after) if retry_after else None,
+                )
+            elif response.status_code == 402:
+                error_code = "CREDIT_NEEDED"
+                error_msg = f"Payment required: {response.text[:200]}"
+                return self.build_failure_result(
+                    task_id=task_id,
+                    error_code=error_code,
+                    error_message=error_msg,
+                    suggested_next_step="flag_for_review",
+                )
             else:
                 error_msg = f"API error {response.status_code}: {response.text[:200]}"
                 suggested = (
-                    "reassign" if response.status_code in [401, 403, 429] else "retry"
+                    "reassign" if response.status_code in [401, 403] else "retry"
                 )
                 return self.build_failure_result(
                     task_id=task_id,
