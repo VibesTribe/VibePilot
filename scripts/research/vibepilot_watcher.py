@@ -113,13 +113,52 @@ def analyze_relevance(bookmark):
     tags = [t.lower() for t in bookmark.get('tags', [])]
     text = f"{title} {excerpt} {' '.join(tags)}"
     
-    # VibePilot keywords
+    # BROAD research categories - anything VibePilot could learn from
     keywords = {
-        'models_platforms': ['llm', 'model', 'ai', 'gemini', 'claude', 'chatgpt', 'kimi', 'deepseek', 'api', 'free tier'],
-        'architecture': ['agent', 'automation', 'orchestration', 'pipeline', 'workflow', 'multi-agent', 'vibepilot'],
-        'courier_browser': ['browser', 'automation', 'playwright', 'scraping', 'courier', 'openclaw'],
-        'cost_optimization': ['pricing', 'cost', 'rate limit', 'token', 'efficiency', 'free'],
-        'infrastructure': ['supabase', 'github', 'vercel', 'deployment', 'database']
+        # AI/ML Models and Platforms
+        'models_platforms': ['llm', 'model', 'ai', 'gemini', 'claude', 'chatgpt', 'kimi', 'deepseek', 'glm', 'gpt', 'api', 'free tier', 'open source', 'local llm', 'ollama', 'llama.cpp'],
+        
+        # Agent Architecture and Patterns  
+        'agent_architecture': ['agent', 'automation', 'orchestration', 'pipeline', 'workflow', 'multi-agent', 'swarm', 'vibepilot', 'agentic', 'actor model', 'event-driven', 'state machine'],
+        
+        # Browser Automation and Web Interaction
+        'courier_browser': ['browser', 'automation', 'playwright', 'puppeteer', 'selenium', 'scraping', 'courier', 'openclaw', 'web automation', 'headless', 'cdp', 'computer use', 'browser-use'],
+        
+        # Infrastructure and Deployment
+        'infrastructure': ['supabase', 'github', 'vercel', 'deployment', 'database', 'postgresql', 'serverless', 'edge', 'cloud', 'hosting', 'ci/cd', 'docker', 'kubernetes'],
+        
+        # Security and Privacy
+        'security': ['security', 'privacy', 'vault', 'encryption', 'oauth', 'auth', 'zero trust', 'sandbox', 'isolation', 'permissions', 'rbac', 'audit', 'compliance'],
+        
+        # Testing and Quality Assurance
+        'testing': ['testing', 'test', 'qa', 'quality', 'validation', 'verification', 'benchmark', 'evaluation', 'metrics', 'observability', 'monitoring', 'logging', 'tracing'],
+        
+        # UI/UX and Developer Experience
+        'ui_ux': ['ui', 'ux', 'dashboard', 'interface', 'design', 'developer experience', 'dx', 'cli', 'ide', 'vscode', 'plugin', 'extension', 'tooling'],
+        
+        # Local/Edge Inference and Sovereignty
+        'local_edge': ['local', 'edge', 'on-device', 'offline', 'self-hosted', 'sovereign', 'privacy-preserving', 'federated', 'distributed', 'p2p', 'mesh'],
+        
+        # Cost Optimization and Efficiency
+        'cost_optimization': ['pricing', 'cost', 'rate limit', 'token', 'efficiency', 'optimization', 'caching', 'memoization', 'compression', 'quantization', 'distillation', 'moE'],
+        
+        # Data Management and Storage
+        'data_management': ['data', 'storage', 'vector db', 'embedding', 'rag', 'retrieval', 'knowledge base', 'memory', 'context', 'serialization', 'migration', 'backup'],
+        
+        # API Design and Integration
+        'api_integration': ['api', 'rest', 'graphql', 'webhook', 'sdk', 'integration', 'connector', 'adapter', 'protocol', 'mcp', 'stdio', 'sse', 'websocket'],
+        
+        # Workflow and Task Management
+        'workflow_management': ['task', 'queue', 'scheduler', 'cron', 'job', 'worker', 'background', 'async', 'concurrent', 'parallel', 'dependency', 'dag', 'state management'],
+        
+        # Learning and Knowledge Resources
+        'learning_resources': ['tutorial', 'guide', 'documentation', 'paper', 'research', 'benchmark', 'comparison', 'review', 'best practice', 'pattern', 'architecture', 'case study'],
+        
+        # Community and Ecosystem
+        'community': ['open source', 'community', 'ecosystem', 'plugin', 'extension', 'marketplace', 'template', 'starter', 'boilerplate', 'framework', 'library'],
+        
+        # Performance and Scaling
+        'performance': ['performance', 'scaling', 'latency', 'throughput', 'concurrency', 'load balancing', 'caching', 'cdn', 'optimization', 'profiler', 'benchmark']
     }
     
     scores = {}
