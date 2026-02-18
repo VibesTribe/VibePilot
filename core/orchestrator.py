@@ -244,6 +244,7 @@ class RunnerPool:
         self.busy: Dict[str, str] = {}  # runner_id -> task_id
         self.lock = threading.Lock()
         self.cooldown_manager = cooldown_manager
+        self.logger = logging.getLogger("VibePilot.RunnerPool")
         self._load_runners(use_config)
 
     def _load_runners(self, use_config: bool = True):
