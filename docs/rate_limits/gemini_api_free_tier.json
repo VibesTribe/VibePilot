@@ -1,0 +1,96 @@
+{
+  "metadata": {
+    "last_verified": "2026-02-18",
+    "source": "Kimi research via web search of official Google docs",
+    "important_notes": [
+      "Rate limits are per PROJECT, not per API key",
+      "Free tier limits reduced December 2025 (50-80% cuts)",
+      "Free tier NOT available for EU/EEA/UK/Switzerland",
+      "All free tier data may be used to improve Google's models"
+    ]
+  },
+  "rate_limit_windows": {
+    "rpm": {"window": "60 seconds rolling", "description": "Requests in last 60s"},
+    "tpm": {"window": "60 seconds rolling", "description": "INPUT tokens in last 60s"},
+    "rpd": {"window": "Fixed daily", "reset_time": "Midnight PT (08:00 UTC winter / 07:00 UTC summer)"}
+  },
+  "windows_that_do_not_exist": ["TPH", "TPD", "RPH", "RPW", "4-hour", "8-hour"],
+  "models": {
+    "gemini-2.5-pro": {
+      "rpm": 5,
+      "tpm": 250000,
+      "rpd": 100,
+      "context_window": 1048576,
+      "input_token_limit": 1048576,
+      "output_token_limit": 65536,
+      "notes": "Most restrictive, best for complex reasoning"
+    },
+    "gemini-2.5-flash": {
+      "rpm": 10,
+      "tpm": 250000,
+      "rpd": 250,
+      "context_window": 1048576,
+      "input_token_limit": 1048576,
+      "output_token_limit": 65536,
+      "notes": "Best balance of capability and quota"
+    },
+    "gemini-2.5-flash-lite": {
+      "rpm": 15,
+      "tpm": 250000,
+      "rpd": 1000,
+      "context_window": 1048576,
+      "input_token_limit": 1048576,
+      "output_token_limit": 65536,
+      "notes": "Highest RPD, good for high-throughput simple tasks"
+    },
+    "gemini-2.0-flash": {
+      "rpm": 10,
+      "tpm": 250000,
+      "rpd": 500,
+      "context_window": 1048576,
+      "input_token_limit": 1048576,
+      "output_token_limit": 8192,
+      "notes": "DEPRECATED - shutdown March 31, 2026"
+    },
+    "gemini-1.5-flash": {
+      "rpm": 15,
+      "tpm": 1000000,
+      "rpd": 1500,
+      "context_window": 1048576,
+      "input_token_limit": 1048576,
+      "output_token_limit": 8192,
+      "notes": "Higher TPM (1M), good for large documents"
+    },
+    "gemini-1.5-pro": {
+      "rpm": 2,
+      "tpm": 32000,
+      "rpd": 50,
+      "context_window": 2097152,
+      "input_token_limit": 2097152,
+      "output_token_limit": 8192,
+      "notes": "Essentially unusable - very restrictive"
+    }
+  },
+  "api_key_vs_ai_studio": {
+    "difference": "NONE - same project-based quota",
+    "multiple_keys": "Do NOT increase quota",
+    "ai_studio_playground": "Counts against API quota"
+  },
+  "tracking_for_80_percent_safety": {
+    "gemini-2.5-flash": {
+      "safe_rpm": 8,
+      "safe_tpm": 200000,
+      "safe_rpd": 200
+    },
+    "gemini-2.5-flash-lite": {
+      "safe_rpm": 12,
+      "safe_tpm": 200000,
+      "safe_rpd": 800
+    },
+    "gemini-1.5-flash": {
+      "safe_rpm": 12,
+      "safe_tpm": 800000,
+      "safe_rpd": 1200
+    }
+  }
+}

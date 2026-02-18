@@ -1,19 +1,19 @@
 # VibePilot Current State
 
-**Required reading: FOUR files**
+**Required reading: FIVE files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
-2. **`docs/prd_v1.4.md`** - Complete system specification
-3. **`docs/core_philosophy.md`** - Strategic mindset and inviolable principles
-4. **`CHANGELOG.md`** - History, changes, rollback commands
+2. **`docs/WHAT_WHERE.md`** - Where everything is located
+3. **`docs/prd_v1.4.md`** - Complete system specification
+4. **`docs/core_philosophy.md`** - Strategic mindset and inviolable principles
+5. **`CHANGELOG.md`** - History, changes, rollback commands
 
-**Read all four → Know everything → Do anything**
+**Read all five → Know everything → Do anything**
 
 ---
 
-**Last Updated:** 2026-02-18 08:30 UTC
-**Updated By:** GLM-5 (Session 13: Dashboard ROI display fixes, collapsible sections)
-**Known Good Commit:** `647f1b69`
-**Kimi Subscription:** $0.99/mo expires Feb 27 → $19/mo (9 DAYS LEFT - MAXIMIZE USAGE)
+**Last Updated:** 2026-02-18 20:00 UTC
+**Updated By:** GLM-5 (Session 14: Foundation redesign)
+**Session Focus:** Fixing the entire foundation - data model, pipeline flow, orchestrator
 
 ---
 
@@ -28,147 +28,177 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 - Reversible - if it can't be undone, it can't be done
 - Always improving - new ideas evaluated daily
 
-**Core Rules:**
-- All state in Supabase
-- All code in GitHub
-- All changes via config (zero code edits for swaps)
-- Context isolation per agent (task agents see ONLY their task)
-- Council for PRDs/plans (iterative), system updates (one-shot vote)
-- Maintenance is ONLY agent that touches system files
-
----
-
-# CURRENT STATUS
-
-## What's Working ✅
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Orchestrator dispatch | ✅ Working | Dispatches to available runners based on DB status |
-| Task status flow | ✅ Working | pending → available → in_progress → review |
-| Planner | ✅ Working | Creates tasks with full prompt_packets |
-| Dashboard research slice | ✅ Deployed | Daily Research, Inquiry Research, etc. |
-| Dashboard prompt_packet | ✅ Deployed | Shows full task content |
-| Runner selection | ✅ Working | Subscription > Free API > Paid API scoring |
-| Task assignment display | ✅ Working | Dashboard shows model assigned |
-| ROI calculation | ✅ Working | Automatic after task_run insert |
-| Token tracking | ✅ Working | tokens_in, tokens_out, tokens_used |
-| Cost tracking | ✅ Working | theoretical vs actual, savings calculated |
-| Dashboard header button | ✅ Working | Shows Tokens 24K and ROI $0.001661 |
-| ROI panel precision | ✅ Working | 6 decimals for small values |
-| Collapsible sections | ✅ Working | By Slice / By Model collapsed by default |
-| USD/CAD toggle | ⚠️ Needs check | May need CSS adjustment for visibility |
-
-## What's Blocked ❌
-
-None currently.
-
----
-
-# ORCHESTRATOR TESTING STATUS
-
-## Live Test Results (2026-02-18)
-
-**What works:**
+**The Vision:**
 ```
-✓ Orchestrator finds available tasks
-✓ Runner selection with database status (paused/active)
-✓ Subscription priority (Kimi > Free API > Paid API)
-✓ Web → Internal fallback when no couriers available
-✓ Task dispatch to kimi-internal for web research
-✓ task_runs insert with courier column
-✓ ROI calculation triggered automatically
-✓ Token tracking: tokens_in, tokens_out, tokens_used
+User → "Hey Vibes, I want feature X" → Vibes triggers pipeline
+                                              ↓
+                              Consultant → PRD → Planner → Tasks
+                                              ↓
+                              Supervisor reviews → Council vets → Approves
+                                              ↓
+                              Tasks become "available" → Orchestrator picks up
+                                              ↓
+                              Routes to best available runner → Executes → Learns
 ```
 
-## ROI Calculation
-
-**Formula:**
-- `theoretical` = (tokens_in/1000 × platform_input_rate) + (tokens_out/1000 × platform_output_rate)
-- `actual` = $0 for subscriptions, API cost for paid
-- `savings` = theoretical - actual
-
-**Platform Rates (in platforms table):**
-| Platform | Input/1K | Output/1K |
-|----------|----------|-----------|
-| chatgpt | $0.00015 | $0.00060 |
-| claude | $0.00100 | $0.00500 |
-| gemini | $0.00030 | $0.00250 |
-| deepseek-api | $0.00028 | $0.00042 |
-| moonshot (Kimi) | $0.00060 | $0.00250 |
-
-## Column Mismatch Fixes Applied
-
-| Column | Status | Action |
-|--------|--------|--------|
-| `test_type` | ✅ Fixed | Removed from supervisor.py |
-| `duration_seconds` | ✅ Fixed | Removed from orchestrator.py |
-| `tokens_total` → `tokens_used` | ✅ Fixed | Corrected column name |
+**Vibes** = The conversational interface. User talks to Vibes like talking to me now. Vibes IS the system.
 
 ---
 
-# NEXT SESSION ACTION ITEMS
+# CURRENT SESSION (14) - FOUNDATION REDESIGN
 
-1. **Verify USD/CAD toggle** - check if visible in ROI panel
-2. **Test model list display** - ensure rows are readable
-3. **Run more tasks** - accumulate token data and ROI
-4. **Maximize Kimi usage** - 9 days left on $0.99 subscription
+## What We Discovered
+
+### The Real Problem (Type 1 Error)
+
+The `models` table conflates everything:
+- AI models (kimi-k2.5, glm-5, deepseek-chat)
+- Tools/interfaces (opencode, kimi-cli)
+- Access methods (api, subscription, web_free_tier)
+- Rate limits (single values, no windows)
+- Usage tracking (broken)
+
+**Result:** Orchestrator cannot answer "What models can I use right now?"
+
+### Pipeline Flow Broken
+
+- Planner writes tasks as `pending`
+- Orchestrator looks for `available`
+- **Nothing transitions between them**
+- Supervisor exists but never triggered
+- Council never called
+
+### Orchestrator Not a Service
+
+- Requires manual `orch.start()` call
+- Should be always-on, watching queue
+- Previous session bypassed instead of fixing
+
+### No Multi-Window Rate Limits
+
+- We killed Gemini API in 60 seconds
+- No RPM (requests/minute) tracking
+- No rolling window tracking
+- Can't respect 80% threshold
+
+## What We Fixed (Committed)
+
+| Fix | File | Commit |
+|-----|------|--------|
+| Increment attempts on failure | `task_manager.py` | `24960cdc` |
+| Check attempts before dispatch | `core/orchestrator.py` | `24960cdc` |
+| Clear assigned_to on return to queue | `task_manager.py` | `24960cdc` |
+| CSS By Model cut-off fix | `vibeflow/styles.css` | `ea034ef9` (branch) |
+
+## What We Documented
+
+| Document | Purpose |
+|----------|---------|
+| `docs/DATA_MODEL_REDESIGN.md` | Full schema redesign plan |
+| `docs/rate_limits/gemini_api_free_tier.json` | Gemini limits researched by Kimi |
+
+## What We Cleaned Up
+
+- Benched ghost models not in RUNNER_REGISTRY (gpt-4o, claude-*, opencode, glm-5, deepseek-reasoner, etc.)
+- Unbenched kimi-k2.5 (the actual Kimi model, should be active)
+- Updated AGENTS.md to include WHAT_WHERE.md
 
 ---
 
-# VIBEFLOW DASHBOARD (Reference)
+# ACTIVE MODELS (Current State)
 
-**Live Dashboard (Supabase):** https://vibeflow-dashboard.vercel.app/
+| Model ID | Status | Access Via | Notes |
+|----------|--------|------------|-------|
+| kimi-cli | active | kimi-cli (subscription) | 7 days left at $0.99 |
+| kimi-internal | active | kimi-cli | Same as above |
+| kimi-k2.5 | active | kimi-cli | Unbenched - the actual Kimi model |
+| gemini-api | paused | API | quota_exhausted |
+| gemini-2.0-flash | paused | API | quota_exhausted |
+| deepseek-chat | paused | API | credit_needed |
+| gpt-4o, gpt-4o-mini | benched | N/A | Web platform only, no API key |
+| claude-sonnet-4-5, claude-haiku-4-5 | benched | N/A | Web platform only, no API key |
+| opencode, glm-5 | benched | N/A | Tool, not a model |
 
+---
+
+# NEXT STEPS (In Order)
+
+## 1. Data Model Redesign (In Progress)
+
+**Status:** Design complete, implementation pending
+
+See `docs/DATA_MODEL_REDESIGN.md` for full plan.
+
+**New Tables:**
+```
+models (AI capabilities only)
+tools (interfaces: opencode, kimi-cli, courier)
+access (how we reach models, limits, usage, learning)
+platforms (web destinations - keep existing)
+task_history (learning from every task)
+```
+
+**Migration:**
+1. Create new tables (keep old as backup)
+2. Populate from config files
+3. Update orchestrator
+4. Wire pipeline flow
+5. Test end-to-end
+
+## 2. Pipeline Auto-Flow
+
+Wire the transitions:
+- pending → supervisor_review (trigger after planner)
+- supervisor_review → council_review (supervisor calls council)
+- council_review → available (on approval)
+
+## 3. Orchestrator as Service
+
+- Run continuously, not manual start
+- Watch queue, dispatch, learn
+- Maybe systemd service or background process
+
+## 4. Rate Limit Tracking
+
+- Multi-window (RPM, RPD, TPM, TPD)
+- Rolling windows
+- 80% threshold enforcement
+- Cooldown periods
+
+---
+
+# GEMINI API FREE TIER LIMITS
+
+Researched by Kimi, stored in `docs/rate_limits/gemini_api_free_tier.json`
+
+| Model | RPM | RPD | TPM | TPD |
+|-------|-----|-----|-----|-----|
+| gemini-2.5-pro | 5 | 100 | 250K | - |
+| gemini-2.5-flash | 10 | 250 | 250K | - |
+| gemini-2.5-flash-lite | 15 | 1000 | 250K | - |
+| gemini-1.5-flash | 15 | 1500 | 1M | - |
+| gemini-1.5-pro | 2 | 50 | 32K | - |
+
+**Reset:** Daily at Midnight PT (08:00 UTC)
+
+**80% Safe Limits:**
+| Model | Safe RPM | Safe RPD |
+|-------|----------|----------|
+| gemini-2.5-flash | 8 | 200 |
+| gemini-2.5-flash-lite | 12 | 800 |
+| gemini-1.5-flash | 12 | 1200 |
+
+---
+
+# VIBEFLOW DASHBOARD
+
+**Live Dashboard:** https://vibeflow-dashboard.vercel.app/
 **GitHub Repo:** https://github.com/VibesTribe/vibeflow
 
-**Note:** These URLs have been provided multiple times. Check here first before asking.
-
----
-
-# SESSION NOTES
-
-See `SESSION_NOTES_2026-02-18.md` for detailed testing notes.
-
----
-
-# FILE STRUCTURE
-
-```
-vibepilot/
-├── agents/
-│   ├── planner.py (REWRITTEN - full implementation)
-│   ├── supervisor.py (FIXED - removed test_type)
-│   └── ...
-├── core/
-│   ├── orchestrator.py (FIXED - self.runners, duration_seconds; NEEDS - tokens_total)
-│   └── ...
-├── config/
-│   ├── prompts/
-│   │   └── planner.md (full planner spec)
-│   ├── researcher_context.md (NEW - compressed context for researcher)
-│   └── templates/
-│       └── research_packet.json (NEW - task packet template)
-├── runners/
-│   ├── contract_runners.py (has token counting)
-│   └── ...
-├── docs/
-│   ├── supabase-schema/ (NEW - all schemas in one place)
-│   └── UPDATE_CONSIDERATIONS.md (research findings)
-├── kimi_usage_log.md (NEW - track all Kimi usage)
-├── SESSION_NOTES_2026-02-18.md (NEW - this session's notes)
-└── ...
-```
-
----
-
-# GIT BRANCHING RULES (CRITICAL)
-
-**Vercel auto-deploys from main. Breaking main = Breaking production.**
-
-- Dashboard/UI changes → Feature branch first, human approves → merge to main
-- Backend changes → Less risky, can go direct but prefer branches
-- **The Rule:** "If it's the dashboard, never goes to main until approved by me."
+**Git Rules:**
+- Dashboard/UI → Feature branch, human approves → merge
+- Backend → Less risky, can go direct
+- **Never push dashboard to main without human approval**
 
 ---
 
@@ -176,8 +206,21 @@ vibepilot/
 
 | Command | Action |
 |---------|--------|
-| `cat SESSION_NOTES_2026-02-18.md` | This session's detailed notes |
+| `cat docs/DATA_MODEL_REDESIGN.md` | Full schema redesign plan |
+| `cat docs/rate_limits/gemini_api_free_tier.json` | Gemini limits |
 | `git log --oneline -5` | Recent commits |
-| `git diff origin/main` | Unpushed changes |
-| `source venv/bin/activate && python -c "from core.orchestrator import ConcurrentOrchestrator"` | Test orchestrator import |
+| `kimi --yolo --prompt "..."` | Send task to Kimi for research |
+| `cd ~/vibepilot && git checkout main && git pull` | Get latest |
 
+---
+
+# KIMI USAGE PRIORITY
+
+**Kimi subscription: 7 days left at $0.99, then $19/mo**
+
+Use Kimi for:
+- Research tasks (web access)
+- Parallel sub-agent tasks (up to 100)
+- Any task requiring browser/vision/multimodal
+
+Maximize usage before renewal decision.
