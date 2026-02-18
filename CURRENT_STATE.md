@@ -10,9 +10,9 @@
 
 ---
 
-**Last Updated:** 2026-02-18 15:30 UTC
-**Updated By:** GLM-5 (Session 13: Fixed tokens_total → tokens_used)
-**Known Good Commit:** `1dc8c5ec`
+**Last Updated:** 2026-02-18 06:22 UTC
+**Updated By:** GLM-5 (Session 13: Smart routing, ROI calculation)
+**Known Good Commit:** `891aa2d7`
 **Kimi Subscription:** $0.99/mo expires Feb 27 → $19/mo (9 DAYS LEFT - MAXIMIZE USAGE)
 
 ---
@@ -44,13 +44,16 @@ Sovereign AI execution engine. Human provides idea → VibePilot executes with z
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Orchestrator dispatch | ✅ Working | Dispatches to gemini, deepseek, glm-5, kimi |
+| Orchestrator dispatch | ✅ Working | Dispatches to available runners based on DB status |
 | Task status flow | ✅ Working | pending → available → in_progress → review |
 | Planner | ✅ Working | Creates tasks with full prompt_packets |
 | Dashboard research slice | ✅ Deployed | Daily Research, Inquiry Research, etc. |
 | Dashboard prompt_packet | ✅ Deployed | Shows full task content |
-| Runner selection | ✅ Working | Picks best runner for task routing_flag |
+| Runner selection | ✅ Working | Subscription > Free API > Paid API scoring |
 | Task assignment display | ✅ Working | Dashboard shows model assigned |
+| ROI calculation | ✅ Working | Automatic after task_run insert |
+| Token tracking | ✅ Working | tokens_in, tokens_out, tokens_used |
+| Cost tracking | ✅ Working | theoretical vs actual, savings calculated |
 
 ## What's Blocked ❌
 
@@ -65,12 +68,30 @@ None currently.
 **What works:**
 ```
 ✓ Orchestrator finds available tasks
-✓ Runner selection works (gemini-2.0-flash, deepseek-chat, glm-5)
-✓ Task dispatch works
-✓ Dashboard shows assignment
-✓ Status changes: pending → in_progress
-✓ task_runs insert works (tokens_total → tokens_used fixed)
+✓ Runner selection with database status (paused/active)
+✓ Subscription priority (Kimi > Free API > Paid API)
+✓ Web → Internal fallback when no couriers available
+✓ Task dispatch to kimi-internal for web research
+✓ task_runs insert with courier column
+✓ ROI calculation triggered automatically
+✓ Token tracking: tokens_in, tokens_out, tokens_used
 ```
+
+## ROI Calculation
+
+**Formula:**
+- `theoretical` = (tokens_in/1000 × platform_input_rate) + (tokens_out/1000 × platform_output_rate)
+- `actual` = $0 for subscriptions, API cost for paid
+- `savings` = theoretical - actual
+
+**Platform Rates (in platforms table):**
+| Platform | Input/1K | Output/1K |
+|----------|----------|-----------|
+| chatgpt | $0.00015 | $0.00060 |
+| claude | $0.00100 | $0.00500 |
+| gemini | $0.00030 | $0.00250 |
+| deepseek-api | $0.00028 | $0.00042 |
+| moonshot (Kimi) | $0.00060 | $0.00250 |
 
 ## Column Mismatch Fixes Applied
 
