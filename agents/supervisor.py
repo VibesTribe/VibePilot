@@ -516,13 +516,15 @@ class SupervisorAgent:
 
     def approve_plan(self, project_id: str = None) -> Dict:
         """
-        Approve pending plan and transition tasks to available.
+        Approve pending plan and transition tasks based on dependencies.
 
         This is called after:
         1. Supervisor reviews plan
         2. Council vets plan (if needed)
 
-        Transitions: status "pending" → "available"
+        Transitions:
+        - status "pending" → "available" (no dependencies)
+        - status "pending" → "locked" (has dependencies, waiting on parents)
         """
         review = self.review_plan(project_id)
         if not review["approved"]:
@@ -535,23 +537,41 @@ class SupervisorAgent:
         if review["task_count"] == 0:
             return {"success": True, "approved_count": 0, "message": "No pending tasks"}
 
-        query = (
-            db.table("tasks")
-            .update(
-                {"status": "available", "updated_at": datetime.utcnow().isoformat()}
-            )
-            .eq("status", "pending")
+        pending_tasks = self.get_pending_plans()
+        if not pending_tasks:
+            return {"success": True, "approved_count": 0, "message": "No pending tasks"}
+
+        available_count = 0
+        locked_count = 0
+
+        for task in pending_tasks:
+            deps = task.get("dependencies")
+            has_deps = deps and len(deps) > 0
+
+            if has_deps:
+                new_status = "locked"
+                locked_count += 1
+            else:
+                new_status = "available"
+                available_count += 1
+
+            update_data = {
+                "status": new_status,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+
+            db.table("tasks").update(update_data).eq("id", task["id"]).execute()
+
+        self.logger.info(
+            f"Approved plan: {available_count} available, {locked_count} locked (awaiting deps)"
         )
 
-        if project_id:
-            query = query.eq("project_id", project_id)
-
-        result = query.execute()
-
-        approved_count = len(result.data) if result.data else 0
-        self.logger.info(f"Approved plan: {approved_count} tasks now available")
-
-        return {"success": True, "approved_count": approved_count}
+        return {
+            "success": True,
+            "available_count": available_count,
+            "locked_count": locked_count,
+            "total_count": available_count + locked_count,
+        }
 
     def get_pending_approvals(self) -> List[Dict]:
         """Get all tasks awaiting final approval."""
