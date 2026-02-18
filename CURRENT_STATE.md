@@ -11,12 +11,22 @@
 
 ---
 
-**Last Updated:** 2026-02-18 21:00 UTC
+**Last Updated:** 2026-02-18 22:00 UTC
 **Updated By:** GLM-5 (Session 14: Foundation redesign)
 **Session Focus:** Fixing the entire foundation - data model, pipeline flow, orchestrator
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Data model redesign COMPLETE, orchestrator updated to use new schema
+**Progress:** Data model redesign COMPLETE, orchestrator uses new schema, rate limits tracked
+
+---
+
+## SQL TO RUN
+
+Run these in Supabase SQL Editor (in order):
+1. ✅ `001_data_model_redesign.sql` - Creates new tables
+2. ✅ `002_rls_fix.sql` - Disables RLS on new tables
+3. ✅ `003_tools_columns_fix.sql` - Adds columns to tools table
+4. ⏳ `004_usage_rpc.sql` - Creates usage tracking functions (NEEDS TO RUN)
 
 ---
 
@@ -173,14 +183,40 @@ The `models` table conflates everything:
 - Add usage tracking after task completion (update access table)
 - Test end-to-end task dispatch with new schema
 
-## 3. Pipeline Auto-Flow (Pending)
+## 3. Pipeline Auto-Flow (SIGNIFICANT GAP)
 
-**Status:** Not yet implemented
+**Status:** Major implementation gap identified
 
-Wire the transitions:
-- pending → supervisor_review (trigger after planner)
-- supervisor_review → council_review (supervisor calls council)
-- council_review → available (on approval)
+**What PRD says should happen:**
+```
+Planner creates plan → Council reviews → Supervisor approves → Tasks become "available"
+```
+
+**What currently happens:**
+```
+Planner creates plan → Tasks written as "pending" → NOTHING transitions them → BLOCKED
+```
+
+**What's missing:**
+1. **Pre-execution plan review** - Supervisor should vet plans before tasks go to available
+2. **Council coordination** - Supervisor calls Council for plan review
+3. **Approval trigger** - After Council + Supervisor approve, tasks become "available"
+
+**Implementation needed:**
+- `supervisor.review_plan()` - Reviews plan before execution
+- `supervisor.call_council()` - Coordinates Council review
+- `supervisor.approve_plan()` - Transitions tasks from "pending" to "available"
+- Trigger after planner completes
+
+**Status flow per PRD:**
+```
+pending → available → in_progress → review → testing → approval → merged
+              ↑            │          │         │          │
+              └────────────┴──────────┴─────────┴──────────┘
+                           (loops back on failure)
+```
+
+Current gap: `pending → available` transition not implemented.
 
 ## 4. Orchestrator as Service (Pending)
 
@@ -189,6 +225,22 @@ Wire the transitions:
 - Run continuously, not manual start
 - Watch queue, dispatch, learn
 - Maybe systemd service or background process
+
+## 5. Rate Limit Data Collected
+
+**DeepSeek API:** `docs/rate_limits/deepseek_api.json`
+- No fixed rate limits (dynamic throttling)
+- 5M free tokens for new users
+- Pricing: $0.28/1M input (cache miss), $0.42/1M output
+
+**Kimi/Moonshot API:** `docs/rate_limits/kimi_moonshot_api.json`
+- Tier-based limits ($1 min to activate)
+- Tier0: 3 RPM, 500K TPM, 1.5M TPD
+- Kimi K2.5: 256K context, multimodal
+
+**Gemini API:** `docs/rate_limits/gemini_api_free_tier.json`
+- gemini-2.5-flash: 10 RPM, 250 RPD, 250K TPM
+- Daily reset at midnight PT
 
 ## 3. Orchestrator as Service
 
