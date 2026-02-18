@@ -101,6 +101,19 @@ vibepilot/
 3. Update orchestrator to use new config structure
 4. Evaluate Qwen 3.5 API for courier driver
 
+### Error Handling (Added This Session)
+
+| Error | Code | Orchestrator Action | Dashboard Icon |
+|-------|------|---------------------|----------------|
+| 429 Rate Limit | `QUOTA_EXHAUSTED` | Cooldown with timer | ⏲ Cooldown |
+| 402 Payment Required | `CREDIT_NEEDED` | Pause, flag for review | 💰 Credit Needed |
+
+Runners now return specific error codes. Orchestrator updates models table:
+- `QUOTA_EXHAUSTED`: `status='paused'`, `cooldown_expires_at=<reset time>`
+- `CREDIT_NEEDED`: `status='paused'`, `status_reason='credit_needed'`
+
+Dashboard adapter detects `credit_needed` in status_reason and shows 💰 icon.
+
 ---
 
 # 2026-02-17 (Session 10)
