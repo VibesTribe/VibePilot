@@ -1,0 +1,16 @@
+{
+  "task_id": "research-YYYY-MM-DD_HHMM",
+  "research_type": "video|article|daily_scan|topic",
+  "target": "URL or topic description",
+  "context_file": "config/researcher_context.md",
+  "focus_hint": "courier|routing|cost|quality|general",
+  "requested_by": "human|maintenance|scheduled",
+  "created_at": "ISO timestamp",
+  "output_branch": "research-considerations",
+  "output_format": {
+    "filename": "YYYY-MM-DD_HHMM_topic.md",
+    "include_metadata": true,
+    "include_cost_tracking": true,
+    "tag_findings": "SIMPLE|VET"
+  }
+}
