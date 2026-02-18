@@ -4,6 +4,9 @@ VibePilot Planner Agent
 Takes a zero-ambiguity PRD and creates a modular, isolated execution plan.
 Uses vertical slicing to ensure tasks are atomic and isolated.
 
+CRITICAL: Every task MUST include a complete prompt_packet. 
+Empty prompt_packets cause plans to be REJECTED by Supervisor.
+
 Output goes to Supabase tasks table for Orchestrator to pick up.
 
 See config/prompts/planner.md for full behavior specification.
@@ -35,6 +38,9 @@ db = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Planner uses Kimi CLI (internal agent, per PRD routing rules)
 kimi_runner = KimiRunner()
 
+# Minimum prompt_packet length - anything less is considered empty/incomplete
+MIN_PROMPT_PACKET_LENGTH = 200
+
 
 class PlannerAgent(Agent):
     name = "Planner"
@@ -61,6 +67,9 @@ class PlannerAgent(Agent):
         """Fallback prompt if file not found."""
         return """You are the Planner agent. Create a modular execution plan.
 
+CRITICAL REQUIREMENT: Every task MUST include a complete prompt_packet.
+An empty or too-short prompt_packet will cause the plan to be REJECTED.
+
 Break the PRD into:
 1. Slices (isolated functional areas)
 2. Phases within slices (P1, P2, P3)
@@ -75,7 +84,23 @@ Each task needs:
 - routing_flag_reason: Why this flag
 - dependencies: Array of dependent task_ids
 - confidence: 0.95-1.0
-- prompt_packet: Full instructions for the task
+- prompt_packet: FULL INSTRUCTIONS (minimum 200 characters)
+
+The prompt_packet must follow this template:
+# TASK: [task_id] - [title]
+
+## CONTEXT
+[Why this task exists, what problem it solves]
+
+## WHAT TO BUILD
+[Detailed description]
+
+## ACCEPTANCE CRITERIA
+- [ ] [Specific criterion 1]
+- [ ] [Specific criterion 2]
+
+## OUTPUT FORMAT
+[Expected output structure]
 
 Output valid JSON following the format in config/prompts/planner.md."""
     
@@ -122,8 +147,18 @@ Output valid JSON following the format in config/prompts/planner.md."""
         
         self.log("Breaking down PRD into atomic tasks...")
         
-        # Build the full prompt
+        # Build the full prompt with CRITICAL emphasis on prompt_packet
         full_prompt = f"""{self.planner_prompt}
+
+---
+
+# CRITICAL REMINDER
+
+Every task MUST have a complete prompt_packet. This is NOT optional.
+A plan with empty prompt_packets will be REJECTED and sent back to you.
+
+Minimum prompt_packet length: 200 characters.
+Include: CONTEXT, WHAT TO BUILD, ACCEPTANCE CRITERIA, OUTPUT FORMAT.
 
 ---
 
@@ -137,7 +172,7 @@ Remember:
 1. Identify natural slice boundaries (things that won't affect each other)
 2. Group features into isolated slices
 3. Phase work within each slice (P1=Foundation, P2=Features, P3=Polish)
-4. Create atomic tasks with full prompt_packets
+4. Create atomic tasks with FULL prompt_packets (NOT EMPTY!)
 5. Flag routing correctly (internal vs web)
 6. Map dependencies explicitly
 7. Ensure 95%+ confidence on every task
@@ -158,18 +193,41 @@ Return ONLY valid JSON following the output format specified above."""
                     error="Could not parse plan from LLM response"
                 )
             
-            # Validate plan structure
-            validation = self._validate_plan(plan)
+            # Extract all tasks from plan
+            all_tasks = self._extract_tasks(plan)
+            
+            # Validate ALL tasks have proper prompt_packets
+            validation = self._validate_tasks(all_tasks)
+            
             if not validation["valid"]:
+                # Log which tasks have issues
+                self.log(f"Plan validation FAILED: {len(validation['errors'])} issues", level="error")
+                for error in validation["errors"][:10]:  # Show first 10
+                    self.log(f"  - {error}", level="error")
+                
+                # Try to fix incomplete prompt_packets
+                self.log("Attempting to generate missing prompt_packets...")
+                all_tasks = self._ensure_prompt_packets(all_tasks, prd)
+                
+                # Re-validate
+                validation = self._validate_tasks(all_tasks)
+                if not validation["valid"]:
+                    return AgentResult(
+                        success=False,
+                        output={"plan": plan, "validation_errors": validation["errors"]},
+                        error=f"Plan rejected: {validation['errors'][:5]}"
+                    )
+            
+            # Validate plan structure
+            structure_validation = self._validate_plan_structure(plan)
+            if not structure_validation["valid"]:
                 return AgentResult(
                     success=False,
                     output=plan,
-                    error=f"Plan validation failed: {validation['errors']}"
+                    error=f"Plan structure validation failed: {structure_validation['errors']}"
                 )
             
-            # Extract all tasks from plan
-            all_tasks = self._extract_tasks(plan)
-            self.log(f"Generated {len(all_tasks)} atomic tasks across {len(plan.get('slices', []))} slices")
+            self.log(f"Plan validated: {len(all_tasks)} tasks across {len(plan.get('slices', []))} slices")
             
             # Write to Supabase
             write_result = self._write_tasks_to_supabase(all_tasks, project_id)
@@ -200,6 +258,121 @@ Return ONLY valid JSON following the output format specified above."""
                 error=str(e)
             )
     
+    def _validate_tasks(self, tasks: List[Dict]) -> Dict:
+        """
+        Validate that ALL tasks have substantive prompt_packets.
+        This is CRITICAL - empty prompt_packets will cause execution failure.
+        """
+        errors = []
+        
+        for task in tasks:
+            task_id = task.get("task_id", "unknown")
+            prompt_packet = task.get("prompt_packet", "")
+            
+            if not prompt_packet:
+                errors.append(f"Task {task_id}: prompt_packet is EMPTY")
+            elif len(prompt_packet) < MIN_PROMPT_PACKET_LENGTH:
+                errors.append(f"Task {task_id}: prompt_packet too short ({len(prompt_packet)} chars, minimum {MIN_PROMPT_PACKET_LENGTH})")
+            
+            # Check for required task fields
+            required = ["task_id", "slice_id", "title", "routing_flag"]
+            for field in required:
+                if field not in task or not task.get(field):
+                    errors.append(f"Task {task_id}: missing required field '{field}'")
+        
+        return {"valid": len(errors) == 0, "errors": errors}
+    
+    def _ensure_prompt_packets(self, tasks: List[Dict], prd: str) -> List[Dict]:
+        """
+        Ensure every task has a complete prompt_packet.
+        If missing or too short, generate one from task metadata.
+        """
+        for task in tasks:
+            prompt_packet = task.get("prompt_packet", "")
+            
+            if not prompt_packet or len(prompt_packet) < MIN_PROMPT_PACKET_LENGTH:
+                self.log(f"Generating prompt_packet for {task.get('task_id', 'unknown')}", level="warning")
+                task["prompt_packet"] = self._generate_prompt_packet(task, prd)
+        
+        return tasks
+    
+    def _generate_prompt_packet(self, task: Dict, prd: str) -> str:
+        """
+        Generate a complete prompt_packet from task metadata.
+        Used when LLM returns empty/incomplete prompt_packets.
+        """
+        task_id = task.get("task_id", "UNKNOWN")
+        title = task.get("title", "Untitled Task")
+        slice_id = task.get("slice_id", "unknown")
+        phase = task.get("phase", "P1")
+        purpose = task.get("purpose", "")
+        objectives = task.get("objectives", [])
+        deliverables = task.get("deliverables", [])
+        expected_output = task.get("expected_output", {})
+        confidence = task.get("confidence", 0.95)
+        routing_flag = task.get("routing_flag", "web")
+        routing_reason = task.get("routing_flag_reason", "")
+        
+        # Build prompt_packet from available data
+        objectives_text = "\n".join([f"- {obj}" for obj in objectives]) if objectives else "- Complete the task as described"
+        deliverables_text = "\n".join([f"- {d}" for d in deliverables]) if deliverables else "- Working implementation"
+        expected_text = json.dumps(expected_output, indent=2) if expected_output else "{}"
+        
+        prompt_packet = f"""# TASK: {task_id} - {title}
+
+## CONTEXT
+{purpose if purpose else f"This task is part of the {slice_id} slice, phase {phase}. It contributes to the overall project goals defined in the PRD."}
+
+## WHAT TO BUILD
+
+### Objectives
+{objectives_text}
+
+### Deliverables
+{deliverables_text}
+
+## TECHNICAL SPECIFICATIONS
+
+### Slice: {slice_id}
+### Phase: {phase}
+### Routing: {routing_flag} ({routing_reason})
+
+## ACCEPTANCE CRITERIA
+- [ ] All objectives completed
+- [ ] All deliverables produced
+- [ ] Code follows project conventions
+- [ ] Tests pass (if applicable)
+
+## EXPECTED OUTPUT
+```json
+{expected_text}
+```
+
+## CONFIDENCE
+{confidence}
+
+## OUTPUT FORMAT
+Return JSON:
+```json
+{{
+  "task_id": "{task_id}",
+  "model_name": "[your model name]",
+  "files_created": ["path1", "path2"],
+  "files_modified": ["path1"],
+  "summary": "Brief description of what was built",
+  "tests_written": ["path/to/test.py"],
+  "notes": "Any important decisions or things to know"
+}}
+```
+
+## DO NOT
+- Add features not listed in this task
+- Modify files not listed
+- Add dependencies not specified
+- Leave TODO comments
+"""
+        return prompt_packet
+    
     def _parse_plan(self, response: str) -> Optional[Dict]:
         """Parse plan JSON from LLM response."""
         try:
@@ -226,7 +399,7 @@ Return ONLY valid JSON following the output format specified above."""
             
             return None
     
-    def _validate_plan(self, plan: Dict) -> Dict:
+    def _validate_plan_structure(self, plan: Dict) -> Dict:
         """Validate plan has required structure."""
         errors = []
         
@@ -240,7 +413,7 @@ Return ONLY valid JSON following the output format specified above."""
             
             for phase in slice_data.get("phases", []):
                 for task in phase.get("tasks", []):
-                    # Check required task fields
+                    # Check required task fields (prompt_packet validated separately)
                     required = ["task_id", "slice_id", "title", "routing_flag"]
                     for field in required:
                         if field not in task:
@@ -286,6 +459,12 @@ Return ONLY valid JSON following the output format specified above."""
         for task in tasks:
             task_number = task.get("task_id", f"TASK-{written}")
             
+            # Ensure prompt_packet exists (should already be validated)
+            prompt_packet = task.get("prompt_packet", "")
+            if not prompt_packet or len(prompt_packet) < MIN_PROMPT_PACKET_LENGTH:
+                self.log(f"WARNING: Task {task_number} has incomplete prompt_packet, regenerating...", level="warning")
+                prompt_packet = self._generate_prompt_packet(task, "")
+            
             task_record = {
                 "task_number": task_number,
                 "title": task.get("title", "Untitled task"),
@@ -297,7 +476,7 @@ Return ONLY valid JSON following the output format specified above."""
                 "routing_flag_reason": task.get("routing_flag_reason"),
                 "status": "pending",
                 "result": {
-                    "prompt_packet": task.get("prompt_packet", ""),
+                    "prompt_packet": prompt_packet,
                     "expected_output": task.get("expected_output"),
                     "confidence": task.get("confidence"),
                     "confidence_reasoning": task.get("confidence_reasoning"),
