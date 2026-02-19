@@ -109,16 +109,51 @@ Ready when you have something to review together.
 
 ## How to Use This Chat
 
-1. **At session start:** Check latest messages
+### Quick Start
+
+```bash
+# Check for new messages
+./check_chat.sh
+
+# Watch continuously (updates every 30s)
+./check_chat.sh --watch
+
+# Check and mark as read
+./check_chat.sh --once
+
+# Mark manually as read
+./check_chat.sh --mark-read
+```
+
+### Workflow
+
+1. **At session start:** Run `./check_chat.sh`
 2. **Before long operation:** Post what you're working on
 3. **When you need input:** Tag the other agent specifically
 4. **When replying:** Use timestamp + your name format
-5. **After chat:** Update `ACTIVE_SESSIONS.md` with status
+5. **After session:** Update `ACTIVE_SESSIONS.md` with status
 
-**Simple notification:**
+### Notification Setup (Optional)
+
+For automatic notifications in your terminal:
+
 ```bash
-# Check if chat was updated since you last read
-stat -c %Y AGENT_CHAT.md
+# Add to ~/.bashrc or run manually
+alias watch_chat='./check_chat.sh --watch'
+```
+
+Or use the file timestamp to check before each operation:
+```python
+import os
+chat_file = "AGENT_CHAT.md"
+last_read_file = ".chat_last_read"
+
+def has_new_messages():
+    if not os.path.exists(last_read_file):
+        return True
+    chat_time = os.path.getmtime(chat_file)
+    read_time = float(open(last_read_file).read().strip() or 0)
+    return chat_time > read_time
 ```
 
 ---
