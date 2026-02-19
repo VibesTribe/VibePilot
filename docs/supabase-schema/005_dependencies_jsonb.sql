@@ -10,6 +10,11 @@
 
 BEGIN;
 
+-- 0. Drop the circular dependency check constraint (uses ANY() which needs array)
+ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_circular_dep_check;
+-- Note: constraint name may vary, if error on this line, check actual name with:
+-- SELECT conname FROM pg_constraint WHERE conrelid = 'tasks'::regclass;
+
 -- 1. Drop the default first (can't cast UUID[] default to JSONB)
 ALTER TABLE tasks ALTER COLUMN dependencies DROP DEFAULT;
 
@@ -25,11 +30,15 @@ END;
 -- 3. Set new JSONB default
 ALTER TABLE tasks ALTER COLUMN dependencies SET DEFAULT '[]'::jsonb;
 
--- 2. Update the GIN index for JSONB
+-- 4. Recreate circular dependency check with JSONB syntax
+ALTER TABLE tasks ADD CONSTRAINT tasks_no_self_dependency 
+  CHECK (NOT (dependencies ? id::text) OR dependencies IS NULL OR dependencies = '[]'::jsonb);
+
+-- 5. Update the GIN index for JSONB
 DROP INDEX IF EXISTS idx_tasks_deps;
 CREATE INDEX idx_tasks_deps ON tasks USING GIN(dependencies);
 
--- 3. Fix check_dependencies_complete to work with JSONB array of UUIDs
+-- 6. Fix check_dependencies_complete to work with JSONB array of UUIDs
 CREATE OR REPLACE FUNCTION check_dependencies_complete(p_task_id UUID)
 RETURNS BOOLEAN AS $$
 DECLARE
@@ -65,7 +74,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 4. Fix unlock_dependent_tasks to work with JSONB
+-- 7. Fix unlock_dependent_tasks to work with JSONB
 CREATE OR REPLACE FUNCTION unlock_dependent_tasks(p_completed_task_id UUID)
 RETURNS TABLE(unlocked_id UUID, unlocked_title TEXT) AS $$
 DECLARE
@@ -115,7 +124,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 5. Fix get_available_tasks return type
+-- 8. Fix get_available_tasks return type
 DROP FUNCTION IF EXISTS get_available_tasks();
 CREATE OR REPLACE FUNCTION get_available_tasks()
 RETURNS TABLE(
@@ -135,7 +144,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 6. Fix claim_next_task
+-- 9. Fix claim_next_task
 DROP FUNCTION IF EXISTS claim_next_task(TEXT, TEXT, TEXT);
 CREATE OR REPLACE FUNCTION claim_next_task(
     p_courier TEXT,
@@ -168,7 +177,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 7. Add routing-aware task fetch (was missing)
+-- 10. Add routing-aware task fetch (was missing)
 CREATE OR REPLACE FUNCTION get_available_for_routing(
     p_can_web BOOLEAN DEFAULT TRUE,
     p_can_internal BOOLEAN DEFAULT TRUE,
@@ -196,15 +205,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 8. Grant permissions
+-- 11. Grant permissions
 GRANT EXECUTE ON FUNCTION check_dependencies_complete(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION unlock_dependent_tasks(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_available_tasks() TO authenticated;
 GRANT EXECUTE ON FUNCTION claim_next_task(TEXT, TEXT, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_available_for_routing(BOOLEAN, BOOLEAN, BOOLEAN) TO authenticated;
 
--- 9. Add locked status to check constraint if not exists
--- (Note: May need to drop/recreate constraint if locked not included)
+-- Note: If tasks table has status check constraint, 'locked' may need to be added
+-- Check existing constraint: SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname LIKE '%status%';
 
 COMMIT;
 
