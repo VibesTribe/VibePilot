@@ -10,8 +10,8 @@
 
 | Agent | Last Active | Status | Current Focus |
 |-------|-------------|--------|---------------|
-| Kimi | 2026-02-18 19:24 | Active | Research, token tracking, Council prep |
-| GLM-5 | 2026-02-18 22:15 | Active | Dependency schema research, RPC fixes |
+| Kimi | 2026-02-18 19:55 | Active | Research, token tracking, coordination |
+| GLM-5 | 2026-02-18 22:50 | Active | Migration fix, constraint issue |
 
 ---
 
