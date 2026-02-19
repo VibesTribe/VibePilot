@@ -11,22 +11,99 @@
 
 ---
 
-**Last Updated:** 2026-02-18 22:00 UTC
-**Updated By:** GLM-5 (Session 14: Foundation redesign)
-**Session Focus:** Fixing the entire foundation - data model, pipeline flow, orchestrator
+**Last Updated:** 2026-02-19 01:30 UTC
+**Updated By:** GLM-5 (Session 15: Dependency System Complete)
+**Session Focus:** Fixed dependency schema, all RPC functions working, task flow operational
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Data model redesign COMPLETE, orchestrator uses new schema, rate limits tracked
+**Progress:** Dependencies migrated to JSONB, all 5 RPC functions working, task flow operational
 
 ---
 
-## SQL TO RUN
+# SESSION 15 SUMMARY (2026-02-18/19)
 
-Run these in Supabase SQL Editor (in order):
-1. ✅ `001_data_model_redesign.sql` - Creates new tables
-2. ✅ `002_rls_fix.sql` - Disables RLS on new tables
-3. ✅ `003_tools_columns_fix.sql` - Adds columns to tools table
-4. ⏳ `004_usage_rpc.sql` - Creates usage tracking functions (NEEDS TO RUN)
+## What We Fixed
+
+### 1. Dependencies Column: UUID[] → JSONB ✅
+
+**Problem:** RPC functions expected JSONB but column was UUID[]. Functions crashed with operator errors.
+
+**Solution:**
+- Ran 13 SQL migrations (005-013)
+- Migrated `dependencies` column to JSONB
+- Fixed all 5 RPC functions
+
+**Files Created:**
+```
+docs/supabase-schema/
+├── 005_dependencies_jsonb.sql      - Main migration
+├── 006_fix_dependencies_data.sql   - Data cleanup attempt
+├── 007_fix_deps_v2.sql             - Another cleanup attempt
+├── 008_fix_rpc_strip_quotes.sql    - RPC fix for double-quoted UUIDs
+├── 009_fix_claim_next_task.sql     - Fix duplicate functions
+├── 010_check_duplicates.sql        - Diagnostic query
+├── 011_nuclear_claim_next_task.sql - Force drop all versions
+├── 012_find_claim_signatures.sql   - Find exact signatures
+└── 013_fix_claim_final.sql         - Final fix (3-arg + 4-arg drop)
+```
+
+### 2. All RPC Functions Working ✅
+
+| Function | Status | Notes |
+|----------|--------|-------|
+| `check_dependencies_complete` | ✅ Working | Returns boolean |
+| `unlock_dependent_tasks` | ✅ Working | Returns unlocked task IDs |
+| `get_available_tasks` | ✅ Working | 8 rows returned |
+| `claim_next_task` | ✅ Working | Claims task atomically |
+| `get_available_for_routing` | ✅ Working | 7 rows returned |
+
+### 3. Task Flow Operational ✅
+
+```
+pending → approve_plan() → locked (has deps) or available (no deps)
+                              ↓
+                    parent merges → unlock fires → available
+                              ↓
+                    claim_next_task → in_progress → review → merged
+```
+
+### 4. Dashboard Fixes ✅
+
+- Token data cleaned (24K → 1.4K, removed hardcoded test values)
+- CSS model line cutoff fixed
+- ROI panel collapsible sections working
+
+### 5. Agent Coordination ✅
+
+- Created `AGENT_CHAT.md` for GLM-Kimi communication
+- Created `inbox/` system for task delegation
+- Kimi (research) and GLM-5 (code) roles defined
+- Session tracking in `ACTIVE_SESSIONS.md`
+
+---
+
+## What We Created
+
+| File | Purpose |
+|------|---------|
+| `run_orchestrator.py` | Service entry point for orchestrator |
+| `scripts/vibepilot-orchestrator.service` | systemd unit file |
+| `scripts/cleanup_task_runs.py` | Fix bad token data |
+| `AGENT_CHAT.md` | GLM-Kimi communication channel |
+| `inbox/README.md` | Inbox system documentation |
+| `inbox/kimi/*.md` | Tasks for Kimi |
+| `inbox/glm-5/*.md` | Tasks for GLM-5 |
+
+---
+
+## What's Left
+
+| Priority | Task | Notes |
+|----------|------|-------|
+| 1 | Orchestrator as systemd service | Files ready, needs install on GCE |
+| 2 | Council implementation | Currently placeholder |
+| 3 | Executioner connection | Tests don't run after review |
+| 4 | Data cleanup | Old test tasks still in DB |
 
 ---
 
@@ -58,69 +135,6 @@ User → "Hey Vibes, I want feature X" → Vibes triggers pipeline
 
 ---
 
-# CURRENT SESSION (14) - FOUNDATION REDESIGN
-
-## What We Discovered
-
-### The Real Problem (Type 1 Error)
-
-The `models` table conflates everything:
-- AI models (kimi-k2.5, glm-5, deepseek-chat)
-- Tools/interfaces (opencode, kimi-cli)
-- Access methods (api, subscription, web_free_tier)
-- Rate limits (single values, no windows)
-- Usage tracking (broken)
-
-**Result:** Orchestrator cannot answer "What models can I use right now?"
-
-### Pipeline Flow Broken
-
-- Planner writes tasks as `pending`
-- Orchestrator looks for `available`
-- **Nothing transitions between them**
-- Supervisor exists but never triggered
-- Council never called
-
-### Orchestrator Not a Service
-
-- Requires manual `orch.start()` call
-- Should be always-on, watching queue
-- Previous session bypassed instead of fixing
-
-### No Multi-Window Rate Limits
-
-- We killed Gemini API in 60 seconds
-- No RPM (requests/minute) tracking
-- No rolling window tracking
-- Can't respect 80% threshold
-
-## What We Fixed (Committed)
-
-| Fix | File | Commit |
-|-----|------|--------|
-| Increment attempts on failure | `task_manager.py` | `24960cdc` |
-| Check attempts before dispatch | `core/orchestrator.py` | `24960cdc` |
-| Clear assigned_to on return to queue | `task_manager.py` | `24960cdc` |
-| CSS By Model cut-off fix | `vibeflow/styles.css` | `ea034ef9` (branch) |
-
-## What We Documented
-
-| Document | Purpose |
-|----------|---------|
-| `docs/DATA_MODEL_REDESIGN.md` | Full schema redesign plan |
-| `docs/rate_limits/gemini_api_free_tier.json` | Gemini limits researched by Kimi |
-| `docs/supabase-schema/001_data_model_redesign.sql` | NEW - SQL for new tables |
-| `scripts/populate_new_schema.py` | Script to populate tables from config |
-
-## What We Cleaned Up
-
-- Benched ghost models not in RUNNER_REGISTRY
-- Unbenched kimi-k2.5 (the actual Kimi model)
-- Updated AGENTS.md: user constraints (no click/copy/paste), OpenCode context
-- Consolidated schema files: removed duplicate `supabase/migrations/`, kept `docs/supabase-schema/`
-
----
-
 # ACTIVE MODELS (Current State)
 
 | Model ID | Status | Access Via | Notes |
@@ -137,92 +151,55 @@ The `models` table conflates everything:
 
 ---
 
-# NEXT STEPS (In Order)
+# TASK STATUS FLOW
 
-## 1. Data Model Redesign (COMPLETE)
-
-**Status:** Tables created, populated, verified
-
-**New Tables:**
-- `models_new`: 10 models (AI capabilities only)
-- `tools`: 4 tools (opencode, kimi-cli, direct-api, courier)
-- `access`: 15 access records (links models to tools with limits, usage)
-- `task_history`: Ready for learning data
-
-**Active Access (by priority):**
-| Priority | Model | Tool | Method |
-|----------|-------|------|--------|
-| 0 | kimi-internal | kimi-cli | subscription |
-| 0 | glm-5 | opencode | subscription |
-| 1 | gpt-4o, claude-* | courier | web_free_tier |
-| paused | gemini-*, deepseek-* | direct-api | api |
-
-**Next:** Update orchestrator to query new `access` table for routing decisions
-
-## 2. Update Orchestrator (In Progress)
-
-**Status:** RunnerPool loads from new access table
-
-**Done:**
-- `RunnerPool._load_from_database()` queries `access` table with joins
-- Runners keyed as `model_id:tool_id` (e.g., `kimi-internal:kimi-cli`)
-- Loads rate limits, capabilities, priority from new schema
-
-**Current runners (from new schema):**
-| Priority | Runner Key | Method | Routing |
-|----------|------------|--------|---------|
-| 0 | kimi-internal:kimi-cli | subscription | internal, web, mcp |
-| 0 | glm-5:opencode | subscription | internal, mcp |
-| 1 | gpt-4o:courier | web_free_tier | web |
-| 1 | claude-sonnet-4-5:courier | web_free_tier | web |
-| 1 | claude-haiku-4-5:courier | web_free_tier | web |
-| 1 | gpt-4o-mini:courier | web_free_tier | web |
-
-**Next:**
-- Add rate limit checking before dispatch (check 80% threshold)
-- Add usage tracking after task completion (update access table)
-- Test end-to-end task dispatch with new schema
-
-## 3. Pipeline Auto-Flow (IMPLEMENTED ✅)
-
-**Status:** Working
-
-**Flow:**
 ```
-Planner writes "pending" → Supervisor reviews plan → Council vets → 
-Supervisor approves → Tasks become "available" → Orchestrator dispatches
+pending ──► approve_plan() ──┬──► available (no deps) ──► in_progress
+                             │
+                             └──► locked (has deps)
+                                        │
+                                        │ [parent task merges]
+                                        │ [unlock_dependent_tasks RPC fires]
+                                        ▼
+                                   available ──► in_progress
 ```
 
-**Implementation:**
-- `supervisor.get_pending_plans()` - Gets tasks with status="pending"
-- `supervisor.review_plan()` - Validates plan for issues
-- `supervisor.call_council()` - Coordinates council review
-- `supervisor.approve_plan()` - Transitions pending → available
-- `orchestrator._process_pending_plans()` - Called on each tick
-
-**Tested:**
-- Before: 16 pending, 8 available
-- After: 0 pending, 24 available ✅
-
-**Full status flow per PRD:**
+**Full status lifecycle per PRD:**
 ```
 pending → available → in_progress → review → testing → approved → merged
-              ↑            │          │         │           │
-              └────────────┴──────────┴─────────┴───────────┘
-                           (loops back on failure)
+     ↑            │          │         │           │
+     └────────────┴──────────┴─────────┴───────────┘
+                  (loops back on failure)
+
+Special states:
+- locked: Awaiting dependencies
+- escalated: Max attempts exceeded
+- awaiting_human: Visual/manual testing needed
 ```
 
-## 4. Orchestrator as Service (NOT IMPLEMENTED)
+---
 
-**Status:** Still requires manual `orch.start()` call
+# NEXT STEPS (In Order)
 
-**Needed:**
-- Run continuously as background process
-- Watch queue, dispatch, learn
-- systemd service or screen/tmux session
-- Auto-restart on failure
+## 1. Orchestrator as systemd Service (READY TO INSTALL)
 
-## 5. Full Council Implementation (NOT IMPLEMENTED)
+**Status:** Files created, needs installation on GCE
+
+**Files:**
+- `run_orchestrator.py` - Entry point
+- `scripts/vibepilot-orchestrator.service` - systemd unit
+
+**Install:**
+```bash
+sudo cp scripts/vibepilot-orchestrator.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable vibepilot-orchestrator
+sudo systemctl start vibepilot-orchestrator
+```
+
+**Result:** Orchestrator runs 24/7, auto-restarts on crash, starts on boot
+
+## 2. Full Council Implementation (NOT IMPLEMENTED)
 
 **Status:** Simplified placeholder only
 
@@ -236,60 +213,43 @@ pending → available → in_progress → review → testing → approved → me
 - Iterative consensus (up to 4 rounds)
 - Real voting mechanism
 
-## 6. Data Cleanup Needed
+## 3. Executioner Connection (NOT IMPLEMENTED)
 
-**Token Issues:**
-- Some task_runs have hardcoded test token values (9000, 4900, etc.)
-- Dashboard shows 24K tokens - includes bad test data
-- Need to audit and clean task_runs table
+**Status:** Executioner agent exists but not wired
+
+**Needed:**
+- After supervisor review passes → route to Executioner
+- Run tests → update task with results
+- Pass/fail → appropriate status transition
+
+## 4. Data Cleanup (PARTIAL)
+
+**Token Issues:** ✅ Fixed - cleaned bad test data
 
 **Tasks to Clean Up:**
 - Old test tasks with status issues
 - Duplicate task_runs from infinite retry bug (fixed now)
 - Tasks stuck in invalid states
 
-**Orphaned Data:**
-- task_runs referencing benched models
-- task_history records pointing to old access IDs
-
-## 7. Rate Limit Data Collected
-
-**DeepSeek API:** `docs/rate_limits/deepseek_api.json`
-- No fixed rate limits (dynamic throttling)
-- 5M free tokens for new users
-- Pricing: $0.28/1M input (cache miss), $0.42/1M output
-
-**Kimi/Moonshot API:** `docs/rate_limits/kimi_moonshot_api.json`
-- Tier-based limits ($1 min to activate)
-- Tier0: 3 RPM, 500K TPM, 1.5M TPD
-- Kimi K2.5: 256K context, multimodal
-
-**Gemini API:** `docs/rate_limits/gemini_api_free_tier.json`
-- gemini-2.5-flash: 10 RPM, 250 RPD, 250K TPM
-- Daily reset at midnight PT
-
 ---
 
-# GEMINI API FREE TIER LIMITS
+# AGENT COORDINATION
 
-Researched by Kimi, stored in `docs/rate_limits/gemini_api_free_tier.json`
+## GLM-5 + Kimi Communication
 
-| Model | RPM | RPD | TPM | TPD |
-|-------|-----|-----|-----|-----|
-| gemini-2.5-pro | 5 | 100 | 250K | - |
-| gemini-2.5-flash | 10 | 250 | 250K | - |
-| gemini-2.5-flash-lite | 15 | 1000 | 250K | - |
-| gemini-1.5-flash | 15 | 1500 | 1M | - |
-| gemini-1.5-pro | 2 | 50 | 32K | - |
+**Primary Channel:** `AGENT_CHAT.md` - Check at session start
 
-**Reset:** Daily at Midnight PT (08:00 UTC)
+**Inbox System:**
+- `inbox/kimi/` - Tasks for Kimi (research)
+- `inbox/glm-5/` - Tasks for GLM-5 (code)
 
-**80% Safe Limits:**
-| Model | Safe RPM | Safe RPD |
-|-------|----------|----------|
-| gemini-2.5-flash | 8 | 200 |
-| gemini-2.5-flash-lite | 12 | 800 |
-| gemini-1.5-flash | 12 | 1200 |
+**Branch Ownership:**
+| Agent | Branch | Focus |
+|-------|--------|-------|
+| kimi | research-considerations | Research, docs, analysis |
+| glm-5 | main | Core orchestration, infrastructure |
+
+**Session Tracking:** `ACTIVE_SESSIONS.md`
 
 ---
 
@@ -309,10 +269,11 @@ Researched by Kimi, stored in `docs/rate_limits/gemini_api_free_tier.json`
 
 | Command | Action |
 |---------|--------|
-| `cat docs/DATA_MODEL_REDESIGN.md` | Full schema redesign plan |
-| `cat docs/rate_limits/gemini_api_free_tier.json` | Gemini limits |
+| `cat CURRENT_STATE.md` | This file |
+| `cat CHANGELOG.md` | Full history |
+| `cat AGENT_CHAT.md` | GLM-Kimi chat |
+| `./check_chat.sh` | Check for new messages |
 | `git log --oneline -5` | Recent commits |
-| `kimi --yolo --prompt "..."` | Send task to Kimi for research |
 | `cd ~/vibepilot && git checkout main && git pull` | Get latest |
 
 ---
