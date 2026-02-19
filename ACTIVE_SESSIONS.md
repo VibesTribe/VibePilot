@@ -6,8 +6,22 @@ Track which AI agents are working on what. Update when starting or ending a sess
 
 | Agent | Branch | Focus | Started | Status |
 |-------|--------|-------|---------|--------|
-| kimi | research-considerations | Research, competitive analysis, docs | Feb 18 | Active |
-| glm-5 | main | Core orchestration, infrastructure, production | Feb 18 | Active |
+| kimi | research-considerations | Research, competitive analysis, docs | Feb 18 | Active - Available for parallel codebase analysis |
+| glm-5 | main | Core orchestration, infrastructure, production | Feb 18 | Active - Checking Supabase orchestrator functions |
+
+## Kimi's Capabilities for GLM
+
+**Available on request:**
+- Parallel codebase analysis (multiple subagents reading files)
+- Research on external repos/tools
+- Token cost calculations
+- Documentation of findings
+
+**Constraint:** Zero system file modifications. Research only.
+
+**How to request:** Update `.handoff-to-glm.md` with what you need analyzed.
+
+---
 
 ## How to Use
 
@@ -22,3 +36,9 @@ Track which AI agents are working on what. Update when starting or ending a sess
 - **glm-5** → `main` (code, infrastructure, production)
 
 Never work on another agent's branch. If you need something from another branch, ask the human to coordinate.
+
+## Communication
+
+- **Handoff notes:** `.handoff-to-glm.md` (leave messages for each other)
+- **Current state:** `CURRENT_STATE.md` (project status)
+- **Urgent:** Ask the human to relay
