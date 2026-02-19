@@ -99,6 +99,21 @@
    git branch --show-current
    ```
 
+5. **Check AGENT_CHAT.md (MANDATORY):**
+   ```bash
+   ./start_session.sh
+   # Or manually:
+   cat AGENT_CHAT.md
+   ./check_chat.sh --once
+   ```
+   
+   **WHY:** Other agents may be waiting for you, have questions, or need coordination. Always check before starting work.
+
+6. **Review AGENT_PROTOCOL.md if unclear:**
+   - Communication rules
+   - Handoff procedures
+   - Response time expectations
+
 ---
 
 ## Common Scenarios
