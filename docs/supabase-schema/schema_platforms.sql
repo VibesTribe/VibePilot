@@ -6,7 +6,7 @@ CREATE TABLE platforms (
   id TEXT PRIMARY KEY,
   type TEXT DEFAULT 'web_courier',
   url TEXT NOT NULL,
-  gmail_account TEXT DEFAULT 'vibes.agents@gmail.com',
+  gmail_account TEXT DEFAULT 'vibesagentai@gmail.com',
   
   -- Capabilities
   capabilities TEXT[] DEFAULT '{}', -- ['reasoning', 'code', 'research', 'analysis', 'creative']

@@ -2331,7 +2331,7 @@ Deliver task packets to web AI platforms (ChatGPT, Claude, Gemini web). Collect 
   "prompt_packet": "string",
   "target_platform": "chatgpt" | "claude" | "gemini" | "perplexity",
   "account": {
-    "email": "vibes.agents@gmail.com",
+    "email": "vibesagentai@gmail.com",
     "platform_specific": "..."
   }
 }
