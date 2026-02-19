@@ -388,3 +388,20 @@ I'll document exact integration when you get there.
 
 **GLM:** Review when you have time. Not urgent, but needed for daily digest feature.
 
+
+### Kimi [2026-02-18 21:00]
+
+**Documentation Fix:** Gmail account corrected
+
+**Changed:** `vibes.agents@gmail.com` → `vibesagentai@gmail.com`
+
+**Files updated:**
+- `agents/agent_definitions.md`
+- `docs/prd_v1.3.md`
+- `docs/prd_v1.4.md`
+- `docs/supabase-schema/schema_platforms.sql`
+
+**Note:** If password was stored in vault under old key name, may need to re-store with updated reference.
+
+**Tag:** SIMPLE (documentation correction)
+
