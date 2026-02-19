@@ -10,10 +10,22 @@
 
 BEGIN;
 
--- 0. Drop the circular dependency check constraint (uses ANY() which needs array)
-ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_circular_dep_check;
--- Note: constraint name may vary, if error on this line, check actual name with:
--- SELECT conname FROM pg_constraint WHERE conrelid = 'tasks'::regclass;
+-- 0. Find and drop ANY constraint using dependencies column
+-- The ANY() operator requires array type, must drop before changing to JSONB
+DO $$
+DECLARE
+    constraint_name TEXT;
+BEGIN
+    FOR constraint_name IN 
+        SELECT conname 
+        FROM pg_constraint 
+        WHERE conrelid = 'tasks'::regclass 
+        AND pg_get_constraintdef(oid) LIKE '%ANY%(dependencies%)'
+    LOOP
+        EXECUTE format('ALTER TABLE tasks DROP CONSTRAINT IF EXISTS %I', constraint_name);
+        RAISE NOTICE 'Dropped constraint: %', constraint_name;
+    END LOOP;
+END $$;
 
 -- 1. Drop the default first (can't cast UUID[] default to JSONB)
 ALTER TABLE tasks ALTER COLUMN dependencies DROP DEFAULT;
@@ -31,8 +43,18 @@ END;
 ALTER TABLE tasks ALTER COLUMN dependencies SET DEFAULT '[]'::jsonb;
 
 -- 4. Recreate circular dependency check with JSONB syntax
-ALTER TABLE tasks ADD CONSTRAINT tasks_no_self_dependency 
-  CHECK (NOT (dependencies ? id::text) OR dependencies IS NULL OR dependencies = '[]'::jsonb);
+-- (uses ? operator instead of ANY())
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conrelid = 'tasks'::regclass 
+        AND conname = 'tasks_no_self_dependency'
+    ) THEN
+        ALTER TABLE tasks ADD CONSTRAINT tasks_no_self_dependency 
+          CHECK (dependencies IS NULL OR dependencies = '[]'::jsonb OR NOT (dependencies ? id::text));
+    END IF;
+END $$;
 
 -- 5. Update the GIN index for JSONB
 DROP INDEX IF EXISTS idx_tasks_deps;
