@@ -6,6 +6,100 @@
 
 ---
 
+# 2026-02-18/19 (Session 15)
+
+## Summary
+
+Fixed dependency system foundation: migrated to JSONB, all 5 RPC functions working, task flow operational.
+
+### Major Work
+
+1. **Dependencies: UUID[] → JSONB**
+   - Column migrated from `uuid[]` to `jsonb`
+   - RPC functions expected jsonb but table was uuid[]
+   - 13 SQL migrations to fix (005-013)
+   - Data had double-quoted UUIDs that needed stripping
+
+2. **All RPC Functions Working**
+   - `check_dependencies_complete` ✓
+   - `unlock_dependent_tasks` ✓
+   - `get_available_tasks` ✓
+   - `claim_next_task` ✓ (had duplicate 3-arg and 4-arg versions)
+   - `get_available_for_routing` ✓
+
+3. **Task Flow Operational**
+   - `approve_plan()` now routes to `available` (no deps) or `locked` (has deps)
+   - When parent merges, `unlock_dependent_tasks` fires
+   - Locked tasks with satisfied deps become `available`
+
+4. **Dashboard Fixes**
+   - Token data cleaned (24K → 1.4K)
+   - CSS model line cutoff fixed in ROI panel
+   - Collapsible sections working
+
+5. **Agent Coordination**
+   - Created `AGENT_CHAT.md` for GLM-Kimi communication
+   - Created `inbox/` system for task delegation
+   - Session tracking in `ACTIVE_SESSIONS.md`
+
+### Files Created
+
+```
+vibepilot/
+├── run_orchestrator.py                  - Service entry point
+├── AGENT_CHAT.md                        - GLM-Kimi communication
+├── ACTIVE_SESSIONS.md                   - Session tracking
+├── scripts/
+│   ├── vibepilot-orchestrator.service   - systemd unit file
+│   └── cleanup_task_runs.py             - Token data cleanup
+├── inbox/
+│   ├── README.md                        - Inbox system docs
+│   ├── kimi/                            - Tasks for Kimi
+│   └── glm-5/                           - Tasks for GLM-5
+└── docs/supabase-schema/
+    ├── 005_dependencies_jsonb.sql
+    ├── 006_fix_dependencies_data.sql
+    ├── 007_fix_deps_v2.sql
+    ├── 008_fix_rpc_strip_quotes.sql
+    ├── 009_fix_claim_next_task.sql
+    ├── 010_check_duplicates.sql
+    ├── 011_nuclear_claim_next_task.sql
+    ├── 012_find_claim_signatures.sql
+    └── 013_fix_claim_final.sql
+```
+
+### Commits
+
+```
+281bf168 Fix: Drop both 3-arg and 4-arg claim_next_task versions
+74d1c5c5 Add SQL to find all claim_next_task signatures
+7d3d80b4 Add nuclear option to drop ALL claim_next_task versions
+18e786d6 Add SQL to check for duplicate claim_next_task functions
+03ad608c Fix: Drop all claim_next_task versions and recreate single one
+7af486e7 Add SQL fixes for double-quoted UUIDs in dependencies
+acb12d82 Fix migration: drop all functions upfront before recreating
+f2887c0c Fix migration: drop default before type change
+66a1178f Add migration: dependencies UUID[] → JSONB
+c929f18b GLM-5: Acknowledge Kimi coordination, update migration status
+eb6cf9ee Add inter-agent inbox system for GLM-Kimi coordination
+... (more)
+```
+
+### Known Issues
+
+- Orchestrator not running as service (files ready, needs install)
+- Council is placeholder (simplified implementation)
+- Executioner not wired (tests don't run after review)
+
+### Remaining Work
+
+1. Install orchestrator as systemd service on GCE
+2. Implement full Council (3 independent reviews)
+3. Wire Executioner for post-review testing
+4. Clean up old test tasks in database
+
+---
+
 # 2026-02-18 (Session 13)
 
 ## Summary
