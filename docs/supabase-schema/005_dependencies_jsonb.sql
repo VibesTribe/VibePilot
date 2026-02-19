@@ -10,7 +10,14 @@
 
 BEGIN;
 
--- 0. Find and drop ANY constraint using dependencies column
+-- 0. Drop ALL functions that will be recreated (must drop before column type change)
+DROP FUNCTION IF EXISTS check_dependencies_complete(UUID);
+DROP FUNCTION IF EXISTS unlock_dependent_tasks(UUID);
+DROP FUNCTION IF EXISTS get_available_tasks();
+DROP FUNCTION IF EXISTS claim_next_task(TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS get_available_for_routing(BOOLEAN, BOOLEAN, BOOLEAN);
+
+-- 1. Find and drop ANY constraint using dependencies column
 -- The ANY() operator requires array type, must drop before changing to JSONB
 DO $$
 DECLARE
@@ -27,10 +34,10 @@ BEGIN
     END LOOP;
 END $$;
 
--- 1. Drop the default first (can't cast UUID[] default to JSONB)
+-- 2. Drop the default first (can't cast UUID[] default to JSONB)
 ALTER TABLE tasks ALTER COLUMN dependencies DROP DEFAULT;
 
--- 2. Migrate dependencies column to JSONB
+-- 3. Migrate dependencies column to JSONB
 ALTER TABLE tasks 
 ALTER COLUMN dependencies TYPE JSONB 
 USING CASE 
@@ -39,10 +46,10 @@ USING CASE
   ELSE to_jsonb(dependencies)
 END;
 
--- 3. Set new JSONB default
+-- 4. Set new JSONB default
 ALTER TABLE tasks ALTER COLUMN dependencies SET DEFAULT '[]'::jsonb;
 
--- 4. Recreate circular dependency check with JSONB syntax
+-- 5. Recreate circular dependency check with JSONB syntax
 -- (uses ? operator instead of ANY())
 DO $$
 BEGIN
@@ -56,7 +63,7 @@ BEGIN
     END IF;
 END $$;
 
--- 5. Update the GIN index for JSONB
+-- 6. Update the GIN index for JSONB
 DROP INDEX IF EXISTS idx_tasks_deps;
 CREATE INDEX idx_tasks_deps ON tasks USING GIN(dependencies);
 
@@ -147,7 +154,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- 8. Fix get_available_tasks return type
-DROP FUNCTION IF EXISTS get_available_tasks();
 CREATE OR REPLACE FUNCTION get_available_tasks()
 RETURNS TABLE(
     id UUID,
@@ -167,7 +173,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- 9. Fix claim_next_task
-DROP FUNCTION IF EXISTS claim_next_task(TEXT, TEXT, TEXT);
 CREATE OR REPLACE FUNCTION claim_next_task(
     p_courier TEXT,
     p_platform TEXT,
