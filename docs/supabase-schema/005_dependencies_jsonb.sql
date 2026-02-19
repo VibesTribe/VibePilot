@@ -10,13 +10,20 @@
 
 BEGIN;
 
--- 1. Migrate dependencies column to JSONB
+-- 1. Drop the default first (can't cast UUID[] default to JSONB)
+ALTER TABLE tasks ALTER COLUMN dependencies DROP DEFAULT;
+
+-- 2. Migrate dependencies column to JSONB
 ALTER TABLE tasks 
 ALTER COLUMN dependencies TYPE JSONB 
 USING CASE 
   WHEN dependencies IS NULL THEN '[]'::jsonb
+  WHEN dependencies = '{}'::uuid[] THEN '[]'::jsonb
   ELSE to_jsonb(dependencies)
 END;
+
+-- 3. Set new JSONB default
+ALTER TABLE tasks ALTER COLUMN dependencies SET DEFAULT '[]'::jsonb;
 
 -- 2. Update the GIN index for JSONB
 DROP INDEX IF EXISTS idx_tasks_deps;
