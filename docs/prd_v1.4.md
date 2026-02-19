@@ -1000,7 +1000,7 @@ A model with full multimodal browser use capability (not Playwright, not Seleniu
 **Courier lifecycle:**
 1. Receive task packet
 2. Navigate to target platform
-3. Log in if needed (shared Gmail: vibes.agents@gmail.com)
+3. Log in if needed (shared Gmail: vibesagentai@gmail.com)
 4. Enter task packet as prompt
 5. Wait for response
 6. Copy result + chat URL

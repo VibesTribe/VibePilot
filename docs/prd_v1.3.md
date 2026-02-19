@@ -196,7 +196,7 @@ def select_platform(task):
 ## 4.2 Courier Runner
 
 **Environment:**
-- Gmail account: `vibes.agents@gmail.com`
+- Gmail account: `vibesagentai@gmail.com`
 - Web platform access (free tiers)
 - Playwright (for platform interaction if needed)
 
