@@ -1,7 +1,8 @@
 # VibePilot Process - Complete System Flow
 
 **Created:** 2026-02-19
-**Status:** Draft - Human Review Required
+**Updated:** 2026-02-19 (Session 16 clarifications)
+**Status:** Human Review Complete
 **Session:** 16
 
 ---
@@ -9,6 +10,18 @@
 ## Overview
 
 This document captures the complete VibePilot process: how ideas become code, who does what, and how everything connects.
+
+---
+
+## ALWAYS-ON SERVICES
+
+| Service | Why Always On |
+|---------|---------------|
+| **Vibes** | Human interface - must respond to voice/text anytime |
+| **Orchestrator** | Task routing - must watch queue, route to runners, track status |
+| **System Researcher** | Scheduled daily cron for research |
+
+Everything else is called as needed.
 
 ---
 
@@ -41,16 +54,21 @@ Consultant/Researcher agent:
 PRD in GitHub: docs/prd/project-name.md
     ↓
 Planner reads PRD:
+  - Decides modules/slices (grouping related tasks)
+  - Sets priority ordering
+  - Flags: needs_codebase (internal) vs no_codebase (courier)
   - Breaks into atomic tasks (95%+ confidence each)
-  - Maps dependencies
-  - Creates complete prompt packets
+  - Maps dependencies between tasks
+  - Creates complete prompt packets for each task
   - Plan saved to GitHub: docs/plans/project-name-plan.md
 ```
 
 **What is Planner?**
-- Role: Task decomposition
-- Reads PRD, codebase context
-- Produces: task breakdown, dependencies, prompt packets
+- Role: Plan creation and editing
+- Reads PRD + codebase context
+- Decides: module structure, priority, runner type flags
+- Creates: task breakdown, dependencies, prompt packets
+- Edits: plan when Council requests changes
 - Needs: file_read for codebase context (read-only)
 - Powered by: Any capable model
 
@@ -65,10 +83,7 @@ Supervisor: "This plan needs Council review"
     ↓
 Supervisor → Orchestrator: "Route council review"
     ↓
-Orchestrator calls available models with plan:
-  - Lens 1: User Alignment (does this match what human wanted?)
-  - Lens 2: Architecture (is it technically sound?)
-  - Lens 3: Feasibility (can it actually be built as specified?)
+Orchestrator calls available models with appropriate context
     ↓
 Models return votes → Orchestrator aggregates → Supervisor
     ↓
@@ -76,6 +91,13 @@ Consensus?
   - YES → Plan approved
   - NO → Back to Planner with feedback
 ```
+
+**Council Context Depends on Review Type:**
+
+| Review Type | Context Provided to Council |
+|-------------|----------------------------|
+| **New Project Plan** | PRD + Plan |
+| **System Improvement** | System researcher doc (UPDATE_CONSIDERATIONS.md) + Full system understanding + VibePilot principles (core_philosophy.md) |
 
 **Council hats for NEW PROJECT:**
 - User Alignment: Does this match human's intent?
@@ -87,66 +109,53 @@ Consensus?
 - Security: Any vulnerabilities introduced?
 - Integration: Does it break anything?
 - Reversibility: Can we undo if needed?
+- Principle Alignment: Does it follow VibePilot principles?
 
 ---
 
-### 4. Approved Plan → Orchestrator
+### 4. Approved Plan → Tasks Created
 
 ```
 Supervisor approves plan
     ↓
 Tasks created in Supabase:
-  - Each task: task_id, title, prompt_packet, status='available', dependencies
+  - Each task: task_id, title, prompt_packet, status='pending', dependencies
+  - Dependencies mapped from plan
     ↓
-Orchestrator (always on, systemd service):
-  - Polls Supabase for 'available' tasks
-  - Checks dependencies met
-  - Routes to appropriate runner
+Tasks become 'available' when dependencies met
 ```
-
-**What is Orchestrator?**
-- Role: Task routing and monitoring
-- Always running (systemd service)
-- Watches Supabase queue
-- Knows: model availability, rate limits, capabilities
-- Routes tasks to best available runner
-- Tracks: success rates, token usage, model performance
-- Powered by: Lightweight model (Gemini Flash) or runs as code
 
 ---
 
 ### 5. Orchestrator → Runner
 
 ```
-Orchestrator sees available task T001
+Orchestrator (always on, systemd service):
+  - Polls Supabase for 'available' tasks
+  - Checks dependencies met
+  - Checks runner availability
+  - Routes to appropriate runner
     ↓
-Checks task requirements:
+Task requirements checked:
   - needs_codebase? → Route to internal runner
   - no_codebase? → Route to courier
-    ↓
-Available runners?
-  - Internal CLI (Kimi, GLM-5): Has codebase access
-  - Courier: No codebase, uses web platforms
     ↓
 Orchestrator assigns: "T001 → Internal CLI (Kimi)"
     ↓
 Task status → 'in_progress'
 ```
 
-**What is Courier Agent?**
-- Role: Execute tasks on web AI platforms
-- No codebase access
-- Receives: task packet only
-- Goes to: ChatGPT, Claude, Gemini (web), Perplexity
-- Returns: output + chat_url
-- Powered by: Browser automation + web platform
-
-**What is Internal Runner?**
-- Role: Execute tasks with codebase context
-- Has: file_read access (not write)
-- Receives: task packet + relevant codebase files
-- Returns: code output
-- Powered by: Kimi CLI, GLM-5, DeepSeek API
+**What is Orchestrator?**
+- Role: Task routing, monitoring, and learning
+- Always running (systemd service)
+- Watches Supabase queue
+- Knows: model availability, rate limits, capabilities, refresh times
+- Shows: countdown to rate limit resets (e.g., "Gemini available in 4h 23m")
+- Ensures: stays under 80% threshold when possible
+- Routes tasks to best available runner
+- Tracks: success rates, token usage, model performance
+- Learns: which model for which task type, improves routing over time
+- Powered by: Lightweight model (Gemini Flash) or runs as code
 
 ---
 
@@ -164,8 +173,12 @@ Orchestrator: "No runner available for T001"
     ↓
 Task status → 'queued'
     ↓
+Orchestrator shows countdown:
+  - "ChatGPT rate limit resets in 2h 15m"
+  - "Gemini daily quota resets in 6h 00m"
+    ↓
 Orchestrator:
-  - Retries periodically (checks rate limits)
+  - Retries when platforms refresh (knows exact times)
   - Routes to different platform if available
   - If critical priority: alert human
   - If can wait: queue until runner available
@@ -181,13 +194,16 @@ Runner completes T001
 Returns to Orchestrator:
   - status: success/failed
   - output: code files
-  - metadata: model, tokens, duration
+  - metadata: model, tokens, duration, chat_url (if courier)
     ↓
 Orchestrator:
   - Logs to task_runs table
+  - Tracks model/platform performance
   - Updates task status → 'review'
   - Notifies Supervisor: "T001 ready for review"
 ```
+
+**NOTE: Task is NOT complete yet. Output returned ≠ task done.**
 
 ---
 
@@ -196,26 +212,31 @@ Orchestrator:
 ```
 Supervisor receives: task + output + expected_output
     ↓
+Supervisor reads task branch (has read access to git)
+    ↓
 Checks:
   - All expected files present?
   - Output matches packet?
   - No hardcoded secrets?
   - Pattern consistency?
   - No extra files touched?
+  - Quality acceptable?
     ↓
 Decision:
   - PASS → Trigger tests
-  - FAIL → Return to runner with specific feedback
+  - FAIL → Return to runner with specific feedback (tracked as attempt)
   - REROUTE → Different runner/model (if model seems incapable)
 ```
 
 **What is Supervisor?**
 - Role: Quality gatekeeper
+- Has: git read access (to review branches)
+- Does NOT have: git write access
 - Reviews: output vs expected
 - Decides: approve/reject/reroute
-- Triggers: tests, git commands
-- Commands: Maintenance (via command queue)
-- Calls: Council (via Orchestrator)
+- Triggers: tests
+- Commands: Maintenance via command queue
+- Calls: Council via Orchestrator
 - Powered by: Any capable model
 
 ---
@@ -232,7 +253,7 @@ Triggers Code Tester:
     ↓
 Result:
   - PASS → Ready for merge
-  - FAIL → Back to runner with test failures
+  - FAIL → Back to runner with test failures (tracked as attempt)
 ```
 
 **What is Tester?**
@@ -258,18 +279,24 @@ Maintenance:
   - Deletes task branch
   - Reports: success + commit hash
     ↓
-Task status → 'merged'
+Task status → 'complete' (NOW task is done)
     ↓
 Supervisor: unlocks dependent tasks
 ```
 
-**When is a task done?**
+**When is a task SUCCESS?**
 - Output matches packet ✓
 - Supervisor approved ✓
 - Tests passed ✓
 - Merged to module branch ✓
 - Task branch deleted ✓
 - Status = 'complete' in Supabase
+
+**When is a task FAILURE?**
+- Runner failed and exhausted retries
+- Supervisor rejected and no reroute possible
+- Tests failed repeatedly
+- Tracked with: failure reason, which model, which stage failed
 
 ---
 
@@ -295,75 +322,114 @@ Maintenance:
 
 ---
 
-## ROLES VS MODELS
-
-**Core Principle:** Agent ≠ Fixed Identity
-
-| Concept | What It Is |
-|---------|------------|
-| **Role** | Skills + Tools + Scope + Prompt (fixed definition) |
-| **Model** | Compute power (swappable) |
-| **Agent** | Role + Model (temporary pairing) |
-
-Example:
-- Supervisor role: decide, review, approve
-- Today powered by: GLM-5
-- Tomorrow could be powered by: Kimi, DeepSeek, whatever's available
-
----
-
-## BRANCH LIFECYCLE
+## BRANCH LIFECYCLE - DETAILED
 
 ```
-1. Supervisor assigns task → Maintenance creates task/T001
+┌─────────────────────────────────────────────────────────────────┐
+│                     BRANCH LIFECYCLE                             │
+└─────────────────────────────────────────────────────────────────┘
 
-2. Runner returns code → Supervisor approves → Maintenance commits to task/T001
+1. TASK ASSIGNED
+   Orchestrator assigns task → Supervisor notified
+   Supervisor → Maintenance: "Create task/T001-desc"
+   Maintenance: creates branch, reports success
+   
+2. CODE COMMITTED
+   Runner returns code → Supervisor reviews (reads branch)
+   Supervisor approves → Maintenance: "Commit to task/T001"
+   Maintenance: commits code, reports success
+   
+3. TASK → MODULE (after tests pass)
+   Supervisor → Maintenance: "Merge task/T001 → module/user-auth, delete task branch"
+   Maintenance: 
+     - Creates module branch if needed
+     - Merges task → module
+     - Deletes task branch
+     - Reports success
+   
+4. MODULE → MAIN (all tasks complete + module tests pass)
+   Supervisor → Maintenance: "Merge module/user-auth → main, tag, delete"
+   Maintenance:
+     - Merges to main
+     - Tags: module-name-v1
+     - Deletes module branch
+     - Reports success
 
-3. Tests pass → Maintenance merges task/T001 → module/user-auth → deletes task/T001
-
-4. All module tasks complete + module tests pass → Maintenance merges module/user-auth → main → deletes module/user-auth → tags
-
-Result: Clean main, no stale branches
+RESULT: Clean main, all work tagged, no stale branches
 ```
 
 ---
 
 ## GITHUB - WHO DOES WHAT
 
-| Action | Decides | Executes |
-|--------|---------|----------|
-| Create task branch | Supervisor | Maintenance |
-| Commit code to task branch | Supervisor (approves output) | Maintenance |
-| Merge task → module | Supervisor (after tests pass) | Maintenance |
-| Delete task branch | Automatic (after merge verified) | Maintenance |
-| Create module branch | Supervisor (first task in module passes) | Maintenance |
-| Merge module → main | Supervisor (after module complete + tests) | Maintenance |
-| Delete module branch | Automatic (after merge verified) | Maintenance |
-| Tag release | Supervisor | Maintenance |
+| Action | Who Decides | Who Executes | Notes |
+|--------|-------------|--------------|-------|
+| Create task branch | Supervisor | Maintenance | After Orchestrator assigns |
+| Read task branch | Supervisor | - | For quality review |
+| Commit code | Supervisor (approves) | Maintenance | After review passes |
+| Merge task → module | Supervisor | Maintenance | After tests pass |
+| Delete task branch | Automatic | Maintenance | After merge verified |
+| Create module branch | Supervisor | Maintenance | First task in module passes |
+| Merge module → main | Supervisor | Maintenance | After module complete + tests |
+| Delete module branch | Automatic | Maintenance | After merge verified |
+| Tag release | Supervisor | Maintenance | After merge to main |
 
-**Rule: Only Maintenance touches git. Everyone else commands.**
+**Rule: Only Maintenance has git write access. Supervisor has read access for review.**
+
+---
+
+## REASSIGNMENT - TWO SOURCES
+
+### Source 1: Orchestrator (Automatic)
+
+```
+Orchestrator sees:
+  - task_runs for T001: 3 failed attempts with same model
+    ↓
+Orchestrator decision:
+  - Try different model automatically
+  - Track: which models fail on which task types
+  - Learn: avoid this model for this task type
+```
+
+### Source 2: Supervisor (Quality Decision)
+
+```
+Supervisor reviews output:
+  - Output looks wrong for this model's capability
+  - Task seems too complex for this runner type
+    ↓
+Supervisor decision:
+  - REROUTE to different model
+  - Request SPLIT if task too complex
+  - Mark FAILED with detailed notes if unfixable
+```
 
 ---
 
 ## COUNCIL - HOW IT'S CALLED
 
 ```
-1. Supervisor receives plan → needs review
+1. Supervisor determines review needed
 
-2. Supervisor → Orchestrator: "Route council review for this doc, lenses: architecture, feasibility, security"
+2. Supervisor → Orchestrator: "Route council review for this doc, lenses: X, Y, Z"
 
 3. Orchestrator checks available models:
-   - 3 available? → Assign 1 lens each, parallel
-   - 1 available? → Same model does 3 sequential passes
-   - None available? → Queue, retry
+   - 3 available? → Assign 1 lens each, parallel execution
+   - 1 available? → Same model does 3 sequential passes (independent votes)
+   - None available? → Queue until model available
 
-4. Models review independently, return votes
+4. Orchestrator provides context based on review type:
+   - Project review: PRD + Plan
+   - System review: UPDATE_CONSIDERATIONS.md + system context + principles
 
-5. Orchestrator aggregates → returns to Supervisor
+5. Models review independently, return votes
 
-6. Supervisor checks consensus:
+6. Orchestrator aggregates → returns to Supervisor
+
+7. Supervisor checks consensus:
    - All approve? → Plan approved
-   - Any revision needed? → Back to Planner
+   - Any revision needed? → Back to Planner with feedback
    - Blocked? → Escalate to human
 ```
 
@@ -373,7 +439,7 @@ Result: Clean main, no stale branches
 
 ## AGENT DEFINITIONS
 
-### Vibes (Interface)
+### Vibes (Interface) - ALWAYS ON
 - Role: Human's primary interface
 - Receives: Voice, text, dashboard input
 - Routes to appropriate agent
@@ -388,43 +454,53 @@ Result: Clean main, no stale branches
 - Powered by: Any capable model
 
 ### Planner
-- Role: Task decomposition
-- Reads PRD + codebase
-- Creates atomic tasks with prompt packets
+- Role: Plan creation and editing
+- Decides: modules/slices, priority, runner type flags
+- Creates: tasks, dependencies, prompt packets
+- Edits: plan when Council requests changes
 - Needs: file_read (read-only)
 - Powered by: Any capable model
 
 ### Council
-- Not a fixed agent
+- Not a fixed agent - a function
 - Function: Multi-lens review
 - Lenses: User Alignment, Architecture, Feasibility, Security
+- Context: Depends on review type (project vs system)
 - Routed by: Orchestrator
 - Powered by: Any 1-3 available models
 
-### Orchestrator
-- Role: Task routing and monitoring
-- Always on (systemd service)
+### Orchestrator - ALWAYS ON
+- Role: Task routing, monitoring, learning
+- Always running (systemd service)
 - Routes tasks to runners
-- Tracks performance
+- Knows: rate limits, refresh times, countdown
+- Ensures: 80% threshold
+- Tracks: success/failure at every level
+- Learns: improves routing over time
 - Powered by: Lightweight model or code
 
 ### Supervisor
 - Role: Quality gatekeeper
-- Reviews output vs expected
-- Commands Maintenance
-- Triggers Council via Orchestrator
+- Has: git read access (for review)
+- Does NOT have: git write access
+- Reviews: output vs expected
+- Decides: approve/reject/reroute
+- Commands: Maintenance via queue
+- Calls: Council via Orchestrator
 - Powered by: Any capable model
 
 ### Maintenance
-- Role: File/git operator
-- ONLY agent with write/git access
-- Polls command queue
-- Executes commands
+- Role: Git/file operator (executes commands)
+- ONLY agent with: git write access, file write access
+- Polls: command queue
+- Executes: create branch, commit, merge, delete, tag
+- Reports: success/failure of each command
 - Powered by: Any capable model
 
 ### Runner (Internal)
 - Role: Execute tasks with codebase context
 - Has: file_read (not write)
+- Receives: task packet + relevant codebase files
 - Returns: code output
 - Powered by: Kimi CLI, GLM-5, DeepSeek API
 
@@ -436,14 +512,16 @@ Result: Clean main, no stale branches
 
 ### Tester
 - Role: Validate code
+- Sees: code + test criteria only
 - Runs: tests, lint, typecheck
 - Returns: pass/fail
 - Powered by: Any capable model
 
-### System Researcher
+### System Researcher - SCHEDULED (daily cron)
 - Role: Continuous improvement intelligence
-- Runs: Daily (scheduled)
-- Researches: new models, pricing, tools
+- Has: Full system understanding
+- Knows: what models/platforms we use, what matters
+- Researches: new models, pricing, tools, improvements
 - Output: docs/UPDATE_CONSIDERATIONS.md
 - Powered by: Any model with web access
 
@@ -456,40 +534,25 @@ Supabase: tasks table
   - id, title, status, dependencies, prompt_packet
 
 Status values:
-  - pending: Created, not yet available
-  - available: Ready to be picked up
+  - pending: Created, dependencies not met
+  - available: Ready to be picked up, dependencies met
   - in_progress: Runner assigned
   - review: Output returned, awaiting Supervisor
   - testing: Tests running
-  - merged: Merged to module
-  - complete: All done
-  - failed: Exhausted retries
-  - blocked: Dependencies not met
+  - complete: Approved, tested, merged to module (SUCCESS)
+  - failed: Exhausted retries or unfixable (FAILURE with notes)
+  - queued: No runner available (shows countdown)
+  - blocked: Dependencies stuck
 
 Supabase: task_runs table
-  - task_id, model_id, status, tokens, output, created_at
+  - task_id, model_id, status, tokens, output, failure_reason, created_at
 
-Orchestrator queries these tables to know:
+Orchestrator queries to know:
   - What needs assignment
   - What's stuck
   - What needs reassignment
-```
-
----
-
-## REASSIGNMENT / SPLIT LOGIC
-
-```
-Orchestrator sees:
-  - task_runs for T001: 3 failed attempts with same model
-    ↓
-Orchestrator decision:
-  - Try different model?
-  - Flag for Supervisor to consider split?
-  - Mark as blocked and alert?
-    ↓
-If model issue: Route to different model
-If task issue: Supervisor reviews, may ask Planner to split
+  - Model success rates by task type
+  - Platform reliability
 ```
 
 ---
@@ -505,7 +568,7 @@ If task issue: Supervisor reviews, may ask Planner to split
        ▼
 ┌─────────────┐     creates     ┌─────────────┐
 │   VIBES     │ ───────────────→│    PRD      │
-│(Interface)  │                 │  (GitHub)   │
+│ (ALWAYS ON) │                 │  (GitHub)   │
 └─────────────┘                 └──────┬──────┘
                                        │ read by
                                        ▼
@@ -517,7 +580,7 @@ If task issue: Supervisor reviews, may ask Planner to split
                                        ▼
 ┌─────────────┐     routes      ┌─────────────┐
 │ORCHESTRATOR │ ◄────────────── │  COUNCIL    │
-│             │                 │(via Orchestrator)
+│ (ALWAYS ON) │                 │(via Orchestrator)
 └──────┬──────┘                 └─────────────┘
        │ assigns
        ▼
@@ -529,13 +592,13 @@ If task issue: Supervisor reviews, may ask Planner to split
                                        ▼
 ┌─────────────┐     approves     ┌─────────────┐
 │ SUPERVISOR  │ ◄─────────────── │   TESTS     │
-│             │                  │             │
+│  (read git) │                  │             │
 └──────┬──────┘                  └─────────────┘
-       │ commands
+       │ commands (queue)
        ▼
 ┌─────────────┐     executes    ┌─────────────┐
 │ MAINTENANCE │ ───────────────→│    GIT      │
-│             │                 │  (branches) │
+│ (write git) │                 │  (branches) │
 └─────────────┘                 └─────────────┘
 ```
 
@@ -545,8 +608,8 @@ If task issue: Supervisor reviews, may ask Planner to split
 
 1. maintenance_commands table + schema
 2. Maintenance agent: polls queue, executes commands
-3. Supervisor refactor: removes git, inserts commands
-4. Council review queue (same pattern)
+3. Supervisor refactor: removes git write, keeps read, inserts commands
+4. Council review function via Orchestrator
 5. Runner contract enforcement
 6. Branch lifecycle code
 7. Full task flow end-to-end
@@ -560,7 +623,13 @@ If task issue: Supervisor reviews, may ask Planner to split
 - [x] Roles defined
 - [x] Branch lifecycle captured
 - [x] Council process defined
-- [ ] Human review
+- [x] Council context clarified (project vs system)
+- [x] Task complete/failure definitions clarified
+- [x] Orchestrator rate limit countdown added
+- [x] Planner scope expanded
+- [x] Reassignment sources documented
+- [x] Always-on services identified
+- [x] Human review complete
 - [ ] Implementation
 
 ---
