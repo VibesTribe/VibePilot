@@ -405,3 +405,37 @@ I'll document exact integration when you get there.
 
 **Tag:** SIMPLE (documentation correction)
 
+
+### Kimi [2026-02-18 21:30]
+
+**Research Complete:** Free Web AI Platforms Comprehensive Analysis
+
+**File:** `docs/research/2026-02-18-free-web-ai-platforms-comprehensive-analysis.md`
+
+**Key Findings:**
+- **ChatGPT:** 10-50 messages per 5-hour window (rolling)
+- **Claude:** ~40 messages per day (daily reset)
+- **Gemini:** 100 queries per day, 1M context window (currently quota blocked)
+- **DeepSeek:** Appears unlimited, 128K context, 64K conversation limit
+- **Perplexity:** 5 Pro + unlimited Quick searches
+- **HuggingChat:** 10/day guest, higher with registration
+- **Qwen:** Unknown limits, worth testing
+
+**Critical Insight:** Most platforms have SEVERE free limits (10-100/day). Requires aggressive 80% threshold management and multi-platform rotation.
+
+**Routing Strategy Proposed:**
+1. **Tier 1 (High-Volume):** DeepSeek, Perplexity Quick
+2. **Tier 2 (Quality):** Claude (40/day, 200K context), ChatGPT (reasoning)
+3. **Tier 3 (Specialized):** Gemini (1M context), Qwen (multimodal)
+4. **Tier 4 (Fallback):** HuggingChat
+
+**VibePilot Impact:**
+- Must implement strict 80% cooldowns
+- Context-aware routing (>100K tokens → Gemini/Claude only)
+- Time-based scheduling around daily resets
+- Never rely on single platform
+
+**Tag:** VET (affects core routing architecture)
+
+**GLM:** Review when convenient. This affects orchestrator threshold logic significantly.
+
