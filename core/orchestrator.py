@@ -27,6 +27,8 @@ from dotenv import load_dotenv
 from task_manager import TaskManager
 from agents.supervisor import SupervisorAgent
 from agents.executioner import ExecutionerAgent
+from agents.consultant import ConsultantAgent
+from agents.planner import PlannerAgent
 from core.telemetry import get_telemetry, traced
 
 load_dotenv()
@@ -728,6 +730,9 @@ class ConcurrentOrchestrator:
         self.supervisor.set_council_callback(self.route_council_review)
         self.task_manager = TaskManager()
         self.telemetry = get_telemetry()
+
+        self.consultant = ConsultantAgent()
+        self.planner = PlannerAgent()
 
         self.config = load_config()
         self._explicit_max_workers = max_workers
@@ -1437,6 +1442,61 @@ class ConcurrentOrchestrator:
         except Exception as e:
             self.logger.error(f"ROI report failed: {e}")
             return {"error": str(e)}
+
+    # IDEA PROCESSING (Entry Layer)
+    # Turns human ideas into PRD → Tasks → Queue
+    # =========================================================================
+
+    def process_idea(self, idea: str, project_id: str = None) -> Dict:
+        """
+        Process a human idea through Consultant → Planner → Queue.
+
+        This is the entry point for "Hey Vibes, I want X" requests.
+
+        Args:
+            idea: Human's description of what they want
+            project_id: Optional project to associate tasks with
+
+        Returns:
+            {
+                "success": bool,
+                "prd": str,
+                "tasks": List[Dict],
+                "task_count": int
+            }
+        """
+        self.logger.info(f"Processing idea: {idea[:100]}...")
+
+        prd_result = self.consultant.execute({"description": idea})
+        if not prd_result.success:
+            self.logger.error(f"Consultant failed: {prd_result.error}")
+            return {
+                "success": False,
+                "error": "Consultant failed",
+                "details": prd_result.error,
+            }
+
+        prd = prd_result.output
+        self.logger.info("PRD generated successfully")
+
+        plan_result = self.planner.execute({"prd": prd, "project_id": project_id})
+        if not plan_result.success:
+            self.logger.error(f"Planner failed: {plan_result.error}")
+            return {
+                "success": False,
+                "error": "Planner failed",
+                "details": plan_result.error,
+            }
+
+        tasks = (
+            plan_result.output.get("tasks", [])
+            if isinstance(plan_result.output, dict)
+            else []
+        )
+
+        self.logger.info(f"Plan created with {len(tasks)} tasks")
+
+        return {"success": True, "prd": prd, "tasks": tasks, "task_count": len(tasks)}
 
     # COUNCIL ROUTING (Phase C)
     # Routes council reviews to available models
