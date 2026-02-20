@@ -5834,3 +5834,98 @@ After SQL is applied:
 **Waiting for: Kimi's Council fix + Human SQL apply**
 
 ---
+
+### GLM-5 [2026-02-21 00:00] - CRITICAL GAP IDENTIFIED: Agents Bypass Orchestrator
+
+**Human is RIGHT. Foundational work is broken.**
+
+---
+
+## THE PROBLEM
+
+**agents/base.py has hardcoded LLM call:**
+
+```python
+DS_KEY = os.getenv("DEEPSEEK_KEY")  # ← HARDCODED
+DS_URL = "https://api.deepseek.com/v1/chat/completions"  # ← HARDCODED
+
+class Agent:
+    def call_llm(self, prompt, max_tokens):
+        if not DS_KEY:
+            raise ValueError("DEEPSEEK_KEY not configured")  # ← NO FALLBACK
+        # Direct API call to DeepSeek...
+```
+
+**This violates EVERY core principle:**
+- ❌ Zero Vendor Lock-In → Hardcoded to DeepSeek
+- ❌ Config-driven selection → Code-locked to one API
+- ❌ Orchestrator routing → Bypasses runner pool entirely
+
+---
+
+## WHAT SHOULD HAPPEN
+
+Per `docs/vibepilot_process.md`:
+
+> "Powered by: Any capable model" (Consultant, Planner, Supervisor, etc.)
+> "Routed by: Orchestrator" (Council)
+
+**Correct flow:**
+```
+Consultant needs LLM
+    ↓
+Ask Orchestrator to route
+    ↓
+Orchestrator checks runner pool:
+  - DeepSeek: OUT OF CREDIT
+  - Gemini: PAUSED
+  - Kimi CLI: Available ✅
+  - GLM-5: Available ✅
+    ↓
+Routes to Kimi or GLM-5
+    ↓
+Runner executes, returns result
+    ↓
+Consultant continues
+```
+
+---
+
+## CURRENT ARCHITECTURE
+
+| Component | Current | Should Be |
+|-----------|---------|-----------|
+| Consultant | `call_llm()` → DeepSeek hardcoded | Ask orchestrator to route |
+| Planner | Same hardcoded | Ask orchestrator to route |
+| Supervisor | Same hardcoded | Ask orchestrator to route |
+| Orchestrator | Has `_call_runner()` with routing | ✅ This is correct |
+| Runner Pool | Tracks availability | ✅ This is correct |
+
+---
+
+## THE FIX NEEDED
+
+**Option A: Agent → Orchestrator callback**
+- Agents receive orchestrator reference
+- `self.call_llm()` becomes `self.orchestrator.route_llm()`
+- Orchestrator picks best available runner
+
+**Option B: Agent as task**
+- Consultant/Planner work becomes a task in Supabase
+- Orchestrator picks it up like any other task
+- Routes to available runner
+
+**Option C: Dedicated "agent runner" method**
+- Add `orchestrator.run_agent_task(agent_name, prompt)`
+- Uses same routing logic as tasks
+- Returns result synchronously
+
+---
+
+## THIS IS FOUNDATIONAL
+
+Before ANY test can work, agents must use orchestrator routing.
+
+**Human: Which approach should we implement?**
+
+---
