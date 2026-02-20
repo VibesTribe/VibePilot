@@ -3,9 +3,9 @@ from typing import Dict, Any, List
 import re
 
 
-class MaintenanceAgent(Agent):
-    name = "Maintenance"
-    role = "Council - Checks dependencies, code quality, and maintainability"
+class CodeQualityAgent(Agent):
+    name = "CodeQuality"
+    role = "Council - Checks code quality, maintainability, and best practices"
     
     def execute(self, task: Dict[str, Any]) -> AgentResult:
         code = task.get("code", "")
