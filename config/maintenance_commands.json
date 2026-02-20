@@ -36,6 +36,18 @@
       ]
     },
     
+    "commit_changes": {
+      "description": "Commit all changed files in working directory (for runners that write directly)",
+      "required_payload_fields": ["branch"],
+      "optional_payload_fields": ["message", "add_all"],
+      "default_message": "Auto-commit by VibePilot",
+      "default_add_all": true,
+      "examples": [
+        {"branch": "task/T001", "message": "Complete T001"},
+        {"branch": "task/T001", "add_all": true}
+      ]
+    },
+    
     "merge_branch": {
       "description": "Merge source branch into target branch",
       "required_payload_fields": ["source", "target"],
