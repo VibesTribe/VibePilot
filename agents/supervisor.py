@@ -53,8 +53,13 @@ class SupervisorAgent:
     - Update model performance ratings
     """
 
-    def __init__(self):
+    def __init__(self, council_callback=None):
         self.logger = logger
+        self.council_callback = council_callback
+
+    def set_council_callback(self, callback):
+        """Set the Council review callback (injected by orchestrator)."""
+        self.council_callback = callback
 
     def review_task_output(self, task_id: str, output: Dict, expected: Dict) -> Dict:
         """
@@ -517,8 +522,8 @@ class SupervisorAgent:
         """
         Call Council to review the plan.
 
-        For now, this is a simplified check. Full implementation would
-        dispatch to three different models for independent review.
+        If council_callback is set (by orchestrator), uses real multi-model review.
+        Otherwise, falls back to simplified placeholder check.
 
         Returns:
             {"approved": bool, "concerns": [...], "rounds": int}
@@ -531,6 +536,19 @@ class SupervisorAgent:
                 "concerns": [],
                 "message": "No pending tasks to review",
             }
+
+        if self.council_callback:
+            try:
+                self.logger.info(
+                    f"Calling real Council review for {len(pending)} tasks"
+                )
+                return self.council_callback(
+                    doc_path=f"projects/{project_id}/plan.md",
+                    lenses=["user_alignment", "architecture", "feasibility"],
+                    context_type="plan",
+                )
+            except Exception as e:
+                self.logger.error(f"Council callback failed: {e}, using fallback")
 
         concerns = []
 
