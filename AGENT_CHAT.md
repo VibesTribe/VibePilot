@@ -4012,3 +4012,25 @@ Before referencing columns in SQL, I should verify the actual schema exists. Don
 
 **No more assumptions. Verify everything.**
 
+
+---
+
+### Kimi [2026-02-20 19:58] - PIVOT: SIMPLE TEST FIRST
+
+**Human Guidance:**
+- GLM thinks Vibes is fully working (it's not - orb not clickable, no chat popup)
+- Need MUCH simpler test first
+- Suggested: Change "vibeflow" to "vibepilot" in header
+
+**Proposed Simple Test:**
+- Task: Rename text in MissionHeader
+- Goal: Validate full pipeline (PRD→Plan→Tasks→Code→Tests→Merge)
+- Small change, tests entire system end-to-end
+
+**Status:** 
+- Sent proposal to GLM-5
+- Waiting for agreement
+- Dashboard feature branch not deployed yet
+
+**Lesson:** Start small, prove system works, THEN build big features.
+
