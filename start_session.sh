@@ -1,99 +1,63 @@
 #!/bin/bash
 # VibePilot Agent Session Startup
 # REQUIRED: Run this at the start of EVERY session
+# 
+# Usage: ./start_session.sh [agent_name]
+# Example: ./start_session.sh glm-5
+
+AGENT_NAME="${1:-glm-5}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "═══════════════════════════════════════════════════"
 echo "  VIBEPILOT AGENT SESSION STARTUP"
+echo "  Agent: $AGENT_NAME"
 echo "═══════════════════════════════════════════════════"
 echo ""
 
-cd "$(dirname "$0")"
+cd "$SCRIPT_DIR"
 
 # 1. Git sync
 echo "📥 Syncing with main..."
 git checkout main 2>/dev/null
-git pull origin main
-if [ $? -ne 0 ]; then
-    echo "❌ Git pull failed! Check manually."
-    exit 1
-fi
+git pull origin main 2>/dev/null
 echo "✅ Synced"
 echo ""
 
-# 2. Check protocol (in case it changed)
-echo "📋 Checking protocol..."
-if [ -f AGENT_PROTOCOL.md ]; then
-    echo "✅ AGENT_PROTOCOL.md present"
-else
-    echo "⚠️  AGENT_PROTOCOL.md missing (shouldn't happen)"
+# 2. PRIMARY: Check Supabase messages (real-time)
+echo "📨 Checking Supabase messages (PRIMARY)..."
+if [ -d "venv" ]; then
+    source venv/bin/activate
 fi
+python3 scripts/check_agent_mail.py "$AGENT_NAME" 2>/dev/null
 echo ""
 
-# 3. PRIMARY: Check AGENT_CHAT.md
-echo "💬 Checking AGENT_CHAT.md (PRIMARY)..."
-./check_chat.sh
-CHAT_STATUS=$?
-
-if [ $CHAT_STATUS -eq 0 ]; then
-    echo ""
-    echo "🔔 NEW MESSAGES - READ THEM!"
-    echo "Run: cat AGENT_CHAT.md | tail -100"
-    echo ""
-    read -p "Press Enter after reading..."
-    ./check_chat.sh --once  # Mark as read
-else
-    echo "✅ No new messages"
-fi
-echo ""
-
-# 4. SECONDARY: Check inbox
-echo "📨 Checking inbox/kimi/ (if exists)..."
-if [ -d inbox/kimi ] && [ "$(ls -A inbox/kimi 2>/dev/null)" ]; then
-    echo "🔔 INBOX ITEMS FOUND:"
-    ls -la inbox/kimi/
-    echo ""
-    echo "Read them:"
-    for f in inbox/kimi/*; do
-        echo "--- $f ---"
-        head -20 "$f"
-        echo ""
-    done
-    read -p "Press Enter after reading inbox..."
-else
-    echo "✅ No inbox items"
-fi
-echo ""
-
-# 5. TERTIARY: Check handoff
-echo "📄 Checking .handoff-to-kimi.md (if exists and new)..."
-if [ -f .handoff-to-kimi.md ]; then
-    echo "📝 Handoff file found:"
-    stat -c "%y" .handoff-to-kimi.md
-    echo ""
-    read -p "Read handoff file? [Y/n]: " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        cat .handoff-to-kimi.md
-        echo ""
-        read -p "Press Enter to continue..."
+# 3. SECONDARY: Check AGENT_CHAT.md (for context/history)
+echo "💬 Checking AGENT_CHAT.md (SECONDARY - for context)..."
+if [ -f AGENT_CHAT.md ]; then
+    LAST_SECTION=$(grep -n "^### " AGENT_CHAT.md | tail -3)
+    if [ -n "$LAST_SECTION" ]; then
+        echo "Recent activity:"
+        echo "$LAST_SECTION"
     fi
-else
-    echo "✅ No handoff file"
+fi
+echo ""
+
+# 4. Current status
+echo "📊 Current Status:"
+echo "   Last commits:"
+git log --oneline -3 2>/dev/null
+echo ""
+if [ -f CURRENT_STATE.md ]; then
+    echo "   Session info:"
+    head -20 CURRENT_STATE.md | grep -E "(Last Updated|Session|Focus)" || true
 fi
 echo ""
 
 # Done
 echo "═══════════════════════════════════════════════════"
-echo "  SESSION STARTUP COMPLETE"
+echo "  READY - You are synced and caught up"
 echo "═══════════════════════════════════════════════════"
 echo ""
-echo "You are now synced and caught up."
-echo "Remember: Check AGENT_CHAT.md regularly during session."
+echo "After completing work: ./scripts/notify_done.sh"
+echo "Check messages anytime: python3 scripts/check_agent_mail.py $AGENT_NAME"
 echo ""
-
-# Show current status
-echo "--- Current Session Status ---"
-git log --oneline -3
-echo ""
-echo "Active agents:"
-cat ACTIVE_SESSIONS.md | grep -E "^\| (kimi|glm)" || echo "(Check ACTIVE_SESSIONS.md)"
