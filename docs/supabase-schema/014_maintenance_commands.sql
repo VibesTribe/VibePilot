@@ -81,6 +81,8 @@ CREATE TRIGGER trigger_maintenance_commands_updated_at
     EXECUTE FUNCTION update_maintenance_commands_updated_at();
 
 -- Function to claim next pending command (atomic)
+-- Note: If changing return type, must DROP first:
+-- DROP FUNCTION IF EXISTS claim_next_command(text);
 CREATE OR REPLACE FUNCTION claim_next_command(p_agent_id TEXT)
 RETURNS TABLE (
     command_id UUID,
