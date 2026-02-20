@@ -3,8 +3,8 @@
 -- Returns plan_path for tracking
 
 CREATE OR REPLACE FUNCTION vibes_submit_idea(
-    p_user_id TEXT DEFAULT 'anonymous',
     p_idea TEXT,
+    p_user_id TEXT DEFAULT 'anonymous',
     p_project_id UUID DEFAULT NULL
 )
 RETURNS JSONB
