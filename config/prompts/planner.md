@@ -42,8 +42,14 @@ Each slice owns its domain completely.
 
 - The PRD (zero-ambiguity, fully specified)
 - Codebase (read-only, to understand existing structure)
-- Git history (to understand patterns)
+- Git read access (to review existing code patterns, NOT to modify)
 - Tech stack specifications (from PRD)
+
+## You Never
+
+- Write to git (no branch creation, no commits)
+- Modify codebase directly
+- Execute code
 
 ## What You Produce
 
