@@ -11,12 +11,40 @@
 
 ---
 
-**Last Updated:** 2026-02-19 01:30 UTC
-**Updated By:** GLM-5 (Session 15: Dependency System Complete)
-**Session Focus:** Fixed dependency schema, all RPC functions working, task flow operational
+**Last Updated:** 2026-02-20 05:52 UTC
+**Updated By:** GLM-5 (Session 18: Command Queue + Systemd Service)
+**Session Focus:** Fixed command queue RLS, added service key to vault, installed orchestrator as systemd service
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
 **Progress:** Dependencies migrated to JSONB, all 5 RPC functions working, task flow operational
+
+---
+
+# SESSION 18 SUMMARY (2026-02-20)
+
+## What We Fixed
+
+### 1. Command Queue RLS ✅
+- Added `SUPABASE_SERVICE_KEY` to vault
+- Updated `agents/maintenance.py` and `agents/supervisor.py` to use service key
+- Fixed `claim_next_command` RPC to return `cmd_status` (was ambiguous with PL/pgSQL)
+
+### 2. All Integration Tests Passing ✅
+```
+RESULTS: 8 passed, 0 failed
+```
+
+### 3. Orchestrator as Systemd Service ✅
+- Installed `vibepilot-orchestrator.service`
+- Enabled on boot
+- Running and polling task queue
+
+## Files Modified
+- `agents/maintenance.py` - Service key support
+- `agents/supervisor.py` - Service key support
+- `tests/test_full_flow.py` - Service key support, cmd_status check
+- `docs/supabase-schema/014_maintenance_commands.sql` - RPC return type note
+- `docs/supabase-schema/015_fix_claim_rpc_return_status.sql` - Migration to fix RPC
 
 ---
 
@@ -100,10 +128,11 @@ pending → approve_plan() → locked (has deps) or available (no deps)
 
 | Priority | Task | Notes |
 |----------|------|-------|
-| 1 | Orchestrator as systemd service | Files ready, needs install on GCE |
+| 1 | ~~Orchestrator as systemd service~~ | ✅ DONE - Running, enabled on boot |
 | 2 | Council implementation | Currently placeholder |
 | 3 | Executioner connection | Tests don't run after review |
-| 4 | Data cleanup | Old test tasks still in DB |
+| 4 | First autonomous task flow | Ready to test |
+| 5 | Data cleanup | Old test tasks still in DB |
 
 ---
 
@@ -181,25 +210,30 @@ Special states:
 
 # NEXT STEPS (In Order)
 
-## 1. Orchestrator as systemd Service (READY TO INSTALL)
+## 1. Orchestrator as systemd Service ✅ DONE
 
-**Status:** Files created, needs installation on GCE
+**Status:** Installed, running, enabled on boot
 
-**Files:**
-- `run_orchestrator.py` - Entry point
-- `scripts/vibepilot-orchestrator.service` - systemd unit
-
-**Install:**
+**Commands:**
 ```bash
-sudo cp scripts/vibepilot-orchestrator.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable vibepilot-orchestrator
-sudo systemctl start vibepilot-orchestrator
+sudo systemctl status vibepilot-orchestrator  # Check status
+sudo systemctl stop vibepilot-orchestrator    # Stop
+sudo systemctl restart vibepilot-orchestrator # Restart
+journalctl -u vibepilot-orchestrator -f       # View logs
 ```
 
-**Result:** Orchestrator runs 24/7, auto-restarts on crash, starts on boot
+## 2. First Autonomous Task Flow (READY TO TEST)
 
-## 2. Full Council Implementation (NOT IMPLEMENTED)
+**Status:** Infrastructure complete, ready for first real task
+
+**What to test:**
+- Create a real task via dashboard
+- Watch orchestrator pick it up
+- Runner executes
+- Supervisor reviews
+- Maintenance commits
+
+## 3. Full Council Implementation (NOT IMPLEMENTED)
 
 **Status:** Simplified placeholder only
 
