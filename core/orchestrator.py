@@ -875,6 +875,8 @@ class ConcurrentOrchestrator:
         """Main orchestrator tick - dispatch tasks and check results."""
         self._check_completed_futures()
 
+        self._process_pending_ideas()
+
         unlocked = self.dependency_manager.unlock_ready_tasks()
         if unlocked:
             self.logger.info(f"Unlocked {len(unlocked)} tasks")
@@ -899,6 +901,60 @@ class ConcurrentOrchestrator:
 
         for task in tasks:
             self._dispatch_task(task)
+
+    def _process_pending_ideas(self):
+        """Process pending ideas from Vibes panel."""
+        try:
+            result = (
+                db.table("vibes_ideas")
+                .select("*")
+                .eq("status", "pending")
+                .limit(1)
+                .execute()
+            )
+
+            if not result.data:
+                return
+
+            idea = result.data[0]
+            idea_id = idea["id"]
+            idea_text = idea["idea_text"]
+            project_id = idea.get("project_id")
+
+            self.logger.info(f"Processing idea: {idea_text[:50]}...")
+
+            process_result = self.process_idea(
+                idea_text, project_id, save_to_github=True
+            )
+
+            if process_result.get("success"):
+                review_result = self.review_and_approve_plan(
+                    process_result.get("plan_path"), project_id
+                )
+
+                db.table("vibes_ideas").update(
+                    {
+                        "status": "processed",
+                        "prd_path": process_result.get("prd_path"),
+                        "plan_path": process_result.get("plan_path"),
+                        "processed_at": datetime.utcnow().isoformat(),
+                    }
+                ).eq("id", idea_id).execute()
+
+                self.logger.info(
+                    f"Idea processed: {review_result.get('tasks_created', 0)} tasks created"
+                )
+            else:
+                db.table("vibes_ideas").update(
+                    {"status": "failed", "processed_at": datetime.utcnow().isoformat()}
+                ).eq("id", idea_id).execute()
+
+                self.logger.error(
+                    f"Idea processing failed: {process_result.get('error')}"
+                )
+
+        except Exception as e:
+            self.logger.error(f"Error processing ideas: {e}")
 
     def _process_pending_plans(self):
         """Process pending plan tasks - review and approve."""
@@ -1701,16 +1757,21 @@ class ConcurrentOrchestrator:
         lenses: List[str] = None,
         context_type: str = "project",
         timeout: int = 300,
+        max_rounds: int = 4,
     ) -> Dict:
         """
-        Route council review to available models.
+        Route council review to available models with iterative consensus.
+
+        Implements iterative deliberation: up to 4 rounds where models see
+        each other's feedback and can revise their positions.
 
         Args:
             doc_path: Path to document to review (PRD or system doc)
             lenses: List of lenses to use ["user_alignment", "architecture", "feasibility"]
                    If None, uses default based on context_type
             context_type: "project" (PRD+Plan) or "system" (full context)
-            timeout: Maximum seconds to wait for all reviews
+            timeout: Maximum seconds to wait for all reviews per round
+            max_rounds: Maximum deliberation rounds (default 4)
 
         Returns:
             {
@@ -1718,7 +1779,9 @@ class ConcurrentOrchestrator:
                 "consensus": str,  # "unanimous", "majority", "split"
                 "reviews": Dict[str, Dict],
                 "concerns": List[str],
-                "recommendations": List[str]
+                "recommendations": List[str],
+                "rounds": int,
+                "deliberation_history": List[Dict]
             }
         """
         if lenses is None:
@@ -1728,7 +1791,7 @@ class ConcurrentOrchestrator:
                 lenses = ["architecture", "security", "integration", "reversibility"]
 
         self.logger.info(
-            f"Routing council review: {len(lenses)} lenses, context={context_type}"
+            f"Routing council review: {len(lenses)} lenses, context={context_type}, max_rounds={max_rounds}"
         )
 
         # Get available models for council review
@@ -1743,36 +1806,127 @@ class ConcurrentOrchestrator:
         # Distribute lenses across models
         model_assignments = self._assign_lenses_to_models(lenses, available_models)
 
-        # Execute reviews in parallel
-        reviews = {}
-        with ThreadPoolExecutor(max_workers=len(model_assignments)) as executor:
-            futures = {}
-            for model_id, assigned_lenses in model_assignments.items():
-                future = executor.submit(
-                    self._execute_council_review,
-                    model_id,
-                    doc_path,
-                    assigned_lenses,
-                    context_type,
+        # Iterative deliberation
+        all_reviews = {}  # model_id -> List[review_dict] per round
+        deliberation_history = []
+        
+        for round_num in range(1, max_rounds + 1):
+            self.logger.info(f"Council deliberation round {round_num}/{max_rounds}")
+            
+            # Build context with previous rounds' feedback (for rounds > 1)
+            previous_feedback = None
+            if round_num > 1:
+                previous_feedback = self._compile_deliberation_feedback(
+                    all_reviews, round_num - 1
                 )
-                futures[future] = model_id
+            
+            # Execute reviews in parallel for this round
+            round_reviews = {}
+            with ThreadPoolExecutor(max_workers=len(model_assignments)) as executor:
+                futures = {}
+                for model_id, assigned_lenses in model_assignments.items():
+                    future = executor.submit(
+                        self._execute_council_review,
+                        model_id,
+                        doc_path,
+                        assigned_lenses,
+                        context_type,
+                        previous_feedback,
+                        round_num,
+                    )
+                    futures[future] = model_id
 
-            # Collect results with timeout
-            for future in as_completed(futures, timeout=timeout):
-                model_id = futures[future]
-                try:
-                    result = future.result()
-                    reviews[model_id] = result
-                except Exception as e:
-                    self.logger.error(f"Council review failed for {model_id}: {e}")
-                    reviews[model_id] = {
-                        "error": str(e),
-                        "vote": "abstain",
-                        "lenses": model_assignments[model_id],
-                    }
+                # Collect results with timeout
+                for future in as_completed(futures, timeout=timeout):
+                    model_id = futures[future]
+                    try:
+                        result = future.result()
+                        round_reviews[model_id] = result
+                    except Exception as e:
+                        self.logger.error(f"Council review failed for {model_id} round {round_num}: {e}")
+                        round_reviews[model_id] = {
+                            "error": str(e),
+                            "vote": "abstain",
+                            "lenses": model_assignments[model_id],
+                            "round": round_num,
+                        }
 
-        # Aggregate results
-        return self._aggregate_council_reviews(reviews, lenses)
+            # Store reviews for this round
+            for model_id, review in round_reviews.items():
+                if model_id not in all_reviews:
+                    all_reviews[model_id] = []
+                all_reviews[model_id].append(review)
+
+            # Aggregate results for this round
+            aggregation = self._aggregate_council_reviews(round_reviews, lenses)
+            aggregation["round"] = round_num
+            deliberation_history.append(aggregation)
+            
+            self.logger.info(
+                f"Round {round_num} result: {aggregation['consensus']} "
+                f"({aggregation['votes']['approve']} approve, "
+                f"{aggregation['votes']['reject']} reject, "
+                f"{aggregation['votes']['needs_changes']} needs_changes)"
+            )
+
+            # Check if we have strong consensus
+            if aggregation["consensus"] == "unanimous":
+                self.logger.info(f"Unanimous consensus reached in round {round_num}")
+                break
+            elif aggregation["consensus"] == "majority" and round_num >= 2:
+                # Strong majority after 2+ rounds is sufficient
+                self.logger.info(f"Strong majority consensus reached in round {round_num}")
+                break
+            elif round_num == max_rounds:
+                # Final round, use whatever we have
+                self.logger.info(f"Max rounds reached ({max_rounds}), using final aggregation")
+                break
+            else:
+                # Continue to next round with feedback
+                self.logger.info(f"No strong consensus yet, continuing to round {round_num + 1}")
+
+        # Final aggregation using last round's reviews
+        final_reviews = {model_id: reviews[-1] for model_id, reviews in all_reviews.items()}
+        final_result = self._aggregate_council_reviews(final_reviews, lenses)
+        final_result["rounds"] = len(deliberation_history)
+        final_result["deliberation_history"] = deliberation_history
+        final_result["all_reviews"] = all_reviews
+        
+        return final_result
+
+    def _compile_deliberation_feedback(self, all_reviews: Dict, last_round: int) -> str:
+        """Compile feedback from previous rounds for iterative deliberation."""
+        feedback = f"""
+--- PREVIOUS DELIBERATION (Round {last_round}) ---
+
+Summary of previous round reviews:
+"""
+        for model_id, reviews in all_reviews.items():
+            if len(reviews) >= last_round:
+                review = reviews[last_round - 1]
+                vote = review.get("vote", "abstain")
+                concerns = review.get("concerns", [])
+                recommendations = review.get("recommendations", [])
+                
+                feedback += f"\n{model_id}:"
+                feedback += f"\n  Vote: {vote}"
+                if concerns:
+                    feedback += f"\n  Concerns: {'; '.join(concerns[:3])}"
+                if recommendations:
+                    feedback += f"\n  Recommendations: {'; '.join(recommendations[:3])}"
+                feedback += "\n"
+        
+        feedback += """
+--- YOUR TASK ---
+
+Consider the feedback above. You may:
+1. Maintain your position with additional justification
+2. Revise your vote based on others' perspectives
+3. Address concerns raised by other reviewers
+
+Provide your updated review below.
+"""
+        return feedback
 
     def _get_council_models(self) -> List[str]:
         """Get models available for council review."""
@@ -1821,7 +1975,8 @@ class ConcurrentOrchestrator:
         return assignments
 
     def _execute_council_review(
-        self, model_id: str, doc_path: str, lenses: List[str], context_type: str
+        self, model_id: str, doc_path: str, lenses: List[str], context_type: str,
+        previous_feedback: str = None, round_num: int = 1
     ) -> Dict:
         """Execute council review with a specific model."""
         # Read the document
@@ -1871,19 +2026,196 @@ Review from your assigned perspective(s) and provide:
 Consider VibePilot principles: zero vendor lock-in, modular, reversible, exit-ready.
 """
 
-        # TODO: Actually dispatch to model via appropriate runner
-        # For now, return placeholder that needs implementation
-        self.logger.info(
-            f"Would dispatch council review to {model_id} for lenses: {lenses}"
-        )
+        # Add round information and previous feedback for iterative deliberation
+        if round_num > 1:
+            context = f"""{context}
 
+--- ROUND {round_num} ---
+This is deliberation round {round_num}. Previous rounds have occurred.
+"""
+            if previous_feedback:
+                context = f"""{context}
+
+{previous_feedback}
+"""
+        else:
+            context = f"""{context}
+
+--- ROUND {round_num} ---
+This is the first round of deliberation.
+"""
+
+        # Dispatch to model via runner
+        self.logger.info(f"Dispatching council review to {model_id} for lenses: {lenses}")
+
+        try:
+            # Get runner info from pool
+            runner_info = self.runner_pool.runners.get(model_id, {})
+            if not runner_info:
+                # Try to find by model_id substring match
+                for rid, info in self.runner_pool.runners.items():
+                    if model_id in rid or model_id in info.get("model_id", ""):
+                        runner_info = info
+                        model_id = rid
+                        break
+
+            # Build task packet for council review
+            task_packet = {
+                "task_id": f"council-review-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+                "prompt": context,
+                "title": f"Council Review - {context_type}",
+                "constraints": {
+                    "max_tokens": 2000,
+                    "timeout_seconds": 120,
+                },
+                "runner_context": {
+                    "work_dir": os.getcwd(),
+                },
+            }
+
+            # Determine runner type
+            tool_id = runner_info.get("tool_id", model_id)
+            runner_model_id = runner_info.get("model_id", model_id)
+
+            if tool_id == "kimi-cli" or "kimi" in tool_id.lower():
+                runner_type = "kimi"
+            elif tool_id == "opencode":
+                runner_type = "kimi"
+            elif tool_id == "direct-api":
+                if "deepseek" in runner_model_id.lower():
+                    runner_type = "deepseek"
+                elif "gemini" in runner_model_id.lower():
+                    runner_type = "gemini"
+                else:
+                    runner_type = runner_model_id
+            else:
+                runner_type = tool_id
+
+            # Execute via contract runner
+            from runners.contract_runners import get_runner
+            runner = get_runner(runner_type)
+            result = runner.execute(task_packet)
+
+            if result.get("status") != "success":
+                errors = result.get("errors", [])
+                error_msg = errors[0].get("message", "Unknown error") if errors else "Runner failed"
+                self.logger.error(f"Council review failed for {model_id}: {error_msg}")
+                return {
+                    "model_id": model_id,
+                    "lenses": lenses,
+                    "vote": "abstain",
+                    "concerns": [f"Review execution failed: {error_msg}"],
+                    "recommendations": [],
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+
+            # Parse the response to extract vote, concerns, recommendations
+            output = result.get("output", "")
+            parsed = self._parse_council_response(output, lenses)
+
+            self.logger.info(f"Council review from {model_id}: {parsed['vote']}")
+
+            return {
+                "model_id": model_id,
+                "lenses": lenses,
+                "vote": parsed["vote"],
+                "concerns": parsed["concerns"],
+                "recommendations": parsed["recommendations"],
+                "raw_response": output[:1000],  # Truncated for logging
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+        except Exception as e:
+            self.logger.error(f"Council review error for {model_id}: {e}")
+            return {
+                "model_id": model_id,
+                "lenses": lenses,
+                "vote": "abstain",
+                "concerns": [f"Review execution error: {str(e)}"],
+                "recommendations": [],
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+    def _parse_council_response(self, response: str, lenses: List[str]) -> Dict:
+        """Parse council review response to extract structured data.
+        
+        Expected format in response:
+        - Vote: approve / needs_changes / reject
+        - Concerns: list of concerns
+        - Recommendations: list of recommendations
+        """
+        response_lower = response.lower()
+        
+        # Determine vote
+        vote = "abstain"
+        if "vote: approve" in response_lower or "vote:approve" in response_lower:
+            vote = "approve"
+        elif "vote: reject" in response_lower or "vote:reject" in response_lower:
+            vote = "reject"
+        elif "vote: needs_changes" in response_lower or "vote:needs_changes" in response_lower:
+            vote = "needs_changes"
+        elif "approve" in response_lower and "reject" not in response_lower:
+            vote = "approve"
+        elif "reject" in response_lower:
+            vote = "reject"
+        elif "needs changes" in response_lower or "needs_changes" in response_lower:
+            vote = "needs_changes"
+        
+        # Extract concerns and recommendations
+        concerns = []
+        recommendations = []
+        
+        lines = response.split('\n')
+        current_section = None
+        
+        for line in lines:
+            line_stripped = line.strip()
+            line_lower = line_stripped.lower()
+            
+            # Section detection
+            if any(x in line_lower for x in ['concern:', 'concerns:', 'issues:', 'problems:']):
+                current_section = 'concerns'
+                # Check if content on same line
+                content = line_stripped.split(':', 1)[1].strip()
+                if content and not content.startswith('http'):
+                    concerns.append(content)
+                continue
+            elif any(x in line_lower for x in ['recommendation:', 'recommendations:', 'suggestions:']):
+                current_section = 'recommendations'
+                content = line_stripped.split(':', 1)[1].strip()
+                if content and not content.startswith('http'):
+                    recommendations.append(content)
+                continue
+            
+            # Content collection
+            if line_stripped.startswith('- ') or line_stripped.startswith('* '):
+                content = line_stripped[2:].strip()
+                if content and not content.lower().startswith('vote:'):
+                    if current_section == 'concerns':
+                        concerns.append(content)
+                    elif current_section == 'recommendations':
+                        recommendations.append(content)
+            elif line_stripped and current_section and not line_stripped.lower().startswith('vote:'):
+                # Continuation or new item without bullet
+                if current_section == 'concerns':
+                    concerns.append(line_stripped)
+                elif current_section == 'recommendations':
+                    recommendations.append(line_stripped)
+        
+        # If no explicit sections found, do basic extraction
+        if not concerns and not recommendations:
+            sentences = response.split('.')
+            for sent in sentences:
+                sent = sent.strip()
+                if any(word in sent.lower() for word in ['concern', 'issue', 'problem', 'risk', 'warning']):
+                    concerns.append(sent)
+                elif any(word in sent.lower() for word in ['recommend', 'suggest', 'improve', 'consider']):
+                    recommendations.append(sent)
+        
         return {
-            "model_id": model_id,
-            "lenses": lenses,
-            "vote": "approve",  # Placeholder
-            "concerns": [],
-            "recommendations": ["Implementation needed: wire to actual model"],
-            "timestamp": datetime.utcnow().isoformat(),
+            "vote": vote,
+            "concerns": concerns[:5],  # Limit to top 5
+            "recommendations": recommendations[:5],
         }
 
     def _aggregate_council_reviews(
