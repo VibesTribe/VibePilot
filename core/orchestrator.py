@@ -26,6 +26,7 @@ from dotenv import load_dotenv
 
 from task_manager import TaskManager
 from agents.supervisor import SupervisorAgent
+from agents.executioner import ExecutionerAgent
 from core.telemetry import get_telemetry, traced
 
 load_dotenv()
@@ -880,6 +881,10 @@ class ConcurrentOrchestrator:
         if pending_reviews > 0:
             self._process_reviews()
 
+        testing_tasks = self._get_testing_tasks()
+        if testing_tasks:
+            self._process_testing_tasks(testing_tasks)
+
         available = self.runner_pool.get_available()
         if not available:
             return
@@ -1315,6 +1320,57 @@ class ConcurrentOrchestrator:
                 f"{result['approved']} approved, {result['rejected']} rejected"
             )
 
+    def _get_testing_tasks(self, limit: int = 5) -> List[Dict]:
+        """Get tasks in testing status."""
+        try:
+            res = (
+                db.table("tasks")
+                .select("*")
+                .eq("status", "testing")
+                .limit(limit)
+                .execute()
+            )
+            return res.data or []
+        except Exception as e:
+            self.logger.error(f"Failed to get testing tasks: {e}")
+            return []
+
+    def _process_testing_tasks(self, tasks: List[Dict]):
+        """Run Executioner on testing tasks."""
+        executioner = ExecutionerAgent()
+
+        for task in tasks:
+            task_id = task.get("id")
+            work_dir = task.get("work_dir", os.getcwd())
+            test_command = task.get("test_command", "pytest")
+
+            self.logger.info(f"Running tests for task {task_id[:8]}")
+
+            result = executioner.execute(
+                {"action": "run_tests", "test_command": test_command, "cwd": work_dir}
+            )
+
+            if result.success:
+                self.logger.info(f"Tests PASSED for task {task_id[:8]}")
+                self.supervisor.process_test_results(
+                    task_id,
+                    {"passed": True, "test_type": "code", "output": result.output},
+                )
+            else:
+                self.logger.warning(
+                    f"Tests FAILED for task {task_id[:8]}: {result.error}"
+                )
+                self.supervisor.process_test_results(
+                    task_id,
+                    {
+                        "passed": False,
+                        "test_type": "code",
+                        "failures": [result.error]
+                        if result.error
+                        else ["Unknown error"],
+                    },
+                )
+
     def get_status(self) -> Dict:
         """Get current orchestrator status."""
         return {
@@ -1380,7 +1436,6 @@ class ConcurrentOrchestrator:
         except Exception as e:
             self.logger.error(f"ROI report failed: {e}")
             return {"error": str(e)}
-
 
     # COUNCIL ROUTING (Phase C)
     # Routes council reviews to available models
@@ -1736,7 +1791,6 @@ Consider VibePilot principles: zero vendor lock-in, modular, reversible, exit-re
                 self.logger.info(
                     f"  ⏸️  {platform}: Paused at 80% - available in {info['available_in_human']}"
                 )
-
 
 
 if __name__ == "__main__":
