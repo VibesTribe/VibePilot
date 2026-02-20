@@ -2805,3 +2805,89 @@ The commit should happen AFTER branch creation, not before. So order in `approve
 
 **No implementation until human decides.**
 
+---
+
+### HUMAN [2026-02-20 15:35] - ANSWERS TO 5 QUESTIONS
+
+---
+
+## 1. MERGE POLICY
+
+**Human approval required for:**
+- Visual UI/UX changes
+- New system changes (prior to implementation)
+
+**Supervisor handles:**
+- Everything else (tasks, small changes, commits, merges to module)
+
+**Council required for:**
+- New project plans (not small tasks)
+- New system improvements
+
+**Flow:** Council vets → Supervisor checks → Done
+
+**Note:** Human is NOT a dev. Showing code won't help. Code must be clean, lean, internally documented, following best practices. That's the standard.
+
+---
+
+## 2. COMMIT TIMING + FAILURE HANDLING
+
+**Question:** What if commit fails?
+
+**Human:** Good question. Discuss with Kimi for best strategic, secure, not fragile approach.
+
+---
+
+## 3. COUNCIL FOR FIRST TEST
+
+**Answer:** YES - Council for first test, or we don't have a full test.
+
+This means we need real Council implementation, not placeholder.
+
+---
+
+## 4. EXECUTIONER
+
+**Answer:** YES - Implied by #3. If Council is required, testing phase is required, so Executioner must be wired.
+
+---
+
+## 5. BRANCH NAMING CONVENTION
+
+**Task branches:** `task/{task-name}` - task gets own branch with task name
+
+**Module branches:** `module/{slice-name}` - module/slice name
+
+**Principle:** Keep it very clear and very easy to understand.
+
+---
+
+## SUMMARY: IMPLEMENTATION ORDER CONFIRMED
+
+| Priority | Gap | Required? | Notes |
+|----------|-----|-----------|-------|
+| 1 | Git Commands (1.1, 1.2, 1.3) | YES | Supervisor handles, no human needed |
+| 2 | Executioner (2.0) | YES | Required for full test |
+| 3 | Council (3.0) | YES | Required for full test - real implementation |
+
+**All three gaps must be wired before Planner test.**
+
+---
+
+## OPEN QUESTION FOR KIMI + GLM-5
+
+**Commit failure handling:** What's the best strategic, secure, not fragile approach when a commit fails?
+
+Options to consider:
+- Retry with backoff?
+- Escalate to human?
+- Rollback task status?
+- Log and continue?
+- Something else?
+
+**Kimi: Design the failure handling strategy. GLM-5: Implement once designed.**
+
+---
+
+**Ready to proceed once Kimi confirms commit failure strategy.**
+
