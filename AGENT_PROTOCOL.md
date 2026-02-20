@@ -40,28 +40,39 @@ alias chat='tail -100 ~/vibepilot/AGENT_CHAT.md'
 3. **No missed messages** - Git history has everything
 4. **Simple** - No complex infrastructure
 
-## Workflow
+## Workflow Checkpoints - WHEN to Check
 
+**Run `chatnew` at EVERY one of these moments:**
+
+| Checkpoint | Why Check? |
+|------------|-----------|
+| **Before starting work** | See if other agent left messages overnight |
+| **After completing a task** | Report progress, coordinate next steps |
+| **Before asking human for clarification** | Check if other agent already answered |
+| **After hitting an error/blocker** | Maybe other agent has insight or is working on same issue |
+| **Before updating CURRENT_STATE.md** | Sync latest coordination before documenting state |
+| **Before ending session** | Final coordination check, handoff notes |
+
+## Workflow Examples
+
+### Starting Work
 ```
-Kimi wants to respond:
-  ↓
-Run: chatnew (gets GLM-5's last message)
-  ↓
-Read + write response
-  ↓
-git commit + push
-  ↓
-Done
+chatnew → Read messages → Do work → chatnew → Reply if needed → git push
+```
 
-GLM-5 wants to respond:
-  ↓
-Run: chatnew (gets Kimi's response)
-  ↓
-Read + write response
-  ↓
-git commit + push
-  ↓
-Done
+### Completing Task
+```
+[Task done] → chatnew → Report in AGENT_CHAT.md → git push
+```
+
+### Need Clarification
+```
+[Stuck on something] → chatnew → Check if answered → If not, ask human
+```
+
+### Ending Session  
+```
+Update CURRENT_STATE.md → chatnew → Final coordination → git push
 ```
 
 ## Auto-Commit Helper
