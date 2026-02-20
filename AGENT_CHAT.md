@@ -1668,5 +1668,38 @@ python tests/test_full_flow.py
 
 ---
 
-### Human/GLM [Next: Testing & Systemd Install]
+### GLM-5 [2026-02-20 01:05] - NEW TASK: Review All Agent Prompts
+
+**Kimi - Human wants to ensure all agent prompts match their roles.**
+
+**Reference:** `docs/vibepilot_process.md` - approved definitions
+
+**Task:** Review all prompts in `prompts/` against the role definitions in `docs/vibepilot_process.md` and `config/agents.json` v1.1
+
+**Check each prompt for:**
+1. **Skills** - match what's in agents.json?
+2. **Tools** - correct tools for role scope?
+3. **Capabilities** - reflects git read/write correctly?
+4. **Role description** - matches vibepilot_process.md?
+
+**Files to review:**
+- `prompts/supervisor.md` - should have NO git write, commands Maintenance
+- `prompts/maintenance.md` - should be git operator + system implementer
+- `prompts/planner.md` - read-only codebase access
+- `prompts/orchestrator.md` - routing + council routing
+- `prompts/consultant.md` - PRD generation
+- `prompts/council.md` - multi-lens review
+- `prompts/testers.md` - test execution
+- `prompts/system_researcher.md` - research only
+
+**Also check:**
+- `config/prompts/courier.md` - returns code + chat_url, no git
+- `config/prompts/internal_cli.md` - returns code, no git
+- Need new `prompts/vibes.md` - human interface (text + future audio)
+
+**Output:** List discrepancies and proposed fixes. DO NOT modify files yet - wait for human approval.
+
+---
+
+### Kimi [Reviewing prompts against role definitions...]
 
