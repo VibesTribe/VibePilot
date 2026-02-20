@@ -4717,3 +4717,92 @@ I proposed an "ideas table" + polling approach without understanding:
 
 ---
 
+
+
+---
+
+### Kimi [2026-02-20 23:00] - ACTUAL STATE UNDERSTOOD (Post-Reading)
+
+**I was confused. Here's what ACTUALLY exists vs PRD ideal:**
+
+---
+
+## **ACTUAL Current Implementation**
+
+### ✅ What's Wired and Working:
+```
+process_idea(idea) 
+    ↓
+Consultant → PRD → Planner → tasks (status: pending) in Supabase
+    ↓
+Orchestrator._tick() [every 5s] → _process_pending_plans()
+    ↓
+review_plan() → call_council() → approve_plan()
+    ↓
+pending → available (no deps) OR locked (has deps)
+    ↓
+_get_available_tasks() → dispatch to runner
+```
+
+**The MECHANICAL flow IS complete.** Tasks will move through the system.
+
+---
+
+### ⚠️ What's Placeholder/Simplified:
+
+**1. Council (line 570-596 in supervisor.py)**
+```python
+def call_council():
+    # ACTUAL: Checks for DB changes, counts high-priority tasks
+    # MISSING: 3 independent model reviews, iterative consensus, real voting
+    # CURRENT: Auto-approves with concerns
+    return {"approved": True, "concerns": [], "rounds": 1}
+```
+
+**2. Executioner**
+- CURRENT_STATE.md: "Executioner agent exists but not wired"
+- Method exists but full integration not complete
+
+**3. Entry Layer Connection**
+- `process_idea()` exists in orchestrator
+- NOT connected to Vibes panel yet
+- Can only be called programmatically
+
+---
+
+## **Real Question: What is "Foundational Work"?**
+
+Per CURRENT_STATE.md:
+
+| Component | Status | What It Means |
+|-----------|--------|---------------|
+| Orchestrator | ✅ Running | systemd service works, polls every 5s |
+| Task Flow | ✅ Wired | Mechanical flow works, tasks move through states |
+| Council | ⚠️ Placeholder | Auto-approves, no real multi-model review |
+| Executioner | ⚠️ Partial | Agent exists, not fully wired |
+| First Autonomous Task | 🧪 Ready to Test | "Create a real task via dashboard" - but how? |
+
+**The Confusion:** PRD describes IDEAL system with full Council. Current system has SIMPLIFIED implementations that still function.
+
+---
+
+## **What I Now Understand**
+
+**Before:** I thought we needed to BUILD the entry layer flow.
+**Reality:** Entry layer EXISTS but needs:
+1. Connection to Vibes panel (API endpoint or RPC)
+2. END-TO-END TEST to verify it actually works
+3. Council made real (3 models, iterative, voting)
+4. Executioner fully wired
+
+**Both GLM-5 and I need to stop proposing and LISTEN to what the human actually wants built.**
+
+---
+
+## **Standing By**
+
+Not proposing work. Not assuming priorities.
+
+**Waiting for:** Human clarification on what "foundational work" means for this phase.
+
+---
