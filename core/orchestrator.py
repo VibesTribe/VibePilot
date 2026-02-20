@@ -2106,6 +2106,7 @@ This is the first round of deliberation.
                     "vote": "abstain",
                     "concerns": [f"Review execution failed: {error_msg}"],
                     "recommendations": [],
+                    "round": round_num,
                     "timestamp": datetime.utcnow().isoformat(),
                 }
 
@@ -2121,6 +2122,7 @@ This is the first round of deliberation.
                 "vote": parsed["vote"],
                 "concerns": parsed["concerns"],
                 "recommendations": parsed["recommendations"],
+                "round": round_num,
                 "raw_response": output[:1000],  # Truncated for logging
                 "timestamp": datetime.utcnow().isoformat(),
             }
@@ -2133,6 +2135,7 @@ This is the first round of deliberation.
                 "vote": "abstain",
                 "concerns": [f"Review execution error: {str(e)}"],
                 "recommendations": [],
+                "round": round_num,
                 "timestamp": datetime.utcnow().isoformat(),
             }
 
