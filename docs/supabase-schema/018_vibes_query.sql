@@ -12,10 +12,15 @@ DECLARE
   v_result JSONB;
   v_user_prefs JSONB;
 BEGIN
-  -- Get user preferences (if table exists)
-  SELECT to_jsonb(vp.*) INTO v_user_prefs
-  FROM vibes_preferences vp
-  WHERE vp.user_id = p_user_id;
+  -- Get user preferences (if table exists, handle gracefully if not)
+  BEGIN
+    SELECT to_jsonb(vp.*) INTO v_user_prefs
+    FROM vibes_preferences vp
+    WHERE vp.user_id = p_user_id;
+  EXCEPTION
+    WHEN undefined_table THEN
+      v_user_prefs := NULL;
+  END;
 
   -- Build comprehensive response with real system data
   v_result := jsonb_build_object(
