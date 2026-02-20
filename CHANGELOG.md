@@ -6,6 +6,76 @@
 
 ---
 
+# 2026-02-20 (Session 18)
+
+## Summary
+
+Fixed command queue RLS, all integration tests passing, orchestrator installed as systemd service. System now runs autonomously.
+
+### Major Work
+
+1. **Command Queue RLS Fix**
+   - Added `SUPABASE_SERVICE_KEY` to vault
+   - Updated `agents/maintenance.py` and `agents/supervisor.py` to use service key
+   - Fixed `claim_next_command` RPC to return `cmd_status` (was ambiguous with PL/pgSQL)
+
+2. **All Integration Tests Passing**
+   ```
+   RESULTS: 8 passed, 0 failed
+   ```
+
+3. **Orchestrator as Systemd Service**
+   - Installed `vibepilot-orchestrator.service`
+   - Status: active (running), enabled on boot
+   - Auto-restarts on crash (10s delay)
+   - Polling task queue every 5 seconds
+
+### Files Modified
+
+```
+vibepilot/
+├── agents/
+│   ├── maintenance.py                    - Service key support
+│   └── supervisor.py                     - Service key support
+├── tests/
+│   └── test_full_flow.py                 - Service key, cmd_status check
+├── docs/supabase-schema/
+│   ├── 014_maintenance_commands.sql      - RPC return type note
+│   └── 015_fix_claim_rpc_return_status.sql - Migration to fix RPC
+└── CURRENT_STATE.md                      - Session 18 summary
+```
+
+### Commits
+
+```
+de5de8dc Docs: Update CURRENT_STATE for Session 18
+f58f417f Fix: Rename status to cmd_status to avoid PL/pgSQL conflict
+f354e87d Fix: Disambiguate status column in claim_next_command RPC
+b1e6fcf6 Fix: Move migration to correct location
+d179b3d6 Add migration 015 to fix claim_next_command return type
+cfdbb573 Fix: Add DROP note for claim_next_command RPC
+d24bf2dc Fix: Add service key support + return status from claim RPC
+```
+
+### Service Commands
+
+```bash
+sudo systemctl status vibepilot-orchestrator  # Check status
+sudo systemctl stop vibepilot-orchestrator    # Stop
+sudo systemctl restart vibepilot-orchestrator # Restart
+journalctl -u vibepilot-orchestrator -f       # View logs
+```
+
+### Remaining Work
+
+1. ~~Install orchestrator as systemd service~~ ✅ DONE
+2. First autonomous task flow test (tomorrow)
+3. Implement full Council (3 independent reviews)
+4. Wire Executioner for post-review testing
+5. Clean up old test tasks in database
+
+---
+
 # 2026-02-18/19 (Session 15)
 
 ## Summary
