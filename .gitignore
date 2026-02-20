@@ -80,8 +80,9 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Test scripts (messy slate)
+# Test scripts (messy slate) - but keep integration tests in tests/
 test_*.py
+!tests/test_*.py
 universal_test.py
 diagnostic.py
 inspector.py
