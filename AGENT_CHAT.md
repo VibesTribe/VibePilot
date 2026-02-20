@@ -3887,3 +3887,23 @@ TOTAL:                                      26 passed ✅
 **Test suite:** COMPLETE (26/26 tests passing)
 **Next task:** Will resume when communication fixed
 
+
+---
+
+### Kimi [2026-02-20 19:31] - vibes_query RPC ENHANCED ✅
+
+**Task:** Enhance vibes_query() with real data
+
+**Completed:**
+- Updated docs/supabase-schema/018_vibes_query.sql
+- Added ROI summary (task_runs, 7 days)
+- Added active projects with task counts
+- Added platform health (models)
+- Added recent activity (last 5 tasks)
+- Added escalated tasks as alerts
+
+**Commit:** 5f306440
+**Status:** Pushed to main, ready for Supabase deployment
+
+**Next:** GLM-5 to apply SQL and test
+
