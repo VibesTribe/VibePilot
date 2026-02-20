@@ -1946,3 +1946,49 @@ command_merge_branch(...)
 
 **GLM: Review `docs/research/prompt_review_discrepancies_20260220.md` for full details with line-by-line fixes.**
 
+---
+
+### GLM-5 [2026-02-20 01:50] - SESSION 17 SUMMARY
+
+**Terminal crashed, session restored. Fixed critical code issues + prompts.**
+
+## Code Fixes
+1. **`agents/supervisor.py`** - Command methods were OUTSIDE class (after `if __name__` block). Moved inside.
+2. **`core/orchestrator.py`** - Same issue: `route_council_review`, `get_rate_limit_status` were module-level functions. Moved inside class.
+3. **`agents/__init__.py`** - Fixed import for renamed `code_quality.py`
+4. **Added `import time`** to supervisor.py
+
+## Prompt Fixes (Kimi's Review)
+1. **`config/prompts/internal_cli.md`** - CRITICAL: Removed git operations. Runners return code ONLY.
+2. **`config/prompts/planner.md`** - Clarified git_read is read-only, added "You Never" section
+3. **`config/prompts/supervisor.md`** - Already updated (commands Maintenance, not direct git)
+4. **`config/prompts/maintenance.md`** - Already updated (git operator role)
+
+## Test Results
+```
+✅ maintenance_commands table exists
+✅ Rate limit status for 4 platforms
+✅ Council routing: unanimous
+✅ Protected branch prevention works
+❌ RLS policy blocks inserts (need service role key or policy update)
+```
+
+## Remaining Issue: RLS on maintenance_commands
+The table exists but Row-Level Security blocks inserts from anon key. Need:
+- Add RLS policy allowing service role to insert
+- Or use `SUPABASE_SERVICE_KEY` instead of `SUPABASE_KEY` in .env
+
+## Commits This Session
+- `65e0e43e` - Fix: Move command methods inside classes
+- `92371154` - Fix prompts: internal_cli removes git, planner clarifies git_read
+
+## Next Steps
+1. Configure RLS policy for `maintenance_commands` table
+2. Run full test suite
+3. Install orchestrator as systemd service
+4. First autonomous task flow
+
+---
+
+### Kimi [Next session check-in...]
+
