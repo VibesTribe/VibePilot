@@ -4806,3 +4806,127 @@ Not proposing work. Not assuming priorities.
 **Waiting for:** Human clarification on what "foundational work" means for this phase.
 
 ---
+
+
+---
+
+### Kimi [2026-02-20 23:15] - FOUNDATIONAL BUILD PLAN
+
+**Human direction: Build full start-to-end system for testing**
+
+---
+
+## **Current State Audit: What EXISTS vs What's NEEDED**
+
+| Stage | Component | Status | Gap |
+|-------|-----------|--------|-----|
+| **Entry** | Trigger mechanism | ❌ MISSING | Need way to submit idea |
+| **Entry** | `process_idea()` | ✅ EXISTS | GLM-5 built this |
+| **Planning** | Consultant → Planner | ✅ EXISTS | Writes tasks to Supabase |
+| **Approval** | `_process_pending_plans()` | ✅ EXISTS | Auto-runs every 5s |
+| **Approval** | Council review | ⚠️ PLACEHOLDER | Auto-approves for now - OK for foundation |
+| **Execution** | Task dispatch | ✅ EXISTS | Orchestrator polls & dispatches |
+| **Execution** | Runners | ✅ EXISTS | Kimi, GLM runners ready |
+| **Review** | Supervisor review | ✅ EXISTS | Checks task output |
+| **Testing** | Executioner | ⚠️ PARTIAL | Exists but wiring incomplete |
+| **Merge** | Git commands | ✅ EXISTS | approve_task() + final_merge() work |
+| **Cleanup** | Maintenance | ✅ EXISTS | Runs git commands |
+
+**Critical Gap:** No ENTRY POINT to inject a task into the system.
+
+---
+
+## **What "Foundational" Means**
+
+**NOT:** Making Council perfect (that's enhancement)
+**NOT:** Adding features (that's Phase 2)
+**YES:** Ensuring mechanical flow works end-to-end
+
+**The Test:**
+```
+1. Submit: "Create a hello world Python script"
+2. System produces: PRD → Plan → Tasks → Execution → Merge
+3. Result: Working code in repo, task marked complete
+```
+
+---
+
+## **Work Required (Parallel Where Possible)**
+
+### **Kimi's Work: Entry Point + Executioner Wiring**
+
+**A. Create Entry Mechanism** (NEW)
+- Option 1: CLI command `vibepilot submit "idea text"`
+- Option 2: Python script `scripts/submit_idea.py`
+- Option 3: Simple HTTP endpoint
+
+**B. Wire Executioner** (CRITICAL GAP)
+- `core/orchestrator.py` `_process_testing_tasks()` exists but incomplete
+- Need: After Supervisor approves → route to Executioner → run tests → update status
+- CURRENT_STATE.md says: "Executioner agent exists but not wired"
+
+**C. End-to-End Test** (VALIDATION)
+- Test that submits real idea
+- Verifies task flows through all states
+- Confirms git commands execute
+
+### **GLM-5's Work: Vibes Panel Integration (PARALLEL)**
+
+**A. Connect Vibes Panel to Entry Point**
+- VibesChatPanel calls whatever entry mechanism I build
+- OR: Direct Supabase insert if we use "ideas table" approach
+
+**B. Dashboard Updates** (if needed)
+- Show task status progression
+- Display PRD/plan for human review
+
+---
+
+## **Key Question for Human**
+
+**For foundation testing, do we:**
+
+**Option A: CLI Entry (Fastest)**
+- Build `scripts/submit_idea.py`
+- Test: `python scripts/submit_idea.py "Create hello world script"`
+- Pros: No web UI needed, test immediately
+- Cons: Not the final UX
+
+**Option B: Ideas Table (Matches GLM-5's proposal)**
+- New `ideas` table in Supabase
+- Orchestrator polls ideas table
+- Pros: Aligns with Vibes panel later
+- Cons: More moving parts
+
+**Option C: HTTP API**
+- FastAPI endpoint `/api/submit-idea`
+- Pros: Clean architecture
+- Cons: New service to maintain
+
+**My recommendation: Option A (CLI) for foundation, Option B for Vibes integration.**
+
+Build CLI first to prove pipeline works, then add ideas table for Vibes.
+
+---
+
+## **Proposed Division**
+
+| Agent | Work | Deliverable |
+|-------|------|-------------|
+| **Kimi** | Entry CLI + Executioner wiring + E2E test | `scripts/submit_idea.py`, complete `_process_testing_tasks()`, `tests/e2e/test_full_pipeline.py` |
+| **GLM-5** | Vibes panel integration (after CLI works) | Connect panel to entry mechanism |
+| **Both** | Validate together | Run E2E test, confirm task completes |
+
+**Zero conflicts:** Different files entirely.
+
+---
+
+## **Questions**
+
+1. **Entry approach:** CLI first (Option A) or Ideas table (Option B)?
+2. **Council:** Keep placeholder for foundation, or make it real now?
+3. **Test scope:** Simple task (hello world) or real feature?
+
+**Ready to build once you confirm approach.**
+
+---
