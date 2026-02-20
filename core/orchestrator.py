@@ -1407,3 +1407,361 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("Ready to start. Run orch.start() to begin dispatch loop.")
     print("=" * 60)
+
+
+    # =========================================================================
+    # COUNCIL ROUTING (Phase C)
+    # Routes council reviews to available models
+    # =========================================================================
+
+    def route_council_review(
+        self,
+        doc_path: str,
+        lenses: List[str] = None,
+        context_type: str = "project",
+        timeout: int = 300
+    ) -> Dict:
+        """
+        Route council review to available models.
+        
+        Args:
+            doc_path: Path to document to review (PRD or system doc)
+            lenses: List of lenses to use ["user_alignment", "architecture", "feasibility"]
+                   If None, uses default based on context_type
+            context_type: "project" (PRD+Plan) or "system" (full context)
+            timeout: Maximum seconds to wait for all reviews
+            
+        Returns:
+            {
+                "approved": bool,
+                "consensus": str,  # "unanimous", "majority", "split"
+                "reviews": Dict[str, Dict],
+                "concerns": List[str],
+                "recommendations": List[str]
+            }
+        """
+        if lenses is None:
+            if context_type == "project":
+                lenses = ["user_alignment", "architecture", "feasibility"]
+            else:  # system
+                lenses = ["architecture", "security", "integration", "reversibility"]
+        
+        self.logger.info(f"Routing council review: {len(lenses)} lenses, context={context_type}")
+        
+        # Get available models for council review
+        available_models = self._get_council_models()
+        
+        if len(available_models) < len(lenses):
+            self.logger.warning(
+                f"Not enough models ({len(available_models)}) for {len(lenses)} lenses. "
+                "Will reuse models for multiple lenses."
+            )
+        
+        # Distribute lenses across models
+        model_assignments = self._assign_lenses_to_models(lenses, available_models)
+        
+        # Execute reviews in parallel
+        reviews = {}
+        with ThreadPoolExecutor(max_workers=len(model_assignments)) as executor:
+            futures = {}
+            for model_id, assigned_lenses in model_assignments.items():
+                future = executor.submit(
+                    self._execute_council_review,
+                    model_id,
+                    doc_path,
+                    assigned_lenses,
+                    context_type
+                )
+                futures[future] = model_id
+            
+            # Collect results with timeout
+            for future in as_completed(futures, timeout=timeout):
+                model_id = futures[future]
+                try:
+                    result = future.result()
+                    reviews[model_id] = result
+                except Exception as e:
+                    self.logger.error(f"Council review failed for {model_id}: {e}")
+                    reviews[model_id] = {
+                        "error": str(e),
+                        "vote": "abstain",
+                        "lenses": model_assignments[model_id]
+                    }
+        
+        # Aggregate results
+        return self._aggregate_council_reviews(reviews, lenses)
+
+    def _get_council_models(self) -> List[str]:
+        """Get models available for council review."""
+        available = []
+        for runner_id, runner in self.runner_pool.runners.items():
+            if self.runner_pool.is_available(runner_id):
+                # Prefer models with good track record
+                ratings = runner.get("task_ratings", {})
+                council_rating = ratings.get("council_review", {})
+                success_rate = council_rating.get("success", 0) / max(council_rating.get("count", 1), 1)
+                
+                if success_rate >= 0.7 or council_rating.get("count", 0) < 5:
+                    available.append(runner_id)
+        
+        # If no specific council experience, use any available
+        if not available:
+            available = self.runner_pool.get_available()
+        
+        return available[:3]  # Max 3 models for council
+
+    def _assign_lenses_to_models(
+        self, 
+        lenses: List[str], 
+        models: List[str]
+    ) -> Dict[str, List[str]]:
+        """Distribute lenses across available models."""
+        if not models:
+            # Use single model for all lenses if none available
+            return {"kimi-cli": lenses}
+        
+        assignments = {}
+        
+        # If we have enough models, assign one lens per model
+        if len(models) >= len(lenses):
+            for i, lens in enumerate(lenses):
+                model = models[i]
+                assignments[model] = [lens]
+        else:
+            # Distribute lenses across available models
+            for i, lens in enumerate(lenses):
+                model = models[i % len(models)]
+                if model not in assignments:
+                    assignments[model] = []
+                assignments[model].append(lens)
+        
+        return assignments
+
+    def _execute_council_review(
+        self,
+        model_id: str,
+        doc_path: str,
+        lenses: List[str],
+        context_type: str
+    ) -> Dict:
+        """Execute council review with a specific model."""
+        # Read the document
+        try:
+            with open(doc_path, 'r') as f:
+                doc_content = f.read()
+        except Exception as e:
+            return {
+                "error": f"Failed to read document: {e}",
+                "vote": "abstain",
+                "lenses": lenses
+            }
+        
+        # Build context based on type
+        if context_type == "project":
+            context = f"""
+You are reviewing a PROJECT PLAN for VibePilot.
+
+Document to review:
+{doc_content[:5000]}...
+
+Your assigned lenses: {', '.join(lenses)}
+
+Review from your assigned perspective(s) and provide:
+1. Your assessment of the plan
+2. Specific concerns (if any)
+3. Vote: approve / needs_changes / reject
+4. Recommendations for improvement
+
+Be thorough but concise.
+"""
+        else:  # system
+            context = f"""
+You are reviewing a SYSTEM IMPROVEMENT for VibePilot.
+
+Document to review:
+{doc_content[:5000]}...
+
+Your assigned lenses: {', '.join(lenses)}
+
+Review from your assigned perspective(s) and provide:
+1. Your assessment of the improvement
+2. Specific concerns (architecture, security, integration)
+3. Vote: approve / needs_changes / reject
+4. Recommendations for improvement
+
+Consider VibePilot principles: zero vendor lock-in, modular, reversible, exit-ready.
+"""
+        
+        # TODO: Actually dispatch to model via appropriate runner
+        # For now, return placeholder that needs implementation
+        self.logger.info(f"Would dispatch council review to {model_id} for lenses: {lenses}")
+        
+        return {
+            "model_id": model_id,
+            "lenses": lenses,
+            "vote": "approve",  # Placeholder
+            "concerns": [],
+            "recommendations": ["Implementation needed: wire to actual model"],
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    def _aggregate_council_reviews(
+        self, 
+        reviews: Dict[str, Dict], 
+        lenses: List[str]
+    ) -> Dict:
+        """Aggregate council reviews into consensus decision."""
+        votes = []
+        all_concerns = []
+        all_recommendations = []
+        
+        for model_id, review in reviews.items():
+            vote = review.get("vote", "abstain")
+            votes.append(vote)
+            all_concerns.extend(review.get("concerns", []))
+            all_recommendations.extend(review.get("recommendations", []))
+        
+        # Determine consensus
+        approve_count = votes.count("approve")
+        reject_count = votes.count("reject")
+        needs_changes_count = votes.count("needs_changes")
+        total_votes = len([v for v in votes if v != "abstain"])
+        
+        if total_votes == 0:
+            consensus = "no_quorum"
+            approved = False
+        elif approve_count == total_votes:
+            consensus = "unanimous"
+            approved = True
+        elif approve_count > total_votes / 2:
+            consensus = "majority"
+            approved = True
+        else:
+            consensus = "split"
+            approved = False
+        
+        return {
+            "approved": approved,
+            "consensus": consensus,
+            "votes": {
+                "approve": approve_count,
+                "reject": reject_count,
+                "needs_changes": needs_changes_count,
+                "total": total_votes
+            },
+            "reviews": reviews,
+            "concerns": list(set(all_concerns)),
+            "recommendations": list(set(all_recommendations))
+        }
+
+    # =========================================================================
+    # RATE LIMIT COUNTDOWN (Phase C)
+    # Shows time until platforms are available again
+    # =========================================================================
+
+    def get_rate_limit_status(self) -> Dict[str, Dict]:
+        """
+        Get rate limit status for all platforms with countdowns.
+        
+        Returns:
+            {
+                "platform_id": {
+                    "status": "available" | "cooldown" | "paused",
+                    "available_in_seconds": int | None,
+                    "available_in_human": str | None,  # "4h 23m"
+                    "daily_remaining": int,
+                    "daily_limit": int,
+                    "usage_percent": float  # 0.0 to 100.0
+                }
+            }
+        """
+        status = {}
+        
+        for runner_id, runner in self.runner_pool.runners.items():
+            platform_id = runner.get("platform_id", runner_id)
+            
+            # Check cooldown
+            cooldown_remaining = None
+            if self.runner_pool.cooldown_manager:
+                cooldown_remaining = self.runner_pool.cooldown_manager.get_cooldown_remaining(runner_id)
+            
+            # Get rate limits
+            rate_limits = runner.get("rate_limits", {})
+            current_usage = runner.get("current_usage", {})
+            
+            rpd = rate_limits.get("rpd")
+            requests_today = current_usage.get("requests_today", 0)
+            
+            # Calculate status
+            if cooldown_remaining:
+                platform_status = "cooldown"
+                available_in = cooldown_remaining
+            elif rpd and requests_today >= rpd * 0.8:
+                platform_status = "paused"
+                # Estimate reset time (midnight UTC or rolling)
+                available_in = self._estimate_reset_time(platform_id)
+            else:
+                platform_status = "available"
+                available_in = None
+            
+            # Calculate percentage
+            usage_percent = (requests_today / rpd * 100) if rpd else 0
+            
+            status[platform_id] = {
+                "status": platform_status,
+                "available_in_seconds": available_in,
+                "available_in_human": self._format_duration(available_in) if available_in else None,
+                "daily_remaining": max(0, (rpd or 0) - requests_today),
+                "daily_limit": rpd,
+                "usage_percent": round(usage_percent, 1)
+            }
+        
+        return status
+
+    def _estimate_reset_time(self, platform_id: str) -> Optional[int]:
+        """Estimate seconds until rate limit resets."""
+        # Platform-specific reset logic
+        reset_times = {
+            "chatgpt": 5 * 60 * 60,  # 5 hours rolling
+            "claude": 12 * 60 * 60,   # 12 hours
+            "gemini": 24 * 60 * 60,   # 24 hours
+            "deepseek": 24 * 60 * 60, # 24 hours
+        }
+        
+        for key, seconds in reset_times.items():
+            if key in platform_id.lower():
+                return seconds
+        
+        return 6 * 60 * 60  # Default 6 hours
+
+    def _format_duration(self, seconds: int) -> str:
+        """Format seconds as human-readable duration."""
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        else:
+            return f"{minutes}m"
+
+    def log_rate_limit_status(self):
+        """Log current rate limit status for all platforms."""
+        status = self.get_rate_limit_status()
+        
+        self.logger.info("Rate Limit Status:")
+        for platform, info in status.items():
+            if info["status"] == "available":
+                self.logger.info(
+                    f"  ✅ {platform}: {info['daily_remaining']}/{info['daily_limit']} remaining"
+                )
+            elif info["status"] == "cooldown":
+                self.logger.info(
+                    f"  ⏲️  {platform}: Cooldown - available in {info['available_in_human']}"
+                )
+            else:
+                self.logger.info(
+                    f"  ⏸️  {platform}: Paused at 80% - available in {info['available_in_human']}"
+                )
+
+
+if __name__ == "__main__":
