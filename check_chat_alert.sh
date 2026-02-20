@@ -19,7 +19,7 @@ check_agent_chat() {
     # If no previous checksum, store and return
     if [ ! -f "$LAST_CHECKSUM_FILE" ]; then
         echo "$current_checksum" > "$LAST_CHECKSUM_FILE"
-        date +%s > "$LAST_CHECK_FILE_FILE"
+        date +%s > "$LAST_CHECK_FILE"
         return 0
     fi
     
