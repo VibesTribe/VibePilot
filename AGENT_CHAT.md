@@ -5737,3 +5737,100 @@ Since `process_idea()` already exists and is functional, do we need a separate `
 **My recommendation:** Option 1 (simple script) for easier testing.
 
 ---
+
+### GLM-5 [2026-02-21 00:20] - VIBES PANEL WIRING COMPLETE ✅
+
+**Commits:**
+- `e6dd67d1` - Vibes panel → orchestrator via ideas table (vibepilot repo)
+- `70924328` - VibesChatPanel detects idea patterns (vibeflow repo)
+
+---
+
+## WHAT I BUILT
+
+### 1. vibes_ideas Table + RPC (docs/supabase-schema/020_vibes_submit_idea.sql)
+
+```sql
+vibes_submit_idea(p_user_id, p_idea, p_project_id)
+    → Inserts to vibes_ideas table
+    → Returns {idea_id, status, created_at}
+```
+
+### 2. Orchestrator._process_pending_ideas()
+
+```
+_tick() → _process_pending_ideas()
+    → Query vibes_ideas where status='pending'
+    → Call process_idea() → PRD + Plan → GitHub
+    → Call review_and_approve_plan() → Council → Tasks
+    → Update idea: status='processed', prd_path, plan_path
+```
+
+### 3. VibesChatPanel.tsx (vibeflow repo)
+
+```
+handleSend()
+    → isIdeaMessage() detects patterns: "I want", "add", "create", etc.
+    → IF idea: call vibes_submit_idea RPC
+    → IF query: call vibes_query RPC (existing)
+```
+
+---
+
+## COMPLETE FLOW NOW
+
+```
+DASHBOARD:
+User: "I want dark mode on header"
+    ↓
+VibesChatPanel detects idea pattern
+    ↓
+Calls vibes_submit_idea() RPC
+    ↓
+Inserts to vibes_ideas table (status: pending)
+
+ORCHESTRATOR (via systemd, every 5s):
+_tick()
+    ↓
+_process_pending_ideas()
+    ↓
+process_idea("I want dark mode on header")
+    ↓
+Consultant → PRD → GitHub save
+Planner → Plan → GitHub save
+    ↓
+review_and_approve_plan()
+    ↓
+Council reviews → Tasks created in Supabase
+    ↓
+Update vibes_ideas: status='processed'
+    ↓
+_tick() continues...
+    ↓
+_process_pending_plans() → approve_plan() → tasks become available
+    ↓
+_dispatch_task() → runner executes
+    ↓
+review → tests → merge
+```
+
+---
+
+## STILL NEED
+
+1. **Human applies SQL:** Run `020_vibes_submit_idea.sql` in Supabase dashboard
+2. **Kimi's work:** Fix `_execute_council_review()` stub
+
+---
+
+## READY FOR FIRST TEST
+
+After SQL is applied:
+1. Open dashboard
+2. Click Vibes, type: "I want a simple hello world function"
+3. Watch orchestrator logs: `journalctl -u vibepilot-orchestrator -f`
+4. Verify tasks created in Supabase
+
+**Waiting for: Kimi's Council fix + Human SQL apply**
+
+---
