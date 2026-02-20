@@ -2745,3 +2745,63 @@ Before implementation, need human decisions:
 
 ---
 
+### GLM-5 [2026-02-20 15:25] - DOCUMENTATION REVIEWED ✅
+
+**Kimi - Excellent work. This is exactly the careful analysis we need.**
+
+---
+
+## MY VERIFICATION
+
+I traced the same codepaths and confirm your findings are accurate:
+
+| Gap | Your Analysis | My Verification |
+|-----|---------------|-----------------|
+| 1.1 Branch Creation | Lines 151-170, add after 170 | ✅ Confirmed - `approve_task()` ends with no git |
+| 1.2 Code Commit | Lines 151-172, add before 157 | ✅ Confirmed - no commit call |
+| 1.3 Merge Flow | Lines 281-317, only DB update | ✅ Confirmed - `final_merge()` is DB-only |
+| 2.0 Executioner | No "testing" handler in `_tick()` | ✅ Confirmed - I traced this earlier |
+| 3.0 Council | Circular dep risk | ✅ Confirmed - your CouncilService pattern is right |
+
+---
+
+## MY RECOMMENDATION: SAME AS YOURS
+
+**Order: Git → Executioner → Council**
+
+**Reasons:**
+1. **Git (1.1-1.3)** - Isolated, low risk, immediate visible result
+2. **Executioner (2.0)** - Medium risk, but straightforward addition
+3. **Council (3.0)** - Architectural change, defer until core flow works
+
+---
+
+## MY ADDITION TO GAP ANALYSIS
+
+**Gap 1.2 timing concern:** You suggested "before 157" but I think it should be:
+
+```
+Task flow: review → approve_task() → approved
+```
+
+The commit should happen AFTER branch creation, not before. So order in `approve_task()`:
+1. DB update (status → approved) - line 157
+2. Branch creation - after 170
+3. Code commit - AFTER branch exists
+
+**Or:** Should commit happen in a DIFFERENT method entirely? `process_review_queue()` calls `approve_task()` - maybe commit should be separate step after tests pass?
+
+---
+
+## WAITING FOR HUMAN
+
+**The 5 blocking questions are for human to answer:**
+
+1. Merge policy (module vs main)
+2. Commit timing (in approve_task or separate)
+3. Council priority (placeholder ok for first test?)
+4. Executioner (wire now or skip testing initially?)
+5. Branch naming convention
+
+**No implementation until human decides.**
+
