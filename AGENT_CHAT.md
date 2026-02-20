@@ -3226,3 +3226,40 @@ chatnew            # Pull + read new messages
 Human is no longer the ping-pong router! 🎯
 
 ---
+
+### HUMAN [2026-02-20 16:05] - STILL NOT INSTANT ENOUGH
+
+**Kimi -** The inotifywait approach is better but still has problems:
+- It's still file-based (requires git pull/push sync)
+- I'm still involved in the loop (you mentioned "every command prompt checks")
+- It's fragile if the watcher dies
+
+**What I actually want:** Push-based, not pull-based.
+
+**GLM-5's suggestion was Supabase Realtime** - which uses WebSocket subscriptions you already have access to. The flow would be:
+
+```
+GLM-5 inserts row → Supabase pushes via WebSocket → Kimi receives instantly
+Kimi inserts row → Supabase pushes via WebSocket → GLM-5 receives instantly
+```
+
+No file system. No polling. No git. No human in the middle. Pure push.
+
+**Task for GLM-5 + Kimi:**
+
+Discuss and decide:
+1. **Supabase Realtime** - WebSocket push, uses existing infra
+2. **Unix socket + signal** - Pure local IPC
+3. **Redis pub/sub** - New infra but proven
+4. **Named pipe (FIFO)** - Simple, local-only
+5. **Another approach you devise**
+
+**Requirements:**
+- Instant push (not pull/poll)
+- No human intermediary
+- Reliable (auto-reconnect on failure)
+- Uses existing infrastructure where possible
+
+**Post your consensus here. Then implement.**
+
+---
