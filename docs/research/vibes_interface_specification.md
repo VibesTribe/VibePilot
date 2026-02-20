@@ -40,34 +40,46 @@ Vibes is the human-facing AI assistant for VibePilot - accessible from anywhere,
 
 ## User Experience Design
 
-### Primary Interface: Header Vibes Button
+### Primary Interface: Sticky Header with Vibes
 
-Vibes lives in the **top-left of the Mission Control header** - exactly where it is now. This is the optimal position because:
+Vibes lives in the **top-left of a FIXED Mission Control header** that stays visible while scrolling through projects. This is the optimal design because:
 
-- ✅ **Always visible** - No scrolling needed, even on large projects
+- ✅ **Always visible** - Header stays fixed while content scrolls
+- ✅ **Vibes always accessible** - No scrolling up to find it
+- ✅ **Key data visible** - Status, tokens, ROI always in view
 - ✅ **First thing you see** - Establishes Vibes as the primary interface
 - ✅ **Consistent placement** - Same location on desktop and mobile
-- ✅ **Familiar pattern** - Similar to Siri, Alexa app placement
 
 ```
-┌─────────────────────────────────────┐
-│ 🤖 Vibes    Mission Control    [≡] │  ← Header with Vibes top-left
-│     ↑                               │
-│  Tap to talk                        │
-│  or "Text me" for chat              │
-├─────────────────────────────────────┤
+┌─────────────────────────────────────┐ ← Fixed Header (always visible)
+│ 🤖 Vibes  Mission Control  [Tokens] │    
+│     ↑         [Status]     [ROI]    │
+│  Tap to                             │
+│  talk                               │
+├─────────────────────────────────────┤ ← Scrollable content starts here
 │                                     │
-│    [Dashboard Content]              │
-│    (may scroll for pages)           │
+│    [Project Slice 1]                │
+│                                     │
+│    [Project Slice 2]                │
+│                                     │
+│    [Project Slice 3...]             │
+│    (scrolls while header            │
+│     stays fixed)                    │
 │                                     │
 └─────────────────────────────────────┘
 ```
 
+**Header Contents (Fixed):**
+- **Left:** Vibes orb + "Text me" micro-label
+- **Center:** Mission Control title + status summary
+- **Right:** Key metrics (Tokens, ROI) + menu button
+
 **Interaction:**
 - **Tap Vibes icon** → Opens voice interface overlay
-- **Tap "Text me"** (small text below icon) → Opens chat panel
+- **Tap "Text me"** (small text below orb) → Chat panel slides in
 - **Pulsing glow** when Vibes has a proactive message
 - **Badge counter** for unread notifications
+- **Scroll content** → Header stays fixed at top
 
 ### Interaction Modes
 
