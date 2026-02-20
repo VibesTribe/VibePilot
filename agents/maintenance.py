@@ -120,6 +120,8 @@ class MaintenanceAgent:
                 result = self._execute_create_branch(payload)
             elif command_type == "commit_code":
                 result = self._execute_commit_code(payload)
+            elif command_type == "commit_changes":
+                result = self._execute_commit_changes(payload)
             elif command_type == "merge_branch":
                 result = self._execute_merge_branch(payload)
             elif command_type == "delete_branch":
@@ -273,6 +275,79 @@ class MaintenanceAgent:
                 "success": True,
                 "branch": branch,
                 "files_committed": files_written,
+                "commit_hash": commit_hash,
+                "message": message,
+            }
+
+        except Exception as e:
+            return {"success": False, "error": f"Exception: {str(e)}"}
+
+    def _execute_commit_changes(self, payload: Dict) -> Dict:
+        """
+        Commit all changed files in working directory (for runners that write directly).
+
+        Payload:
+            branch: str - Branch to commit to
+            message: str - Commit message
+            add_all: bool - Add all changed files (default True)
+        """
+        branch = payload.get("branch")
+        message = payload.get("message", "Auto-commit by VibePilot")
+        add_all = payload.get("add_all", True)
+
+        if not branch:
+            return {"success": False, "error": "Missing branch"}
+
+        try:
+            result = self._git_command(["checkout", branch])
+            if result.returncode != 0:
+                return {
+                    "success": False,
+                    "error": f"Failed to checkout {branch}: {result.stderr}",
+                }
+
+            if add_all:
+                result = self._git_command(["add", "-A"])
+                if result.returncode != 0:
+                    self.logger.warning(f"git add -A warning: {result.stderr}")
+
+            result = self._git_command(["status", "--porcelain"])
+            if result.returncode == 0 and not result.stdout.strip():
+                return {
+                    "success": True,
+                    "message": "No changes to commit",
+                    "files_committed": [],
+                }
+
+            result = self._git_command(["commit", "-m", message])
+            if result.returncode != 0:
+                if (
+                    "nothing to commit" in result.stderr
+                    or "nothing to commit" in result.stdout
+                ):
+                    return {
+                        "success": True,
+                        "message": "No changes to commit",
+                        "files_committed": [],
+                    }
+                return {"success": False, "error": f"Failed to commit: {result.stderr}"}
+
+            result = self._git_command(["push", "origin", branch])
+            if result.returncode != 0:
+                return {"success": False, "error": f"Failed to push: {result.stderr}"}
+
+            result = self._git_command(["rev-parse", "HEAD"])
+            commit_hash = result.stdout.strip() if result.returncode == 0 else None
+
+            result = self._git_command(["diff", "--name-only", "HEAD~1"])
+            files_committed = (
+                result.stdout.strip().split("\n") if result.returncode == 0 else []
+            )
+
+            return {
+                "success": True,
+                "branch": branch,
+                "files_committed": [f for f in files_committed if f],
                 "commit_hash": commit_hash,
                 "message": message,
             }

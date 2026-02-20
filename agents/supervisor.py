@@ -149,10 +149,15 @@ class SupervisorAgent:
         return {"issues": issues, "warnings": warnings}
 
     def approve_task(self, task_id: str, reviewer: str = "supervisor") -> Dict:
-        """Approve a task and unlock dependents."""
+        """Approve a task, execute git operations, and unlock dependents."""
         task = self._get_task(task_id)
         if not task:
             return {"success": False, "error": "Task not found"}
+
+        branch_name = task.get("branch_name") or f"task/{task_id[:8]}"
+        module = task.get("module", "general")
+        module_branch = f"module/{module}"
+        task_title = task.get("title", "Automated commit")
 
         db.table("tasks").update(
             {
@@ -161,15 +166,43 @@ class SupervisorAgent:
                     "approved_by": reviewer,
                     "approved_at": datetime.utcnow().isoformat(),
                 },
+                "branch_name": branch_name,
                 "updated_at": datetime.utcnow().isoformat(),
             }
         ).eq("id", task_id).execute()
 
         self.logger.info(f"Task {task_id} APPROVED by {reviewer}")
 
+        create_result = self.command_create_branch(
+            task_id=task_id, branch_name=branch_name, base_branch="main"
+        )
+
+        if not create_result.get("success"):
+            self.logger.warning(
+                f"Branch creation queued but may have issues: {create_result}"
+            )
+
+        commit_result = self.command_commit_changes(
+            task_id=task_id,
+            branch=branch_name,
+            message=f"Task {task_id[:8]}: {task_title}",
+        )
+
+        if not commit_result.get("success"):
+            self.logger.warning(f"Commit queued but may have issues: {commit_result}")
+
         self._unlock_dependents(task_id)
 
-        return {"success": True, "task_id": task_id, "status": "approved"}
+        return {
+            "success": True,
+            "task_id": task_id,
+            "status": "approved",
+            "branch": branch_name,
+            "git_commands_queued": {
+                "create_branch": create_result.get("success", False),
+                "commit_changes": commit_result.get("success", False),
+            },
+        }
 
     def reject_task(self, task_id: str, reason: str, reassign: bool = True) -> Dict:
         """Reject a task and optionally reassign."""
@@ -278,11 +311,16 @@ class SupervisorAgent:
         """Process human approval for visual tasks."""
         return self.approve_task(task_id, f"human:{approved_by}")
 
-    def final_merge(self, task_id: str, branch_name: str = None) -> Dict:
+    def final_merge(
+        self, task_id: str, branch_name: str = None, target: str = None
+    ) -> Dict:
         """
-        Final merge to main.
+        Final merge from task branch to module or main.
 
-        This is the last gate before production.
+        Args:
+            task_id: Task ID
+            branch_name: Source branch (task branch)
+            target: Target branch (module/{name} or main). If None, uses module branch.
         """
         task = self._get_task(task_id)
         if not task:
@@ -294,16 +332,30 @@ class SupervisorAgent:
                 "error": f"Task status is {task.get('status')}, not approved",
             }
 
+        source_branch = branch_name or task.get("branch_name") or f"task/{task_id[:8]}"
+        module = task.get("module", "general")
+        target_branch = target or f"module/{module}"
+
+        merge_result = self.command_merge_branch(
+            task_id=task_id,
+            source=source_branch,
+            target=target_branch,
+            delete_source=True,
+        )
+
+        if not merge_result.get("success"):
+            self.logger.warning(f"Merge command queued with issues: {merge_result}")
+
         db.table("tasks").update(
             {
                 "status": "merged",
-                "branch_name": branch_name,
+                "branch_name": source_branch,
                 "completed_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat(),
             }
         ).eq("id", task_id).execute()
 
-        self.logger.info(f"Task {task_id} MERGED to main")
+        self.logger.info(f"Task {task_id} MERGED to {target_branch}")
 
         self._unlock_dependents(task_id)
 
@@ -313,7 +365,9 @@ class SupervisorAgent:
             "success": True,
             "task_id": task_id,
             "status": "merged",
-            "branch": branch_name,
+            "source_branch": source_branch,
+            "target_branch": target_branch,
+            "merge_command_queued": merge_result.get("success", False),
         }
 
     def _get_task(self, task_id: str) -> Optional[Dict]:
@@ -852,6 +906,59 @@ class SupervisorAgent:
 
         except Exception as e:
             self.logger.error(f"Failed to queue delete_branch command: {e}")
+            return {"success": False, "error": str(e)}
+
+    def command_commit_changes(
+        self, task_id: str, branch: str, message: str = None
+    ) -> Dict:
+        """
+        Command Maintenance to commit all changed files (for runners that write directly).
+
+        Args:
+            task_id: Task ID for tracking
+            branch: Branch to commit to
+            message: Commit message (optional)
+
+        Returns:
+            {"success": bool, "command_id": str, "message": str}
+        """
+        try:
+            idempotency_key = f"commit-changes-{task_id}-{int(time.time())}"
+
+            commit_message = message or f"Task {task_id[:8]}: Automated commit"
+
+            result = (
+                db_service.table("maintenance_commands")
+                .insert(
+                    {
+                        "command_type": "commit_changes",
+                        "payload": {
+                            "branch": branch,
+                            "message": commit_message,
+                            "add_all": True,
+                        },
+                        "status": "pending",
+                        "idempotency_key": idempotency_key,
+                        "approved_by": "supervisor",
+                        "created_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .execute()
+            )
+
+            command_id = result.data[0]["id"] if result.data else None
+
+            self.logger.info(f"Commanded commit_changes on branch: {branch}")
+
+            return {
+                "success": True,
+                "command_id": command_id,
+                "branch": branch,
+                "message": f"Command queued: commit changes to {branch}",
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to queue commit_changes command: {e}")
             return {"success": False, "error": str(e)}
 
     def get_command_status(self, command_id: str) -> Optional[Dict]:
