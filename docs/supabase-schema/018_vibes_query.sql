@@ -34,15 +34,9 @@ BEGIN
         'id', p.id,
         'name', p.name,
         'status', p.status,
-        'progress', p.progress_pct,
-        'tasks_completed', (
-          SELECT COUNT(*) FROM tasks t 
-          WHERE t.project_id = p.id AND t.status = 'merged'
-        ),
-        'tasks_pending', (
-          SELECT COUNT(*) FROM tasks t 
-          WHERE t.project_id = p.id AND t.status = 'pending'
-        )
+        'progress', CASE WHEN p.total_tasks > 0 THEN ROUND((p.completed_tasks::float / p.total_tasks) * 100) ELSE 0 END,
+        'tasks_completed', p.completed_tasks,
+        'tasks_pending', p.total_tasks - p.completed_tasks
       ))
       FROM projects p
       WHERE p.status = 'active'
