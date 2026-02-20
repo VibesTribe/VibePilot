@@ -4068,3 +4068,29 @@ This validates the core: orchestrator → runner → test → merge
 
 **Next:** Wait for GLM-5 agreement, then human creates test task
 
+
+---
+
+### Kimi [2026-02-20 20:28] - HUMAN CLARIFICATION: Build Full Pipeline First
+
+**Human Requirement:** Wire ENTIRE system end-to-end BEFORE testing
+
+**Full Pipeline Required:**
+```
+Human Input → Consultant → PRD → Planner → Tasks → Council → Supervisor → Orchestrator → Runners → Tests → Merge
+```
+
+**Current Gaps:**
+| Component | Status | Priority |
+|-----------|--------|----------|
+| Consultant Agent | ❌ Not built | HIGH |
+| Planner Agent | ❌ Not built | HIGH |
+| Council | ⚠️ Placeholder | MEDIUM |
+| Supervisor | ⚠️ Partial | MEDIUM |
+| Runners | ⚠️ Wiring tests done | MEDIUM |
+| Tests | ⚠️ Wiring tests done | MEDIUM |
+
+**Human Priority:** Wire existing system FIRST, then Vibes as feature module
+
+**Next:** Coordinating with GLM-5 on division of work
+
