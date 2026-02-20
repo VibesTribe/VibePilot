@@ -6115,3 +6115,306 @@ class Agent:
 **This is BLOCKING** - agents won't work properly without this.
 
 ---
+
+
+---
+
+### Kimi [2026-02-21 00:35] - FIX ASSIGNED TO GLM-5
+
+**Human is taking a break. GLM-5 - implement the fix below.**
+
+---
+
+## THE PROBLEM
+
+**Agents bypass orchestrator with hardcoded DeepSeek API calls in `agents/base.py`.**
+
+**Violates:** Zero Vendor Lock-In, Orchestrator Routing, Config-Driven Architecture
+
+---
+
+## THE SOLUTION (Implement This)
+
+### Step 1: Add `run_agent_task()` to Orchestrator
+
+**File:** `core/orchestrator.py`
+**Add after:** `_call_runner()` method (around line 1250)
+
+```python
+def run_agent_task(self, agent_role: str, prompt: str, 
+                   context: Dict = None, timeout: int = 300) -> Dict:
+    """
+    Execute an agent task (Consultant, Planner, etc.) through runner pool.
+    
+    This ensures agents use orchestrator routing instead of hardcoded APIs.
+    Internal roles never use web platforms (per PRD).
+    
+    Args:
+        agent_role: "consultant", "planner", "supervisor", etc.
+        prompt: The task prompt
+        context: Additional context
+        timeout: Max execution time
+        
+    Returns:
+        {
+            "success": bool,
+            "output": str,
+            "model_used": str,
+            "tokens": int,
+            "error": str
+        }
+    """
+    import uuid
+    
+    # Build task packet
+    task_packet = {
+        "task_id": f"{agent_role}-{uuid.uuid4().hex[:8]}",
+        "prompt": prompt,
+        "title": f"Agent Task - {agent_role}",
+        "constraints": {
+            "max_tokens": 4000,
+            "timeout_seconds": timeout,
+        },
+        "runner_context": {
+            "work_dir": os.getcwd(),
+        },
+    }
+    
+    # Select runner - internal roles use CLI/API runners only
+    available = []
+    for runner_id in self.runner_pool.get_available():
+        runner = self.runner_pool.runners.get(runner_id, {})
+        caps = runner.get("routing_capability", [])
+        # Internal agents need codebase access
+        if "internal" in caps or "mcp" in caps:
+            available.append(runner_id)
+    
+    if not available:
+        return {
+            "success": False,
+            "error": "No internal runners available (need CLI/API access)",
+            "output": None
+        }
+    
+    # Pick first available (pool sorts by priority)
+    runner_id = available[0]
+    
+    # Execute
+    self.logger.info(f"Routing agent task '{agent_role}' to {runner_id}")
+    
+    try:
+        result = self._call_runner(runner_id, prompt, {
+            "type": "agent",
+            "role": agent_role,
+            "task_id": task_packet["task_id"]
+        })
+        
+        return {
+            "success": result.get("success", False),
+            "output": result.get("output", ""),
+            "model_used": runner_id,
+            "tokens": result.get("tokens", 0),
+            "error": result.get("error")
+        }
+    except Exception as e:
+        self.logger.error(f"Agent task failed: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "output": None
+        }
+```
+
+### Step 2: Refactor Agent Base Class
+
+**File:** `agents/base.py`
+**Replace:** The entire `call_llm()` method and remove hardcoded keys
+
+**Remove these lines:**
+```python
+# REMOVE THESE HARDCODED LINES:
+DS_KEY = os.getenv("DEEPSEEK_KEY")
+DS_URL = "https://api.deepseek.com/v1/chat/completions"
+```
+
+**Replace `call_llm()` with:**
+```python
+def call_llm(self, prompt: str, max_tokens: int = 2000, 
+             temperature: float = 0.7, context: Dict = None) -> AgentResult:
+    """
+    Call LLM through orchestrator routing.
+    
+    Falls back to direct call only if orchestrator not available.
+    """
+    # Route through orchestrator if available
+    if hasattr(self, 'orchestrator') and self.orchestrator:
+        result = self.orchestrator.run_agent_task(
+            agent_role=self.name.lower(),
+            prompt=prompt,
+            context=context or {}
+        )
+        return AgentResult(
+            success=result["success"],
+            output=result["output"],
+            error=result.get("error"),
+            metadata={"model_used": result.get("model_used")}
+        )
+    
+    # Fallback: direct Kimi CLI call (for testing without orchestrator)
+    return self._fallback_to_kimi(prompt, max_tokens, temperature)
+
+def _fallback_to_kimi(self, prompt: str, max_tokens: int, 
+                      temperature: float) -> AgentResult:
+    """Fallback using Kimi CLI when orchestrator unavailable."""
+    import subprocess
+    import os
+    
+    kimi_path = os.path.expanduser("~/.local/bin/kimi")
+    
+    cmd = [
+        kimi_path,
+        "--yolo",
+        "--print",
+        "--output-format", "text",
+        "--final-message-only"
+    ]
+    
+    full_prompt = f"{prompt}\n\n[Respond with just the answer, no questions]"
+    cmd.extend(["--prompt", full_prompt])
+    
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+        
+        if result.returncode == 0:
+            return AgentResult(
+                success=True,
+                output=result.stdout.strip(),
+                metadata={"model_used": "kimi-k2.5", "fallback": True}
+            )
+        else:
+            return AgentResult(
+                success=False,
+                output=None,
+                error=result.stderr.strip() or "Kimi execution failed"
+            )
+    except Exception as e:
+        return AgentResult(
+            success=False,
+            output=None,
+            error=f"Fallback failed: {str(e)}"
+        )
+```
+
+### Step 3: Wire Orchestrator to Agents
+
+**File:** `core/orchestrator.py`
+**In `__init__()` method:**
+
+```python
+# After creating agents, wire orchestrator reference
+self.consultant = ConsultantAgent()
+self.consultant.orchestrator = self  # ADD THIS
+
+self.planner = PlannerAgent()
+self.planner.orchestrator = self  # ADD THIS
+
+# Note: Supervisor is created above, wire it too
+self.supervisor.orchestrator = self  # ADD THIS
+```
+
+### Step 4: Remove Direct API Calls from Consultant
+
+**File:** `agents/consultant.py`
+**In `execute()` method:**
+
+**Find and remove any direct API calls like:**
+```python
+# REMOVE any requests.post() or direct API calls
+# The agent should ONLY use self.call_llm()
+```
+
+**Ensure it uses:**
+```python
+result = self.call_llm(prompt)
+```
+
+### Step 5: Same for Planner
+
+**File:** `agents/planner.py`
+**Same changes as Consultant**
+
+---
+
+## VERIFICATION
+
+**After implementing, verify:**
+
+1. **No hardcoded API keys** in `agents/` directory:
+   ```bash
+   grep -r "DEEPSEEK\|OPENAI\|API_KEY" agents/ --include="*.py"
+   # Should return nothing except in env loading
+   ```
+
+2. **No direct requests.post()** in agents:
+   ```bash
+   grep -r "requests.post\|requests.get" agents/ --include="*.py"
+   # Should return nothing
+   ```
+
+3. **All agents use `call_llm()`**:
+   ```bash
+   grep -r "call_llm" agents/ --include="*.py"
+   # Should show usage in execute() methods
+   ```
+
+---
+
+## TEST
+
+**Test the fix:**
+
+```python
+# In Python shell
+from core.orchestrator import ConcurrentOrchestrator
+orch = ConcurrentOrchestrator()
+
+# Test agent routing
+result = orch.run_agent_task(
+    agent_role="consultant",
+    prompt="Write a one-sentence PRD for a hello world app"
+)
+
+print(result)
+# Should show success, output, and which model was used
+```
+
+---
+
+## DELIVERABLES
+
+When done, commit with message:
+```
+fix: Route agent LLM calls through orchestrator
+
+- Remove hardcoded DeepSeek API calls from agents/base.py
+- Add orchestrator.run_agent_task() for agent LLM routing
+- Wire orchestrator reference to all agents
+- Agents now use runner pool instead of direct API
+
+Refs: Architecture principles - Zero vendor lock-in
+```
+
+---
+
+## QUESTIONS?
+
+If unclear, check `docs/ARCHITECTURE_PRINCIPLES.md` (just committed).
+
+**Do not take shortcuts. Do not hardcode. Follow the architecture.**
+
+---
