@@ -1,186 +1,86 @@
-# Agent Communication Protocol
+# Agent Coordination Protocol
+# Kimi ↔ GLM-5 Real-Time Collaboration
 
-**Mandatory reading at EVERY session start.**
+## The Reality
 
-This is the single source of truth for how agents coordinate.
+**Direct terminal notification doesn't work reliably** because:
+- OpenCode CLI may intercept terminal output
+- Different PTY sessions don't share notifications
+- File watching requires active polling
 
----
+## The Solution: Lightweight Pull Protocol
 
-## Golden Rule
+### For Every Interaction
 
-> **Check AGENT_CHAT.md FIRST. Always. Every session.**
-
-No exceptions. No "I'll check later." 
-
-**Before ANY work:**
-1. `git pull origin main`
-2. `cat AGENT_CHAT.md`
-3. `./check_chat.sh --once` (mark as read)
-4. Respond to any messages waiting
-
----
-
-## Communication Channels (Simplified)
-
-### PRIMARY: AGENT_CHAT.md
-**Use for:** Real-time coordination, questions, status updates
-
-**When to use:**
-- "I'm working on X"
-- "I need your input on Y"
-- "Status update: Z is done"
-- "Quick question..."
-- Any back-and-forth
-
-**Check:** At session start, and before ending session
-
-### SECONDARY: inbox/{agent_name}/
-**Use for:** Research assignments, task handoffs, detailed findings
-
-**When to use:**
-- "Research this and report back"
-- "Here's a complex analysis"
-- "Task assignment with full context"
-- "Files too big for chat"
-
-**Check:** At session start (after AGENT_CHAT.md)
-
-**Format:** Use header:
-```markdown
----
-from: glm-5
- to: kimi
-type: task|response|fyi
-priority: high|medium|low
-created: 2026-02-18T21:45:00Z
----
-```
-
-### TERTIARY: .handoff-to-{agent}.md
-**Use for:** Session summaries, complex state transfers
-
-**When to use:**
-- Ending session with work in progress
-- Complex context that needs preservation
-- State that next session must know
-
-**Check:** At session start (if exists and newer than last session)
-
----
-
-## Quick Reference
-
-| If you want to... | Use | Example |
-|-------------------|-----|---------|
-| Ask a quick question | AGENT_CHAT.md | "What do you think about X?" |
-| Say "I'm working on Y" | AGENT_CHAT.md | "Starting on token tracking" |
-| Request research | inbox/{name}/ | "Research JSONB migration options" |
-| Report findings | inbox/{name}/ | Detailed analysis with code |
-| End session with WIP | .handoff-to-{name}.md | "Task 50% done, here's state" |
-| Share status | AGENT_CHAT.md | "Finished Z, committed to main" |
-
----
-
-## Anti-Patterns (Don't Do This)
-
-❌ **Put message in random file** - "They'll find it somewhere"
-❌ **Assume they know** - "They probably saw my commit"
-❌ **Multiple channels for same thing** - Chat + inbox + handoff for one question
-❌ **Not checking at start** - Starting work without seeing if someone needs you
-❌ **Session without closing loop** - Disappearing without updating status
-
----
-
-## Session Start Checklist
-
-**Copy-paste this every session:**
-
+**Before you start working:**
 ```bash
-# 1. Sync
-cd ~/vibepilot
-git checkout main
-git pull origin main
-
-# 2. Check primary communication
-cat AGENT_CHAT.md
-./check_chat.sh --once
-
-# 3. Check secondary (if exists)
-ls inbox/kimi/ 2>/dev/null && cat inbox/kimi/*
-
-# 4. Check handoff (if exists and new)
-if [ -f .handoff-to-kimi.md ]; then
-    stat .handoff-to-kimi.md
-    # If newer than your last session, read it
-fi
-
-# 5. NOW start work
+chatnew  # Pull + read latest AGENT_CHAT.md
 ```
 
----
-
-## Session End Checklist
-
-**Before you finish:**
-
+**After you post:**
 ```bash
-# 1. Update chat
-# Add message to AGENT_CHAT.md with status
-
-# 2. If work in progress
-# Create .handoff-to-{other}.md with state
-
-# 3. Commit everything
-git add -A
-git commit -m "Status: [what you did]"
-git push origin main
-
-# 4. Mark chat read
-./check_chat.sh --once
+git add AGENT_CHAT.md
+git commit -m "Chat: Your message summary"
+git push
+# Other agent sees it on their next `chatnew`
 ```
 
----
+### The `chatnew` Command
 
-## Real-Time Teamwork
+Added to both agents' `.bashrc`:
+```bash
+alias chatnew='cd ~/vibepilot && git pull && echo "=== AGENT CHAT ===" && tail -30 AGENT_CHAT.md'
+alias chat='tail -100 ~/vibepilot/AGENT_CHAT.md'
+```
 
-**What this enables:**
+## Why This Works
 
-- **Parallel work:** Both agents active, checking chat every few minutes
-- **Quick questions:** "Should I do X or Y?" → Response in minutes
-- **No lost messages:** Single protocol, mandatory check
-- **Clear handoffs:** Who's doing what, when
+1. **No polling** - You pull when YOU are ready to work
+2. **Always fresh** - `chatnew` gets latest before you act
+3. **No missed messages** - Git history has everything
+4. **Simple** - No complex infrastructure
 
-**Response time expectation:**
-- Chat messages: Check at session start + every 15 min
-- Inbox tasks: Respond same session if possible
-- Handoffs: Read immediately, acknowledge
+## Workflow
 
----
+```
+Kimi wants to respond:
+  ↓
+Run: chatnew (gets GLM-5's last message)
+  ↓
+Read + write response
+  ↓
+git commit + push
+  ↓
+Done
 
-## Emergency Escalation
+GLM-5 wants to respond:
+  ↓
+Run: chatnew (gets Kimi's response)
+  ↓
+Read + write response
+  ↓
+git commit + push
+  ↓
+Done
+```
 
-If you need immediate response:
+## Auto-Commit Helper
 
-1. Post in AGENT_CHAT.md with **URGENT** tag
-2. Also post brief note in .handoff-to-{name}.md
-3. Human will coordinate if needed
+The existing `auto_commit_chat.sh` runs every 2 minutes to prevent data loss.
+But for real-time coordination: **always run `chatnew` before working**.
 
-**Don't abuse.** Use for blockers only.
+## Emergency: Need Immediate Attention?
 
----
+If you need the other agent to see something URGENT:
 
-## This Session
+1. Post in AGENT_CHAT.md
+2. Commit + push
+3. Also post in the **human's chat** asking them to notify the other agent
 
-**Kimi:** Checked AGENT_CHAT.md ✅  
-**GLM:** [Update when you see this]  
+This is the "escalation path" for critical issues.
 
-**Outstanding items:**
-- JSONB migration: Kimi approved ✅ (GLM implementing)
-- Token calculator: Ready for wiring
-- Council practice: Both preparing
+## Success Metric
 
-**Next sync point:** When GLM sees this, reply in chat
+**Goal:** Human never has to say "check chat"
 
----
-
-**Remember:** We are a team. Teams communicate. Check the chat.
+**How:** Both agents habitually run `chatnew` before every work session.
