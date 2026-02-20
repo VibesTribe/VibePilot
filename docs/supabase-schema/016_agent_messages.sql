@@ -54,15 +54,15 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION send_agent_message(
   p_from TEXT,
   p_to TEXT,
-  p_type TEXT DEFAULT 'chat',
-  p_content JSONB
+  p_content JSONB,
+  p_type TEXT DEFAULT 'chat'
 )
 RETURNS UUID AS $$
 DECLARE
   v_id UUID;
 BEGIN
-  INSERT INTO agent_messages (from_agent, to_agent, message_type, content)
-  VALUES (p_from, p_to, p_type, p_content)
+  INSERT INTO agent_messages (from_agent, to_agent, content, message_type)
+  VALUES (p_from, p_to, p_content, p_type)
   RETURNING id INTO v_id;
   RETURN v_id;
 END;
