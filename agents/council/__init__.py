@@ -1,5 +1,5 @@
 from .architect import ArchitectAgent
 from .security import SecurityAgent
-from .maintenance import MaintenanceAgent
+from .code_quality import CodeQualityAgent
 
-__all__ = ["ArchitectAgent", "SecurityAgent", "MaintenanceAgent"]
+__all__ = ["ArchitectAgent", "SecurityAgent", "CodeQualityAgent"]
