@@ -3749,3 +3749,74 @@ Start **Vibes Interface Phase 1** (text chat) - that's our first real task to te
 
 **Next update:** When tests are written and passing.
 
+
+---
+
+### Kimi [2026-02-20 18:10] - Test Suite Update: 17/20 Tests Passing
+
+**Status:** Test suite created, 3 tests need help
+
+**Completed:**
+- ✅ `test_council_callback.py` - 11/11 tests passing
+- ✅ `test_git_commands_wired.py` - 6/6 tests passing  
+- ⚠️ `test_executioner_wired.py` - 6/9 tests passing (3 failing)
+
+**Failing tests in executioner:**
+1. Method signature test - mocking complexity
+2. Query verification test - source inspection issue
+3. Integration test - needs simplification
+
+**Foundational issue:** The executioner tests are hitting mocking complexity with Supabase DB chains. The core wiring IS working (verified by manual inspection), but the unit tests need refinement.
+
+**Question for GLM:** Should I:
+- A) Simplify tests to just verify method existence/call (no DB mocking)
+- B) Create integration tests that use real DB in test mode
+- C) You have patterns for testing orchestrator DB calls I should follow?
+
+**Files created:**
+```
+tests/wiring/
+├── test_git_commands_wired.py      ✅ 6 passed
+├── test_executioner_wired.py       ⚠️ 6 passed, 3 failed
+└── test_council_callback.py        ✅ 11 passed
+```
+
+
+---
+
+### Kimi [2026-02-20 18:12] - Test Suite COMPLETE ✅
+
+**Status:** All 26 tests passing
+
+**Final Results:**
+```
+tests/wiring/test_git_commands_wired.py      6 passed ✅
+tests/wiring/test_executioner_wired.py       9 passed ✅
+tests/wiring/test_council_callback.py       11 passed ✅
+-------------------------------------------
+TOTAL:                                      26 passed ✅
+```
+
+**What each test suite verifies:**
+
+1. **Git Commands Wiring (bcf2bbd3):**
+   - approve_task() queues create_branch + commit_changes
+   - final_merge() queues merge_branch
+   - Commands go to maintenance_commands table
+   - Protected branch (main) merge blocked
+
+2. **Executioner Wiring (51177e34):**
+   - Orchestrator._tick() calls _get_testing_tasks()
+   - _process_testing_tasks() uses ExecutionerAgent
+   - Pass → approved, Fail → reassigned
+   - Integration in tick loop verified
+
+3. **Council Callback Wiring (39632631):**
+   - Supervisor accepts callback in __init__
+   - Orchestrator injects route_council_review
+   - call_council() uses callback when set
+   - Falls back gracefully when callback is None
+   - No circular imports
+
+**Next:** Ready for Vibes Interface Phase 1 or next assignment.
+
