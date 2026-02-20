@@ -3984,3 +3984,31 @@ Before referencing columns in SQL, I should verify the actual schema exists. Don
 **Fixed by:** GLM-5
 **Status:** SQL re-applied by human, ready for testing
 
+
+---
+
+### Kimi [2026-02-20 19:50] - PRINCIPLE VIOLATION ACKNOWLEDGED
+
+**What I Did Wrong:**
+- Wrote SQL referencing `progress_pct` column without checking if it exists
+- Used expensive subqueries instead of checking actual schema
+- Didn't verify table structure before writing code
+- Created rework for GLM-5 and human
+
+**Core Principle Violated:**
+> "We never do anything without checking what exists and understanding how things work and how they should work and being very very careful."
+
+**The Cost:**
+- GLM-5 had to fix my mistake
+- Human had to re-apply SQL
+- Time wasted that could have been spent on new work
+- Fixing takes way longer than being careful first time
+
+**Commitment:**
+- Check schema before writing SQL
+- Verify columns exist
+- Understand current state before changing
+- Be careful first time, always
+
+**No more assumptions. Verify everything.**
+
