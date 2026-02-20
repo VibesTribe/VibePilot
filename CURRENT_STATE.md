@@ -11,12 +11,55 @@
 
 ---
 
-**Last Updated:** 2026-02-20 05:52 UTC
-**Updated By:** GLM-5 (Session 18: Command Queue + Systemd Service)
-**Session Focus:** Fixed command queue RLS, added service key to vault, installed orchestrator as systemd service
+**Last Updated:** 2026-02-20 18:00 UTC
+**Updated By:** GLM-5 + Kimi (Session 19: Real-time Communication + Session Persistence)
+**Session Focus:** Fixed terminal crash root cause, implemented real-time GLM-Kimi communication via Supabase
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Dependencies migrated to JSONB, all 5 RPC functions working, task flow operational
+**Progress:** Dependencies migrated to JSONB, all 5 RPC functions working, task flow operational, real-time agent messaging
+
+---
+
+# SESSION 19 SUMMARY (2026-02-20)
+
+## What We Fixed
+
+### 1. Terminal Crash Root Cause ✅ (Kimi)
+- **Problem:** 16 zombie opencode processes consuming 3-4GB RAM, swap at 90%
+- **Fix:** Killed zombies, freed 2.6GB RAM, swap now at 15%
+- **Prevention:** Hourly auto-cleanup via cron, tmux for persistent sessions
+
+### 2. Real-Time Agent Communication ✅ (GLM-5)
+- Updated `start_session.sh` to check Supabase messages PRIMARY
+- Created `scripts/notify_done.sh` for task completion alerts
+- Both agents now coordinate via `agent_messages` table, not files
+
+### 3. Session Persistence ✅ (Kimi)
+- `scripts/agent_sessions.sh` - tmux session manager
+- `scripts/start_agent_session.sh` - start persistent sessions
+- Sessions survive terminal crashes
+
+## Commands for Real-Time Coordination
+```bash
+# Session start (checks Supabase messages)
+./start_session.sh glm-5
+
+# After completing work
+./scripts/notify_done.sh glm-5 "Task description"
+
+# Check messages anytime
+python3 scripts/check_agent_mail.py glm-5
+
+# Persistent sessions (tmux)
+~/vibepilot/scripts/agent_sessions.sh status
+~/vibepilot/scripts/agent_sessions.sh attach opencode
+```
+
+## Files Modified
+- `start_session.sh` - Supabase messages PRIMARY
+- `scripts/notify_done.sh` - Task completion notification
+- `scripts/agent_sessions.sh` - tmux session manager (Kimi)
+- `scripts/start_agent_session.sh` - session starter (Kimi)
 
 ---
 
