@@ -3589,3 +3589,36 @@ comm.start_listening()  # Runs in background thread
 **Ready for human review before implementation starts.**
 
 ---
+
+---
+
+### Kimi [2026-02-20 16:35] - CORRECTION: Vibes Position ✅
+
+**Human is absolutely right.** 
+
+I incorrectly suggested floating bottom-right button. **Vibes already lives in the top-left header** - which is the perfect spot.
+
+**Why header top-left is better:**
+- ✅ Always visible (no scrolling on long projects)
+- ✅ First thing you see when opening dashboard
+- ✅ Already implemented in MissionHeader (`vibes-orb`)
+- ✅ Consistent desktop + mobile placement
+
+**Updated spec:** `docs/research/vibes_interface_specification.md`
+
+**Current Vibes location confirmed:**
+```tsx
+// MissionHeader.tsx line 291-293
+<span className="vibes-orb" aria-hidden="true">
+  <span className="vibes-orb__label">Vibes</span>
+</span>
+```
+
+Implementation approach: Enhance the existing vibes-orb in header to:
+1. Add "Text me" micro-label below
+2. Make it tappable (open voice/chat)
+3. Add pulsing notification state
+
+Much cleaner than floating button! 🎯
+
+---
