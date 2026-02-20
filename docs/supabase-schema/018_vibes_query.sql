@@ -48,9 +48,9 @@ BEGIN
         'total_tasks', COUNT(*),
         'tokens_in', COALESCE(SUM(tokens_in), 0),
         'tokens_out', COALESCE(SUM(tokens_out), 0),
-        'actual_cost_usd', COALESCE(SUM(actual_cost_usd), 0),
-        'theoretical_cost_usd', COALESCE(SUM(theoretical_cost_usd), 0),
-        'savings_usd', COALESCE(SUM(theoretical_cost_usd - actual_cost_usd), 0)
+        'actual_cost_usd', COALESCE(SUM(total_actual_cost_usd), 0),
+        'theoretical_cost_usd', COALESCE(SUM(platform_theoretical_cost_usd), 0),
+        'savings_usd', COALESCE(SUM(total_savings_usd), 0)
       )
       FROM task_runs
       WHERE completed_at > NOW() - INTERVAL '7 days'
