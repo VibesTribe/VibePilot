@@ -34,10 +34,12 @@ For each completed task, ask:
 
 ### Passed
 ```
-1. Merge task branch to main
-2. Delete task branch
-3. Mark task complete
-4. Store chat_url for future revisions
+1. Command Maintenance: "Merge task/T001 → module/feature"
+2. Wait for merge confirmation
+3. Command Maintenance: "Merge module/feature → main" (if module complete)
+4. Mark task complete in Supabase
+5. Unlock dependent tasks
+6. Store chat_url for future revisions
 ```
 
 ### Failed
@@ -104,5 +106,7 @@ Council reviews from multiple model perspectives. If rejected:
 - Route tasks to runners (that's orchestrator)
 - Track platform limits (that's orchestrator)
 - Merge without tester approval
+- Touch git directly (always command Maintenance)
+- Create branches directly (command Maintenance)
 - Reassign without clear WHY + WHAT TO FIX
 - Skip the quality check
