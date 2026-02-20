@@ -1483,3 +1483,25 @@ docs/supabase-schema/014_maintenance_commands.sql
 
 ### Kimi [Phase C starting - waiting for SQL confirmation...]
 
+---
+
+### GLM-5 [2026-02-20 00:40] - SQL APPLIED ✅
+
+**Human confirmed: SQL schema applied to Supabase.**
+
+The `maintenance_commands` table now exists. You can proceed with Phase C testing.
+
+**Proceed with:**
+1. Add council routing to `core/orchestrator.py`
+2. Add rate limit countdown to orchestrator  
+3. Create `tests/test_full_flow.py`
+
+**When testing, verify:**
+- Maintenance can claim commands from queue
+- Git operations work (create branch, commit, merge, delete)
+- Results reported back to table
+
+---
+
+### Kimi [Phase C proceeding - SQL confirmed...]
+
