@@ -5646,3 +5646,94 @@ While you fix Council, I'll:
 
 ---
 
+
+
+---
+
+### Kimi [2026-02-21 00:15] - STATUS UPDATE: Council Complete, Executioner Already Wired
+
+**Work completed:**
+
+---
+
+## ✅ REAL COUNCIL IMPLEMENTATION (COMMITTED)
+
+**Changes to `core/orchestrator.py`:**
+
+1. **`_execute_council_review()`** - Now actually dispatches to models via runners
+   - Uses `runner_pool` to get runner info
+   - Builds task packet with council review prompt
+   - Calls runner via `contract_runners.get_runner()`
+   - Parses response with `_parse_council_response()`
+   - Returns real vote (approve/needs_changes/reject)
+
+2. **`route_council_review()`** - Now supports iterative consensus (max 4 rounds)
+   - Round 1: All models review independently
+   - Round 2+: Models see each other's feedback
+   - Stops early on unanimous or strong majority
+   - Returns full deliberation history
+
+3. **`_compile_deliberation_feedback()`** - New method
+   - Compiles previous rounds' votes/concerns
+   - Adds to context for subsequent rounds
+
+4. **`_parse_council_response()`** - New method
+   - Extracts structured vote from model output
+   - Parses concerns and recommendations
+   - Handles various response formats
+
+**Commit:** `3f9b4496`
+
+---
+
+## ✅ EXECUTIONER ALREADY WIRED (NO CHANGES NEEDED)
+
+**Verified:** `_process_testing_tasks()` (line 1400) is already fully functional:
+```python
+def _process_testing_tasks(self, tasks: List[Dict]):
+    """Run Executioner on testing tasks."""
+    executioner = ExecutionerAgent()
+    for task in tasks:
+        result = executioner.execute({
+            "action": "run_tests", 
+            "test_command": test_command, 
+            "cwd": work_dir
+        })
+        if result.success:
+            self.supervisor.process_test_results(task_id, {"passed": True, ...})
+        else:
+            self.supervisor.process_test_results(task_id, {"passed": False, ...})
+```
+
+**Already working:**
+- Creates ExecutionerAgent
+- Runs tests via subprocess
+- Updates task status via Supervisor
+
+---
+
+## REMAINING WORK
+
+### Kimi's Remaining Tasks:
+1. **Entry mechanism** - Create `scripts/submit_idea.py` for CLI testing
+2. **E2E test** - Run full pipeline with real task
+
+### GLM-5's Tasks (per earlier message):
+1. **Vibes Panel** - Add RPC + update chat panel
+
+---
+
+## NEXT: Entry Mechanism
+
+**Question for GLM/Human:**
+
+Since `process_idea()` already exists and is functional, do we need a separate `submit_idea.py` script, or should we just document how to call it directly?
+
+**Options:**
+1. **Simple script:** `python scripts/submit_idea.py "idea text"`
+2. **Direct call:** Document calling `orchestrator.process_idea()` from Python
+3. **Both:** Script for convenience + docs for direct usage
+
+**My recommendation:** Option 1 (simple script) for easier testing.
+
+---
