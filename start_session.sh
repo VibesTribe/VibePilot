@@ -2,10 +2,13 @@
 # VibePilot Agent Session Startup
 # REQUIRED: Run this at the start of EVERY session
 # 
-# Usage: ./start_session.sh [agent_name]
-# Example: ./start_session.sh glm-5
+# Usage: ./start_session.sh [agent_name] [--listen]
+# Example: ./start_session.sh glm-5 --listen
+#
+# --listen: Start background message listener (notifications on new messages)
 
 AGENT_NAME="${1:-glm-5}"
+LISTEN_MODE="${2:-}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "═══════════════════════════════════════════════════"
@@ -16,6 +19,10 @@ echo ""
 
 cd "$SCRIPT_DIR"
 
+if [ -d "venv" ]; then
+    source venv/bin/activate
+fi
+
 # 1. Git sync
 echo "📥 Syncing with main..."
 git checkout main 2>/dev/null
@@ -23,16 +30,13 @@ git pull origin main 2>/dev/null
 echo "✅ Synced"
 echo ""
 
-# 2. PRIMARY: Check Supabase messages (real-time)
-echo "📨 Checking Supabase messages (PRIMARY)..."
-if [ -d "venv" ]; then
-    source venv/bin/activate
-fi
+# 2. PRIMARY: Check Supabase messages
+echo "📨 Checking Supabase messages..."
 python3 scripts/check_agent_mail.py "$AGENT_NAME" 2>/dev/null
 echo ""
 
 # 3. SECONDARY: Check AGENT_CHAT.md (for context/history)
-echo "💬 Checking AGENT_CHAT.md (SECONDARY - for context)..."
+echo "💬 Checking AGENT_CHAT.md (for context)..."
 if [ -f AGENT_CHAT.md ]; then
     LAST_SECTION=$(grep -n "^### " AGENT_CHAT.md | tail -3)
     if [ -n "$LAST_SECTION" ]; then
@@ -53,11 +57,25 @@ if [ -f CURRENT_STATE.md ]; then
 fi
 echo ""
 
+# 5. Start listener if requested
+if [ "$LISTEN_MODE" == "--listen" ]; then
+    echo "🎧 Starting message listener (background)..."
+    echo "   You will see notifications when messages arrive."
+    echo ""
+    python3 scripts/listen_for_messages.py "$AGENT_NAME"
+else
+    echo "💡 TIP: Start with --listen to get real-time message notifications"
+    echo "   Example: ./start_session.sh $AGENT_NAME --listen"
+    echo ""
+fi
+
 # Done
 echo "═══════════════════════════════════════════════════"
 echo "  READY - You are synced and caught up"
 echo "═══════════════════════════════════════════════════"
 echo ""
-echo "After completing work: ./scripts/notify_done.sh"
-echo "Check messages anytime: python3 scripts/check_agent_mail.py $AGENT_NAME"
+echo "COMMANDS:"
+echo "  Check messages:  python3 scripts/check_agent_mail.py $AGENT_NAME"
+echo "  Start listener:  python3 scripts/listen_for_messages.py $AGENT_NAME &"
+echo "  Notify partner:  ./scripts/notify_done.sh $AGENT_NAME \"task description\""
 echo ""
