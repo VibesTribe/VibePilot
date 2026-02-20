@@ -4637,3 +4637,83 @@ def test_approve_plan_routes_correctly():
 **Ready to build when you give the go-ahead.**
 
 ---
+
+### GLM-5 [2026-02-20 23:05] - STOPPED TO READ FULLY
+
+**Human is right. I did not understand the actual flow.**
+
+---
+
+## WHAT I READ
+
+**From `docs/vibepilot_process.md`:**
+
+```
+CORRECT FLOW:
+1. Consultant → PRD (saved to GitHub: docs/prd/)
+2. Planner → Plan (saved to GitHub: docs/plans/)
+3. Council reviews Plan
+4. Approved Plan → Tasks created in Supabase
+5. Orchestrator assigns → Runner executes
+6. Supervisor reviews → Tests run
+7. Maintenance creates branch, commits, merges task→module, deletes branch
+8. Module complete → merge to main
+```
+
+---
+
+## WHAT CURRENTLY EXISTS
+
+**ConsultantAgent (agents/consultant.py):**
+- Takes idea, calls LLM, returns PRD text
+- ❌ Does NOT save PRD to GitHub
+- ❌ Does NOT converse with human
+
+**PlannerAgent (agents/planner.py):**
+- Takes PRD, uses Kimi CLI, writes tasks DIRECTLY to Supabase
+- ❌ Does NOT save Plan to GitHub
+- ❌ Tasks written before Council review
+
+**process_idea() in orchestrator:**
+- Calls Consultant → Planner → returns
+- ❌ No GitHub saves
+- ❌ No Council step
+
+**_process_pending_plans():**
+- ✅ Does call Council via supervisor.call_council()
+- ✅ Does call approve_plan()
+- But tasks already exist in DB (written by Planner before review)
+
+---
+
+## THE DISCREPANCY
+
+| Per Process Doc | Current Implementation |
+|-----------------|------------------------|
+| PRD saved to GitHub | ❌ Text only, not saved |
+| Plan saved to GitHub | ❌ Not created as file |
+| Council reviews BEFORE tasks | ❌ Tasks written before Council |
+| Branch created on assignment | ? Not verified |
+| Maintenance handles git | ✅ Yes, via command queue |
+
+---
+
+## MY MISTAKE
+
+I proposed an "ideas table" + polling approach without understanding:
+1. The flow should save PRD/Plan to GitHub
+2. Council should review BEFORE tasks exist
+3. The existing `process_idea()` doesn't match the spec
+
+**I need guidance on which direction:**
+
+**Option A:** Fix `process_idea()` to match spec (save PRD/Plan to GitHub, do Council before tasks)
+
+**Option B:** Accept current implementation and wire Vibes to it (tasks created directly, Council reviews pending plans)
+
+**Option C:** Something else I'm still not understanding
+
+**Stopping until I understand correctly.**
+
+---
+
