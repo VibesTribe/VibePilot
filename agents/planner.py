@@ -4,7 +4,7 @@ VibePilot Planner Agent
 Takes a zero-ambiguity PRD and creates a modular, isolated execution plan.
 Uses vertical slicing to ensure tasks are atomic and isolated.
 
-CRITICAL: Every task MUST include a complete prompt_packet. 
+CRITICAL: Every task MUST include a complete prompt_packet.
 Empty prompt_packets cause plans to be REJECTED by Supervisor.
 
 Output goes to Supabase tasks table for Orchestrator to pick up.
@@ -45,16 +45,15 @@ MIN_PROMPT_PACKET_LENGTH = 200
 class PlannerAgent(Agent):
     name = "Planner"
     role = "Breaks PRDs into atomic tasks using vertical slicing"
-    
+
     def __init__(self):
         super().__init__()
         self.planner_prompt = self._load_planner_prompt()
-    
+
     def _load_planner_prompt(self) -> str:
         """Load the full planner prompt from config."""
         prompt_path = os.path.join(
-            os.path.dirname(__file__), 
-            "..", "config", "prompts", "planner.md"
+            os.path.dirname(__file__), "..", "config", "prompts", "planner.md"
         )
         try:
             with open(prompt_path, "r") as f:
@@ -62,7 +61,7 @@ class PlannerAgent(Agent):
         except Exception as e:
             self.logger.warning(f"Could not load planner prompt from file: {e}")
             return self._get_fallback_prompt()
-    
+
     def _get_fallback_prompt(self) -> str:
         """Fallback prompt if file not found."""
         return """You are the Planner agent. Create a modular execution plan.
@@ -103,50 +102,46 @@ The prompt_packet must follow this template:
 [Expected output structure]
 
 Output valid JSON following the format in config/prompts/planner.md."""
-    
+
     def _call_planner_llm(self, prompt: str, max_tokens: int = 8000) -> str:
         """
         Call LLM for planning. Uses Kimi CLI (internal agent routing).
-        
+
         Per PRD: Internal agents (Planner, Supervisor, Council) use CLI subscriptions,
         not API or web platforms.
         """
-        result = kimi_runner.execute_task(
-            prompt=prompt,
-            timeout=300,
-            auto_approve=True
-        )
-        
+        result = kimi_runner.execute_task(prompt=prompt, timeout=300, auto_approve=True)
+
         if result["success"]:
             return result["output"]
         else:
-            raise Exception(f"Kimi planning failed: {result.get('error', 'Unknown error')}")
-    
-    def execute(self, task: Dict[str, Any]) -> AgentResult:
+            raise Exception(
+                f"Kimi planning failed: {result.get('error', 'Unknown error')}"
+            )
+
+    def execute(self, task: Dict[str, Any], write_to_db: bool = False) -> AgentResult:
         """
         Execute planning on a PRD.
-        
+
         Input:
             task = {
                 "prd": "Full PRD text...",
                 "project_id": "optional project reference"
             }
-        
+
         Output:
             AgentResult with plan and Supabase write results
         """
         prd = task.get("prd", "")
         project_id = task.get("project_id")
-        
+
         if not prd:
             return AgentResult(
-                success=False,
-                output=None,
-                error="No PRD provided for planning"
+                success=False, output=None, error="No PRD provided for planning"
             )
-        
+
         self.log("Breaking down PRD into atomic tasks...")
-        
+
         # Build the full prompt with CRITICAL emphasis on prompt_packet
         full_prompt = f"""{self.planner_prompt}
 
@@ -178,110 +173,134 @@ Remember:
 7. Ensure 95%+ confidence on every task
 
 Return ONLY valid JSON following the output format specified above."""
-        
+
         try:
             # Call Kimi for planning
             response = self._call_planner_llm(full_prompt)
-            
+
             # Parse JSON from response
             plan = self._parse_plan(response)
-            
+
             if not plan:
                 return AgentResult(
                     success=False,
                     output=None,
-                    error="Could not parse plan from LLM response"
+                    error="Could not parse plan from LLM response",
                 )
-            
+
             # Extract all tasks from plan
             all_tasks = self._extract_tasks(plan)
-            
+
             # Validate ALL tasks have proper prompt_packets
             validation = self._validate_tasks(all_tasks)
-            
+
             if not validation["valid"]:
                 # Log which tasks have issues
-                self.log(f"Plan validation FAILED: {len(validation['errors'])} issues", level="error")
+                self.log(
+                    f"Plan validation FAILED: {len(validation['errors'])} issues",
+                    level="error",
+                )
                 for error in validation["errors"][:10]:  # Show first 10
                     self.log(f"  - {error}", level="error")
-                
+
                 # Try to fix incomplete prompt_packets
                 self.log("Attempting to generate missing prompt_packets...")
                 all_tasks = self._ensure_prompt_packets(all_tasks, prd)
-                
+
                 # Re-validate
                 validation = self._validate_tasks(all_tasks)
                 if not validation["valid"]:
                     return AgentResult(
                         success=False,
-                        output={"plan": plan, "validation_errors": validation["errors"]},
-                        error=f"Plan rejected: {validation['errors'][:5]}"
+                        output={
+                            "plan": plan,
+                            "validation_errors": validation["errors"],
+                        },
+                        error=f"Plan rejected: {validation['errors'][:5]}",
                     )
-            
+
             # Validate plan structure
             structure_validation = self._validate_plan_structure(plan)
             if not structure_validation["valid"]:
                 return AgentResult(
                     success=False,
                     output=plan,
-                    error=f"Plan structure validation failed: {structure_validation['errors']}"
+                    error=f"Plan structure validation failed: {structure_validation['errors']}",
                 )
-            
-            self.log(f"Plan validated: {len(all_tasks)} tasks across {len(plan.get('slices', []))} slices")
-            
-            # Write to Supabase
-            write_result = self._write_tasks_to_supabase(all_tasks, project_id)
-            
-            if write_result["errors"]:
-                self.log(f"Some tasks failed to write: {write_result['errors']}", level="warning")
-            
-            return AgentResult(
-                success=True,
-                output={
-                    "plan": plan,
-                    "tasks_written": write_result["written"],
-                    "task_ids": write_result["task_ids"],
-                    "write_errors": write_result["errors"]
-                },
-                metadata={
-                    "task_count": len(all_tasks),
-                    "slice_count": len(plan.get("slices", [])),
-                    "source": "planner"
-                }
+
+            self.log(
+                f"Plan validated: {len(all_tasks)} tasks across {len(plan.get('slices', []))} slices"
             )
-            
+
+            if write_to_db:
+                write_result = self._write_tasks_to_supabase(all_tasks, project_id)
+
+                if write_result["errors"]:
+                    self.log(
+                        f"Some tasks failed to write: {write_result['errors']}",
+                        level="warning",
+                    )
+
+                return AgentResult(
+                    success=True,
+                    output={
+                        "plan": plan,
+                        "tasks": all_tasks,
+                        "tasks_written": write_result["written"],
+                        "task_ids": write_result["task_ids"],
+                        "write_errors": write_result["errors"],
+                    },
+                    metadata={
+                        "task_count": len(all_tasks),
+                        "slice_count": len(plan.get("slices", [])),
+                        "source": "planner",
+                    },
+                )
+            else:
+                return AgentResult(
+                    success=True,
+                    output={
+                        "plan": plan,
+                        "tasks": all_tasks,
+                        "task_count": len(all_tasks),
+                    },
+                    metadata={
+                        "task_count": len(all_tasks),
+                        "slice_count": len(plan.get("slices", [])),
+                        "source": "planner",
+                    },
+                )
+
         except Exception as e:
             self.log(f"Failed to create plan: {e}", level="error")
-            return AgentResult(
-                success=False,
-                output=None,
-                error=str(e)
-            )
-    
+            return AgentResult(success=False, output=None, error=str(e))
+
     def _validate_tasks(self, tasks: List[Dict]) -> Dict:
         """
         Validate that ALL tasks have substantive prompt_packets.
         This is CRITICAL - empty prompt_packets will cause execution failure.
         """
         errors = []
-        
+
         for task in tasks:
             task_id = task.get("task_id", "unknown")
             prompt_packet = task.get("prompt_packet", "")
-            
+
             if not prompt_packet:
                 errors.append(f"Task {task_id}: prompt_packet is EMPTY")
             elif len(prompt_packet) < MIN_PROMPT_PACKET_LENGTH:
-                errors.append(f"Task {task_id}: prompt_packet too short ({len(prompt_packet)} chars, minimum {MIN_PROMPT_PACKET_LENGTH})")
-            
+                errors.append(
+                    f"Task {task_id}: prompt_packet too short ({len(prompt_packet)} chars, minimum {MIN_PROMPT_PACKET_LENGTH})"
+                )
+
             # Check for required task fields
             required = ["task_id", "slice_id", "title", "routing_flag"]
             for field in required:
                 if field not in task or not task.get(field):
                     errors.append(f"Task {task_id}: missing required field '{field}'")
-        
+
         return {"valid": len(errors) == 0, "errors": errors}
-    
+
     def _ensure_prompt_packets(self, tasks: List[Dict], prd: str) -> List[Dict]:
         """
         Ensure every task has a complete prompt_packet.
@@ -289,13 +308,16 @@ Return ONLY valid JSON following the output format specified above."""
         """
         for task in tasks:
             prompt_packet = task.get("prompt_packet", "")
-            
+
             if not prompt_packet or len(prompt_packet) < MIN_PROMPT_PACKET_LENGTH:
-                self.log(f"Generating prompt_packet for {task.get('task_id', 'unknown')}", level="warning")
+                self.log(
+                    f"Generating prompt_packet for {task.get('task_id', 'unknown')}",
+                    level="warning",
+                )
                 task["prompt_packet"] = self._generate_prompt_packet(task, prd)
-        
+
         return tasks
-    
+
     def _generate_prompt_packet(self, task: Dict, prd: str) -> str:
         """
         Generate a complete prompt_packet from task metadata.
@@ -312,12 +334,22 @@ Return ONLY valid JSON following the output format specified above."""
         confidence = task.get("confidence", 0.95)
         routing_flag = task.get("routing_flag", "web")
         routing_reason = task.get("routing_flag_reason", "")
-        
+
         # Build prompt_packet from available data
-        objectives_text = "\n".join([f"- {obj}" for obj in objectives]) if objectives else "- Complete the task as described"
-        deliverables_text = "\n".join([f"- {d}" for d in deliverables]) if deliverables else "- Working implementation"
-        expected_text = json.dumps(expected_output, indent=2) if expected_output else "{}"
-        
+        objectives_text = (
+            "\n".join([f"- {obj}" for obj in objectives])
+            if objectives
+            else "- Complete the task as described"
+        )
+        deliverables_text = (
+            "\n".join([f"- {d}" for d in deliverables])
+            if deliverables
+            else "- Working implementation"
+        )
+        expected_text = (
+            json.dumps(expected_output, indent=2) if expected_output else "{}"
+        )
+
         prompt_packet = f"""# TASK: {task_id} - {title}
 
 ## CONTEXT
@@ -372,7 +404,7 @@ Return JSON:
 - Leave TODO comments
 """
         return prompt_packet
-    
+
     def _parse_plan(self, response: str) -> Optional[Dict]:
         """Parse plan JSON from LLM response."""
         try:
@@ -386,63 +418,74 @@ Return JSON:
                     return json.loads(response[start:end])
                 except json.JSONDecodeError:
                     pass
-            
+
             # Try to find JSON array
             start = response.find("[")
             end = response.rfind("]") + 1
             if start != -1 and end > start:
                 try:
                     tasks = json.loads(response[start:end])
-                    return {"slices": [{"slice_id": "default", "phases": [{"phase_id": "P1", "tasks": tasks}]}]}
+                    return {
+                        "slices": [
+                            {
+                                "slice_id": "default",
+                                "phases": [{"phase_id": "P1", "tasks": tasks}],
+                            }
+                        ]
+                    }
                 except json.JSONDecodeError:
                     pass
-            
+
             return None
-    
+
     def _validate_plan_structure(self, plan: Dict) -> Dict:
         """Validate plan has required structure."""
         errors = []
-        
+
         if "slices" not in plan:
             errors.append("Missing 'slices' in plan")
             return {"valid": False, "errors": errors}
-        
+
         for slice_data in plan.get("slices", []):
             if "slice_id" not in slice_data:
                 errors.append(f"Slice missing 'slice_id': {slice_data}")
-            
+
             for phase in slice_data.get("phases", []):
                 for task in phase.get("tasks", []):
                     # Check required task fields (prompt_packet validated separately)
                     required = ["task_id", "slice_id", "title", "routing_flag"]
                     for field in required:
                         if field not in task:
-                            errors.append(f"Task missing '{field}': {task.get('title', 'unknown')}")
-        
+                            errors.append(
+                                f"Task missing '{field}': {task.get('title', 'unknown')}"
+                            )
+
         return {"valid": len(errors) == 0, "errors": errors}
-    
+
     def _extract_tasks(self, plan: Dict) -> List[Dict]:
         """Extract all tasks from plan structure."""
         all_tasks = []
-        
+
         for slice_data in plan.get("slices", []):
             slice_id = slice_data.get("slice_id", "unknown")
-            
+
             for phase in slice_data.get("phases", []):
                 phase_id = phase.get("phase_id", "P1")
-                
+
                 for task in phase.get("tasks", []):
                     # Ensure task has slice_id and phase
                     task["slice_id"] = task.get("slice_id", slice_id)
                     task["phase"] = task.get("phase", phase_id)
                     all_tasks.append(task)
-        
+
         return all_tasks
-    
-    def _write_tasks_to_supabase(self, tasks: List[Dict], project_id: str = None) -> Dict:
+
+    def _write_tasks_to_supabase(
+        self, tasks: List[Dict], project_id: str = None
+    ) -> Dict:
         """
         Write tasks to Supabase tasks table.
-        
+
         Each task gets:
         - task_number: Human-readable ID (RES-P1-T001)
         - slice_id, phase, routing_flag from planner
@@ -452,19 +495,22 @@ Return JSON:
         written = 0
         task_ids = []
         errors = []
-        
+
         # First pass: Insert all tasks to get UUIDs
         task_uuid_map = {}  # task_number -> uuid
-        
+
         for task in tasks:
             task_number = task.get("task_id", f"TASK-{written}")
-            
+
             # Ensure prompt_packet exists (should already be validated)
             prompt_packet = task.get("prompt_packet", "")
             if not prompt_packet or len(prompt_packet) < MIN_PROMPT_PACKET_LENGTH:
-                self.log(f"WARNING: Task {task_number} has incomplete prompt_packet, regenerating...", level="warning")
+                self.log(
+                    f"WARNING: Task {task_number} has incomplete prompt_packet, regenerating...",
+                    level="warning",
+                )
                 prompt_packet = self._generate_prompt_packet(task, "")
-            
+
             task_record = {
                 "task_number": task_number,
                 "title": task.get("title", "Untitled task"),
@@ -483,12 +529,12 @@ Return JSON:
                     "objectives": task.get("objectives"),
                     "deliverables": task.get("deliverables"),
                     "suggested_agent": task.get("suggested_agent"),
-                }
+                },
             }
-            
+
             if project_id:
                 task_record["project_id"] = project_id
-            
+
             try:
                 result = db.table("tasks").insert(task_record).execute()
                 if result.data:
@@ -500,12 +546,12 @@ Return JSON:
             except Exception as e:
                 errors.append({"task_id": task_number, "error": str(e)})
                 self.log(f"Failed to write task {task_number}: {e}", level="error")
-        
+
         # Second pass: Update dependencies (now we have UUIDs)
         for task in tasks:
             task_number = task.get("task_id")
             deps = task.get("dependencies", [])
-            
+
             if deps and task_number in task_uuid_map:
                 # Convert dependency task_numbers to UUIDs
                 dep_uuids = []
@@ -514,24 +560,29 @@ Return JSON:
                         dep_id = dep.get("task_id")
                     else:
                         dep_id = dep
-                    
+
                     if dep_id in task_uuid_map:
                         dep_uuids.append(task_uuid_map[dep_id])
-                
+
                 if dep_uuids:
                     try:
-                        db.table("tasks").update({
-                            "dependencies": dep_uuids
-                        }).eq("id", task_uuid_map[task_number]).execute()
-                        self.log(f"Updated dependencies for {task_number}: {len(dep_uuids)} deps")
+                        db.table("tasks").update({"dependencies": dep_uuids}).eq(
+                            "id", task_uuid_map[task_number]
+                        ).execute()
+                        self.log(
+                            f"Updated dependencies for {task_number}: {len(dep_uuids)} deps"
+                        )
                     except Exception as e:
-                        self.log(f"Failed to update dependencies for {task_number}: {e}", level="warning")
-        
+                        self.log(
+                            f"Failed to update dependencies for {task_number}: {e}",
+                            level="warning",
+                        )
+
         return {
             "written": written,
             "task_ids": task_ids,
             "errors": errors,
-            "uuid_map": task_uuid_map
+            "uuid_map": task_uuid_map,
         }
 
 
@@ -572,10 +623,12 @@ VibePilot needs a research capability for autonomous improvement.
 - Findings are structured with SIMPLE/VET tags
 - Token usage is tracked for ROI
 """
-    
+
     planner = PlannerAgent()
-    result = planner.execute({"prd": research_prd, "project_id": "550e8400-e29b-41d4-a716-446655440001"})
-    
+    result = planner.execute(
+        {"prd": research_prd, "project_id": "550e8400-e29b-41d4-a716-446655440001"}
+    )
+
     return result
 
 
@@ -583,18 +636,18 @@ if __name__ == "__main__":
     print("=" * 60)
     print("VIBEPILOT PLANNER AGENT")
     print("=" * 60)
-    
+
     # Test with Research module
     print("\nCreating Research Module plan...")
     result = create_research_module_plan()
-    
+
     if result.success:
         print(f"\n[OK] Plan created successfully")
         print(f"  Tasks written: {result.output.get('tasks_written', 0)}")
         print(f"  Task IDs: {result.output.get('task_ids', [])}")
-        if result.output.get('write_errors'):
+        if result.output.get("write_errors"):
             print(f"  Errors: {result.output['write_errors']}")
     else:
         print(f"\n[FAIL] Plan creation failed: {result.error}")
-    
+
     print("\n" + "=" * 60)
