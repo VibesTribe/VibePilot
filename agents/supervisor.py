@@ -15,6 +15,10 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 from supabase import create_client
 from dotenv import load_dotenv
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from vault_manager import get_env_or_vault
 
 load_dotenv()
 
@@ -25,11 +29,15 @@ logger = logging.getLogger("VibePilot.Supervisor")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_SERVICE_KEY = get_env_or_vault("SUPABASE_SERVICE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Missing SUPABASE_URL or SUPABASE_KEY")
 
 db = create_client(SUPABASE_URL, SUPABASE_KEY)
+db_service = (
+    create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY) if SUPABASE_SERVICE_KEY else db
+)
 
 
 class SupervisorAgent:
@@ -639,7 +647,7 @@ class SupervisorAgent:
             idempotency_key = f"create-branch-{task_id}-{int(time.time())}"
 
             result = (
-                db.table("maintenance_commands")
+                db_service.table("maintenance_commands")
                 .insert(
                     {
                         "command_type": "create_branch",
@@ -693,7 +701,7 @@ class SupervisorAgent:
             idempotency_key = f"commit-{task_id}-{int(time.time())}"
 
             result = (
-                db.table("maintenance_commands")
+                db_service.table("maintenance_commands")
                 .insert(
                     {
                         "command_type": "commit_code",
@@ -760,7 +768,7 @@ class SupervisorAgent:
             idempotency_key = f"merge-{task_id}-{source}-{target}-{int(time.time())}"
 
             result = (
-                db.table("maintenance_commands")
+                db_service.table("maintenance_commands")
                 .insert(
                     {
                         "command_type": "merge_branch",
@@ -817,7 +825,7 @@ class SupervisorAgent:
             idempotency_key = f"delete-{task_id}-{branch_name}-{int(time.time())}"
 
             result = (
-                db.table("maintenance_commands")
+                db_service.table("maintenance_commands")
                 .insert(
                     {
                         "command_type": "delete_branch",
@@ -858,7 +866,7 @@ class SupervisorAgent:
         """
         try:
             result = (
-                db.table("maintenance_commands")
+                db_service.table("maintenance_commands")
                 .select("*")
                 .eq("id", command_id)
                 .execute()
