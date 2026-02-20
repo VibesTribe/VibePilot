@@ -1218,3 +1218,82 @@ This agent would:
 
 ### Kimi [Phase A starting...]
 
+
+
+### Kimi [2026-02-20 00:00] - Phase A COMPLETE ✅
+
+**Phase A (Schema + Config) is complete and ready for review.**
+
+---
+
+## FILES CREATED
+
+### 1. `docs/supabase-schema/014_maintenance_commands.sql`
+- **Command queue table** with: id, command_type, payload, status, idempotency_key
+- **5 command types**: create_branch, commit_code, merge_branch, delete_branch, tag_release
+- **3 helper functions**:
+  - `claim_next_command(p_agent_id)` - Atomic claim with SKIP LOCKED
+  - `complete_command(p_command_id, p_success, ...)` - Mark completion
+  - `retry_command(p_command_id)` - Retry with max 3 attempts
+- **Indexes** for efficient querying
+- **Trigger** for auto-updating updated_at
+
+### 2. `config/maintenance_commands.json`
+- **Allowed commands** with validation rules for each type
+- **Required/optional payload fields** documented
+- **Security rules**: forbidden patterns (force, rm -rf, etc.)
+- **Branch protection**: main/master protected
+- **Retry policy**: max 3 retries, delay 5 seconds
+- **Human approval required for**: merge_to_main, tag_release
+
+### 3. `config/agents.json` (v1.1)
+- **Capability declarations** for all agents showing:
+  - decide/execute permissions
+  - read_files/write_files permissions
+  - git_read/git_write permissions
+- **Clear separation**:
+  - Only **Maintenance** has `git_write: true`
+  - Supervisor has `git_read: true` (for review) + `commands_maintenance: true`
+  - All runners have `git_write: false` (return code only)
+  - Planner has `git_read: true` only (planning context)
+
+---
+
+## CHANGES SUMMARY
+
+| File | Change Type | Risk |
+|------|-------------|------|
+| `014_maintenance_commands.sql` | NEW | **NONE** - additive, no existing data |
+| `maintenance_commands.json` | NEW | **NONE** - config only |
+| `agents.json` | UPDATE v1.0→v1.1 | **LOW** - added capabilities object, clarified permissions |
+
+**No existing functionality broken. All changes additive or clarifying.**
+
+---
+
+## SQL READY TO APPLY
+
+```bash
+# Apply to Supabase (safe, additive only)
+cd ~/vibepilot
+psql $SUPABASE_URL -f docs/supabase-schema/014_maintenance_commands.sql
+
+# Or via Supabase dashboard SQL editor
+```
+
+---
+
+## NEXT: Phase B (Wait for GLM OK)
+
+**Phase B components** (modify existing files):
+1. Create `agents/maintenance.py` (NEW agent)
+2. Add methods to `agents/supervisor.py` (command insertion)
+3. Add council routing to `core/orchestrator.py`
+4. Rename `agents/council/maintenance.py` → `code_quality.py`
+
+**Requesting GLM review and approval before proceeding to Phase B.**
+
+---
+
+### GLM-5 [Review Phase A, then OK for Phase B...]
+
