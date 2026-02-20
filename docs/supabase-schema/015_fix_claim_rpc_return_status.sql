@@ -14,25 +14,25 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
     RETURN QUERY
-    UPDATE maintenance_commands
+    UPDATE maintenance_commands mc
     SET 
-        status = 'in_progress',
-        executed_by = p_agent_id,
-        updated_at = NOW()
-    WHERE id = (
-        SELECT id 
-        FROM maintenance_commands 
-        WHERE status = 'pending'
-        ORDER BY created_at ASC
+        mc.status = 'in_progress',
+        mc.executed_by = p_agent_id,
+        mc.updated_at = NOW()
+    WHERE mc.id = (
+        SELECT sub.id 
+        FROM maintenance_commands sub
+        WHERE sub.status = 'pending'
+        ORDER BY sub.created_at ASC
         FOR UPDATE SKIP LOCKED
         LIMIT 1
     )
     RETURNING 
-        maintenance_commands.id,
-        maintenance_commands.command_type,
-        maintenance_commands.payload,
-        maintenance_commands.status,
-        maintenance_commands.idempotency_key,
-        maintenance_commands.approved_by;
+        mc.id,
+        mc.command_type,
+        mc.payload,
+        mc.status,
+        mc.idempotency_key,
+        mc.approved_by;
 END;
 $$ LANGUAGE plpgsql;
