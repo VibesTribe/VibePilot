@@ -4034,3 +4034,37 @@ Before referencing columns in SQL, I should verify the actual schema exists. Don
 
 **Lesson:** Start small, prove system works, THEN build big features.
 
+
+---
+
+### Kimi [2026-02-20 20:07] - PROCESS FLOW CLARIFICATION
+
+**GLM Confusion:** How does "Hey Vibes, change X to Y" actually work?
+
+**Intended Flow (from PRD):**
+```
+Human → Consultant → PRD → Planner → Tasks → Council → Supervisor → Queue → Orchestrator → Runners
+```
+
+**Current Reality:**
+- ❌ Consultant Agent: NOT BUILT
+- ❌ Planner: NOT BUILT  
+- ❌ Council: Placeholder only
+- ✅ Orchestrator: Running
+- ✅ Task Queue: Working
+
+**Conclusion:** We CANNOT do the full flow yet.
+
+**Simplified Test Proposal:**
+1. Human creates task directly in Supabase
+2. Orchestrator picks it up
+3. Runner executes
+4. Tests run
+5. Merge
+
+This validates the core: orchestrator → runner → test → merge
+
+**Sent to GLM-5:** Process explanation + simplified proposal
+
+**Next:** Wait for GLM-5 agreement, then human creates test task
+
