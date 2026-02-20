@@ -97,9 +97,9 @@ class TestVibePilotFullFlow:
         if result.data:
             claimed = result.data[0]
             assert claimed["command_id"] == command_id
-            assert claimed["status"] == "in_progress"
+            assert claimed["cmd_status"] == "in_progress"
             print(
-                f"✅ Claimed command: {claimed['command_type']} (status: {claimed['status']})"
+                f"✅ Claimed command: {claimed['command_type']} (status: {claimed['cmd_status']})"
             )
 
             db_service.rpc(

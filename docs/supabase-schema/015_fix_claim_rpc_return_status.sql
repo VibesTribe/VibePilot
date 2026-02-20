@@ -8,18 +8,18 @@ RETURNS TABLE (
     command_id UUID,
     command_type TEXT,
     payload JSONB,
-    status TEXT,
+    cmd_status TEXT,
     idempotency_key TEXT,
     approved_by TEXT
 ) AS $$
 BEGIN
     RETURN QUERY
-    UPDATE maintenance_commands mc
+    UPDATE maintenance_commands
     SET 
-        mc.status = 'in_progress',
-        mc.executed_by = p_agent_id,
-        mc.updated_at = NOW()
-    WHERE mc.id = (
+        status = 'in_progress',
+        executed_by = p_agent_id,
+        updated_at = NOW()
+    WHERE id = (
         SELECT sub.id 
         FROM maintenance_commands sub
         WHERE sub.status = 'pending'
@@ -28,11 +28,11 @@ BEGIN
         LIMIT 1
     )
     RETURNING 
-        mc.id,
-        mc.command_type,
-        mc.payload,
-        mc.status,
-        mc.idempotency_key,
-        mc.approved_by;
+        maintenance_commands.id,
+        maintenance_commands.command_type,
+        maintenance_commands.payload,
+        maintenance_commands.status,
+        maintenance_commands.idempotency_key,
+        maintenance_commands.approved_by;
 END;
 $$ LANGUAGE plpgsql;
