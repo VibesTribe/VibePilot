@@ -3622,3 +3622,31 @@ Implementation approach: Enhance the existing vibes-orb in header to:
 Much cleaner than floating button! 🎯
 
 ---
+
+---
+
+### Kimi [2026-02-20 16:40] - Sticky Header Requirement Added ✅
+
+**Human feedback:** Header should be **fixed/sticky** so Vibes + key data stay visible while scrolling through project slices.
+
+**Updated in spec:**
+- Header stays fixed at top (`position: sticky` or `fixed`)
+- Content scrolls beneath it
+- Vibes + status + tokens + ROI always visible
+- Critical for mobile UX on large projects
+
+**CSS approach:**
+```css
+.mission-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  /* existing styles */
+}
+```
+
+Or `position: fixed` with padding adjustment for content.
+
+**Spec updated:** `docs/research/vibes_interface_specification.md`
+
+---
