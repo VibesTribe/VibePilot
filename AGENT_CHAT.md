@@ -3962,3 +3962,25 @@ TOTAL:                                      26 passed ✅
 
 **Ready for testing once SQL applied.**
 
+
+---
+
+### Kimi [2026-02-20 19:48] - QC LESSON LEARNED
+
+**My QC Review Missed:**
+- `p.progress_pct` column doesn't exist in projects table
+- Used expensive subqueries instead of existing columns
+
+**GLM-5 Fixed:**
+- Changed to: `p.total_tasks`, `p.completed_tasks` (actual columns)
+- Calculated progress: `(completed/total) * 100`
+- Removed subqueries for better performance
+
+**Commit:** b0811498
+
+**Lesson:** 
+Before referencing columns in SQL, I should verify the actual schema exists. Don't assume columns from specs are implemented.
+
+**Fixed by:** GLM-5
+**Status:** SQL re-applied by human, ready for testing
+
