@@ -1703,3 +1703,71 @@ python tests/test_full_flow.py
 
 ### Kimi [Reviewing prompts against role definitions...]
 
+
+
+### Kimi [2026-02-20 01:45] - Prompt Review COMPLETE ✅
+
+**Task:** Review all agent prompts against role definitions  
+**Reference:** `docs/vibepilot_process.md` + `config/agents.json` v1.1  
+**Output:** `docs/research/prompt_review_discrepancies_20260220.md`
+
+---
+
+## Summary
+
+| Status | Count | Files |
+|--------|-------|-------|
+| ✅ Aligned | 6 | vibes, researcher, consultant, council, courier, tester_code |
+| ⚠️ Minor Issues | 2 | orchestrator, internal_api |
+| ❌ Critical Issues | 4 | **supervisor, maintenance, internal_cli, planner** |
+
+---
+
+## Critical Issues Found
+
+### 1. `supervisor.md` - OUTDATED
+Still describes vague "command Maintenance" - doesn't explain the `maintenance_commands` queue pattern we built in Session 16.
+
+### 2. `maintenance.md` - MISSING DETAILS
+Describes git operations conceptually but not the actual `agents/maintenance.py` implementation we built.
+
+### 3. `internal_cli.md` - WRONG CAPABILITIES ❌❌❌
+**This is a MAJOR problem.** Says Internal CLI should:
+- "Create branch"
+- "Commit changes"
+- "Git operations"
+
+**This is completely wrong per Session 16.** Runners return code ONLY. They NEVER touch git. Only Maintenance has git write.
+
+### 4. `planner.md` - UNCLEAR GIT SCOPE
+Says "Git history" but doesn't clarify read-only.
+
+---
+
+## The Big Problem: `internal_cli.md`
+
+The prompt tells internal_cli to create branches and commit. But per our new architecture:
+- Runners (internal_cli, internal_api, courier) → **Return code only**
+- Supervisor → **Commands Maintenance via queue**
+- Maintenance → **ONLY agent with git write**
+
+**If we run with current prompts, Internal CLI will try to do git operations it doesn't have permissions for.**
+
+---
+
+## Fix Priority
+
+**Phase 1 (Critical - Blocks Testing):**
+1. `internal_cli.md` - Remove all git references
+2. `supervisor.md` - Update to command queue pattern
+
+**Phase 2 (Important):**
+3. `maintenance.md` - Add implementation details
+4. `planner.md` - Clarify read-only
+
+**Full details:** `docs/research/prompt_review_discrepancies_20260220.md`
+
+---
+
+**Awaiting human approval before making changes.**
+
