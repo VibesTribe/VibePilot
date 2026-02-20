@@ -40,27 +40,34 @@ Vibes is the human-facing AI assistant for VibePilot - accessible from anywhere,
 
 ## User Experience Design
 
-### Primary Interface: Floating Vibes Button
+### Primary Interface: Header Vibes Button
+
+Vibes lives in the **top-left of the Mission Control header** - exactly where it is now. This is the optimal position because:
+
+- ✅ **Always visible** - No scrolling needed, even on large projects
+- ✅ **First thing you see** - Establishes Vibes as the primary interface
+- ✅ **Consistent placement** - Same location on desktop and mobile
+- ✅ **Familiar pattern** - Similar to Siri, Alexa app placement
 
 ```
 ┌─────────────────────────────────────┐
+│ 🤖 Vibes    Mission Control    [≡] │  ← Header with Vibes top-left
+│     ↑                               │
+│  Tap to talk                        │
+│  or "Text me" for chat              │
+├─────────────────────────────────────┤
 │                                     │
 │    [Dashboard Content]              │
+│    (may scroll for pages)           │
 │                                     │
-│                                     │
-│                        ┌──────┐    │
-│                        │ 🤖   │    │  ← Floating Vibes button
-│                        │Vibes │    │     (bottom-right on mobile)
-│                        └──────┘    │
-│                            ↑        │
-│                      "Text me"      │  ← Small label below
 └─────────────────────────────────────┘
 ```
 
-**Mobile Behavior:**
-- Button floats in bottom-right corner (thumb-accessible)
-- Pulsing glow when Vibes has a proactive message
-- "Text me" label appears on first visit, hides after interaction
+**Interaction:**
+- **Tap Vibes icon** → Opens voice interface overlay
+- **Tap "Text me"** (small text below icon) → Opens chat panel
+- **Pulsing glow** when Vibes has a proactive message
+- **Badge counter** for unread notifications
 
 ### Interaction Modes
 
@@ -84,9 +91,10 @@ Vibes is the human-facing AI assistant for VibePilot - accessible from anywhere,
 #### Mode 2: Text Chat
 
 **Access Methods:**
-1. **"Text me" link** below Vibes button
-2. **Swipe up** on voice interface
+1. **"Text me" link** below Vibes icon in header
+2. **Swipe up** on voice interface overlay
 3. **Keyboard icon** in voice interface
+4. **Long-press** Vibes icon (mobile shortcut to text)
 
 **Chat Interface:**
 ```
@@ -179,12 +187,13 @@ Vibes can reach out to the human:
 ```
 apps/dashboard/
 ├── components/
-│   └── vibes/
-│       ├── VibesButton.tsx          # Floating action button
-│       ├── VibesVoiceModal.tsx      # Voice interface overlay
-│       ├── VibesChatPanel.tsx       # Text chat interface
-│       ├── VibesWaveform.tsx        # Audio visualization
-│       └── VibesNotification.tsx    # Proactive message banner
+│   ├── vibes/
+│   │   ├── VibesHeaderButton.tsx    # Header-integrated Vibes button
+│   │   ├── VibesVoiceModal.tsx      # Voice interface overlay
+│   │   ├── VibesChatPanel.tsx       # Text chat interface (slide-out)
+│   │   ├── VibesWaveform.tsx        # Audio visualization
+│   │   └── VibesNotification.tsx    # Proactive message banner
+│   └── MissionHeader.tsx            # Update to integrate Vibes
 ├── hooks/
 │   └── useVibes.ts                  # Main Vibes interaction hook
 ├── lib/
