@@ -725,6 +725,7 @@ class ConcurrentOrchestrator:
         self.runner_pool = RunnerPool(cooldown_manager=self.cooldown_manager)
         self.dependency_manager = DependencyManager()
         self.supervisor = SupervisorAgent()
+        self.supervisor.set_council_callback(self.route_council_review)
         self.task_manager = TaskManager()
         self.telemetry = get_telemetry()
 
