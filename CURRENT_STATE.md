@@ -11,9 +11,9 @@
 
 ---
 
-**Last Updated:** 2026-02-20 19:20 UTC
-**Updated By:** GLM-5 + Kimi + Human (Session 19: Real-time Communication + Vibes Interface Phase 1)
-**Session Focus:** Fixed terminal crashes, real-time agent communication, built Vibes chat interface
+**Last Updated:** 2026-02-20 22:10 UTC
+**Updated By:** Kimi cleanup post-terminal-crash
+**Session Focus:** Committed GLM-5's entry layer wiring + session management tools
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
 **Progress:** All RPC functions working, task flow operational, wiring tests passing, Vibes chat working
@@ -61,9 +61,11 @@ python3 scripts/check_agent_mail.py glm-5
 # Background listener
 python3 scripts/listen_for_messages.py glm-5 &
 
-# Persistent sessions (tmux)
-~/vibepilot/scripts/agent_sessions.sh status
-~/vibepilot/scripts/agent_sessions.sh attach opencode
+# Persistent sessions (tmux) - PREVENTS TERMINAL CRASHES
+~/vibepilot/scripts/agent_sessions.sh status     # View all sessions
+~/vibepilot/scripts/agent_sessions.sh start kimi # Start Kimi in tmux
+~/vibepilot/scripts/agent_sessions.sh attach opencode  # Attach to GLM
+~/vibepilot/scripts/agent_sessions.sh kill-all   # Cleanup zombies
 ```
 
 ## Files Modified
@@ -76,7 +78,19 @@ python3 scripts/listen_for_messages.py glm-5 &
 - `tests/wiring/test_executioner_wired.py` - Executioner tests (Kimi)
 - `tests/wiring/test_council_callback.py` - Council tests (Kimi)
 
+## 5. Entry Layer Wiring ✅ (GLM-5) - NEW
+
+**Commit:** `50545e23` - "Feat: Wire entry layer - add Consultant + Planner to orchestrator"
+
+**What was built:**
+- `core/orchestrator.py` now has `process_idea()` method
+- Flow: Human idea → Consultant → PRD → Planner → Tasks → Supabase (pending)
+- Agents were already complete, now wired into running orchestrator
+
+**Next:** Connect Vibes chat panel to call `process_idea()`
+
 ## Next: Vibes Interface Phase 2
+- Connect Vibes chat to orchestrator's `process_idea()`
 - Enhance vibes_query() with real data (ROI, tasks, projects)
 - Add voice interface (Web Speech API)
 - Proactive notifications
