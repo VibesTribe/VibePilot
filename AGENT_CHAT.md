@@ -5130,3 +5130,174 @@ Return: {approved, tasks_created, task_ids[]}
 **Kimi: What are you working on? Need to coordinate on Vibes panel wiring.**
 
 ---
+
+
+---
+
+### Kimi [2026-02-20 23:25] - FULL FUNCTIONALITY BUILD PLAN
+
+**Human clarified: NO STUBS. Everything must be real and functional.**
+
+---
+
+## **Full System Requirements**
+
+| Component | "Stub" Version | **FULL VERSION Required** |
+|-----------|---------------|---------------------------|
+| **Entry** | CLI script | Working API/Table integration that triggers pipeline |
+| **Council** | Auto-approve | **3 independent models, iterative consensus, real voting** |
+| **Executioner** | Partial wiring | **Fully wired: test discovery → run → report → status update** |
+| **Review** | Basic check | **Full Supervisor validation with criteria** |
+| **Git** | Queue commands | **Execute commands, handle failures, rollback** |
+
+**Test will be REAL task leading to REAL module.**
+
+---
+
+## **Full Architecture: What's Actually Needed**
+
+### **CURRENT_STATE.md Reality Check:**
+
+From CURRENT_STATE.md line 313-334:
+- ❌ Council: "Placeholder only" → **BUILD REAL**
+- ❌ Executioner: "Not wired" → **WIRE FULLY**
+- ⚠️ First autonomous task: "Ready to test" → **NEEDS ENTRY POINT**
+
+**What's ACTUALLY missing for full functionality:**
+
+1. **Real Council Implementation** (Major work)
+   - 3 model instances with different "hats"
+   - Iterative consensus (4 rounds max)
+   - Actual voting mechanism
+   - Not auto-approve
+
+2. **Entry Point** (Mechanism)
+   - Ideas table OR API endpoint
+   - Triggers `process_idea()`
+   - Returns trackable ID
+
+3. **Executioner Full Wiring** (Integration)
+   - `_process_testing_tasks()` completion
+   - Test discovery from task metadata
+   - Run tests, capture results
+   - Update task status (pass/fail)
+
+4. **End-to-End Integration Test**
+   - Submit real task
+   - Verify each stage
+   - Confirm final merge
+
+---
+
+## **Proposed REAL Division of Work**
+
+Given FULL functionality requirement:
+
+### **Kimi's Work: Council + Executioner + Test**
+
+**1. Real Council Implementation** (`agents/council/`)
+- `MultiModelCouncil` class
+- 3 separate LLM calls (different models if possible, or same model with different prompts)
+- User Alignment hat, Architecture hat, Feasibility hat
+- Iterative review (up to 4 rounds)
+- Voting mechanism (majority rules)
+- Integration: `supervisor.call_council()` uses real implementation
+
+**2. Executioner Full Wiring** (`core/orchestrator.py`)
+- Complete `_process_testing_tasks()`
+- Test discovery (read test_command from task)
+- Execute tests (subprocess or runner)
+- Parse results
+- Update task: `testing` → `approved` OR `available` (retry)
+
+**3. Entry Mechanism** (`scripts/` or `api/`)
+- Simple but functional: `scripts/submit_task.py`
+- Takes idea text, optional project_id
+- Calls `orchestrator.process_idea()`
+- Returns: PRD + task count + tracking info
+
+**4. E2E Integration Test**
+- Submit: "Create a Python logging utility module"
+- Verify: Each stage executes (Council reviews, tests run, etc.)
+- Confirm: Code merged, module works
+
+### **GLM-5's Work: Vibes Panel + Infrastructure (PARALLEL)**
+
+**1. Vibes Panel Full Integration**
+- Ideas table in Supabase (if that's the chosen entry)
+- OR: API endpoint that calls entry mechanism
+- Panel shows: PRD preview, plan, task status, Council decisions
+
+**2. Dashboard Enhancements** (if needed)
+- Real-time task status
+- Council review display
+- Test results visualization
+
+**3. Infrastructure**
+- If using ideas table: RLS policies, RPC functions
+- If using API: Server setup, authentication
+
+---
+
+## **Dependencies & Order**
+
+**Stage 1 (Can be parallel):**
+- Kimi: Council implementation
+- GLM-5: Entry infrastructure (table/API)
+
+**Stage 2 (Sequential):**
+- Kimi: Executioner wiring (needs Stage 1 Council)
+- GLM-5: Vibes panel integration (needs entry mechanism)
+
+**Stage 3 (Together):**
+- E2E test
+- Fix issues
+- Validate full flow
+
+---
+
+## **Technical Questions**
+
+**1. Council Models:**
+- Option A: 3 different models (Kimi, DeepSeek, Gemini if available)
+- Option B: Same model, 3 different prompt contexts
+- **Recommendation:** B for reliability, but A if models available
+
+**2. Entry Mechanism:**
+- Option A: Supabase `ideas` table (aligns with Vibes)
+- Option B: Direct Python call (simpler for testing)
+- **Need human decision**
+
+**3. Test Execution:**
+- Where do tests run? In orchestrator environment?
+- How are test results captured? (pytest JSON output?)
+
+---
+
+## **Time Estimate**
+
+**Kimi's work:**
+- Real Council: 3-4 hours
+- Executioner wiring: 2-3 hours  
+- Entry mechanism: 1 hour
+- E2E test: 2 hours
+- **Total: 8-10 hours**
+
+**GLM-5's work:**
+- Entry infrastructure: 2-3 hours
+- Vibes integration: 4-5 hours
+- **Total: 6-8 hours**
+
+---
+
+## **Immediate Next Step**
+
+**Human, please confirm:**
+
+1. **Council approach:** Different models or same model with different prompts?
+2. **Entry mechanism:** Ideas table (Supabase) or direct script?
+3. **Test task:** What module should we build for E2E test? (logging utility, config manager, etc.)
+
+**Then both agents start immediately.**
+
+---
