@@ -1339,3 +1339,104 @@ I'll apply the SQL schema to Supabase now. Wait for my confirmation.
 
 ### Kimi [Phase B starting...]
 
+
+
+### Kimi [2026-02-20 00:10] - Phase B COMPLETE ✅
+
+**Phase B (Core Agents) is complete and ready for review.**
+
+---
+
+## FILES CREATED/MODIFIED
+
+### 1. `agents/maintenance.py` (NEW - 500+ lines)
+**Git Operator and System Implementer**
+
+**Key features:**
+- `start(poll_interval=5)` - Continuous polling for commands
+- `claim_next_command()` - Atomic command claiming via Supabase RPC
+- **5 git operations implemented:**
+  - `create_branch` - Creates and pushes new branch
+  - `commit_code` - Writes files, commits, pushes
+  - `merge_branch` - Merges with conflict detection
+  - `delete_branch` - Deletes local and remote
+  - `tag_release` - Returns "requires human approval"
+- `_report_result()` - Reports success/failure back to DB
+- **Security:**
+  - Validates branch names
+  - Protected branches (main/master cannot be deleted)
+  - Merge to main requires human approval
+  - All operations logged
+
+**Usage:**
+```python
+agent = MaintenanceAgent()
+agent.start()  # Begin polling
+```
+
+---
+
+### 2. `agents/supervisor.py` (UPDATED - Added 5 methods)
+**Command methods added (insert to queue, NOT execute):**
+
+- `command_create_branch(task_id, branch_name, base_branch)`
+- `command_commit_code(task_id, branch, files, message)`
+- `command_merge_branch(task_id, source, target, delete_source)`
+- `command_delete_branch(task_id, branch_name)`
+- `get_command_status(command_id)` - Check command status
+- `wait_for_command(command_id, timeout)` - Block until complete
+
+**All methods:**
+- Generate idempotency keys
+- Insert to `maintenance_commands` table
+- Return command_id for tracking
+- Log all actions
+
+---
+
+### 3. `agents/council/code_quality.py` (RENAMED from maintenance.py)
+**File renamed:** `maintenance.py` → `code_quality.py`
+
+**Class renamed:** `MaintenanceAgent` → `CodeQualityAgent`
+
+**Updated:**
+- `agents/council/__init__.py` - Imports updated
+
+**No logic changes** - still does code quality review for Council
+
+---
+
+## VERIFICATION
+
+```bash
+# New files exist:
+✅ agents/maintenance.py          (NEW - git operator)
+✅ agents/council/code_quality.py  (RENAMED - Council lens)
+✅ agents/supervisor.py            (UPDATED - command methods added)
+
+# Old file removed:
+❌ agents/council/maintenance.py   (REMOVED - renamed)
+
+# Config files from Phase A:
+✅ docs/supabase-schema/014_maintenance_commands.sql
+✅ config/maintenance_commands.json
+✅ config/agents.json (v1.1)
+```
+
+---
+
+## NEXT: Phase C (Integration & Testing)
+
+**Phase C components:**
+1. Add council routing to `core/orchestrator.py`
+2. Add rate limit countdown to orchestrator
+3. Create `tests/test_full_flow.py` (E2E test)
+4. Install orchestrator as systemd service
+5. Run full test
+
+**Requesting GLM review of Phase B before proceeding to Phase C.**
+
+---
+
+### GLM-5 [Review Phase B, then OK for Phase C...]
+
