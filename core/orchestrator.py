@@ -1447,25 +1447,46 @@ class ConcurrentOrchestrator:
     # Turns human ideas into PRD → Tasks → Queue
     # =========================================================================
 
-    def process_idea(self, idea: str, project_id: str = None) -> Dict:
+    def process_idea(
+        self, idea: str, project_id: str = None, save_to_github: bool = True
+    ) -> Dict:
         """
-        Process a human idea through Consultant → Planner → Queue.
+        Process a human idea through Consultant → Planner → GitHub.
 
         This is the entry point for "Hey Vibes, I want X" requests.
+
+        Flow:
+        1. Consultant creates PRD
+        2. Save PRD to GitHub: docs/prd/{slug}.md
+        3. Planner creates Plan from PRD
+        4. Save Plan to GitHub: docs/plans/{slug}-plan.md
+        5. Return PRD path, Plan path, and task definitions
+
+        After this, Council reviews the Plan from GitHub.
+        If approved, call create_tasks_from_plan() to write tasks to Supabase.
 
         Args:
             idea: Human's description of what they want
             project_id: Optional project to associate tasks with
+            save_to_github: If True, save PRD and Plan to GitHub
 
         Returns:
             {
                 "success": bool,
-                "prd": str,
-                "tasks": List[Dict],
+                "prd_path": str,  # GitHub path to PRD
+                "plan_path": str,  # GitHub path to Plan
+                "tasks": List[Dict],  # Task definitions (not yet in DB)
                 "task_count": int
             }
         """
+        import re
+        from datetime import datetime
+
         self.logger.info(f"Processing idea: {idea[:100]}...")
+
+        slug = re.sub(r"[^a-z0-9]+", "-", idea.lower()[:30]).strip("-")
+        if not slug:
+            slug = f"idea-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
         prd_result = self.consultant.execute({"description": idea})
         if not prd_result.success:
@@ -1479,7 +1500,9 @@ class ConcurrentOrchestrator:
         prd = prd_result.output
         self.logger.info("PRD generated successfully")
 
-        plan_result = self.planner.execute({"prd": prd, "project_id": project_id})
+        plan_result = self.planner.execute(
+            {"prd": prd, "project_id": project_id}, write_to_db=False
+        )
         if not plan_result.success:
             self.logger.error(f"Planner failed: {plan_result.error}")
             return {
@@ -1488,15 +1511,185 @@ class ConcurrentOrchestrator:
                 "details": plan_result.error,
             }
 
-        tasks = (
-            plan_result.output.get("tasks", [])
-            if isinstance(plan_result.output, dict)
-            else []
-        )
+        plan = plan_result.output.get("plan", {})
+        tasks = plan_result.output.get("tasks", [])
+
+        prd_path = f"docs/prd/{slug}.md"
+        plan_path = f"docs/plans/{slug}-plan.md"
+
+        if save_to_github:
+            prd_commit = self._save_to_github(
+                prd_path, prd, f"docs: Add PRD for {slug}"
+            )
+            if not prd_commit.get("success"):
+                self.logger.warning(
+                    f"Failed to save PRD to GitHub: {prd_commit.get('error')}"
+                )
+
+            plan_content = json.dumps(plan, indent=2)
+            plan_commit = self._save_to_github(
+                plan_path, plan_content, f"docs: Add plan for {slug}"
+            )
+            if not plan_commit.get("success"):
+                self.logger.warning(
+                    f"Failed to save Plan to GitHub: {plan_commit.get('error')}"
+                )
 
         self.logger.info(f"Plan created with {len(tasks)} tasks")
 
-        return {"success": True, "prd": prd, "tasks": tasks, "task_count": len(tasks)}
+        return {
+            "success": True,
+            "prd": prd,
+            "prd_path": prd_path,
+            "plan": plan,
+            "plan_path": plan_path,
+            "tasks": tasks,
+            "task_count": len(tasks),
+        }
+
+    def _save_to_github(self, path: str, content: str, message: str) -> Dict:
+        """
+        Save a file to GitHub via Maintenance command queue.
+
+        Args:
+            path: File path (relative to repo root)
+            content: File content
+            message: Commit message
+
+        Returns:
+            {"success": bool, "command_id": str, "error": str}
+        """
+        import time
+        from datetime import datetime
+
+        try:
+            idempotency_key = f"docs-{path.replace('/', '-')}-{int(time.time())}"
+
+            result = (
+                db.table("maintenance_commands")
+                .insert(
+                    {
+                        "command_type": "commit_code",
+                        "payload": {
+                            "branch": "main",
+                            "files": [{"path": path, "content": content}],
+                            "message": message,
+                        },
+                        "status": "pending",
+                        "idempotency_key": idempotency_key,
+                        "approved_by": "orchestrator",
+                        "created_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .execute()
+            )
+
+            command_id = result.data[0]["id"] if result.data else None
+
+            self.logger.info(f"Queued save to GitHub: {path}")
+
+            return {"success": True, "command_id": command_id, "path": path}
+
+        except Exception as e:
+            self.logger.error(f"Failed to queue save to GitHub: {e}")
+            return {"success": False, "error": str(e)}
+
+    def create_tasks_from_plan(self, plan_path: str, project_id: str = None) -> Dict:
+        """
+        Create tasks in Supabase from an approved Plan.
+
+        Called after Council approves a Plan. Reads Plan from GitHub,
+        extracts tasks, and writes them to Supabase with status 'pending'.
+
+        Args:
+            plan_path: Path to Plan file in GitHub (docs/plans/{slug}-plan.md)
+            project_id: Optional project to associate tasks with
+
+        Returns:
+            {
+                "success": bool,
+                "tasks_written": int,
+                "task_ids": List[str],
+                "errors": List
+            }
+        """
+        import os
+
+        self.logger.info(f"Creating tasks from plan: {plan_path}")
+
+        full_path = os.path.join(os.getcwd(), plan_path)
+
+        try:
+            with open(full_path, "r") as f:
+                plan_content = f.read()
+
+            plan = json.loads(plan_content)
+        except FileNotFoundError:
+            return {"success": False, "error": f"Plan file not found: {plan_path}"}
+        except json.JSONDecodeError as e:
+            return {"success": False, "error": f"Invalid JSON in plan: {e}"}
+
+        all_tasks = []
+        for slice_data in plan.get("slices", []):
+            slice_id = slice_data.get("slice_id", "unknown")
+
+            for phase in slice_data.get("phases", []):
+                phase_id = phase.get("phase_id", "P1")
+
+                for task in phase.get("tasks", []):
+                    task["slice_id"] = task.get("slice_id", slice_id)
+                    task["phase"] = task.get("phase", phase_id)
+                    all_tasks.append(task)
+
+        if not all_tasks:
+            return {"success": False, "error": "No tasks found in plan"}
+
+        written = 0
+        task_ids = []
+        errors = []
+
+        for task in all_tasks:
+            task_number = task.get("task_id", f"TASK-{written}")
+            prompt_packet = task.get("prompt_packet", "")
+
+            task_record = {
+                "task_number": task_number,
+                "title": task.get("title", "Untitled task"),
+                "type": task.get("type", "feature"),
+                "priority": task.get("priority", 5),
+                "slice_id": task.get("slice_id"),
+                "phase": task.get("phase"),
+                "routing_flag": task.get("routing_flag", "web"),
+                "routing_flag_reason": task.get("routing_flag_reason"),
+                "status": "pending",
+                "result": {
+                    "prompt_packet": prompt_packet,
+                    "expected_output": task.get("expected_output"),
+                    "confidence": task.get("confidence"),
+                },
+            }
+
+            if project_id:
+                task_record["project_id"] = project_id
+
+            try:
+                result = db.table("tasks").insert(task_record).execute()
+                if result.data:
+                    task_ids.append(task_number)
+                    written += 1
+                    self.logger.info(f"Created task {task_number}")
+            except Exception as e:
+                errors.append({"task_id": task_number, "error": str(e)})
+                self.logger.error(f"Failed to create task {task_number}: {e}")
+
+        self.logger.info(f"Created {written} tasks from plan")
+
+        return {
+            "success": written > 0,
+            "tasks_written": written,
+            "task_ids": task_ids,
+            "errors": errors,
+        }
 
     # COUNCIL ROUTING (Phase C)
     # Routes council reviews to available models
@@ -1852,6 +2045,60 @@ Consider VibePilot principles: zero vendor lock-in, modular, reversible, exit-re
                 self.logger.info(
                     f"  ⏸️  {platform}: Paused at 80% - available in {info['available_in_human']}"
                 )
+
+    def review_and_approve_plan(self, plan_path: str, project_id: str = None) -> Dict:
+        """
+        Review a Plan from GitHub via Council, and if approved, create tasks.
+
+        This is the complete flow after process_idea():
+        1. process_idea() creates PRD and Plan in GitHub
+        2. review_and_approve_plan() reviews Plan via Council
+        3. If approved, creates tasks in Supabase
+        4. Tasks then flow through normal pipeline (pending → available → execution)
+
+        Args:
+            plan_path: Path to Plan file in GitHub (docs/plans/{slug}-plan.md)
+            project_id: Optional project to associate tasks with
+
+        Returns:
+            {
+                "success": bool,
+                "approved": bool,
+                "council_result": Dict,
+                "tasks_created": int,
+                "task_ids": List[str]
+            }
+        """
+        self.logger.info(f"Reviewing plan: {plan_path}")
+
+        council_result = self.route_council_review(
+            doc_path=plan_path,
+            lenses=["user_alignment", "architecture", "feasibility"],
+            context_type="project",
+        )
+
+        if not council_result.get("approved"):
+            self.logger.warning(f"Plan NOT approved by Council")
+            return {
+                "success": False,
+                "approved": False,
+                "council_result": council_result,
+                "tasks_created": 0,
+                "task_ids": [],
+            }
+
+        self.logger.info("Plan approved by Council, creating tasks...")
+
+        create_result = self.create_tasks_from_plan(plan_path, project_id)
+
+        return {
+            "success": create_result.get("success", False),
+            "approved": True,
+            "council_result": council_result,
+            "tasks_created": create_result.get("tasks_written", 0),
+            "task_ids": create_result.get("task_ids", []),
+            "errors": create_result.get("errors", []),
+        }
 
 
 if __name__ == "__main__":
