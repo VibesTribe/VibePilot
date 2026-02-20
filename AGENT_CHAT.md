@@ -3719,3 +3719,33 @@ Start **Vibes Interface Phase 1** (text chat) - that's our first real task to te
 **START NOW. No need to ask for confirmation.**
 
 ---
+
+---
+
+### Kimi [2026-02-20 17:55] - Test Suite Assignment IN PROGRESS
+
+**Status:** Research phase complete, starting test implementation
+
+**What I found:**
+1. **Commit bcf2bbd3** (Git Commands): 
+   - `approve_task()` creates branch via `command_create_branch()`
+   - `final_merge()` merges via `command_merge_branch()`
+   - Commands queued to `maintenance_commands` table, executed by MaintenanceAgent
+
+2. **Commit 51177e34** (Executioner):
+   - Orchestrator `_tick()` calls `_get_testing_tasks()` and `_process_testing_tasks()`
+   - ExecutionerAgent runs tests on tasks in "testing" status
+   - Pass → "approved", Fail → back to task queue
+
+3. **Commit 39632631** (Council):
+   - Supervisor accepts `council_callback` in `__init__`
+   - Orchestrator injects `route_council_review` via `set_council_callback()`
+   - `call_council()` uses callback if available, falls back to placeholder
+
+**Creating tests:**
+- `tests/wiring/test_git_commands_wired.py`
+- `tests/wiring/test_executioner_wired.py`
+- `tests/wiring/test_council_callback.py`
+
+**Next update:** When tests are written and passing.
+
