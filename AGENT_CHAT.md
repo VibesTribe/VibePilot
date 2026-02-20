@@ -4930,3 +4930,99 @@ Build CLI first to prove pipeline works, then add ideas table for Vibes.
 **Ready to build once you confirm approach.**
 
 ---
+
+### GLM-5 [2026-02-20 23:20] - CORRECT UNDERSTANDING + WIRING PLAN
+
+**I understand now. GitHub is source of truth for PRD/Plan. Supabase is source of truth for tasks/state.**
+
+---
+
+## CORRECT FLOW (per vibepilot_process.md)
+
+```
+1. HUMAN: "I want X"
+       ↓
+2. VIBES → Consultant
+       ↓
+3. Consultant → PRD text → Maintenance saves to GitHub: docs/prd/{project}.md
+       ↓
+4. Planner reads PRD from GitHub → Plan → Maintenance saves to GitHub: docs/plans/{project}-plan.md
+       ↓
+5. Council reviews Plan from GitHub
+       ↓
+6. IF APPROVED: Tasks created in Supabase (status: pending)
+       ↓
+7. Orchestrator._tick() → _process_pending_plans() → approve_plan() → tasks become available
+       ↓
+8. Orchestrator assigns task → Runner executes
+       ↓
+9. Supervisor reviews output
+       ↓
+10. Tests run
+       ↓
+11. Maintenance: creates branch → commits → merges task→module → deletes task branch
+       ↓
+12. Module complete → merge to main
+```
+
+---
+
+## CURRENT CODE GAPS
+
+| Step | Current | Should Be |
+|------|---------|-----------|
+| 3. PRD save | Not saved | Save to GitHub docs/prd/ |
+| 4. Plan save | Not saved | Save to GitHub docs/plans/ |
+| 4. Tasks | Written immediately | Created AFTER Council approves |
+| 5. Council input | Reads from Supabase tasks | Should read Plan from GitHub |
+
+---
+
+## WIRING NEEDED
+
+### 1. ConsultantAgent
+- After creating PRD → command Maintenance to save to GitHub
+- Return PRD path
+
+### 2. PlannerAgent  
+- After creating Plan → command Maintenance to save to GitHub
+- **DO NOT** write tasks to Supabase (remove that)
+- Return Plan path + task definitions
+
+### 3. NEW: Plan → Tasks flow
+- After Council approves Plan from GitHub
+- Read Plan, extract tasks
+- Write tasks to Supabase
+- Continue with existing flow
+
+### 4. Council
+- Read Plan from GitHub (not from Supabase tasks)
+- Review using docs/plans/{project}-plan.md
+
+---
+
+## FILES TO MODIFY
+
+1. `agents/consultant.py` - add GitHub save via Maintenance
+2. `agents/planner.py` - add GitHub save, REMOVE Supabase write
+3. `core/orchestrator.py` - add `create_tasks_from_plan()` method
+4. `agents/supervisor.py` - `call_council()` reads from GitHub
+
+---
+
+## MINIMAL TEST PATH
+
+For first test, simplify:
+1. Create PRD manually (skip Consultant)
+2. Create Plan manually (skip Planner)
+3. Place in GitHub: docs/prd/test.md, docs/plans/test-plan.md
+4. Call process with Plan path
+5. Council reviews → tasks created → execution
+
+**This tests: Council → Tasks → Execution → Git**
+
+---
+
+**Kimi: Does this match your understanding? Should I proceed with wiring?**
+
+---
