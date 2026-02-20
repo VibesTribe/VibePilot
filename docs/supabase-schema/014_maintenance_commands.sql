@@ -86,6 +86,7 @@ RETURNS TABLE (
     command_id UUID,
     command_type TEXT,
     payload JSONB,
+    status TEXT,
     idempotency_key TEXT,
     approved_by TEXT
 ) AS $$
@@ -108,6 +109,7 @@ BEGIN
         maintenance_commands.id,
         maintenance_commands.command_type,
         maintenance_commands.payload,
+        maintenance_commands.status,
         maintenance_commands.idempotency_key,
         maintenance_commands.approved_by;
 END;
