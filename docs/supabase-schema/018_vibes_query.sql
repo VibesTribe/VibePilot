@@ -29,7 +29,7 @@ BEGIN
     'status', 'ok',
     
     -- Project status
-    'active_projects', (
+    'active_projects', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
         'id', p.id,
         'name', p.name,
@@ -40,7 +40,7 @@ BEGIN
       ))
       FROM projects p
       WHERE p.status = 'active'
-    ),
+    ), '[]'::jsonb),
     
     -- ROI summary (last 7 days)
     'roi_summary', (
@@ -57,44 +57,47 @@ BEGIN
     ),
     
     -- Platform health
-    'platform_health', (
+    'platform_health', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
         'id', m.id,
         'name', m.name,
         'status', m.status,
         'success_rate', m.success_rate,
-        'tokens_used_24h', (
-          SELECT COALESCE(SUM(tokens_in + tokens_out), 0)
+        'tokens_used_24h', COALESCE((
+          SELECT SUM(tokens_in + tokens_out)
           FROM task_runs tr
           WHERE tr.model_id = m.id 
           AND tr.completed_at > NOW() - INTERVAL '24 hours'
-        )
+        ), 0)
       ))
       FROM models m
       WHERE m.status IN ('active', 'paused')
-    ),
+    ), '[]'::jsonb),
     
     -- Recent activity (last 5 tasks)
     'recent_activity', (
-      SELECT jsonb_agg(jsonb_build_object(
-        'task_id', t.id,
-        'title', t.title,
-        'status', t.status,
-        'updated_at', t.updated_at
-      ))
-      FROM tasks t
-      ORDER BY t.updated_at DESC
-      LIMIT 5
+      SELECT COALESCE(jsonb_agg(t_data), '[]'::jsonb)
+      FROM (
+        SELECT jsonb_build_object(
+          'task_id', t.id,
+          'title', t.title,
+          'status', t.status,
+          'updated_at', t.updated_at
+        ) as t_data
+        FROM tasks t
+        ORDER BY t.updated_at DESC
+        LIMIT 5
+      ) recent
     ),
     
     -- Alerts requiring attention (escalated tasks)
     'alerts', (
-      SELECT jsonb_agg(jsonb_build_object(
+      SELECT COALESCE(jsonb_agg(jsonb_build_object(
         'type', 'escalated_task',
         'task_id', t.id,
         'title', t.title,
-        'reason', t.status_reason
-      ))
+        'reason', t.failure_notes
+      )), '[]'::jsonb)
       FROM tasks t
       WHERE t.status = 'escalated'
     ),
