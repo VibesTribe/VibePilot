@@ -11,12 +11,12 @@
 
 ---
 
-**Last Updated:** 2026-02-20 18:00 UTC
+**Last Updated:** 2026-02-20 18:22 UTC
 **Updated By:** GLM-5 + Kimi (Session 19: Real-time Communication + Session Persistence)
 **Session Focus:** Fixed terminal crash root cause, implemented real-time GLM-Kimi communication via Supabase
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Dependencies migrated to JSONB, all 5 RPC functions working, task flow operational, real-time agent messaging
+**Progress:** Dependencies migrated to JSONB, all 5 RPC functions working, task flow operational, real-time agent messaging, wiring tests passing
 
 ---
 
@@ -29,20 +29,28 @@
 - **Fix:** Killed zombies, freed 2.6GB RAM, swap now at 15%
 - **Prevention:** Hourly auto-cleanup via cron, tmux for persistent sessions
 
-### 2. Real-Time Agent Communication ✅ (GLM-5)
+### 2. Real-Time Agent Communication ✅ (GLM-5 + Kimi)
 - Updated `start_session.sh` to check Supabase messages PRIMARY
 - Created `scripts/notify_done.sh` for task completion alerts
-- Both agents now coordinate via `agent_messages` table, not files
+- Created `scripts/listen_for_messages.py` - background listener (polls every 2s)
+- Both agents now coordinate via `agent_messages` table with real-time notifications
+- **VERIFIED WORKING** - Messages deliver within seconds
 
 ### 3. Session Persistence ✅ (Kimi)
 - `scripts/agent_sessions.sh` - tmux session manager
 - `scripts/start_agent_session.sh` - start persistent sessions
 - Sessions survive terminal crashes
 
+### 4. Wiring Tests Complete ✅ (Kimi)
+- **26/26 tests passing**
+- Git commands (approve_task, final_merge) verified
+- Executioner (testing tasks) verified
+- Council callback injection verified
+
 ## Commands for Real-Time Coordination
 ```bash
-# Session start (checks Supabase messages)
-./start_session.sh glm-5
+# Session start with real-time notifications
+./start_session.sh glm-5 --listen
 
 # After completing work
 ./scripts/notify_done.sh glm-5 "Task description"
@@ -50,16 +58,28 @@
 # Check messages anytime
 python3 scripts/check_agent_mail.py glm-5
 
+# Background listener
+python3 scripts/listen_for_messages.py glm-5 &
+
 # Persistent sessions (tmux)
 ~/vibepilot/scripts/agent_sessions.sh status
 ~/vibepilot/scripts/agent_sessions.sh attach opencode
 ```
 
 ## Files Modified
-- `start_session.sh` - Supabase messages PRIMARY
+- `start_session.sh` - Supabase messages PRIMARY, --listen flag
 - `scripts/notify_done.sh` - Task completion notification
+- `scripts/listen_for_messages.py` - Background message listener
 - `scripts/agent_sessions.sh` - tmux session manager (Kimi)
 - `scripts/start_agent_session.sh` - session starter (Kimi)
+- `tests/wiring/test_git_commands_wired.py` - Git wiring tests (Kimi)
+- `tests/wiring/test_executioner_wired.py` - Executioner tests (Kimi)
+- `tests/wiring/test_council_callback.py` - Council tests (Kimi)
+
+## Next: Vibes Interface Phase 1
+- Text chat panel for dashboard
+- First feature built by autonomous VibePilot flow
+- Spec: `docs/research/vibes_interface_specification.md`
 
 ---
 
