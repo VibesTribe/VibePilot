@@ -4094,3 +4094,46 @@ Human Input → Consultant → PRD → Planner → Tasks → Council → Supervi
 
 **Next:** Coordinating with GLM-5 on division of work
 
+
+---
+
+### Kimi [2026-02-20 20:41] - HOMEWORK COMPLETE ✅
+
+**Files Fully Read & Understood:**
+
+**1. agents/consultant.py**
+- Input: task with "description" (the idea)
+- Calls LLM to generate PRD (8 sections)
+- Returns AgentResult with PRD text
+- Simple, complete implementation
+
+**2. agents/planner.py (600 lines)**
+- Input: task with "prd" (PRD text)
+- Uses KimiRunner (CLI) for planning
+- Breaks PRD into atomic tasks with prompt_packets
+- Validates prompt_packets (200+ char minimum)
+- Writes tasks to Supabase tasks table
+- Handles dependencies between tasks
+
+**3. agents/council/*.py**
+- ArchitectAgent: Reviews Docker, architecture
+- SecurityAgent: Scans for secrets (regex patterns)
+- CodeQualityAgent: (exists, similar pattern)
+
+**4. Root orchestrator.py (NOT running)**
+- DualModelOrchestrator class
+- _process_idea(): idea → Consultant → PRD → Planner → tasks
+- process_task(): routes by task type
+- Has all agents initialized
+
+**5. Core orchestrator.py (RUNNING via systemd)**
+- ConcurrentOrchestrator class
+- Only SupervisorAgent + ExecutionerAgent
+- Processes tasks from Supabase queue
+- MISSING: Consultant, Planner, Council entry points
+
+**KEY FINDING:**
+Agents exist and are complete. Core orchestrator needs wiring to USE them.
+
+**Ready for Phase 1.**
+
