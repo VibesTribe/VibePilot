@@ -9,6 +9,7 @@ See prompts/supervisor.md for full behavior specification.
 
 import os
 import json
+import time
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -615,141 +616,135 @@ class SupervisorAgent:
 
         return {"processed": processed, "approved": approved, "rejected": rejected}
 
-
-if __name__ == "__main__":
-    print("=== VibePilot Supervisor Agent ===\n")
-
-    supervisor = SupervisorAgent()
-
-    print("Pending reviews:")
-    reviews = supervisor.get_pending_reviews()
-    print(f"  {len(reviews)} tasks awaiting review")
-
-    print("\nPending approvals:")
-    approvals = supervisor.get_pending_approvals()
-    print(f"  {len(approvals)} tasks awaiting final approval")
-
-    print("\nAwaiting human:")
-    human = supervisor.get_awaiting_human()
-    print(f"  {len(human)} tasks awaiting human review")
-
-    print("\n✅ Supervisor agent ready")
-
-
-    # =========================================================================
     # MAINTENANCE COMMAND METHODS (NEW - Phase B)
     # These methods insert commands to maintenance_commands table
     # Maintenance agent polls and executes them
     # =========================================================================
 
-    def command_create_branch(self, task_id: str, branch_name: str, base_branch: str = "main") -> Dict:
+    def command_create_branch(
+        self, task_id: str, branch_name: str, base_branch: str = "main"
+    ) -> Dict:
         """
         Command Maintenance to create a new branch.
-        
+
         Args:
             task_id: Task ID for tracking
             branch_name: Name of branch to create
             base_branch: Branch to create from (default: main)
-            
+
         Returns:
             {"success": bool, "command_id": str, "message": str}
         """
         try:
             idempotency_key = f"create-branch-{task_id}-{int(time.time())}"
-            
-            result = db.table("maintenance_commands").insert({
-                "command_type": "create_branch",
-                "payload": {
-                    "branch_name": branch_name,
-                    "base_branch": base_branch
-                },
-                "status": "pending",
-                "idempotency_key": idempotency_key,
-                "approved_by": "supervisor",
-                "created_at": datetime.utcnow().isoformat()
-            }).execute()
-            
+
+            result = (
+                db.table("maintenance_commands")
+                .insert(
+                    {
+                        "command_type": "create_branch",
+                        "payload": {
+                            "branch_name": branch_name,
+                            "base_branch": base_branch,
+                        },
+                        "status": "pending",
+                        "idempotency_key": idempotency_key,
+                        "approved_by": "supervisor",
+                        "created_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .execute()
+            )
+
             command_id = result.data[0]["id"] if result.data else None
-            
+
             self.logger.info(f"Commanded create branch: {branch_name}")
-            
+
             return {
                 "success": True,
                 "command_id": command_id,
                 "branch_name": branch_name,
-                "message": f"Command queued: create {branch_name}"
+                "message": f"Command queued: create {branch_name}",
             }
-            
+
         except Exception as e:
             self.logger.error(f"Failed to queue create_branch command: {e}")
             return {"success": False, "error": str(e)}
 
-    def command_commit_code(self, task_id: str, branch: str, files: List[Dict], message: str = None) -> Dict:
+    def command_commit_code(
+        self, task_id: str, branch: str, files: List[Dict], message: str = None
+    ) -> Dict:
         """
         Command Maintenance to commit code to a branch.
-        
+
         Args:
             task_id: Task ID for tracking
             branch: Branch to commit to
             files: List of {"path": str, "content": str}
             message: Commit message (auto-generated if None)
-            
+
         Returns:
             {"success": bool, "command_id": str, "message": str}
         """
         try:
             if not message:
                 message = f"Task {task_id[:8]}: Automated commit"
-            
+
             idempotency_key = f"commit-{task_id}-{int(time.time())}"
-            
-            result = db.table("maintenance_commands").insert({
-                "command_type": "commit_code",
-                "payload": {
-                    "branch": branch,
-                    "files": files,
-                    "message": message
-                },
-                "status": "pending",
-                "idempotency_key": idempotency_key,
-                "approved_by": "supervisor",
-                "created_at": datetime.utcnow().isoformat()
-            }).execute()
-            
+
+            result = (
+                db.table("maintenance_commands")
+                .insert(
+                    {
+                        "command_type": "commit_code",
+                        "payload": {
+                            "branch": branch,
+                            "files": files,
+                            "message": message,
+                        },
+                        "status": "pending",
+                        "idempotency_key": idempotency_key,
+                        "approved_by": "supervisor",
+                        "created_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .execute()
+            )
+
             command_id = result.data[0]["id"] if result.data else None
-            
+
             self.logger.info(f"Commanded commit to {branch}: {len(files)} files")
-            
+
             return {
                 "success": True,
                 "command_id": command_id,
                 "branch": branch,
                 "files_count": len(files),
-                "message": f"Command queued: commit {len(files)} files to {branch}"
+                "message": f"Command queued: commit {len(files)} files to {branch}",
             }
-            
+
         except Exception as e:
             self.logger.error(f"Failed to queue commit_code command: {e}")
             return {"success": False, "error": str(e)}
 
     def command_merge_branch(
-        self, 
-        task_id: str, 
-        source: str, 
-        target: str, 
+        self,
+        task_id: str,
+        source: str,
+        target: str,
         delete_source: bool = True,
-        create_target_if_missing: bool = True
+        create_target_if_missing: bool = True,
     ) -> Dict:
         """
         Command Maintenance to merge source branch into target.
-        
+
         Args:
             task_id: Task ID for tracking
             source: Source branch to merge from
             target: Target branch to merge into
             delete_source: Whether to delete source after merge
             create_target_if_missing: Create target if doesn't exist
-            
+
         Returns:
             {"success": bool, "command_id": str, "message": str}
         """
@@ -759,37 +754,43 @@ if __name__ == "__main__":
                 return {
                     "success": False,
                     "error": f"Merge to {target} requires human approval",
-                    "requires_human_approval": True
+                    "requires_human_approval": True,
                 }
-            
+
             idempotency_key = f"merge-{task_id}-{source}-{target}-{int(time.time())}"
-            
-            result = db.table("maintenance_commands").insert({
-                "command_type": "merge_branch",
-                "payload": {
-                    "source": source,
-                    "target": target,
-                    "delete_source": delete_source,
-                    "create_target_if_missing": create_target_if_missing
-                },
-                "status": "pending",
-                "idempotency_key": idempotency_key,
-                "approved_by": "supervisor",
-                "created_at": datetime.utcnow().isoformat()
-            }).execute()
-            
+
+            result = (
+                db.table("maintenance_commands")
+                .insert(
+                    {
+                        "command_type": "merge_branch",
+                        "payload": {
+                            "source": source,
+                            "target": target,
+                            "delete_source": delete_source,
+                            "create_target_if_missing": create_target_if_missing,
+                        },
+                        "status": "pending",
+                        "idempotency_key": idempotency_key,
+                        "approved_by": "supervisor",
+                        "created_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .execute()
+            )
+
             command_id = result.data[0]["id"] if result.data else None
-            
+
             self.logger.info(f"Commanded merge: {source} → {target}")
-            
+
             return {
                 "success": True,
                 "command_id": command_id,
                 "source": source,
                 "target": target,
-                "message": f"Command queued: merge {source} into {target}"
+                "message": f"Command queued: merge {source} into {target}",
             }
-            
+
         except Exception as e:
             self.logger.error(f"Failed to queue merge_branch command: {e}")
             return {"success": False, "error": str(e)}
@@ -797,11 +798,11 @@ if __name__ == "__main__":
     def command_delete_branch(self, task_id: str, branch_name: str) -> Dict:
         """
         Command Maintenance to delete a branch.
-        
+
         Args:
             task_id: Task ID for tracking
             branch_name: Branch to delete
-            
+
         Returns:
             {"success": bool, "command_id": str, "message": str}
         """
@@ -810,33 +811,37 @@ if __name__ == "__main__":
             if branch_name in ["main", "master"]:
                 return {
                     "success": False,
-                    "error": f"Cannot delete protected branch {branch_name}"
+                    "error": f"Cannot delete protected branch {branch_name}",
                 }
-            
+
             idempotency_key = f"delete-{task_id}-{branch_name}-{int(time.time())}"
-            
-            result = db.table("maintenance_commands").insert({
-                "command_type": "delete_branch",
-                "payload": {
-                    "branch_name": branch_name
-                },
-                "status": "pending",
-                "idempotency_key": idempotency_key,
-                "approved_by": "supervisor",
-                "created_at": datetime.utcnow().isoformat()
-            }).execute()
-            
+
+            result = (
+                db.table("maintenance_commands")
+                .insert(
+                    {
+                        "command_type": "delete_branch",
+                        "payload": {"branch_name": branch_name},
+                        "status": "pending",
+                        "idempotency_key": idempotency_key,
+                        "approved_by": "supervisor",
+                        "created_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .execute()
+            )
+
             command_id = result.data[0]["id"] if result.data else None
-            
+
             self.logger.info(f"Commanded delete branch: {branch_name}")
-            
+
             return {
                 "success": True,
                 "command_id": command_id,
                 "branch_name": branch_name,
-                "message": f"Command queued: delete {branch_name}"
+                "message": f"Command queued: delete {branch_name}",
             }
-            
+
         except Exception as e:
             self.logger.error(f"Failed to queue delete_branch command: {e}")
             return {"success": False, "error": str(e)}
@@ -844,15 +849,20 @@ if __name__ == "__main__":
     def get_command_status(self, command_id: str) -> Optional[Dict]:
         """
         Get status of a queued command.
-        
+
         Args:
             command_id: UUID of the command
-            
+
         Returns:
             Command status dict or None
         """
         try:
-            result = db.table("maintenance_commands").select("*").eq("id", command_id).execute()
+            result = (
+                db.table("maintenance_commands")
+                .select("*")
+                .eq("id", command_id)
+                .execute()
+            )
             return result.data[0] if result.data else None
         except Exception as e:
             self.logger.error(f"Failed to get command status: {e}")
@@ -861,28 +871,29 @@ if __name__ == "__main__":
     def wait_for_command(self, command_id: str, timeout: int = 60) -> Optional[Dict]:
         """
         Wait for a command to complete (blocking).
-        
+
         Args:
             command_id: UUID of the command
             timeout: Maximum seconds to wait
-            
+
         Returns:
             Final command status or None if timeout
         """
         start_time = time.time()
-        
+
         while time.time() - start_time < timeout:
             status = self.get_command_status(command_id)
-            
+
             if not status:
                 return None
-            
+
             if status.get("status") in ["completed", "failed"]:
                 return status
-            
+
             time.sleep(1)
-        
+
         return None  # Timeout
 
 
 if __name__ == "__main__":
+    print("SupervisorAgent loaded. Use via import.")

@@ -3,7 +3,7 @@ from .consultant import ConsultantAgent
 from .planner import PlannerAgent
 from .council.architect import ArchitectAgent
 from .council.security import SecurityAgent
-from .council.maintenance import MaintenanceAgent
+from .council.code_quality import CodeQualityAgent
 from .director import DirectorAgent
 from .executioner import ExecutionerAgent
 from .code_hand import CodeHandAgent
@@ -12,10 +12,10 @@ __all__ = [
     "Agent",
     "AgentResult",
     "ConsultantAgent",
-    "PlannerAgent", 
+    "PlannerAgent",
     "ArchitectAgent",
     "SecurityAgent",
-    "MaintenanceAgent",
+    "CodeQualityAgent",
     "DirectorAgent",
     "ExecutionerAgent",
     "CodeHandAgent",
