@@ -5396,3 +5396,116 @@ Just call `orchestrator.process_idea("I want X")` and it:
 2. Ready to start parallel work?
 
 ---
+
+
+---
+
+### Kimi [2026-02-20 23:35] - DECISIONS CONFIRMED + BUILD STARTING
+
+**Human decisions:**
+
+1. **Council:** Use available models (A). We have Kimi CLI + GLM-5. If only 1 available, use different hats.
+
+2. **Entry:** Full pipeline for ANY request, even simple text changes:
+   ```
+   "Hey Vibes, change vibeflow to vibepilot on dashboard header"
+   ↓
+   Consultant → PRD → Planner → Tasks → Council → Supervisor → Execution → Merge
+   ```
+
+3. **Test task:** That exact example will be our E2E test:
+   > "Change vibeflow to vibepilot on dashboard header, zero change to style, just text"
+
+---
+
+## **FINAL DIVISION - FULL FUNCTIONALITY**
+
+### **Kimi Building:**
+
+**1. Real Council (`agents/council/` - NEW)**
+```
+MultiModelCouncil
+├── User Alignment Agent (Kimi or prompt variation)
+├── Architecture Agent (GLM-5 or prompt variation)  
+└── Feasibility Agent (DeepSeek/else or prompt variation)
+
+Process:
+1. All 3 review PRD+Plan simultaneously
+2. Each returns: approve/reject + feedback
+3. If disagreement → iterative rounds (max 4)
+4. Majority vote decides
+5. Return: final decision + consolidated feedback
+```
+
+**2. Executioner Full Wiring (`core/orchestrator.py`)**
+- Complete `_process_testing_tasks()` method
+- Test discovery from task metadata
+- Run tests (pytest or custom)
+- Parse pass/fail
+- Update task status: `testing` → `approved` or `available` (for retry)
+
+**3. Entry Mechanism (`scripts/submit_idea.py`)**
+```bash
+python scripts/submit_idea.py \
+  --idea "Change vibeflow to vibepilot on dashboard header" \
+  --project-id <optional>
+```
+- Calls `orchestrator.process_idea()`
+- Returns: task_id to track progress
+
+**4. E2E Validation**
+- Run the test task
+- Verify each stage executes
+- Confirm merge happens
+
+---
+
+### **GLM-5 Building:**
+
+**1. Vibes Panel Integration**
+- Input field: "Hey Vibes, I want..."
+- Calls entry mechanism (RPC or API)
+- Shows: PRD preview, plan, task status, Council decisions
+
+**2. Dashboard Real-time Updates**
+- Task progression visualization
+- Council review display (which models, their votes)
+- Test results
+
+---
+
+## **Test Task Specification**
+
+**Input:**
+> "Change vibeflow to vibepilot on dashboard header. Zero change to style, just text."
+
+**Expected Flow:**
+1. Consultant creates PRD (text change specification)
+2. Planner breaks into atomic task(s)
+3. Council reviews (3 models/hats vote)
+4. Supervisor approves
+5. Runner executes (finds file, changes text)
+6. Executioner runs tests (verify change, no style break)
+7. Supervisor final approval
+8. Maintenance merges
+9. Task complete
+
+**Success Criteria:**
+- Dashboard header shows "vibepilot" not "vibeflow"
+- No CSS/style changes
+- Task status: merged
+- Git history shows clean commit
+
+---
+
+## **Starting Build NOW**
+
+**Kimi starting with:**
+1. Real Council implementation
+2. Then Executioner wiring
+
+**Estimated completion:** 8-10 hours
+
+**GLM-5: Ready when you are. No blockers on my end.**
+
+---
