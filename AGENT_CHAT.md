@@ -6511,3 +6511,134 @@ Even if DeepSeek WAS configured, it would bypass the runner pool entirely.
 **Human:** When you're ready, I will implement the fix exactly as Kimi specified. No shortcuts. No assumptions.
 
 ---
+
+### GLM-5 [2026-02-21 02:00] - TRIGGER ANALYSIS: What's Wired vs What's Not
+
+---
+
+## THE HUMAN'S QUESTIONS (Critical)
+
+| Question | Status | Notes |
+|----------|--------|-------|
+| What triggers Planner? | ⚠️ WIRED but BROKEN | process_idea() calls Planner, but Planner uses hardcoded DeepSeek |
+| What triggers Council to vet plan? | ⚠️ DOUBLE-WIRED | review_and_approve_plan() does Council, then _process_pending_plans() does Council AGAIN |
+| What triggers approved plan to orchestrator? | ✅ WIRED | _process_pending_plans() → approve_plan() → pending → available |
+| What triggers Maintenance to create task branch? | ❌ NOT WIRED | No code calls Maintenance for branch creation |
+| What triggers Maintenance to create module branch? | ❌ NOT WIRED | No code calls Maintenance for module branch |
+| What is Supervisor checking? | ⚠️ PARTIAL | review_plan() checks routing_flag, title, dependencies |
+| What triggers testing? | ⚠️ WIRED | _process_testing_tasks() exists, calls Executioner |
+| What triggers merge to module branch? | ❌ NOT WIRED | No code calls Maintenance for merge |
+| What triggers deletion of task branch? | ❌ NOT WIRED | No code calls Maintenance for branch deletion |
+| What triggers merge to main? | ❌ NOT WIRED | No code calls Maintenance for main merge |
+
+---
+
+## DETAILED FINDINGS
+
+### 1. Entry Layer (Idea → Tasks)
+
+**Current Code Path:**
+```
+_tick()
+  → _process_pending_ideas()
+    → process_idea()
+      → Consultant.execute() ← HARDCODED DEEPSEEK (BROKEN)
+      → Planner.execute() ← HARDCODED DEEPSEEK (BROKEN)
+      → _save_to_github() ← saves PRD + Plan
+    → review_and_approve_plan()
+      → route_council_review() ← COUNCIL REVIEW #1
+      → create_tasks_from_plan() ← creates tasks with status='pending'
+  → _process_pending_plans()
+    → supervisor.review_plan() ← checks task validity
+    → supervisor.call_council() ← COUNCIL REVIEW #2 (DUPLICATE!)
+    → supervisor.approve_plan() ← pending → available
+  → _get_available_tasks()
+    → _dispatch_task()
+```
+
+**Problems:**
+1. Consultant/Planner hardcoded to DeepSeek → BROKEN if DeepSeek unavailable
+2. Council called TWICE (redundant)
+3. review_and_approve_plan() does Council → creates tasks
+4. _process_pending_plans() does Council AGAIN → then approves
+
+**Correct Flow Should Be:**
+```
+process_idea() → Consultant → Planner → PRD/Plan in GitHub
+review_and_approve_plan() → Council → create tasks (pending)
+_process_pending_plans() → approve_plan() → pending → available (NO second council!)
+```
+
+### 2. Task Execution (Available → Complete)
+
+**Current Code Path:**
+```
+_tick()
+  → _get_available_tasks() ← gets status='available'
+  → _dispatch_task() ← sends to runner
+  → runner returns output
+  → _check_completed_futures() ← checks results
+  → status → 'review'?
+  → _process_reviews() ← supervisor reviews?
+  → _process_testing_tasks() ← tests run
+  → status → 'complete'?
+```
+
+**Problems:**
+1. No clear status transitions documented
+2. Supervisor review not clearly wired to status changes
+3. No Maintenance calls for git operations
+
+### 3. Git Operations (Branch → Merge → Delete)
+
+**What's Documented (vibepilot_process.md):**
+```
+Task assigned → Maintenance creates task/T001-desc
+Code committed → Maintenance commits to task branch
+Tests pass → Maintenance merges task → module, deletes task branch
+Module complete → Maintenance merges module → main, deletes module branch
+```
+
+**What's Implemented:**
+```
+❌ No calls to Maintenance for branch creation
+❌ No calls to Maintenance for commit
+❌ No calls to Maintenance for merge
+❌ No calls to Maintenance for branch deletion
+```
+
+**Maintenance agent exists:**
+- agents/maintenance.py exists
+- maintenance_commands table exists
+- But orchestrator doesn't call it!
+
+---
+
+## THE CORE PROBLEM
+
+**Orchestrator has execution wired but NOT the git lifecycle.**
+
+Missing:
+1. After _dispatch_task() succeeds → Maintenance create branch
+2. After runner returns code → Maintenance commit
+3. After tests pass → Maintenance merge task → module
+4. After merge → Maintenance delete task branch
+5. After module complete → Maintenance merge module → main
+
+---
+
+## RECOMMENDED FIX ORDER
+
+1. **FIRST:** Fix agent LLM routing (Kimi doing this)
+2. **SECOND:** Remove duplicate Council call in _process_pending_plans()
+3. **THIRD:** Wire Maintenance commands for git lifecycle
+4. **FOURTH:** Test end-to-end with simple task
+
+---
+
+## WAITING FOR
+
+- Kimi: Fix agent LLM routing (agents/base.py)
+- Human: Confirm priority of remaining fixes
+
+---
