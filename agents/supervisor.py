@@ -61,6 +61,10 @@ class SupervisorAgent:
         """Set the Council review callback (injected by orchestrator)."""
         self.council_callback = callback
 
+    def set_orchestrator(self, orchestrator):
+        """Set the orchestrator reference for LLM routing."""
+        self.orchestrator = orchestrator
+
     def review_task_output(self, task_id: str, output: Dict, expected: Dict) -> Dict:
         """
         Review a completed task's output.
@@ -518,7 +522,9 @@ class SupervisorAgent:
             "task_count": len(pending_tasks),
         }
 
-    def call_council(self, project_id: str, plan_path: str = None, plan_summary: str = None) -> Dict:
+    def call_council(
+        self, project_id: str, plan_path: str = None, plan_summary: str = None
+    ) -> Dict:
         """
         Call Council to review the plan.
 
@@ -548,13 +554,20 @@ class SupervisorAgent:
         if not actual_plan_path and project_id:
             # Try to look up plan_path from vibes_ideas table
             try:
-                result = db.table("vibes_ideas").select("plan_path").eq("project_id", project_id).execute()
+                result = (
+                    db.table("vibes_ideas")
+                    .select("plan_path")
+                    .eq("project_id", project_id)
+                    .execute()
+                )
                 if result.data and result.data[0].get("plan_path"):
                     actual_plan_path = result.data[0]["plan_path"]
-                    self.logger.info(f"Found plan_path from vibes_ideas: {actual_plan_path}")
+                    self.logger.info(
+                        f"Found plan_path from vibes_ideas: {actual_plan_path}"
+                    )
             except Exception as e:
                 self.logger.warning(f"Could not look up plan_path: {e}")
-        
+
         # Fallback to constructed path if still not found
         if not actual_plan_path:
             actual_plan_path = f"docs/plans/{project_id}-plan.md"
