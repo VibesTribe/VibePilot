@@ -11,287 +11,190 @@
 
 ---
 
-**Last Updated:** 2026-02-21 03:00 UTC
-**Updated By:** Kimi - Front-end pipeline fixes complete
-**Session Focus:** Fixed agent LLM routing, Planner bypass, Council path issues
+**Last Updated:** 2026-02-21 06:15 UTC
+**Updated By:** GLM-5 - Pipeline test day 1 complete, critical gaps identified
+**Session Focus:** Infrastructure wiring + first pipeline test revealed core gaps
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Agent routing fixed, orchestrator now controls all LLM assignments
+**Progress:** Foundation wired, test revealed routing intelligence gaps
 
 ---
 
-# SESSION 20 SUMMARY (2026-02-21)
+# SESSION 21 SUMMARY (2026-02-21)
 
-## Front-End Pipeline Fixes Complete (Kimi)
+## Infrastructure Wiring Complete (GLM-5 + Kimi)
 
-### 1. Agent Base Routing ✅ FIXED
-**Problem:** Hardcoded DeepSeek API in `agents/base.py`
-**Solution:** Routes through `orchestrator.run_agent_task()`
-**Commit:** `de2811be`
+### 1. Supervisor Final Approval → Tasks Created ✅
+**Problem:** Council approves plan, but no trigger to create tasks
+**Solution:** `SupervisorAgent.approve_plan_and_create_tasks(plan_path)`
+**Key Insight:** Tasks created as "available" (not pending) because plan is already approved
+**Commit:** `e44ce394`
 
-### 2. Planner Bypass ✅ FIXED  
-**Problem:** Planner used direct Kimi CLI (line 113), bypassed orchestrator
-**Solution:** Now uses `self.call_llm()` → orchestrator routing
-**Commit:** `72c46109`
-**Result:** Orchestrator selects best LLM for planning (Kimi, GLM-5, etc.)
+### 2. Maintenance Integrated in Orchestrator ✅
+**Problem:** Maintenance agent existed but never ran (commands queued forever)
+**Solution:** Added `_process_maintenance_commands()` to orchestrator._tick()
+**Decision:** Option B (integrated, not separate service) - if orchestrator dies, no git work anyway
+**Commit:** `9f7b1ae2`
 
-### 3. Council Path Issue ✅ FIXED
-**Problem:** Used fake path `projects/{id}/plan.md`, not actual Plan file
-**Solution:** Looks up plan_path from vibes_ideas table, falls back to constructed path
-**Commit:** `a0d4462b`
-**Result:** Council now reviews actual Plan files from GitHub
+### 3. State Machine Clarified ✅
+**Human Clarified:**
+- `approved` = tests pass, approved = ready for git
+- `merged` = git operations complete = FINAL STATUS
+- No `merged → complete` transition needed
 
-### 4. Full Architecture Understanding ✅ ACHIEVED
-**Key Insight:** Agents = Vehicles (roles), LLMs = Fuel (swappable)
-**Orchestrator = Fleet Manager** - assigns best available LLM to each agent
-**Human can change any agent's LLM anytime**
+### 4. First Pipeline Test Attempted ⚠️
+**Test Task:** Change "Vibeflow" to "VibePilot" in MissionHeader.tsx
+**PRD:** Created in `docs/prd/vibepilot-rename-dashboard-prd.md`
+**Plan:** Created in `docs/plans/vibeflow-test-plan.json`
+**Branch:** `vibeflow-test` in vibeflow repo
 
-## Current Architecture Status
+---
 
+## CRITICAL GAPS DISCOVERED (MUST FIX)
+
+### Gap 1: Routing Intelligence Missing
+
+**Problem:** Tasks have `routing_flag` but orchestrator doesn't make smart decisions
+
+**What Happened:**
+- Task T001 created with `routing_flag="web"`
+- No runner supports "web" routing
+- Task escalated after max retries
+
+**What Should Happen:**
+- Orchestrator or Council analyzes task requirements
+- Dashboard work requires codebase access → should route to "internal" (Kimi/GLM-5)
+- System auto-selects appropriate routing based on task analysis
+
+**Current Valid Routing Flags:** `internal`, `web`
+**Current Runners:** kimi-cli, opencode (both CLI with codebase), courier (browser, no codebase)
+
+### Gap 2: Available Agent Awareness
+
+**Problem:** Orchestrator doesn't know which agents are actually available
+
+**What Happened:**
+- Kimi quota exceeded mid-test
+- Orchestrator kept trying to route to unavailable agents
+- Should have known only GLM-5 was available
+
+**What Should Happen:**
+- Orchestrator tracks agent availability (quota status, online/offline)
+- Routes only to available agents
+- Council/orchestrator considers "who's available" before routing
+
+### Gap 3: Multiple Parallel Tasks
+
+**Problem:** 17 available tasks in queue, orchestrator processing one at a time
+
+**What Should Happen:**
+- Orchestrator dispatches multiple tasks in parallel
+- Respects max_workers config
+- Handles old tasks + new tasks added dynamically
+
+### Gap 4: Planner Plan Parsing
+
+**Problem:** "Could not parse plan from LLM response"
+
+**What Happened:**
+- Planner (via kimi-cli) returned unparseable response
+- Idea processing failed repeatedly
+
+**What Should Happen:**
+- Robust plan parsing with validation
+- Fallback/retry with different model if parsing fails
+- Better error handling
+
+---
+
+## WHAT NEEDS BUILDING (Priority Order)
+
+### 1. Smart Routing Intelligence (CRITICAL)
+**Owner:** GLM-5 or Kimi (needs coordination)
+
+**Tasks:**
+- [ ] Orchestrator analyzes task before routing
+- [ ] Detects: needs codebase? needs browser? simple API?
+- [ ] Maps task type → appropriate routing_flag
+- [ ] Council catches bad routing decisions
+
+**Example Logic:**
 ```
-Agent Role (Vehicle) → Orchestrator assigns LLM (Fuel) → Task Execution
+Task: "Edit React component in dashboard"
+Analysis: Requires codebase access, file editing
+Decision: route to "internal" (Kimi or GLM-5 with codebase)
+
+Task: "Research competitor pricing"
+Analysis: Needs web browsing, no codebase
+Decision: route to "courier" or "web"
 ```
+
+### 2. Agent Availability Tracking
+**Owner:** GLM-5
+
+**Tasks:**
+- [ ] Track each agent's quota status
+- [ ] Track online/offline status
+- [ ] Only route to available agents
+- [ ] Alert when no agents available
+
+### 3. Parallel Task Dispatch
+**Owner:** GLM-5
+
+**Tasks:**
+- [ ] Verify max_workers respected
+- [ ] Multiple tasks dispatch simultaneously
+- [ ] Track each independently
+
+### 4. Robust Plan Parsing
+**Owner:** TBD
+
+**Tasks:**
+- [ ] Validate LLM response before accepting
+- [ ] Fallback to different model if parse fails
+- [ ] Better error messages
+
+### 5. Council Routing Review
+**Owner:** Kimi (front-end) + GLM-5 (back-end coordination)
+
+**Tasks:**
+- [ ] Council reviews routing decisions
+- [ ] Catches "web" routing for codebase tasks
+- [ ] Can veto and reroute
+
+---
+
+## CURRENT SYSTEM STATE
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Consultant | ✅ Routes through orchestrator | Fixed in base.py |
-| Planner | ✅ Fixed - now routes through orchestrator | No longer bypasses |
-| Council | ✅ Fixed - uses actual plan path | Reviews real Plan files |
-| Agent Base | ✅ Fixed - no hardcoded APIs | Uses orchestrator routing |
-
-## Next: GLM-5 Back-End Fixes
-
-**GLM-5 owns:**
-- Supervisor (review flow, approval triggers)
-- Maintenance (git lifecycle wiring)
-- Status transitions (mapping all state changes)
-- Executioner integration
-- Orchestrator flow verification
+| Orchestrator | ✅ Running | systemd service, polling every 2s |
+| Consultant | ✅ Wired | Routes through orchestrator |
+| Planner | ⚠️ Partial | Routes through orchestrator but parsing fails |
+| Council | ⚠️ Simplified | Placeholder, not full implementation |
+| Supervisor | ✅ Wired | approve_plan_and_create_tasks works |
+| Maintenance | ✅ Wired | Integrated in _tick() |
+| Executioner | ✅ Exists | Wired but not tested |
+| Runner Pool | ⚠️ Gaps | No smart routing, no availability tracking |
 
 ---
 
-**Last Updated:** 2026-02-20 22:10 UTC
+## TEST TASK STATUS
+
+**Task T001:** Change brand name in MissionHeader
+- Status: `escalated` (failed after max retries)
+- Issue: Bad routing_flag, no available runner
+- Fix: Updated routing_flag to "internal"
+- Next: Reset and retry after smart routing built
 
 ---
 
-# SESSION 19 SUMMARY (2026-02-20)
+## TOMORROW'S SESSION
 
-## What We Built
-
-### 1. Terminal Crash Root Cause ✅ (Kimi)
-- **Problem:** 16 zombie opencode processes consuming 3-4GB RAM, swap at 90%
-- **Fix:** Killed zombies, freed 2.6GB RAM, swap now at 15%
-- **Prevention:** Hourly auto-cleanup via cron, tmux for persistent sessions
-
-### 2. Real-Time Agent Communication ✅ (GLM-5 + Kimi)
-- `start_session.sh` - Supabase messages PRIMARY, --listen flag
-- `scripts/notify_done.sh` - Task completion notification
-- `scripts/listen_for_messages.py` - Background message listener
-- `agent_messages` table - GLM-Kimi coordination channel
-
-### 3. Wiring Tests Complete ✅ (Kimi)
-- **26/26 tests passing**
-- Git commands (approve_task, final_merge) verified
-- Executioner (testing tasks) verified
-- Council callback injection verified
-
-### 4. Vibes Interface Phase 1 ✅ (GLM-5)
-- **Frontend:** VibesChatPanel component, interactive vibes-orb with "Text me"
-- **Backend:** vibes_query RPC, vibes_conversations table
-- **Branch:** `feature/vibes-chat-panel` in vibeflow repo
-- **Status:** WORKING - click Vibes → chat opens → type question → get response
-
-## Commands for Real-Time Coordination
-```bash
-# Session start with real-time notifications
-./start_session.sh glm-5 --listen
-
-# After completing work
-./scripts/notify_done.sh glm-5 "Task description"
-
-# Check messages anytime
-python3 scripts/check_agent_mail.py glm-5
-
-# Background listener
-python3 scripts/listen_for_messages.py glm-5 &
-
-# Persistent sessions (tmux) - PREVENTS TERMINAL CRASHES
-~/vibepilot/scripts/agent_sessions.sh status     # View all sessions
-~/vibepilot/scripts/agent_sessions.sh start kimi # Start Kimi in tmux
-~/vibepilot/scripts/agent_sessions.sh attach opencode  # Attach to GLM
-~/vibepilot/scripts/agent_sessions.sh kill-all   # Cleanup zombies
-```
-
-## Files Modified
-- `start_session.sh` - Supabase messages PRIMARY, --listen flag
-- `scripts/notify_done.sh` - Task completion notification
-- `scripts/listen_for_messages.py` - Background message listener
-- `scripts/agent_sessions.sh` - tmux session manager (Kimi)
-- `scripts/start_agent_session.sh` - session starter (Kimi)
-- `tests/wiring/test_git_commands_wired.py` - Git wiring tests (Kimi)
-- `tests/wiring/test_executioner_wired.py` - Executioner tests (Kimi)
-- `tests/wiring/test_council_callback.py` - Council tests (Kimi)
-
-## 5. Entry Layer Wiring ✅ (GLM-5) - NEW
-
-**Commit:** `50545e23` - "Feat: Wire entry layer - add Consultant + Planner to orchestrator"
-
-**What was built:**
-- `core/orchestrator.py` now has `process_idea()` method
-- Flow: Human idea → Consultant → PRD → Planner → Tasks → Supabase (pending)
-- Agents were already complete, now wired into running orchestrator
-
-**Next:** Connect Vibes chat panel to call `process_idea()`
-
-## Next: Vibes Interface Phase 2
-- Connect Vibes chat to orchestrator's `process_idea()`
-- Enhance vibes_query() with real data (ROI, tasks, projects)
-- Add voice interface (Web Speech API)
-- Proactive notifications
-
----
-
-# SESSION 18 SUMMARY (2026-02-20)
-
-## What We Fixed
-
-### 1. Command Queue RLS ✅
-- Added `SUPABASE_SERVICE_KEY` to vault
-- Updated `agents/maintenance.py` and `agents/supervisor.py` to use service key
-- Fixed `claim_next_command` RPC to return `cmd_status` (was ambiguous with PL/pgSQL)
-
-### 2. All Integration Tests Passing ✅
-```
-RESULTS: 8 passed, 0 failed
-```
-
-### 3. Orchestrator as Systemd Service ✅
-- Installed `vibepilot-orchestrator.service`
-- Enabled on boot
-- Running and polling task queue
-
-## Files Modified
-- `agents/maintenance.py` - Service key support
-- `agents/supervisor.py` - Service key support
-- `tests/test_full_flow.py` - Service key support, cmd_status check
-- `docs/supabase-schema/014_maintenance_commands.sql` - RPC return type note
-- `docs/supabase-schema/015_fix_claim_rpc_return_status.sql` - Migration to fix RPC
-
----
-
-# SESSION 15 SUMMARY (2026-02-18/19)
-
-## What We Fixed
-
-### 1. Dependencies Column: UUID[] → JSONB ✅
-
-**Problem:** RPC functions expected JSONB but column was UUID[]. Functions crashed with operator errors.
-
-**Solution:**
-- Ran 13 SQL migrations (005-013)
-- Migrated `dependencies` column to JSONB
-- Fixed all 5 RPC functions
-
-**Files Created:**
-```
-docs/supabase-schema/
-├── 005_dependencies_jsonb.sql      - Main migration
-├── 006_fix_dependencies_data.sql   - Data cleanup attempt
-├── 007_fix_deps_v2.sql             - Another cleanup attempt
-├── 008_fix_rpc_strip_quotes.sql    - RPC fix for double-quoted UUIDs
-├── 009_fix_claim_next_task.sql     - Fix duplicate functions
-├── 010_check_duplicates.sql        - Diagnostic query
-├── 011_nuclear_claim_next_task.sql - Force drop all versions
-├── 012_find_claim_signatures.sql   - Find exact signatures
-└── 013_fix_claim_final.sql         - Final fix (3-arg + 4-arg drop)
-```
-
-### 2. All RPC Functions Working ✅
-
-| Function | Status | Notes |
-|----------|--------|-------|
-| `check_dependencies_complete` | ✅ Working | Returns boolean |
-| `unlock_dependent_tasks` | ✅ Working | Returns unlocked task IDs |
-| `get_available_tasks` | ✅ Working | 8 rows returned |
-| `claim_next_task` | ✅ Working | Claims task atomically |
-| `get_available_for_routing` | ✅ Working | 7 rows returned |
-
-### 3. Task Flow Operational ✅
-
-```
-pending → approve_plan() → locked (has deps) or available (no deps)
-                              ↓
-                    parent merges → unlock fires → available
-                              ↓
-                    claim_next_task → in_progress → review → merged
-```
-
-### 4. Dashboard Fixes ✅
-
-- Token data cleaned (24K → 1.4K, removed hardcoded test values)
-- CSS model line cutoff fixed
-- ROI panel collapsible sections working
-
-### 5. Agent Coordination ✅
-
-- Created `AGENT_CHAT.md` for GLM-Kimi communication
-- Created `inbox/` system for task delegation
-- Kimi (research) and GLM-5 (code) roles defined
-- Session tracking in `ACTIVE_SESSIONS.md`
-
----
-
-## What We Created
-
-| File | Purpose |
-|------|---------|
-| `run_orchestrator.py` | Service entry point for orchestrator |
-| `scripts/vibepilot-orchestrator.service` | systemd unit file |
-| `scripts/cleanup_task_runs.py` | Fix bad token data |
-| `AGENT_CHAT.md` | GLM-Kimi communication channel |
-| `inbox/README.md` | Inbox system documentation |
-| `inbox/kimi/*.md` | Tasks for Kimi |
-| `inbox/glm-5/*.md` | Tasks for GLM-5 |
-
----
-
-## What's Left
-
-| Priority | Task | Notes |
-|----------|------|-------|
-| 1 | ~~Orchestrator as systemd service~~ | ✅ DONE - Running, enabled on boot |
-| 2 | Council implementation | Currently placeholder |
-| 3 | Executioner connection | Tests don't run after review |
-| 4 | First autonomous task flow | Ready to test |
-| 5 | Data cleanup | Old test tasks still in DB |
-
----
-
-# WHAT IS VIBEPILOT
-
-Sovereign AI execution engine. Human provides idea → VibePilot executes with zero drift.
-
-**Core Principles (see docs/core_philosophy.md):**
-- Zero vendor lock-in - everything swappable
-- Modular & swappable - change one thing, nothing else breaks
-- Exit ready - pack up, hand over to anyone
-- Reversible - if it can't be undone, it can't be done
-- Always improving - new ideas evaluated daily
-
-**The Vision:**
-```
-User → "Hey Vibes, I want feature X" → Vibes triggers pipeline
-                                              ↓
-                              Consultant → PRD → Planner → Tasks
-                                              ↓
-                              Supervisor reviews → Council vets → Approves
-                                              ↓
-                              Tasks become "available" → Orchestrator picks up
-                                              ↓
-                              Routes to best available runner → Executes → Learns
-```
-
-**Vibes** = The conversational interface. User talks to Vibes like talking to me now. Vibes IS the system.
+1. **Reset test tasks** - Clean state
+2. **Build smart routing** - Analyze task → pick right runner
+3. **Build agent availability tracking** - Know who's online
+4. **Retry pipeline test** - Verify end-to-end
 
 ---
 
@@ -299,15 +202,12 @@ User → "Hey Vibes, I want feature X" → Vibes triggers pipeline
 
 | Model ID | Status | Access Via | Notes |
 |----------|--------|------------|-------|
-| kimi-cli | active | kimi-cli (subscription) | 7 days left at $0.99 |
-| kimi-internal | active | kimi-cli | Same as above |
-| kimi-k2.5 | active | kimi-cli | Unbenched - the actual Kimi model |
+| kimi-cli | quota_exceeded | kimi-cli | Was active, now paused |
+| glm-5 / opencode | active | opencode CLI | Only available agent |
 | gemini-api | paused | API | quota_exhausted |
-| gemini-2.0-flash | paused | API | quota_exhausted |
 | deepseek-chat | paused | API | credit_needed |
-| gpt-4o, gpt-4o-mini | benched | N/A | Web platform only, no API key |
-| claude-sonnet-4-5, claude-haiku-4-5 | benched | N/A | Web platform only, no API key |
-| opencode, glm-5 | benched | N/A | Tool, not a model |
+| gpt-4o, gpt-4o-mini | benched | N/A | Web platform only |
+| claude-sonnet-4-5, claude-haiku-4-5 | benched | N/A | Web platform only |
 
 ---
 
@@ -324,12 +224,9 @@ pending ──► approve_plan() ──┬──► available (no deps) ──�
                                    available ──► in_progress
 ```
 
-**Full status lifecycle per PRD:**
+**Full status lifecycle:**
 ```
-pending → available → in_progress → review → testing → approved → merged
-     ↑            │          │         │           │
-     └────────────┴──────────┴─────────┴───────────┘
-                  (loops back on failure)
+pending → available → in_progress → review → testing → approved → merged (FINAL)
 
 Special states:
 - locked: Awaiting dependencies
@@ -339,117 +236,42 @@ Special states:
 
 ---
 
-# NEXT STEPS (In Order)
-
-## 1. Orchestrator as systemd Service ✅ DONE
-
-**Status:** Installed, running, enabled on boot
-
-**Commands:**
-```bash
-sudo systemctl status vibepilot-orchestrator  # Check status
-sudo systemctl stop vibepilot-orchestrator    # Stop
-sudo systemctl restart vibepilot-orchestrator # Restart
-journalctl -u vibepilot-orchestrator -f       # View logs
-```
-
-## 2. First Autonomous Task Flow (READY TO TEST)
-
-**Status:** Infrastructure complete, ready for first real task
-
-**What to test:**
-- Create a real task via dashboard
-- Watch orchestrator pick it up
-- Runner executes
-- Supervisor reviews
-- Maintenance commits
-
-## 3. Full Council Implementation (NOT IMPLEMENTED)
-
-**Status:** Simplified placeholder only
-
-**Current:** `call_council()` does basic checks, auto-approves
-
-**Needed:**
-- 3 independent model reviews (different models, different hats)
-- User Alignment hat
-- Architecture hat
-- Feasibility hat
-- Iterative consensus (up to 4 rounds)
-- Real voting mechanism
-
-## 3. Executioner Connection (NOT IMPLEMENTED)
-
-**Status:** Executioner agent exists but not wired
-
-**Needed:**
-- After supervisor review passes → route to Executioner
-- Run tests → update task with results
-- Pass/fail → appropriate status transition
-
-## 4. Data Cleanup (PARTIAL)
-
-**Token Issues:** ✅ Fixed - cleaned bad test data
-
-**Tasks to Clean Up:**
-- Old test tasks with status issues
-- Duplicate task_runs from infinite retry bug (fixed now)
-- Tasks stuck in invalid states
-
----
-
-# AGENT COORDINATION
-
-## GLM-5 + Kimi Communication
-
-**Primary Channel:** `AGENT_CHAT.md` - Check at session start
-
-**Inbox System:**
-- `inbox/kimi/` - Tasks for Kimi (research)
-- `inbox/glm-5/` - Tasks for GLM-5 (code)
-
-**Branch Ownership:**
-| Agent | Branch | Focus |
-|-------|--------|-------|
-| kimi | research-considerations | Research, docs, analysis |
-| glm-5 | main | Core orchestration, infrastructure |
-
-**Session Tracking:** `ACTIVE_SESSIONS.md`
-
----
-
-# VIBEFLOW DASHBOARD
-
-**Live Dashboard:** https://vibeflow-dashboard.vercel.app/
-**GitHub Repo:** https://github.com/VibesTribe/vibeflow
-
-**Git Rules:**
-- Dashboard/UI → Feature branch, human approves → merge
-- Backend → Less risky, can go direct
-- **Never push dashboard to main without human approval**
-
----
-
 # QUICK COMMANDS
 
 | Command | Action |
 |---------|--------|
 | `cat CURRENT_STATE.md` | This file |
-| `cat CHANGELOG.md` | Full history |
 | `cat AGENT_CHAT.md` | GLM-Kimi chat |
-| `./check_chat.sh` | Check for new messages |
-| `git log --oneline -5` | Recent commits |
-| `cd ~/vibepilot && git checkout main && git pull` | Get latest |
+| `git log --oneline -10` | Recent commits |
+| `sudo journalctl -u vibepilot-orchestrator -f` | Orchestrator logs |
+| `python -c "from agents.supervisor import SupervisorAgent; s=SupervisorAgent(); print(s.approve_plan_and_create_tasks('docs/plans/plan.json'))"` | Create tasks from plan |
+
+---
+
+# FILES MODIFIED THIS SESSION
+
+| File | Change | Commit |
+|------|--------|--------|
+| `core/orchestrator.py` | Added `_process_maintenance_commands()` | `9f7b1ae2` |
+| `agents/maintenance.py` | Added `execute()` method | `9f7b1ae2` |
+| `agents/supervisor.py` | Added `approve_plan_and_create_tasks()` | `e44ce394` |
+| `agents/supervisor.py` | Added `set_orchestrator()` | `01ac0b1c` |
+| `prompts/consultant.md` | Added ZERO ASSUMPTIONS RULE | Session 19 |
+| `docs/plans/vibeflow-test-plan.json` | Test plan created | `5f91245f` |
 
 ---
 
 # KIMI USAGE PRIORITY
 
-**Kimi subscription: 7 days left at $0.99, then $19/mo**
+**Kimi subscription: Currently quota exceeded**
 
-Use Kimi for:
+Use Kimi for (when available):
 - Research tasks (web access)
-- Parallel sub-agent tasks (up to 100)
+- Parallel sub-agent tasks
 - Any task requiring browser/vision/multimodal
+- Front-end pipeline work
 
-Maximize usage before renewal decision.
+GLM-5 handles:
+- Back-end infrastructure
+- Code wiring
+- Core orchestration
