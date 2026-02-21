@@ -518,12 +518,18 @@ class SupervisorAgent:
             "task_count": len(pending_tasks),
         }
 
-    def call_council(self, project_id: str, plan_summary: str = None) -> Dict:
+    def call_council(self, project_id: str, plan_path: str = None, plan_summary: str = None) -> Dict:
         """
         Call Council to review the plan.
 
         If council_callback is set (by orchestrator), uses real multi-model review.
         Otherwise, falls back to simplified placeholder check.
+
+        Args:
+            project_id: Project identifier
+            plan_path: Path to Plan file in GitHub (e.g., docs/plans/{slug}-plan.md).
+                      If not provided, will attempt to look up from vibes_ideas table.
+            plan_summary: Optional summary of the plan for context
 
         Returns:
             {"approved": bool, "concerns": [...], "rounds": int}
@@ -537,13 +543,30 @@ class SupervisorAgent:
                 "message": "No pending tasks to review",
             }
 
+        # Determine actual plan path
+        actual_plan_path = plan_path
+        if not actual_plan_path and project_id:
+            # Try to look up plan_path from vibes_ideas table
+            try:
+                result = db.table("vibes_ideas").select("plan_path").eq("project_id", project_id).execute()
+                if result.data and result.data[0].get("plan_path"):
+                    actual_plan_path = result.data[0]["plan_path"]
+                    self.logger.info(f"Found plan_path from vibes_ideas: {actual_plan_path}")
+            except Exception as e:
+                self.logger.warning(f"Could not look up plan_path: {e}")
+        
+        # Fallback to constructed path if still not found
+        if not actual_plan_path:
+            actual_plan_path = f"docs/plans/{project_id}-plan.md"
+            self.logger.warning(f"Using constructed plan_path: {actual_plan_path}")
+
         if self.council_callback:
             try:
                 self.logger.info(
-                    f"Calling real Council review for {len(pending)} tasks"
+                    f"Calling real Council review for {len(pending)} tasks using plan: {actual_plan_path}"
                 )
                 return self.council_callback(
-                    doc_path=f"projects/{project_id}/plan.md",
+                    doc_path=actual_plan_path,
                     lenses=["user_alignment", "architecture", "feasibility"],
                     context_type="plan",
                 )
