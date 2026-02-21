@@ -734,7 +734,7 @@ class ConcurrentOrchestrator:
 
         self.consultant = ConsultantAgent()
         self.consultant.set_orchestrator(self)  # Wire orchestrator reference
-        
+
         self.planner = PlannerAgent()
         self.planner.set_orchestrator(self)  # Wire orchestrator reference
 
@@ -881,6 +881,8 @@ class ConcurrentOrchestrator:
 
         self._process_pending_ideas()
 
+        self._process_maintenance_commands()
+
         unlocked = self.dependency_manager.unlock_ready_tasks()
         if unlocked:
             self.logger.info(f"Unlocked {len(unlocked)} tasks")
@@ -905,6 +907,60 @@ class ConcurrentOrchestrator:
 
         for task in tasks:
             self._dispatch_task(task)
+
+    def _process_maintenance_commands(self, max_commands: int = 5):
+        """Process pending maintenance commands (git operations, system updates)."""
+        from agents.maintenance import MaintenanceAgent
+
+        try:
+            maintenance = MaintenanceAgent()
+            processed = 0
+
+            while processed < max_commands:
+                result = db.rpc(
+                    "claim_next_command", {"p_agent_id": "orchestrator"}
+                ).execute()
+
+                if not result.data:
+                    break
+
+                command = result.data[0]
+                command_id = command["command_id"]
+                command_type = command["command_type"]
+                payload = command["payload"]
+
+                self.logger.info(f"Processing maintenance command: {command_type}")
+
+                exec_result = maintenance.execute({"action": command_type, **payload})
+
+                if exec_result.success:
+                    db.table("maintenance_commands").update(
+                        {
+                            "status": "completed",
+                            "result": exec_result.output,
+                            "completed_at": datetime.utcnow().isoformat(),
+                        }
+                    ).eq("id", command_id).execute()
+                    self.logger.info(f"✅ Maintenance command {command_type} completed")
+                else:
+                    db.table("maintenance_commands").update(
+                        {
+                            "status": "failed",
+                            "result": {"error": exec_result.error},
+                            "completed_at": datetime.utcnow().isoformat(),
+                        }
+                    ).eq("id", command_id).execute()
+                    self.logger.warning(
+                        f"❌ Maintenance command {command_type} failed: {exec_result.error}"
+                    )
+
+                processed += 1
+
+            if processed > 0:
+                self.logger.info(f"Processed {processed} maintenance commands")
+
+        except Exception as e:
+            self.logger.error(f"Error processing maintenance commands: {e}")
 
     def _process_pending_ideas(self):
         """Process pending ideas from Vibes panel."""
@@ -1813,17 +1869,17 @@ class ConcurrentOrchestrator:
         # Iterative deliberation
         all_reviews = {}  # model_id -> List[review_dict] per round
         deliberation_history = []
-        
+
         for round_num in range(1, max_rounds + 1):
             self.logger.info(f"Council deliberation round {round_num}/{max_rounds}")
-            
+
             # Build context with previous rounds' feedback (for rounds > 1)
             previous_feedback = None
             if round_num > 1:
                 previous_feedback = self._compile_deliberation_feedback(
                     all_reviews, round_num - 1
                 )
-            
+
             # Execute reviews in parallel for this round
             round_reviews = {}
             with ThreadPoolExecutor(max_workers=len(model_assignments)) as executor:
@@ -1847,7 +1903,9 @@ class ConcurrentOrchestrator:
                         result = future.result()
                         round_reviews[model_id] = result
                     except Exception as e:
-                        self.logger.error(f"Council review failed for {model_id} round {round_num}: {e}")
+                        self.logger.error(
+                            f"Council review failed for {model_id} round {round_num}: {e}"
+                        )
                         round_reviews[model_id] = {
                             "error": str(e),
                             "vote": "abstain",
@@ -1865,7 +1923,7 @@ class ConcurrentOrchestrator:
             aggregation = self._aggregate_council_reviews(round_reviews, lenses)
             aggregation["round"] = round_num
             deliberation_history.append(aggregation)
-            
+
             self.logger.info(
                 f"Round {round_num} result: {aggregation['consensus']} "
                 f"({aggregation['votes']['approve']} approve, "
@@ -1879,23 +1937,31 @@ class ConcurrentOrchestrator:
                 break
             elif aggregation["consensus"] == "majority" and round_num >= 2:
                 # Strong majority after 2+ rounds is sufficient
-                self.logger.info(f"Strong majority consensus reached in round {round_num}")
+                self.logger.info(
+                    f"Strong majority consensus reached in round {round_num}"
+                )
                 break
             elif round_num == max_rounds:
                 # Final round, use whatever we have
-                self.logger.info(f"Max rounds reached ({max_rounds}), using final aggregation")
+                self.logger.info(
+                    f"Max rounds reached ({max_rounds}), using final aggregation"
+                )
                 break
             else:
                 # Continue to next round with feedback
-                self.logger.info(f"No strong consensus yet, continuing to round {round_num + 1}")
+                self.logger.info(
+                    f"No strong consensus yet, continuing to round {round_num + 1}"
+                )
 
         # Final aggregation using last round's reviews
-        final_reviews = {model_id: reviews[-1] for model_id, reviews in all_reviews.items()}
+        final_reviews = {
+            model_id: reviews[-1] for model_id, reviews in all_reviews.items()
+        }
         final_result = self._aggregate_council_reviews(final_reviews, lenses)
         final_result["rounds"] = len(deliberation_history)
         final_result["deliberation_history"] = deliberation_history
         final_result["all_reviews"] = all_reviews
-        
+
         return final_result
 
     def _compile_deliberation_feedback(self, all_reviews: Dict, last_round: int) -> str:
@@ -1911,7 +1977,7 @@ Summary of previous round reviews:
                 vote = review.get("vote", "abstain")
                 concerns = review.get("concerns", [])
                 recommendations = review.get("recommendations", [])
-                
+
                 feedback += f"\n{model_id}:"
                 feedback += f"\n  Vote: {vote}"
                 if concerns:
@@ -1919,7 +1985,7 @@ Summary of previous round reviews:
                 if recommendations:
                     feedback += f"\n  Recommendations: {'; '.join(recommendations[:3])}"
                 feedback += "\n"
-        
+
         feedback += """
 --- YOUR TASK ---
 
@@ -1979,8 +2045,13 @@ Provide your updated review below.
         return assignments
 
     def _execute_council_review(
-        self, model_id: str, doc_path: str, lenses: List[str], context_type: str,
-        previous_feedback: str = None, round_num: int = 1
+        self,
+        model_id: str,
+        doc_path: str,
+        lenses: List[str],
+        context_type: str,
+        previous_feedback: str = None,
+        round_num: int = 1,
     ) -> Dict:
         """Execute council review with a specific model."""
         # Read the document
@@ -2050,7 +2121,9 @@ This is the first round of deliberation.
 """
 
         # Dispatch to model via runner
-        self.logger.info(f"Dispatching council review to {model_id} for lenses: {lenses}")
+        self.logger.info(
+            f"Dispatching council review to {model_id} for lenses: {lenses}"
+        )
 
         try:
             # Get runner info from pool
@@ -2097,12 +2170,17 @@ This is the first round of deliberation.
 
             # Execute via contract runner
             from runners.contract_runners import get_runner
+
             runner = get_runner(runner_type)
             result = runner.execute(task_packet)
 
             if result.get("status") != "success":
                 errors = result.get("errors", [])
-                error_msg = errors[0].get("message", "Unknown error") if errors else "Runner failed"
+                error_msg = (
+                    errors[0].get("message", "Unknown error")
+                    if errors
+                    else "Runner failed"
+                )
                 self.logger.error(f"Council review failed for {model_id}: {error_msg}")
                 return {
                     "model_id": model_id,
@@ -2145,21 +2223,24 @@ This is the first round of deliberation.
 
     def _parse_council_response(self, response: str, lenses: List[str]) -> Dict:
         """Parse council review response to extract structured data.
-        
+
         Expected format in response:
         - Vote: approve / needs_changes / reject
         - Concerns: list of concerns
         - Recommendations: list of recommendations
         """
         response_lower = response.lower()
-        
+
         # Determine vote
         vote = "abstain"
         if "vote: approve" in response_lower or "vote:approve" in response_lower:
             vote = "approve"
         elif "vote: reject" in response_lower or "vote:reject" in response_lower:
             vote = "reject"
-        elif "vote: needs_changes" in response_lower or "vote:needs_changes" in response_lower:
+        elif (
+            "vote: needs_changes" in response_lower
+            or "vote:needs_changes" in response_lower
+        ):
             vote = "needs_changes"
         elif "approve" in response_lower and "reject" not in response_lower:
             vote = "approve"
@@ -2167,58 +2248,74 @@ This is the first round of deliberation.
             vote = "reject"
         elif "needs changes" in response_lower or "needs_changes" in response_lower:
             vote = "needs_changes"
-        
+
         # Extract concerns and recommendations
         concerns = []
         recommendations = []
-        
-        lines = response.split('\n')
+
+        lines = response.split("\n")
         current_section = None
-        
+
         for line in lines:
             line_stripped = line.strip()
             line_lower = line_stripped.lower()
-            
+
             # Section detection
-            if any(x in line_lower for x in ['concern:', 'concerns:', 'issues:', 'problems:']):
-                current_section = 'concerns'
+            if any(
+                x in line_lower
+                for x in ["concern:", "concerns:", "issues:", "problems:"]
+            ):
+                current_section = "concerns"
                 # Check if content on same line
-                content = line_stripped.split(':', 1)[1].strip()
-                if content and not content.startswith('http'):
+                content = line_stripped.split(":", 1)[1].strip()
+                if content and not content.startswith("http"):
                     concerns.append(content)
                 continue
-            elif any(x in line_lower for x in ['recommendation:', 'recommendations:', 'suggestions:']):
-                current_section = 'recommendations'
-                content = line_stripped.split(':', 1)[1].strip()
-                if content and not content.startswith('http'):
+            elif any(
+                x in line_lower
+                for x in ["recommendation:", "recommendations:", "suggestions:"]
+            ):
+                current_section = "recommendations"
+                content = line_stripped.split(":", 1)[1].strip()
+                if content and not content.startswith("http"):
                     recommendations.append(content)
                 continue
-            
+
             # Content collection
-            if line_stripped.startswith('- ') or line_stripped.startswith('* '):
+            if line_stripped.startswith("- ") or line_stripped.startswith("* "):
                 content = line_stripped[2:].strip()
-                if content and not content.lower().startswith('vote:'):
-                    if current_section == 'concerns':
+                if content and not content.lower().startswith("vote:"):
+                    if current_section == "concerns":
                         concerns.append(content)
-                    elif current_section == 'recommendations':
+                    elif current_section == "recommendations":
                         recommendations.append(content)
-            elif line_stripped and current_section and not line_stripped.lower().startswith('vote:'):
+            elif (
+                line_stripped
+                and current_section
+                and not line_stripped.lower().startswith("vote:")
+            ):
                 # Continuation or new item without bullet
-                if current_section == 'concerns':
+                if current_section == "concerns":
                     concerns.append(line_stripped)
-                elif current_section == 'recommendations':
+                elif current_section == "recommendations":
                     recommendations.append(line_stripped)
-        
+
         # If no explicit sections found, do basic extraction
         if not concerns and not recommendations:
-            sentences = response.split('.')
+            sentences = response.split(".")
             for sent in sentences:
                 sent = sent.strip()
-                if any(word in sent.lower() for word in ['concern', 'issue', 'problem', 'risk', 'warning']):
+                if any(
+                    word in sent.lower()
+                    for word in ["concern", "issue", "problem", "risk", "warning"]
+                ):
                     concerns.append(sent)
-                elif any(word in sent.lower() for word in ['recommend', 'suggest', 'improve', 'consider']):
+                elif any(
+                    word in sent.lower()
+                    for word in ["recommend", "suggest", "improve", "consider"]
+                ):
                     recommendations.append(sent)
-        
+
         return {
             "vote": vote,
             "concerns": concerns[:5],  # Limit to top 5
@@ -2452,19 +2549,19 @@ This is the first round of deliberation.
     ) -> Dict:
         """
         Route an agent's LLM call through the orchestrator's runner pool.
-        
+
         This replaces hardcoded API calls in agents with proper routing that:
         - Selects best available model based on agent role
         - Respects rate limits and cooldowns
         - Tracks tokens and performance
         - Provides fallback if primary model fails
-        
+
         Args:
             agent_role: Role of the agent (consultant, planner, supervisor, etc.)
             prompt: The prompt to send to the LLM
             max_tokens: Maximum tokens to generate
             timeout: Timeout in seconds
-            
+
         Returns:
             {
                 "success": bool,
@@ -2475,11 +2572,11 @@ This is the first round of deliberation.
             }
         """
         self.logger.info(f"Routing LLM call for agent_role={agent_role}")
-        
+
         # Determine routing flag based on agent role
         # Internal infrastructure roles need reliable CLI/API access
         routing_flag = "internal"  # Default to internal (Q-tier)
-        
+
         # Map agent roles to preferred model capabilities
         role_preferences = {
             "consultant": ["kimi-k2.5", "glm-5"],
@@ -2488,27 +2585,29 @@ This is the first round of deliberation.
             "council": ["kimi-k2.5", "glm-5", "deepseek-chat"],
             "maintenance": ["glm-5", "kimi-k2.5"],
         }
-        
+
         preferred_models = role_preferences.get(agent_role, ["kimi-k2.5", "glm-5"])
-        
+
         # Try preferred models first
         for model_id in preferred_models:
             if model_id not in self.runner_pool.runners:
                 continue
-                
+
             if not self.runner_pool.is_available(model_id):
                 self.logger.debug(f"Model {model_id} not available, trying next")
                 continue
-                
+
             if self.cooldown_manager.is_in_cooldown(model_id):
                 remaining = self.cooldown_manager.get_cooldown_remaining(model_id)
-                self.logger.debug(f"Model {model_id} in cooldown ({remaining}s remaining)")
+                self.logger.debug(
+                    f"Model {model_id} in cooldown ({remaining}s remaining)"
+                )
                 continue
-            
+
             # Found available model, execute task
             try:
                 self.logger.info(f"Routing to {model_id} for {agent_role}")
-                
+
                 # Create a minimal task packet
                 task_packet = {
                     "task_id": f"agent-{agent_role}-{int(time.time())}",
@@ -2519,21 +2618,21 @@ This is the first round of deliberation.
                         "timeout_seconds": timeout,
                     },
                 }
-                
+
                 # Use contract runners
                 from runners.contract_runners import get_runner
-                
+
                 runner_info = self.runner_pool.runners.get(model_id, {})
                 tool_id = runner_info.get("tool_id", model_id)
-                
+
                 runner = get_runner(tool_id)
                 result = runner.execute(task_packet)
-                
+
                 if result.get("status") == "success":
                     # Track usage
                     tokens = result.get("tokens_used", 0)
                     self.usage_tracker.record_usage(model_id, tokens)
-                    
+
                     return {
                         "success": True,
                         "output": result.get("output", ""),
@@ -2544,25 +2643,27 @@ This is the first round of deliberation.
                     error = result.get("error", "Unknown error")
                     self.logger.warning(f"Model {model_id} failed: {error}")
                     # Continue to try next model
-                    
+
             except Exception as e:
                 self.logger.error(f"Error calling {model_id}: {e}")
                 # Continue to try next model
-        
+
         # If all preferred models failed, try any available runner
-        self.logger.warning(f"All preferred models failed for {agent_role}, trying any available")
-        
+        self.logger.warning(
+            f"All preferred models failed for {agent_role}, trying any available"
+        )
+
         available = self.runner_pool.get_available()
         for runner_id in available:
             if self.cooldown_manager.is_in_cooldown(runner_id):
                 continue
-                
+
             try:
                 from runners.contract_runners import get_runner
-                
+
                 runner_info = self.runner_pool.runners.get(runner_id, {})
                 tool_id = runner_info.get("tool_id", runner_id)
-                
+
                 task_packet = {
                     "task_id": f"agent-{agent_role}-{int(time.time())}",
                     "prompt": prompt,
@@ -2572,25 +2673,25 @@ This is the first round of deliberation.
                         "timeout_seconds": timeout,
                     },
                 }
-                
+
                 runner = get_runner(tool_id)
                 result = runner.execute(task_packet)
-                
+
                 if result.get("status") == "success":
                     tokens = result.get("tokens_used", 0)
                     self.usage_tracker.record_usage(runner_id, tokens)
-                    
+
                     return {
                         "success": True,
                         "output": result.get("output", ""),
                         "model_used": runner_id,
                         "tokens_used": tokens,
                     }
-                    
+
             except Exception as e:
                 self.logger.error(f"Error calling {runner_id}: {e}")
                 continue
-        
+
         # No models available
         self.logger.error(f"No available models for {agent_role}")
         return {

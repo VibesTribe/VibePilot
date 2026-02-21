@@ -98,6 +98,50 @@ class MaintenanceAgent:
         self.running = False
         self.logger.info("Maintenance Agent stopped")
 
+    def execute(self, command: Dict[str, Any]):
+        """
+        Execute a single maintenance command.
+
+        Used by orchestrator to process commands inline instead of polling.
+
+        Args:
+            command: Dict with 'action' key and command-specific params
+
+        Returns:
+            AgentResult with success/failure
+        """
+        from agents.base import AgentResult
+
+        command_type = command.get("action")
+        if not command_type:
+            return AgentResult(success=False, output=None, error="Missing action")
+
+        payload = {k: v for k, v in command.items() if k != "action"}
+
+        if command_type == "create_branch":
+            result = self._execute_create_branch(payload)
+        elif command_type == "commit_code":
+            result = self._execute_commit_code(payload)
+        elif command_type == "commit_changes":
+            result = self._execute_commit_changes(payload)
+        elif command_type == "merge_branch":
+            result = self._execute_merge_branch(payload)
+        elif command_type == "delete_branch":
+            result = self._execute_delete_branch(payload)
+        elif command_type == "tag_release":
+            result = self._execute_tag_release(payload)
+        else:
+            result = {
+                "success": False,
+                "error": f"Unknown command type: {command_type}",
+            }
+
+        return AgentResult(
+            success=result.get("success", False),
+            output=result if result.get("success") else None,
+            error=result.get("error") if not result.get("success") else None,
+        )
+
     def _poll_and_execute(self):
         """Poll for next command and execute it."""
         try:
