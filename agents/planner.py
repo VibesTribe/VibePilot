@@ -105,19 +105,48 @@ Output valid JSON following the format in config/prompts/planner.md."""
 
     def _call_planner_llm(self, prompt: str, max_tokens: int = 8000) -> str:
         """
-        Call LLM for planning. Uses Kimi CLI (internal agent routing).
+        Call LLM for planning. Routes through orchestrator for model selection.
 
-        Per PRD: Internal agents (Planner, Supervisor, Council) use CLI subscriptions,
-        not API or web platforms.
+        Orchestrator assigns best available LLM based on:
+        - Current availability and cooldown status
+        - Task type (planning = needs high context, reasoning)
+        - Historical performance for planning tasks
+        - Rate limits and subscription status
+
+        Per PRD: Internal agents use orchestrator routing, not direct API calls.
         """
-        result = kimi_runner.execute_task(prompt=prompt, timeout=300, auto_approve=True)
-
-        if result["success"]:
-            return result["output"]
-        else:
-            raise Exception(
-                f"Kimi planning failed: {result.get('error', 'Unknown error')}"
+        # Route through orchestrator.run_agent_task() for proper LLM selection
+        # This allows the orchestrator to choose between Kimi, GLM-5, etc.
+        if self.orchestrator:
+            result = self.orchestrator.run_agent_task(
+                agent_role="planner",
+                prompt=prompt,
+                max_tokens=max_tokens,
+                timeout=300
             )
+            
+            if result.get("success"):
+                self.log(f"Planning completed using {result.get('model_used', 'unknown')}")
+                return result.get("output", "")
+            else:
+                error = result.get("error", "Unknown error")
+                self.log(f"Planning failed: {error}", level="error")
+                raise Exception(f"Planning failed: {error}")
+        else:
+            # Fallback: Use direct Kimi CLI only if orchestrator not wired
+            # This should not happen in production - orchestrator should always wire agents
+            self.log(
+                "WARNING: No orchestrator wired, using direct Kimi CLI fallback",
+                level="warning"
+            )
+            result = kimi_runner.execute_task(prompt=prompt, timeout=300, auto_approve=True)
+            
+            if result["success"]:
+                return result["output"]
+            else:
+                raise Exception(
+                    f"Kimi planning failed: {result.get('error', 'Unknown error')}"
+                )
 
     def execute(self, task: Dict[str, Any], write_to_db: bool = False) -> AgentResult:
         """
