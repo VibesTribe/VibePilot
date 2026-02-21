@@ -6642,3 +6642,91 @@ Missing:
 - Human: Confirm priority of remaining fixes
 
 ---
+
+### GLM-5 [2026-02-21 02:15] - COUNCIL WIRING ISSUE FOUND
+
+---
+
+## WHAT COUNCIL NEEDS
+
+**For Project Plan Review:**
+- Input: Path to Plan file (e.g., `docs/plans/vibepilot-rename-plan.md`)
+- Context: Plan content read from file
+- Lenses: User Alignment, Architecture, Feasibility
+- Trigger: Supervisor calls Council after Planner creates Plan
+
+**For System Improvement Review:**
+- Input: Path to `docs/UPDATE_CONSIDERATIONS.md` + core_philosophy.md
+- Context: System improvement content + VibePilot principles
+- Lenses: Architecture, Security, Integration, Reversibility, Principle Alignment
+- Trigger: System Researcher output
+
+---
+
+## THE BUG IN CURRENT CODE
+
+**orchestrator.py line 545-548:**
+```python
+return self.council_callback(
+    doc_path=f"projects/{project_id}/plan.md",  # ← WRONG PATH
+    lenses=["user_alignment", "architecture", "feasibility"],
+    context_type="plan",
+)
+```
+
+**This path doesn't exist.** The actual Plan is at `docs/plans/{slug}-plan.md`.
+
+**_execute_council_review line 1987-1989:**
+```python
+try:
+    with open(doc_path, "r") as f:  # ← Tries to read file
+        doc_content = f.read()
+except Exception as e:
+    return {"error": f"Failed to read document: {e}", ...}
+```
+
+**Result:** Council review FAILS because file not found.
+
+---
+
+## CORRECT FLOW
+
+**Project Plan:**
+```
+process_idea()
+  → Consultant creates PRD
+  → Planner creates Plan with tasks
+  → PRD saved: docs/prd/{slug}.md
+  → Plan saved: docs/plans/{slug}-plan.md
+  → Return: {plan_path: "docs/plans/{slug}-plan.md"}
+
+review_and_approve_plan(plan_path)
+  → route_council_review(doc_path=plan_path)  ← CORRECT PATH
+  → _execute_council_review reads file
+  → Council deliberates
+  → If approved: create_tasks_from_plan(plan_path)
+```
+
+**System Improvement:**
+```
+System Researcher creates docs/UPDATE_CONSIDERATIONS.md
+  ↓
+Supervisor triggers Council
+  ↓
+route_council_review(
+    doc_path="docs/UPDATE_CONSIDERATIONS.md",
+    context_type="system",
+    lenses=["architecture", "security", "integration", "reversibility", "principle_alignment"]
+)
+```
+
+---
+
+## FIX NEEDED
+
+1. **supervisor.call_council()** needs to receive the plan_path, not construct a fake one
+2. **_process_pending_plans()** should NOT call Council - it's redundant with review_and_approve_plan()
+3. **System improvement flow** needs to be wired separately
+
+---
+
