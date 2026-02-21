@@ -6418,3 +6418,96 @@ If unclear, check `docs/ARCHITECTURE_PRINCIPLES.md` (just committed).
 **Do not take shortcuts. Do not hardcode. Follow the architecture.**
 
 ---
+
+### GLM-5 [2026-02-21 00:50] - ASSESSMENT: My Changes vs Foundational Problem
+
+---
+
+## DID I BREAK 30 HOURS OF WORK?
+
+**No.** My changes are additive, not destructive.
+
+**What I added (commits f6c73804, e6dd67d1):**
+- `process_idea()` now saves PRD/Plan to GitHub (was returning text only)
+- `_process_pending_ideas()` polls vibes_ideas table (new method in _tick())
+- `create_tasks_from_plan()` extracts tasks from Plan file (new method)
+- `review_and_approve_plan()` combines Council + task creation (new method)
+
+**What I did NOT change:**
+- Kimi's Council implementation (untouched)
+- Runner pool logic (untouched)
+- _dispatch_task() logic (untouched)
+- _call_runner() logic (untouched)
+
+**Evidence:**
+```
+f6c73804: agents/planner.py (307 lines changed), core/orchestrator.py (269 added)
+e6dd67d1: core/orchestrator.py (420 lines), docs/supabase-schema/020 (new file)
+```
+
+---
+
+## THE FOUNDATIONAL PROBLEM (Existed Before My Session)
+
+**File:** `agents/base.py` (lines 10-11)
+```python
+DS_KEY = os.getenv("DEEPSEEK_KEY")  # ← HARDCODED
+DS_URL = "https://api.deepseek.com/v1/chat/completions"  # ← HARDCODED
+```
+
+**What this means:**
+- ConsultantAgent.call_llm() → DeepSeek directly
+- PlannerAgent.call_llm() → DeepSeek directly  
+- Supervisor calls → DeepSeek directly
+- **Bypasses orchestrator routing entirely**
+
+**This was NOT created by me.** It existed in commit 50545e23 (before my session).
+
+---
+
+## WHY TESTS FAIL
+
+```
+process_idea("Change vibeflow to vibepilot")
+    ↓
+ConsultantAgent.execute()
+    ↓
+self.call_llm(prompt)  # in base.py
+    ↓
+DEEPSEEK_KEY not configured → FAILS
+```
+
+Even if DeepSeek WAS configured, it would bypass the runner pool entirely.
+
+---
+
+## KIMI'S FIX PLAN (Ready to Implement)
+
+1. **Add `orchestrator.run_agent_task()`** - Routes agent LLM calls through runner pool
+2. **Modify `agents/base.py` `call_llm()`** - Use orchestrator routing, fallback to Kimi CLI
+3. **Wire orchestrator reference** - `self.consultant.orchestrator = self` in __init__
+
+**This fixes the foundational problem.**
+
+---
+
+## CURRENT STATE
+
+| Component | Status | Can Test? |
+|-----------|--------|-----------|
+| Orchestrator routing | ✅ Works | Yes |
+| Runner pool | ✅ Works | Yes |
+| Council implementation | ✅ Kimi built | Yes |
+| Executioner | ✅ Kimi verified | Yes |
+| process_idea() GitHub save | ✅ I added | No (blocked by agent routing) |
+| Agent LLM calls | ❌ Hardcoded DeepSeek | **MUST FIX FIRST** |
+
+---
+
+## I AM IN PLAN MODE
+
+**Not executing. Waiting for human confirmation to proceed with Kimi's fix.**
+
+**Human:** When you're ready, I will implement the fix exactly as Kimi specified. No shortcuts. No assumptions.
+
+---
