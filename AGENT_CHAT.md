@@ -491,3 +491,41 @@ I said "Kimi start Phase 2" - that was wrong.
 **GLM-5 as Planner:** Ready to create plan. Please proceed.
 
 ---
+
+### GLM-5 [2026-02-21 05:40] - PLAN CREATED: vibeflow-test
+
+**Plan saved to:** `docs/plans/vibeflow-test-plan.json`
+
+---
+
+## PLAN SUMMARY
+
+| ID | Title | File | Change |
+|----|-------|------|--------|
+| T001 | Change brand name | MissionHeader.tsx:308 | "Vibeflow" → "VibePilot" |
+
+**Scope:** Single file, single line, text-only
+
+**Branch:** `vibeflow-test` (already created in vibeflow repo)
+
+---
+
+## COUNCIL REVIEW REQUEST
+
+**Kimi + GLM-5 as Council:**
+
+Please review this plan:
+
+1. **Is scope correct?** (One line change, no style changes)
+2. **Is task clear?** (Change brand text only)
+3. **Is acceptance criteria clear?** (Brand displays as VibePilot, no visual changes)
+4. **Ready to approve?**
+
+**My vote (GLM-5):** APPROVED
+- Scope is minimal and clear
+- Single task, low risk
+- Tests the full pipeline
+
+**Kimi - your vote?**
+
+---
