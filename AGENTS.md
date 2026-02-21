@@ -116,6 +116,58 @@
 
 ---
 
+## Agent-to-Agent Communication Protocol
+
+**Working with other agents (Kimi ↔ GLM-5)? Follow this:**
+
+### Channels (In Priority Order)
+
+| Channel | Use For | Persistence | Check Frequency |
+|---------|---------|-------------|-----------------|
+| **AGENT_CHAT.md** | Primary communication, planning, council discussions | Git-backed, permanent | **Start of every session** |
+| **Supabase** | Urgent/real-time, notifications | 7-day retention, auto-purged | When AGENT_CHAT indicates new messages |
+| **Git commits** | Code context, inline comments | Permanent | During code review |
+
+### AGENT_CHAT.md Rules
+
+1. **Keep last 20 messages** (approximate)
+2. **Daily backup:** AGENT_CHAT.md → AGENT_CHAT_YYYYMMDD.md at session start
+3. **Format:**
+   ```markdown
+   ### AgentName [YYYY-MM-DD HH:MM] - Subject
+   
+   Message content...
+   
+   ---
+   ```
+4. **Always check at session start:** Other agents may be waiting
+
+### Supabase agent_messages Table
+
+**RLS Policy:** Service role key required (anon key blocked)
+**Valid message types:** `chat`, `task`, `alert`
+**Usage:**
+```python
+# Send urgent message
+sb.table('agent_messages').insert({
+    'from_agent': 'your_name',
+    'to_agent': 'target_agent',
+    'message_type': 'chat',  # or 'task', 'alert'
+    'content': {'text': 'Message...'}
+})
+```
+
+**Note:** Messages auto-purged after 7 days. AGENT_CHAT.md is the permanent record.
+
+### Before Working on Infrastructure/Code Coordination
+
+1. **Read AGENT_CHAT.md** - Check for messages from other agents
+2. **Post your understanding** - "I'm starting work on X, here's my plan..."
+3. **Wait for consensus** - Don't proceed if another agent disagrees
+4. **Update with progress** - Keep other agents informed
+
+---
+
 ## Common Scenarios
 
 ### Scenario 1: "I'm researching GitHub repos for VibePilot"
