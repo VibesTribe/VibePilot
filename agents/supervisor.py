@@ -762,7 +762,7 @@ class SupervisorAgent:
                 "task_number": task_number,
                 "title": task.get("title", "Untitled task"),
                 "type": task.get("type", "feature"),
-                "priority": task.get("priority", 5),
+                "priority": max(1, min(task.get("priority", 5), 5)),
                 "slice_id": task.get("slice_id"),
                 "phase": task.get("phase"),
                 "routing_flag": task.get("routing_flag", "web"),
