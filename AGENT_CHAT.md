@@ -6730,3 +6730,136 @@ route_council_review(
 
 ---
 
+
+### GLM-5 [2026-02-21 02:30] - COMPLETE FLOW ANALYSIS: Documented vs Implemented
+
+---
+
+## DOCUMENTED FLOW (from vibepilot_process.md)
+
+### Phase 1: Idea → Plan
+
+| Step | Documented | Trigger |
+|------|------------|---------|
+| Human says "I want X" | Vibes receives | Human input |
+| Vibes → Consultant | Consultant creates PRD | Vibes routes |
+| PRD saved to GitHub | docs/prd/{name}.md | Consultant completes |
+| Planner reads PRD | Creates Plan | Consultant done |
+| Plan saved to GitHub | docs/plans/{name}-plan.md | Planner completes |
+| Supervisor calls Council | Via Orchestrator | Plan exists |
+| Council reviews | PRD + Plan from GitHub | Supervisor triggers |
+| If consensus → Plan approved | | Council agrees |
+| Tasks created in Supabase | status='pending' | Supervisor approves |
+| approve_plan() | pending → available | Dependencies checked |
+
+### Phase 2: Execution
+
+| Step | Documented | Trigger |
+|------|------------|---------|
+| Orchestrator polls | Gets 'available' tasks | _tick() |
+| Orchestrator assigns runner | status → 'in_progress' | _dispatch_task() |
+| Runner returns output | status → 'review' | Runner done |
+| Supervisor reviews output | Reads git branch | status='review' |
+| Supervisor decision | PASS/FAIL/REROUTE | Supervisor |
+| If PASS → Tests | status → 'testing' | Supervisor |
+| Tester runs | pytest, lint, typecheck | Supervisor triggers |
+| If PASS → Merge ready | | Tests pass |
+
+### Phase 3: Git Lifecycle
+
+| Step | Documented | Trigger |
+|------|------------|---------|
+| Task assigned | Supervisor → Maintenance: "Create branch" | Assignment |
+| Maintenance creates | task/T001-desc | Command queue |
+| Code ready | Supervisor → Maintenance: "Commit" | Review pass |
+| Tests pass | Supervisor → Maintenance: "Merge task→module" | Tests pass |
+| Maintenance merges | task → module | Command queue |
+| Maintenance deletes | task branch | After merge |
+| Module complete | Supervisor → Maintenance: "Merge module→main" | All tasks done |
+| Maintenance tags | module-name-v1 | After merge |
+| Maintenance deletes | module branch | After merge |
+
+---
+
+## WHAT'S IMPLEMENTED vs NOT
+
+### Phase 1: Idea → Plan
+
+| Step | Status | Issue |
+|------|--------|-------|
+| Consultant | ❌ BROKEN | Hardcoded DeepSeek |
+| PRD to GitHub | ⚠️ WIRED | _save_to_github() queues command |
+| Planner | ❌ BROKEN | Hardcoded DeepSeek |
+| Plan to GitHub | ⚠️ WIRED | _save_to_github() queues command |
+| Supervisor calls Council | ⚠️ WRONG PATH | Uses fake path, not actual Plan file |
+| Council reviews | ✅ WIRED | route_council_review() works if file exists |
+| Tasks created | ✅ WIRED | create_tasks_from_plan() works |
+| approve_plan() | ✅ WIRED | pending → available works |
+
+### Phase 2: Execution
+
+| Step | Status | Issue |
+|------|--------|-------|
+| Orchestrator polls | ✅ WIRED | _tick() works |
+| Assign runner | ✅ WIRED | _dispatch_task() works |
+| Runner returns | ✅ WIRED | _call_runner() works |
+| Supervisor reviews | ⚠️ PARTIAL | _process_reviews() exists |
+| Tests run | ✅ WIRED | _process_testing_tasks() exists |
+| Status transitions | ⚠️ UNCLEAR | Not fully mapped |
+
+### Phase 3: Git Lifecycle
+
+| Step | Status | Issue |
+|------|--------|-------|
+| Create task branch | ❌ NOT WIRED | No code calls Maintenance |
+| Commit code | ❌ NOT WIRED | No code calls Maintenance |
+| Merge task→module | ❌ NOT WIRED | No code calls Maintenance |
+| Delete task branch | ❌ NOT WIRED | No code calls Maintenance |
+| Merge module→main | ❌ NOT WIRED | No code calls Maintenance |
+| Tag release | ❌ NOT WIRED | No code calls Maintenance |
+
+---
+
+## THE GAP LIST (What Needs Wiring)
+
+### MUST FIX (Nothing works without these):
+
+1. **Agent LLM Routing** - Consultant/Planner hardcoded to DeepSeek
+2. **Council Path** - supervisor.call_council() uses fake path
+
+### SHOULD FIX (Flow broken):
+
+3. **Duplicate Council** - Called twice (review_and_approve_plan + _process_pending_plans)
+4. **Git Lifecycle** - Zero Maintenance calls wired
+
+### NEEDS CLARITY:
+
+5. **Supervisor review trigger** - When does status → 'review'?
+6. **Test trigger** - When does status → 'testing'?
+7. **Complete trigger** - When does status → 'complete'?
+
+---
+
+## RECOMMENDED APPROACH
+
+**Do NOT wire anything until:**
+
+1. ✅ Read all documentation (done)
+2. ✅ Map documented flow (done above)
+3. ✅ Identify gaps (done above)
+4. ⏳ Human confirms understanding is correct
+5. ⏳ Plan exact fixes needed
+6. ⏳ Implement ONE fix at a time
+7. ⏳ Test each fix before next
+
+---
+
+## QUESTION FOR HUMAN
+
+Before I plan any fixes:
+
+1. Is my understanding of the documented flow correct?
+2. Is the gap list complete?
+3. Should I proceed with planning fixes, or is there more to understand first?
+
+---
