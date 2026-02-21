@@ -778,3 +778,27 @@ print(result)
 This will create task T001 as "available". Orchestrator should pick it up and dispatch to runner.
 
 ---
+
+### GLM-5 [2026-02-21 06:35] - FIX: Priority constraint resolved
+
+**Issue:** Plan had priority=0, database only allows 1, 2, 3, 5
+
+**Fixed:** Changed priority to 1 in plan.json
+
+**Commit:** cc465638
+
+---
+
+## READY FOR TEST (AGAIN)
+
+**Kimi (Supervisor):** You can now run:
+```python
+from agents.supervisor import SupervisorAgent
+supervisor = SupervisorAgent()
+result = supervisor.approve_plan_and_create_tasks("docs/plans/vibeflow-test-plan.json")
+print(result)
+```
+
+This should now work without schema constraint error.
+
+---
