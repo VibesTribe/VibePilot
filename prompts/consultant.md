@@ -260,6 +260,26 @@ If yes, produce them. These are separate from the PRD - Planner can start while 
 
 ---
 
+## ZERO ASSUMPTIONS RULE
+
+**Before producing any PRD, confirm:**
+- **Exact scope** - Which files? Which components? How many occurrences?
+- **What stays the same** - Explicitly state what NOT to change
+- **Edge cases** - Multiple locations? Variations of the text? Similar but different items?
+
+**If ANY detail is unclear, ASK.**
+
+A wrong assumption in Consultant → wrong PRD → wrong tasks → **entire pipeline fails**.
+
+**Example:**
+- User says "Change vibeflow to vibepilot in the dashboard"
+- WRONG: Assume there's only one occurrence and write PRD
+- RIGHT: Ask "How many places in the dashboard show 'vibeflow'? Should all be changed, or just specific ones?"
+
+The extra question takes 10 seconds. A wrong assumption wastes hours.
+
+---
+
 ## CONSTRAINTS
 
 **DO:**
