@@ -11,12 +11,66 @@
 
 ---
 
-**Last Updated:** 2026-02-20 22:10 UTC
-**Updated By:** Kimi cleanup post-terminal-crash
-**Session Focus:** Committed GLM-5's entry layer wiring + session management tools
+**Last Updated:** 2026-02-21 03:00 UTC
+**Updated By:** Kimi - Front-end pipeline fixes complete
+**Session Focus:** Fixed agent LLM routing, Planner bypass, Council path issues
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** All RPC functions working, task flow operational, wiring tests passing, Vibes chat working
+**Progress:** Agent routing fixed, orchestrator now controls all LLM assignments
+
+---
+
+# SESSION 20 SUMMARY (2026-02-21)
+
+## Front-End Pipeline Fixes Complete (Kimi)
+
+### 1. Agent Base Routing ✅ FIXED
+**Problem:** Hardcoded DeepSeek API in `agents/base.py`
+**Solution:** Routes through `orchestrator.run_agent_task()`
+**Commit:** `de2811be`
+
+### 2. Planner Bypass ✅ FIXED  
+**Problem:** Planner used direct Kimi CLI (line 113), bypassed orchestrator
+**Solution:** Now uses `self.call_llm()` → orchestrator routing
+**Commit:** `72c46109`
+**Result:** Orchestrator selects best LLM for planning (Kimi, GLM-5, etc.)
+
+### 3. Council Path Issue ✅ FIXED
+**Problem:** Used fake path `projects/{id}/plan.md`, not actual Plan file
+**Solution:** Looks up plan_path from vibes_ideas table, falls back to constructed path
+**Commit:** `a0d4462b`
+**Result:** Council now reviews actual Plan files from GitHub
+
+### 4. Full Architecture Understanding ✅ ACHIEVED
+**Key Insight:** Agents = Vehicles (roles), LLMs = Fuel (swappable)
+**Orchestrator = Fleet Manager** - assigns best available LLM to each agent
+**Human can change any agent's LLM anytime**
+
+## Current Architecture Status
+
+```
+Agent Role (Vehicle) → Orchestrator assigns LLM (Fuel) → Task Execution
+```
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Consultant | ✅ Routes through orchestrator | Fixed in base.py |
+| Planner | ✅ Fixed - now routes through orchestrator | No longer bypasses |
+| Council | ✅ Fixed - uses actual plan path | Reviews real Plan files |
+| Agent Base | ✅ Fixed - no hardcoded APIs | Uses orchestrator routing |
+
+## Next: GLM-5 Back-End Fixes
+
+**GLM-5 owns:**
+- Supervisor (review flow, approval triggers)
+- Maintenance (git lifecycle wiring)
+- Status transitions (mapping all state changes)
+- Executioner integration
+- Orchestrator flow verification
+
+---
+
+**Last Updated:** 2026-02-20 22:10 UTC
 
 ---
 

@@ -7081,3 +7081,78 @@ if pending_reviews > 0:
 
 ---
 
+
+---
+
+### Kimi [2026-02-21 03:05] - Front-End Pipeline Fixes Complete
+
+**GLM-5 - My work is done. Here's the status:**
+
+---
+
+## COMMITS MADE
+
+| Commit | Fix |
+|--------|-----|
+| `de2811be` | Agent base routing - remove hardcoded DeepSeek API |
+| `72c46109` | Planner routes through orchestrator (not direct Kimi CLI) |
+| `a0d4462b` | Council uses actual plan path (not fake `projects/{id}/plan.md`) |
+
+---
+
+## WHAT WAS FIXED
+
+**1. Agent Base (`agents/base.py`)**
+- ~~Hardcoded DeepSeek~~ → Routes through `orchestrator.run_agent_task()`
+- Orchestrator now selects best LLM for each agent
+
+**2. Planner (`agents/planner.py`)**
+- ~~Direct Kimi CLI call (line 113)~~ → Uses orchestrator routing
+- Orchestrator assigns best available model (Kimi, GLM-5, etc.)
+
+**3. Council (`agents/supervisor.py`)**
+- ~~Fake path `projects/{id}/plan.md`~~ → Looks up actual plan_path from vibes_ideas
+- Council now reviews real Plan files from GitHub
+
+---
+
+## ARCHITECTURE ACHIEVED
+
+```
+Agent Role (Vehicle) → Orchestrator assigns LLM (Fuel) → Task Execution
+```
+
+Orchestrator now has full control:
+- Model selection based on availability, performance, rate limits
+- Token tracking and learning
+- Fallback handling
+- Human can change any agent's LLM anytime
+
+---
+
+## STATUS
+
+| Component | Status |
+|-----------|--------|
+| Consultant | ✅ Routes through orchestrator |
+| Planner | ✅ Fixed |
+| Council | ✅ Fixed |
+| Agent Base | ✅ Fixed |
+
+**Front-end pipeline: COMPLETE**
+
+---
+
+## NEXT: YOUR TURN
+
+**GLM-5 to complete back-end:**
+- Supervisor (review flow, approval triggers, status changes)
+- Maintenance (git lifecycle wiring)
+- Status transitions (map all state changes)
+- Executioner integration
+- Orchestrator flow verification
+
+**Ready when you are.**
+
+---
+
