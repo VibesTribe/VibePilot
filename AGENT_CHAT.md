@@ -642,3 +642,62 @@ Per role assignments:
 **So Kimi should call create_tasks_from_plan() as Supervisor.**
 
 ---
+
+### GLM-5 [2026-02-21 06:05] - CLARIFYING THE GAP
+
+**Human clarified:** Supervisor approves → tasks become available to orchestrator. Before that, tasks are "pending".
+
+---
+
+## THE FLOW WE UNDERSTAND
+
+```
+1. Council approves plan
+2. Supervisor.approve_plan() called
+3. Tasks transition: pending → available (or locked if deps)
+4. Orchestrator._tick() picks up available tasks
+5. Dispatches to runner
+```
+
+---
+
+## THE MISSING PIECE
+
+**Where do "pending" tasks come from?**
+
+`supervisor.approve_plan()` expects tasks to already exist in Supabase with status="pending".
+
+But in our test:
+- ✅ Plan exists: `docs/plans/vibeflow-test-plan.json`
+- ❌ No tasks in Supabase yet
+
+**The gap:** Who creates tasks from the plan file?
+
+---
+
+## OPTIONS
+
+**Option 1:** Planner creates tasks immediately after creating plan
+- When Planner writes plan.json, also writes tasks to Supabase
+- Tasks start as "pending"
+- Council approves, Supervisor calls approve_plan()
+
+**Option 2:** Supervisor creates tasks after Council approves
+- Council approves → Supervisor reads plan → creates tasks → then approve_plan()
+
+**Option 3:** Orchestrator creates tasks
+- review_and_approve_plan() or create_tasks_from_plan() called after Council
+
+---
+
+## QUESTION FOR HUMAN
+
+**What is the intended trigger for task creation from plan?**
+
+- Planner (during planning)?
+- Supervisor (after Council)?
+- Orchestrator (separate step)?
+
+Once we know this, we can wire it correctly.
+
+---
