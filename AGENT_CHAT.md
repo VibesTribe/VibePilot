@@ -6928,3 +6928,156 @@ Before I plan any fixes:
 2. Human: Approve division or adjust
 
 ---
+
+### GLM-5 [2026-02-21 03:30] - DEEP DIVE COMPLETE: Back Pipeline Analysis
+
+---
+
+## MY ASSIGNED AREAS (GLM-5)
+
+1. Supervisor
+2. Maintenance + git wiring
+3. Status transitions
+4. Tester/Executioner
+5. Orchestrator flow verification
+
+---
+
+## FINDING 1: MAINTENANCE AGENT EXISTS BUT ISN'T RUNNING
+
+**What Should Happen (per vibepilot_process.md):**
+- Maintenance is ONLY agent with git write access
+- Polls maintenance_commands table
+- Executes: create branch, commit, merge, delete, tag
+- Reports success/failure
+
+**What Exists:**
+- `agents/maintenance.py` - Complete implementation ✅
+- `maintenance_commands` table - Exists ✅
+- Supervisor `command_*` methods - Queue commands ✅
+
+**Critical Gap:**
+- **Maintenance agent is NOT running as a service**
+- Commands queue but never execute
+- No systemd service file for maintenance
+
+**Fix Needed:**
+```bash
+# Create vibepilot-maintenance.service
+# Start as polling service
+```
+
+---
+
+## FINDING 2: PROMPT VS CODE MISMATCH
+
+**prompts/maintenance.md describes:**
+- System maintenance (updating dependencies, security patches)
+- Daily review of research findings
+- Model registry updates
+
+**agents/maintenance.py implements:**
+- Git operations (create branch, merge, commit, delete)
+- Task branch lifecycle
+
+**These are DIFFERENT roles:**
+- "System Maintainer" - updates VibePilot itself
+- "Git Operator" - handles task branch lifecycle
+
+**Clarification Needed:**
+Should these be separate agents? Or should the prompt be updated?
+
+---
+
+## FINDING 3: STATUS TRANSITIONS INCOMPLETE
+
+**Documented States:**
+```
+pending → available → in_progress → review → testing → complete
+                                                    ↓
+                                              failed/queued/blocked/awaiting_human
+```
+
+**What's Implemented:**
+| Transition | Code | Status |
+|------------|------|--------|
+| pending → available | approve_plan() | ✅ |
+| pending → locked | approve_plan() | ✅ |
+| available → in_progress | _dispatch_task() | ✅ |
+| in_progress → review | ??? | ❓ UNCLEAR |
+| review → testing | route_to_testing() | ✅ |
+| testing → approved | process_test_results() | ✅ |
+| approved → merged | final_merge() | ✅ |
+| merged → complete | ??? | ❓ UNCLEAR |
+
+**Missing:**
+1. When does runner output trigger status → 'review'?
+2. When does merged become 'complete'?
+3. Clear state machine in code
+
+---
+
+## FINDING 4: EXECUTIONER NOT INTEGRATED
+
+**What Exists:**
+- `agents/executioner.py` - Basic test runner
+- `_run_tests()` - Runs pytest via subprocess
+- `_run_lint()` - Runs linter
+
+**Issues:**
+1. Executioner uses hardcoded commands (not through runner pool)
+2. Not called by orchestrator's `_process_testing_tasks()`
+3. No Visual Tester implementation
+
+**Current `_process_testing_tasks()` code:**
+```python
+# Lines ~1000-1050
+# Calls Executioner but doesn't use runner pool routing
+# Doesn't handle Visual Tester separately
+```
+
+---
+
+## FINDING 5: ORCHESTRATOR REVIEW FLOW UNCLEAR
+
+**What Should Happen:**
+```
+Runner completes → status='review' → Supervisor reviews → 
+  PASS → testing → FAIL → return to runner
+```
+
+**What's in _tick():**
+```python
+pending_reviews = len(self.supervisor.get_pending_reviews())
+if pending_reviews > 0:
+    self._process_reviews()
+```
+
+**But:**
+- When does status become 'review'?
+- Where is that transition happening?
+- `_process_reviews()` code is incomplete
+
+---
+
+## SUMMARY OF GAPS
+
+| Priority | Gap | Impact |
+|----------|-----|--------|
+| 1 | Maintenance not running | All git commands queue but never execute |
+| 2 | Status transitions unclear | No clear state machine |
+| 3 | Review trigger missing | When does runner output → review? |
+| 4 | Executioner not integrated | Testing flow incomplete |
+| 5 | Prompt/code mismatch | Maintenance has two different purposes |
+
+---
+
+## QUESTIONS FOR HUMAN
+
+1. Should Maintenance run as a systemd service (like orchestrator)?
+2. Are "System Maintainer" and "Git Operator" the same agent or different?
+3. What triggers status → 'review' after runner completes?
+4. Should Executioner use runner pool routing or is subprocess OK for tests?
+
+---
+
