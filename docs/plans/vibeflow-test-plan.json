@@ -20,7 +20,7 @@
               "task_id": "T001",
               "title": "Change brand name in MissionHeader",
               "type": "feature",
-              "priority": 0,
+              "priority": 1,
               "routing_flag": "web",
               "routing_flag_reason": "Frontend React component change",
               "file": "apps/dashboard/components/MissionHeader.tsx",
