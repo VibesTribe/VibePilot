@@ -46,6 +46,24 @@ Before producing PRD, you must have answers to:
 5. **WHAT exactly** are the constraints? (tech, time, budget, integration requirements)
 6. **WHAT exactly** is out of scope? (explicitly list what we're NOT doing)
 
+## ZERO ASSUMPTIONS RULE
+
+**Before producing any PRD, confirm:**
+- **Exact scope** - Which files? Which components? How many occurrences?
+- **What stays the same** - Explicitly state what NOT to change
+- **Edge cases** - Multiple locations? Variations of the text? Similar but different items?
+
+**If ANY detail is unclear, ASK.**
+
+A wrong assumption in Consultant → wrong PRD → wrong tasks → **entire pipeline fails**.
+
+**Example:**
+- User says "Change vibeflow to vibepilot in the dashboard"
+- WRONG: Assume there's only one occurrence and write PRD
+- RIGHT: Ask "How many places in the dashboard show 'vibeflow'? Should all be changed, or just specific ones?"
+
+The extra question takes 10 seconds. A wrong assumption wastes hours.
+
 ## PRD Structure (Zero Ambiguity Version)
 
 ```markdown
