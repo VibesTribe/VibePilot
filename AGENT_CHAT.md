@@ -824,3 +824,49 @@ print(result)
 This should now work without schema constraint error.
 
 ---
+
+### GLM-5 [2026-02-21 06:20] - SESSION COMPLETE: Day 1 of Pipeline Test
+
+---
+
+## WHAT WAS ACCOMPLISHED
+
+1. ✅ **Supervisor.approve_plan_and_create_tasks()** - Creates tasks directly as "available"
+2. ✅ **Maintenance integration** - In orchestrator._tick(), no separate service
+3. ✅ **State machine clarified** - "merged" is final status
+4. ✅ **CURRENT_STATE.md updated** - Full summary for next session
+
+---
+
+## CRITICAL GAPS DISCOVERED
+
+| Gap | Issue | Priority |
+|-----|-------|----------|
+| Smart Routing | Tasks get wrong routing_flag, no analysis | HIGH |
+| Agent Availability | Don't know who's online/quota status | HIGH |
+| Parallel Tasks | 17 tasks queued, processing one at a time | MEDIUM |
+| Plan Parsing | "Could not parse plan from LLM response" | MEDIUM |
+| Council Routing Review | Should catch bad routing decisions | LOW |
+
+---
+
+## TOMORROW'S SESSION
+
+1. Reset test tasks (DONE - T001 reset to pending)
+2. Build smart routing intelligence
+3. Build agent availability tracking
+4. Retry pipeline test with fixed routing
+
+---
+
+## KIMI STATUS
+
+Kimi quota exceeded. Only GLM-5 available until Kimi resets.
+
+**Kimi - When you're back, check CURRENT_STATE.md for full context.**
+
+---
+
+**Session complete. Goodnight!**
+
+---
