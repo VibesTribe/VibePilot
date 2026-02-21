@@ -690,6 +690,117 @@ class SupervisorAgent:
             "total_count": available_count + locked_count,
         }
 
+    def approve_plan_and_create_tasks(
+        self, plan_path: str, project_id: str = None
+    ) -> Dict:
+        """
+        Final supervisor approval: Create tasks from approved plan.
+
+        Called after Council reaches consensus and Supervisor approves.
+        Tasks are created directly with status="available" (not pending)
+        because the plan is already approved.
+
+        Args:
+            plan_path: Path to approved plan JSON file
+            project_id: Optional project to associate tasks with
+
+        Returns:
+            {
+                "success": bool,
+                "tasks_created": int,
+                "task_ids": List[str],
+                "errors": List
+            }
+        """
+        import json
+        import os
+
+        self.logger.info(f"Supervisor final approval: Creating tasks from {plan_path}")
+
+        if not os.path.exists(plan_path):
+            return {
+                "success": False,
+                "error": f"Plan not found: {plan_path}",
+                "tasks_created": 0,
+            }
+
+        try:
+            with open(plan_path, "r") as f:
+                plan = json.load(f)
+        except json.JSONDecodeError as e:
+            return {
+                "success": False,
+                "error": f"Invalid plan JSON: {e}",
+                "tasks_created": 0,
+            }
+
+        all_tasks = []
+        for slice_data in plan.get("slices", []):
+            slice_id = slice_data.get("slice_id", "S1")
+            for phase in slice_data.get("phases", []):
+                phase_id = phase.get("phase_id", "P1")
+                for task in phase.get("tasks", []):
+                    task["slice_id"] = task.get("slice_id", slice_id)
+                    task["phase"] = task.get("phase", phase_id)
+                    all_tasks.append(task)
+
+        if not all_tasks:
+            return {
+                "success": False,
+                "error": "No tasks found in plan",
+                "tasks_created": 0,
+            }
+
+        created_count = 0
+        task_ids = []
+        errors = []
+
+        for task in all_tasks:
+            task_number = task.get("task_id", f"TASK-{created_count + 1}")
+
+            task_record = {
+                "task_number": task_number,
+                "title": task.get("title", "Untitled task"),
+                "type": task.get("type", "feature"),
+                "priority": task.get("priority", 5),
+                "slice_id": task.get("slice_id"),
+                "phase": task.get("phase"),
+                "routing_flag": task.get("routing_flag", "web"),
+                "routing_flag_reason": task.get("routing_flag_reason"),
+                "status": "available",
+                "result": {
+                    "prompt_packet": task.get("prompt_packet", ""),
+                    "expected_output": task.get("expected_output"),
+                    "file": task.get("file"),
+                    "change": task.get("change"),
+                },
+            }
+
+            if project_id:
+                task_record["project_id"] = project_id
+
+            try:
+                result = db.table("tasks").insert(task_record).execute()
+                if result.data:
+                    task_ids.append(task_number)
+                    created_count += 1
+                    self.logger.info(f"Created task {task_number} (available)")
+            except Exception as e:
+                errors.append({"task_id": task_number, "error": str(e)})
+                self.logger.error(f"Failed to create task {task_number}: {e}")
+
+        self.logger.info(
+            f"Supervisor approved plan: {created_count} tasks created as available"
+        )
+
+        return {
+            "success": created_count > 0,
+            "tasks_created": created_count,
+            "task_ids": task_ids,
+            "errors": errors,
+            "plan_path": plan_path,
+        }
+
     def get_pending_approvals(self) -> List[Dict]:
         """Get all tasks awaiting final approval."""
         res = db.table("tasks").select("*").eq("status", "approved").execute()
