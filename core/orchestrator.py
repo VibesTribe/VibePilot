@@ -728,11 +728,15 @@ class ConcurrentOrchestrator:
         self.dependency_manager = DependencyManager()
         self.supervisor = SupervisorAgent()
         self.supervisor.set_council_callback(self.route_council_review)
+        self.supervisor.set_orchestrator(self)  # Wire orchestrator reference
         self.task_manager = TaskManager()
         self.telemetry = get_telemetry()
 
         self.consultant = ConsultantAgent()
+        self.consultant.set_orchestrator(self)  # Wire orchestrator reference
+        
         self.planner = PlannerAgent()
+        self.planner.set_orchestrator(self)  # Wire orchestrator reference
 
         self.config = load_config()
         self._explicit_max_workers = max_workers
@@ -2433,6 +2437,168 @@ This is the first round of deliberation.
             "tasks_created": create_result.get("tasks_written", 0),
             "task_ids": create_result.get("task_ids", []),
             "errors": create_result.get("errors", []),
+        }
+
+    # AGENT LLM ROUTING
+    # Routes agent LLM calls through runner pool (fixes hardcoded API issue)
+    # =========================================================================
+
+    def run_agent_task(
+        self,
+        agent_role: str,
+        prompt: str,
+        max_tokens: int = 2000,
+        timeout: int = 120,
+    ) -> Dict:
+        """
+        Route an agent's LLM call through the orchestrator's runner pool.
+        
+        This replaces hardcoded API calls in agents with proper routing that:
+        - Selects best available model based on agent role
+        - Respects rate limits and cooldowns
+        - Tracks tokens and performance
+        - Provides fallback if primary model fails
+        
+        Args:
+            agent_role: Role of the agent (consultant, planner, supervisor, etc.)
+            prompt: The prompt to send to the LLM
+            max_tokens: Maximum tokens to generate
+            timeout: Timeout in seconds
+            
+        Returns:
+            {
+                "success": bool,
+                "output": str,
+                "model_used": str,
+                "tokens_used": int,
+                "error": str (if failed)
+            }
+        """
+        self.logger.info(f"Routing LLM call for agent_role={agent_role}")
+        
+        # Determine routing flag based on agent role
+        # Internal infrastructure roles need reliable CLI/API access
+        routing_flag = "internal"  # Default to internal (Q-tier)
+        
+        # Map agent roles to preferred model capabilities
+        role_preferences = {
+            "consultant": ["kimi-k2.5", "glm-5"],
+            "planner": ["kimi-k2.5", "glm-5"],
+            "supervisor": ["glm-5", "kimi-k2.5"],
+            "council": ["kimi-k2.5", "glm-5", "deepseek-chat"],
+            "maintenance": ["glm-5", "kimi-k2.5"],
+        }
+        
+        preferred_models = role_preferences.get(agent_role, ["kimi-k2.5", "glm-5"])
+        
+        # Try preferred models first
+        for model_id in preferred_models:
+            if model_id not in self.runner_pool.runners:
+                continue
+                
+            if not self.runner_pool.is_available(model_id):
+                self.logger.debug(f"Model {model_id} not available, trying next")
+                continue
+                
+            if self.cooldown_manager.is_in_cooldown(model_id):
+                remaining = self.cooldown_manager.get_cooldown_remaining(model_id)
+                self.logger.debug(f"Model {model_id} in cooldown ({remaining}s remaining)")
+                continue
+            
+            # Found available model, execute task
+            try:
+                self.logger.info(f"Routing to {model_id} for {agent_role}")
+                
+                # Create a minimal task packet
+                task_packet = {
+                    "task_id": f"agent-{agent_role}-{int(time.time())}",
+                    "prompt": prompt,
+                    "title": f"{agent_role} task",
+                    "constraints": {
+                        "max_tokens": max_tokens,
+                        "timeout_seconds": timeout,
+                    },
+                }
+                
+                # Use contract runners
+                from runners.contract_runners import get_runner
+                
+                runner_info = self.runner_pool.runners.get(model_id, {})
+                tool_id = runner_info.get("tool_id", model_id)
+                
+                runner = get_runner(tool_id)
+                result = runner.execute(task_packet)
+                
+                if result.get("status") == "success":
+                    # Track usage
+                    tokens = result.get("tokens_used", 0)
+                    self.usage_tracker.record_usage(model_id, tokens)
+                    
+                    return {
+                        "success": True,
+                        "output": result.get("output", ""),
+                        "model_used": model_id,
+                        "tokens_used": tokens,
+                    }
+                else:
+                    error = result.get("error", "Unknown error")
+                    self.logger.warning(f"Model {model_id} failed: {error}")
+                    # Continue to try next model
+                    
+            except Exception as e:
+                self.logger.error(f"Error calling {model_id}: {e}")
+                # Continue to try next model
+        
+        # If all preferred models failed, try any available runner
+        self.logger.warning(f"All preferred models failed for {agent_role}, trying any available")
+        
+        available = self.runner_pool.get_available()
+        for runner_id in available:
+            if self.cooldown_manager.is_in_cooldown(runner_id):
+                continue
+                
+            try:
+                from runners.contract_runners import get_runner
+                
+                runner_info = self.runner_pool.runners.get(runner_id, {})
+                tool_id = runner_info.get("tool_id", runner_id)
+                
+                task_packet = {
+                    "task_id": f"agent-{agent_role}-{int(time.time())}",
+                    "prompt": prompt,
+                    "title": f"{agent_role} task",
+                    "constraints": {
+                        "max_tokens": max_tokens,
+                        "timeout_seconds": timeout,
+                    },
+                }
+                
+                runner = get_runner(tool_id)
+                result = runner.execute(task_packet)
+                
+                if result.get("status") == "success":
+                    tokens = result.get("tokens_used", 0)
+                    self.usage_tracker.record_usage(runner_id, tokens)
+                    
+                    return {
+                        "success": True,
+                        "output": result.get("output", ""),
+                        "model_used": runner_id,
+                        "tokens_used": tokens,
+                    }
+                    
+            except Exception as e:
+                self.logger.error(f"Error calling {runner_id}: {e}")
+                continue
+        
+        # No models available
+        self.logger.error(f"No available models for {agent_role}")
+        return {
+            "success": False,
+            "error": f"No available models for agent_role={agent_role}. All runners busy or in cooldown.",
+            "output": "",
+            "model_used": None,
+            "tokens_used": 0,
         }
 
 
