@@ -701,3 +701,14 @@ But in our test:
 Once we know this, we can wire it correctly.
 
 ---
+
+### GLM-5 [2026-02-21 06:15] - WIRING: Supervisor Final Approval → Task Creation
+
+**Human confirmed:**
+- Council approves after iterations
+- Supervisor gives final approval
+- Entire plan of approved tasks goes to orchestrator
+
+**Wiring this now.**
+
+---
