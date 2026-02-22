@@ -405,18 +405,133 @@ sb.table('task_packets').insert({
 
 ---
 
+## PHASE 2 COMPLETE (2026-02-22)
+
+### What's Now Working
+
+| Component | Status |
+|-----------|--------|
+| Sentry polling | ✅ Every 15s, max 3 concurrent |
+| Task claiming | ✅ REST with status filter |
+| Packet parsing | ✅ Two-step JSON unmarshal |
+| OpenCode execution | ✅ `opencode run --format json "prompt"` |
+| task_run recording | ✅ All fields: model_id, courier, tokens, status |
+| ROI RPC call | ✅ calculate_enhanced_task_roi (needs service key) |
+| Task status update | ✅ → review on success |
+| Dependency unlock | ✅ unlock_dependent_tasks RPC |
+| Failure handling | ✅ Fetch-then-update attempts |
+
+### Test Results
+
+```
+Task: GLM-5 Test: Say Hello
+Status: review
+Model: glm-5
+Courier: governor
+Tokens: 11/265
+```
+
+### Binary Size
+
+9.6MB - fits free tier comfortably
+
+---
+
+## PHASE 3: INTELLIGENT ROUTING (NOT YET IMPLEMENTED)
+
+### Current State (Placeholder)
+
+```yaml
+runners:
+  internal:
+    - model_id: glm-5
+      tool: opencode
+```
+
+Just uses first config entry. No availability checking.
+
+### What's Needed
+
+**Nothing Hardcoded. Everything Swappable.**
+
+Models/tools can appear/disappear anytime. System must adapt.
+
+### Routing Logic (from Python orchestrator.py:639-712)
+
+```
+1. Get active models from DB (models table)
+   - status = 'active'
+   - Not in cooldown (cooldown_expires_at < now or null)
+   - Under rate limits
+
+2. Filter by routing_capability
+   - 'internal': CLI/API with codebase access
+   - 'web': Any runner (courier/browser)
+   - 'mcp': MCP-capable only
+
+3. Score each available runner:
+   - cost_priority: 0=subscription, 1=free API, 2=paid API
+   - success_rate: tasks_completed / (tasks_completed + tasks_failed)
+   - task_type fit: from strengths field
+   - browser capability bonus for web routing
+
+4. Return best score or None if no runners available
+
+5. FALLBACK CHAIN (example):
+   - Web platform over 80% daily? → skip
+   - gemini-api rate limited? → skip
+   - deepseek-api dead? → skip
+   - internal via opencode available? → use it
+   - Nothing available? → return None, task waits
+```
+
+### Models Table Fields (for routing)
+
+| Field | Purpose |
+|-------|---------|
+| `status` | active/paused/benched |
+| `status_reason` | Why paused |
+| `success_rate` | Historical performance |
+| `tasks_completed` | Count |
+| `tasks_failed` | Count |
+| `cooldown_expires_at` | Rate limit cooldown |
+| `cost_priority` | 0=subscription, 1=free, 2=paid |
+
+### NEVER Assume
+
+- "glm via opencode is always available" - WRONG
+- "opencode will exist tomorrow" - WRONG
+- "current model will be best forever" - WRONG
+
+**System must work with whatever models exist in DB at runtime.**
+
+---
+
 ## SESSION NOTES
 
-### What Went Wrong This Session
+### What Went Wrong (First 4 Hours)
 1. Started coding within 2 minutes without reading
 2. Made broken changes to dispatcher and db
 3. Used wrong patterns (SQL expressions, wrong flags)
 4. Wasted time and tokens on broken code
 5. Had to roll back everything
 
-### What Went Right
+### What Went Right (After Homework)
 1. Rolled back cleanly
-2. Did actual homework
+2. Did actual homework (4 hours)
+3. Read every relevant file
+4. Created implementation patterns doc
+5. Clean rewrites (8 minutes)
+6. Working test immediately
+
+### The Numbers
+- Wrong approach: 2 min coding + 4 hours debugging = disaster
+- Right approach: 4 hours homework + 8 min coding = working
+- Context used for broken code: 58%
+- Context used for working code: 7%
+
+### Key Lesson
+**Never code until you understand everything.**
 3. Read: orchestrator.py, task_manager.py, contract_runners.py, supervisor.py, maintenance.py, council/*, base_runner.py, vault_manager.py, ROI schema, adapter.ts
 4. Created IMPLEMENTATION_PATTERNS.md (useful)
 5. This handoff document
