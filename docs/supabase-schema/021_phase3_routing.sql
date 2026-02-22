@@ -250,7 +250,22 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================================
--- 8. GRANT PERMISSIONS
+-- 8. RLS POLICIES
+-- ============================================================================
+
+-- Allow authenticated users to manage runners
+CREATE POLICY "Allow authenticated to manage runners" ON runners
+  FOR ALL TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- Allow authenticated users to read tools (already exists but ensure)
+CREATE POLICY IF NOT EXISTS "Allow authenticated to read tools" ON tools
+  FOR SELECT TO authenticated
+  USING (true);
+
+-- ============================================================================
+-- 9. GRANT PERMISSIONS
 -- ============================================================================
 
 GRANT SELECT, INSERT, UPDATE ON runners TO authenticated;
