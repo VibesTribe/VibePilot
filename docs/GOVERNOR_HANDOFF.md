@@ -1,12 +1,62 @@
 # Governor Implementation Handoff Document
 
 **Session:** 2026-02-22
-**Purpose:** Full understanding captured for next session - NO CODING until this is reviewed
-**Status:** Homework complete, ready for planning
+**Purpose:** Full understanding captured for next session
+**Status:** Phase 3 COMPLETE - Intelligent routing working
 
 ---
 
-## WHY WE ARE BUILDING GO GOVERNOR
+## REPLACEMENT SUMMARY (What Go Replaces)
+
+### Code Size Reduction
+
+| Component | Python | Go | Reduction |
+|-----------|--------|-----|-----------|
+| Core logic | 3,422 lines | 781 lines | **77% less** |
+| Dependencies | 759MB (venv) | 0 (static binary) | **100% less** |
+| Binary size | N/A | 9.6MB | — |
+
+### Memory Usage
+
+| Component | Python Stack | Go Binary |
+|-----------|-------------|-----------|
+| Orchestrator | ~94MB | ~10MB |
+| venv | 759MB | 0 |
+| **Total runtime** | ~850MB+ | ~10-20MB |
+
+### Cost Impact
+
+| Server | Monthly Cost | Can Run |
+|--------|-------------|---------|
+| e2-standard-2 (Python) | $64/mo | Python + OpenCode (barely) |
+| e2-micro (Go) | **$0/mo** | Go Governor + GitHub Actions offload |
+
+**Savings: $768/year**
+
+### What Go Governor Replaces
+
+| Python File | Lines | Go Equivalent |
+|-------------|-------|---------------|
+| `core/orchestrator.py` | 2,872 | `governor/` (781 lines total) |
+| `task_manager.py` | 550 | Built into dispatcher |
+| `venv/` | 759MB | Static binary (9.6MB) |
+
+### What Stays Python (Decision Layer)
+
+| Component | Why Not Replaced |
+|-----------|------------------|
+| `agents/supervisor.py` | Review logic, Council coordination |
+| `agents/maintenance.py` | Git operations |
+| `agents/consultant.py` | PRD generation |
+| `agents/planner.py` | Task planning |
+| `vault_manager.py` | Secret management |
+| `runners/contract_runners.py` | Runner implementations |
+
+**Go = Execution. Python = Decisions.**
+
+---
+
+## WHY WE BUILT GO GOVERNOR
 
 ### The Problem
 | Current State | Problem |
@@ -24,7 +74,7 @@
 | Concurrency | GIL limits threads | Goroutines (2KB stack each) |
 
 ### What Go Enables
-1. **Free tier operation** - 9.5MB binary vs 1.5GB Python stack
+1. **Free tier operation** - 9.6MB binary vs 1.5GB Python stack
 2. **100+ concurrent tasks** - Goroutines scale efficiently
 3. **GitHub Actions offload** - Browser-use tasks on 7GB free runners
 4. **Zero dependency deploy** - Single binary, no venv drift
@@ -264,26 +314,56 @@ json.Unmarshal(output, &result)
 
 ---
 
-## CURRENT GO GOVERNOR STATE (Phase 1)
+## CURRENT GO GOVERNOR STATE (Phase 3 COMPLETE)
 
-### What Works
-- Sentry polls Supabase every 15s
-- Finds available tasks
-- Dispatcher skeleton routes to local/web
-- Janitor detects stuck tasks
-- HTTP server with `/api/tasks`, `/api/models`
-- Binary: 9.5MB
+### What's Working
 
-### What's Broken/Incomplete
-| Component | Issue |
-|-----------|-------|
-| Claim | Uses REST, not RPC (race conditions possible) |
-| Packet parsing | Direct unmarshal (gets JSON string, not parsed) |
-| OpenCode | Wrong flags (`--task-packet` doesn't exist) |
-| task_runs | Not recording anything |
-| ROI RPC | Not calling it |
-| Failure handling | Uses `"attempts + 1"` string (fails) |
-| Unlock deps | Not calling unlock RPC |
+| Component | Status |
+|-----------|--------|
+| Sentry polls | ✅ Every 15s, max 3 concurrent |
+| Model pool | ✅ DB-driven selection (no hardcoded config) |
+| get_best_runner RPC | ✅ Returns best available by cost + success rate |
+| Task claiming | ✅ Atomic REST with status filter |
+| Packet parsing | ✅ Two-step JSON unmarshal |
+| OpenCode execution | ✅ `opencode run --format json "prompt"` |
+| task_runs recording | ✅ All fields: model_id, tokens, status, result |
+| ROI RPC | ✅ calculate_enhanced_task_roi |
+| Learning | ✅ task_ratings updated after each task |
+| 80% throttle | ✅ Triggers cooldown until midnight |
+| Janitor refresh | ✅ Auto-clears cooldowns/rate limits |
+| Binary | 9.6MB |
+
+### Verified Test Results
+
+```
+Dispatcher: selected runner 77e3ca45 (model=glm-5, priority=0)
+Dispatcher: task completed successfully
+
+task_runs:
+  glm-5 | success | tokens: 11/265
+
+runners.task_ratings:
+  glm-5: {'test': {'success': 2, 'fail': 0}}
+```
+
+### Admin Commands
+
+```bash
+# Create runners for active models (uses vault for service key)
+python scripts/admin_setup.py --create-runners
+
+# Verify runners and RPCs
+python scripts/admin_setup.py --verify
+```
+
+### What's NOT Yet Implemented
+
+| Feature | Status |
+|---------|--------|
+| Web routing (courier) | Phase 4 |
+| GitHub Actions dispatch | Phase 4 |
+| Supervisor integration | Python handles |
+| Maintenance integration | Python handles |
 
 ---
 
@@ -454,47 +534,39 @@ Tokens: 11/265
 | 80% throttle | ✅ Triggers cooldown until midnight |
 | Janitor refresh | ✅ Every minute |
 
-### Schema Applied (needs to run in Supabase)
+### Schema Applied
 
 ```bash
-# Run in Supabase SQL Editor:
+# Schema file (applied to Supabase):
 docs/supabase-schema/021_phase3_routing.sql
+
+# Create runners for active models:
+python scripts/admin_setup.py --create-runners
 ```
 
-### Current State (DB-Driven)
+### Runners Created Dynamically
 
-```yaml
-runners:
-  internal:
-    - model_id: glm-5
-      tool: opencode
+No hardcoded config. Runners created from active models in DB.
+
+```sql
+-- Current runners (created via admin_setup.py):
+SELECT model_id, tool_id, cost_priority, status, task_ratings FROM runners;
+
+-- Results:
+-- glm-5 / opencode | priority=0 (subscription) | active | {'test': {'success': 2}}
+-- gemini-api / opencode | priority=1 (free tier) | active | {'test': {'success': 1}}
 ```
 
-Just uses first config entry. No availability checking.
-
-### What's Needed
-
-**Nothing Hardcoded. Everything Swappable.**
-
-Models/tools can appear/disappear anytime. System must adapt.
-
-### Routing Logic (from Python orchestrator.py:639-712)
+### Routing Logic (Implemented)
 
 ```
-1. Get active models from DB (models table)
-   - status = 'active'
-   - Not in cooldown (cooldown_expires_at < now or null)
-   - Under rate limits
-
-2. Filter by routing_capability
-   - 'internal': CLI/API with codebase access
-   - 'web': Any runner (courier/browser)
-   - 'mcp': MCP-capable only
-
-3. Score each available runner:
-   - cost_priority: 0=subscription, 1=free API, 2=paid API
-   - success_rate: tasks_completed / (tasks_completed + tasks_failed)
-   - task_type fit: from strengths field
+1. Call get_best_runner RPC
+2. RPC queries runners WHERE status='active' AND model.status='active'
+3. Filters by routing_capability, cooldown, rate limits, daily limits
+4. Orders by cost_priority ASC, task_ratings DESC
+5. Returns best runner or NULL
+6. If NULL → tasks wait until runner available
+```
    - browser capability bonus for web routing
 
 4. Return best score or None if no runners available
