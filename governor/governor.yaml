@@ -15,8 +15,8 @@ github:
 
 runners:
   internal:
-    - id: opencode
-      command: opencode
+    - model_id: glm-5
+      tool: opencode
       ram_limit_mb: 500
 
 courier:

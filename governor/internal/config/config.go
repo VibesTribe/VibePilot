@@ -45,14 +45,14 @@ type RunnersConfig struct {
 }
 
 type InternalRunner struct {
-	ID         string `yaml:"id"`
-	Command    string `yaml:"command"`
+	ModelID    string `yaml:"model_id"`
+	Tool       string `yaml:"tool"`
 	RAMLimitMB int    `yaml:"ram_limit_mb"`
 }
 
 type CourierConfig struct {
-	DriverModel string             `yaml:"driver_model"`
-	Platforms   []CourierPlatform  `yaml:"platforms"`
+	DriverModel string            `yaml:"driver_model"`
+	Platforms   []CourierPlatform `yaml:"platforms"`
 }
 
 type CourierPlatform struct {

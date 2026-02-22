@@ -111,7 +111,14 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 
 func (d *Dispatcher) selectModel() string {
 	if len(d.cfg.Runners.Internal) > 0 {
-		return d.cfg.Runners.Internal[0].ID
+		return d.cfg.Runners.Internal[0].ModelID
+	}
+	return "glm-5"
+}
+
+func (d *Dispatcher) getTool() string {
+	if len(d.cfg.Runners.Internal) > 0 && d.cfg.Runners.Internal[0].Tool != "" {
+		return d.cfg.Runners.Internal[0].Tool
 	}
 	return "opencode"
 }
@@ -120,7 +127,8 @@ func (d *Dispatcher) runOpenCode(ctx context.Context, prompt string, timeoutSec 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "opencode", "run", "--format", "json", prompt)
+	tool := d.getTool()
+	cmd := exec.CommandContext(ctx, tool, "run", "--format", "json", prompt)
 	raw, execErr := cmd.CombinedOutput()
 
 	if execErr != nil {
