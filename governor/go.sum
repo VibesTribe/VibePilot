@@ -1,0 +1,6 @@
+github.com/gorilla/websocket v1.5.1 h1:GMm5OzvXozPsB3H3CpS2F3UpP3oCdJTyy8w8U4CvJFU=
+github.com/gorilla/websocket v1.5.1/go.mod h1:x3kM2JMyalAU02dmWuwsz4ilK9zb0aZF9w/v9QU8HGY=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Gy0=
+gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64 Voices+XYk9EeM9pj2aQ==

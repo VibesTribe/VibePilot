@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
-	"time"
 
 	"github.com/vibepilot/governor/internal/config"
 	"github.com/vibepilot/governor/internal/db"
@@ -146,7 +145,7 @@ func (d *Dispatcher) dispatchLocal(ctx context.Context, task types.Task) (*types
 		}, nil
 	}
 
-	cleanOutput, warnings := d.leakDetector.Scan(string(output))
+	_, warnings := d.leakDetector.Scan(string(output))
 	if len(warnings) > 0 {
 		log.Printf("Dispatcher: leak warnings for task %s: %+v", task.ID, warnings)
 	}
@@ -176,35 +175,4 @@ func (d *Dispatcher) handleFailure(ctx context.Context, task types.Task, errMsg 
 	if err := d.db.ResetTask(ctx, task.ID, false); err != nil {
 		log.Printf("Dispatcher: failed to reset task %s: %v", task.ID, err)
 	}
-}
-
-func (d *Dispatcher) createTaskRun(ctx context.Context, task types.Task) (*types.TaskRun, error) {
-	run := &types.TaskRun{
-		TaskID:   task.ID,
-		Courier:  string(task.RoutingFlag),
-		Platform: task.AssignedTo,
-		ModelID:  task.AssignedTo,
-		Status:   "running",
-	}
-
-	if err := d.db.CreateTaskRun(ctx, run); err != nil {
-		return nil, err
-	}
-
-	return run, nil
-}
-
-func (d *Dispatcher) completeTaskRun(ctx context.Context, run *types.TaskRun, output string, errStr string) error {
-	resultJSON := []byte(output)
-	return d.db.CompleteTaskRun(ctx, run.ID, resultJSON, errStr)
-}
-
-func (d *Dispatcher) recordMetrics(ctx context.Context, modelID string, tokensIn, tokensOut int, success bool) {
-	start := time.Now()
-	
-	if err := d.db.IncrementModelUsage(ctx, modelID, tokensIn, tokensOut, success); err != nil {
-		log.Printf("Dispatcher: failed to record metrics: %v", err)
-	}
-
-	log.Printf("Dispatcher: recorded metrics for %s in %v", modelID, time.Since(start))
 }

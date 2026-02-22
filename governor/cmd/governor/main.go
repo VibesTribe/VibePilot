@@ -34,10 +34,7 @@ func main() {
 	log.Printf("Poll interval: %v, Max concurrent: %d", cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent)
 
 	// Initialize database connection
-	database, err := db.New(cfg.Supabase.URL, cfg.Supabase.ServiceKey)
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
+	database := db.New(cfg.Supabase.URL, cfg.Supabase.ServiceKey)
 	defer database.Close()
 
 	log.Println("Connected to Supabase")
@@ -67,7 +64,7 @@ func main() {
 	go j.Run(ctx)
 
 	// Start HTTP server
-	srv := server.New(cfg.Server, database)
+	srv := server.New(&cfg.Server, database)
 	go func() {
 		if err := srv.Start(); err != nil {
 			log.Printf("Server error: %v", err)
