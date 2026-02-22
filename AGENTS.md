@@ -237,6 +237,60 @@ git pull origin branch-name
 
 ---
 
+## Mental Model for VibePilot Improvements
+
+**How to think when proposing changes:**
+
+### Research First
+- Understand what exists before building new
+- Learn from best solutions (ZeroClaw, NanoClaw, IronClaw, etc.)
+- Copy patterns, customize to our context
+
+### Think Backwards from Future Problems
+- Don't just fix today's bug
+- Ask: "Will this cause tomorrow's problem?"
+- Design to prevent, not just react
+
+### Principles Over Preferences
+- Swappable, modular, lean, no lock-in
+- 1 file = 1 concern (changes touch one file max)
+- Config-driven, not code-driven
+- Track every token, every model, every task
+
+### Clean As You Go
+- Simplify, don't accumulate
+- 4k lines is achievable (NanoClaw proved it)
+- Code should fit in LLM context for easy modification
+- Remove dead code, don't just add new code
+
+### The Claw Framework Lessons
+
+| From | Pattern | For VibePilot |
+|------|---------|---------------|
+| **ZeroClaw** | Provider traits | Config-driven LLM swapping |
+| **ZeroClaw** | 5MB footprint | Free tier compatible |
+| **ZeroClaw** | SQLite only | Remove abstraction layers |
+| **NanoClaw** | ~4k lines | Fits in LLM context |
+| **NanoClaw** | 1 file per concern | Easy to modify |
+| **NanoClaw** | Skills over plugins | Transform codebase, don't configure |
+| **IronClaw** | Leak detection | Scan tool outputs for secrets |
+| **IronClaw** | Credential injection | Secrets at boundary, never in context |
+
+### AI Coding Time Reality
+- 5 days = ~1 day actual coding
+- Subscription already paid = marginal cost is $0
+- "Weeks of work" = hours with AI
+- The only constraints: human decisions, getting it right
+
+### Before Proposing Solutions
+1. **Research** - What exists? What patterns are proven?
+2. **Audit** - What do we actually have vs dead weight?
+3. **Apply patterns** - Customize proven solutions
+4. **Verify lean** - Does it fit free tier?
+5. **Think future** - Will this scale? Swap? Evolve?
+
+---
+
 ## Questions?
 
 **Not sure which branch?** → Ask the human
