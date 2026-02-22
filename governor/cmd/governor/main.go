@@ -10,11 +10,11 @@ import (
 
 	"github.com/vibepilot/governor/internal/config"
 	"github.com/vibepilot/governor/internal/db"
-	"github.com/vibepilot/governor/internal/sentry"
 	"github.com/vibepilot/governor/internal/dispatcher"
 	"github.com/vibepilot/governor/internal/janitor"
-	"github.com/vibepilot/governor/internal/server"
 	"github.com/vibepilot/governor/internal/security"
+	"github.com/vibepilot/governor/internal/sentry"
+	"github.com/vibepilot/governor/internal/server"
 	"github.com/vibepilot/governor/pkg/types"
 )
 
@@ -81,7 +81,7 @@ func main() {
 	log.Println("Shutting down...")
 	cancel()
 	srv.Shutdown()
-	
+
 	log.Println("Governor stopped.")
 }
 

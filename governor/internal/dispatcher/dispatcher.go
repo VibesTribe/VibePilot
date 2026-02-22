@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"time"
 
 	"github.com/vibepilot/governor/internal/config"
 	"github.com/vibepilot/governor/internal/db"
@@ -36,143 +37,140 @@ func (d *Dispatcher) Run(ctx context.Context, dispatchCh <-chan types.Task) {
 			log.Println("Dispatcher shutting down")
 			return
 		case task := <-dispatchCh:
-			go d.dispatch(ctx, task)
+			go d.execute(ctx, task)
 		}
 	}
 }
 
-func (d *Dispatcher) dispatch(ctx context.Context, task types.Task) {
-	log.Printf("Dispatcher: processing task %s (routing=%s)", task.ID, task.RoutingFlag)
+func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
+	log.Printf("Dispatcher: task %s (routing=%s)", task.ID[:8], task.RoutingFlag)
 
-	var result *types.DispatchResult
-	var err error
-
-	switch task.RoutingFlag {
-	case types.RoutingWeb:
-		result, err = d.dispatchToGitHub(ctx, task)
-	case types.RoutingInternal:
-		result, err = d.dispatchLocal(ctx, task)
-	default:
-		err = fmt.Errorf("unknown routing flag: %s", task.RoutingFlag)
-	}
-
-	if err != nil {
-		log.Printf("Dispatcher: task %s dispatch failed: %v", task.ID, err)
-		d.handleFailure(ctx, task, err.Error())
+	modelID := d.selectModel()
+	if modelID == "" {
+		log.Printf("Dispatcher: no model available for task %s", task.ID[:8])
 		return
 	}
 
-	if result != nil && result.Success {
-		log.Printf("Dispatcher: task %s completed successfully", task.ID)
-	} else if result != nil {
-		log.Printf("Dispatcher: task %s failed: %s", task.ID, result.Error)
-		d.handleFailure(ctx, task, result.Error)
+	if err := d.db.ClaimTask(ctx, task.ID, modelID); err != nil {
+		log.Printf("Dispatcher: claim failed for %s: %v", task.ID[:8], err)
+		return
 	}
-}
-
-func (d *Dispatcher) dispatchToGitHub(ctx context.Context, task types.Task) (*types.DispatchResult, error) {
-	if d.cfg.GitHub.Token == "" {
-		return nil, fmt.Errorf("GitHub token not configured")
-	}
-
-	branchName := fmt.Sprintf("task/%s", task.ID)
 
 	packet, err := d.db.GetTaskPacket(ctx, task.ID)
+	if err != nil || packet == nil {
+		log.Printf("Dispatcher: no packet for %s: %v", task.ID[:8], err)
+		d.handleFailure(ctx, task)
+		return
+	}
+
+	output, tokensIn, tokensOut, execErr := d.runOpenCode(ctx, packet.Prompt, 300)
+
+	status := "success"
+	var result interface{}
+	if execErr != nil {
+		status = "failed"
+		result = map[string]interface{}{"error": execErr.Error()}
+	} else {
+		result = map[string]interface{}{"output": output}
+	}
+
+	runID, err := d.db.RecordTaskRun(ctx, &db.TaskRunInput{
+		TaskID:    task.ID,
+		ModelID:   modelID,
+		Courier:   "governor",
+		Platform:  "internal",
+		Status:    status,
+		Result:    result,
+		TokensIn:  tokensIn,
+		TokensOut: tokensOut,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get task packet: %w", err)
+		log.Printf("Dispatcher: failed to record run for %s: %v", task.ID[:8], err)
+	} else {
+		if err := d.db.CallROIRPC(ctx, runID); err != nil {
+			log.Printf("Dispatcher: ROI RPC failed for run %s: %v", runID[:8], err)
+		}
 	}
 
-	if packet == nil {
-		return nil, fmt.Errorf("no task packet found for task %s", task.ID)
+	if execErr != nil {
+		d.handleFailure(ctx, task)
+		return
 	}
 
-	platform := task.AssignedTo
-	if platform == "" {
-		platform = "chatgpt"
+	if err := d.db.UpdateTaskStatus(ctx, task.ID, types.StatusReview, result); err != nil {
+		log.Printf("Dispatcher: failed to update status for %s: %v", task.ID[:8], err)
+		return
 	}
 
-	payload := map[string]interface{}{
-		"task_id":     task.ID,
-		"prompt":      packet.Prompt,
-		"platform":    platform,
-		"branch_name": branchName,
+	if err := d.db.UnlockDependents(ctx, task.ID); err != nil {
+		log.Printf("Dispatcher: failed to unlock dependents for %s: %v", task.ID[:8], err)
 	}
 
-	payloadJSON, _ := json.Marshal(payload)
-	log.Printf("Dispatcher: would dispatch to GitHub: %s", string(payloadJSON))
-
-	return &types.DispatchResult{
-		TaskID:     task.ID,
-		Success:    true,
-		BranchName: branchName,
-	}, nil
+	log.Printf("Dispatcher: task %s completed successfully", task.ID[:8])
 }
 
-func (d *Dispatcher) dispatchLocal(ctx context.Context, task types.Task) (*types.DispatchResult, error) {
-	if len(d.cfg.Runners.Internal) == 0 {
-		return nil, fmt.Errorf("no internal runners configured")
+func (d *Dispatcher) selectModel() string {
+	if len(d.cfg.Runners.Internal) > 0 {
+		return d.cfg.Runners.Internal[0].ID
+	}
+	return "opencode"
+}
+
+func (d *Dispatcher) runOpenCode(ctx context.Context, prompt string, timeoutSec int) (output string, tokensIn, tokensOut int, err error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "opencode", "run", "--format", "json", prompt)
+	raw, execErr := cmd.CombinedOutput()
+
+	if execErr != nil {
+		return "", 0, 0, fmt.Errorf("opencode: %w\noutput: %s", execErr, string(raw))
 	}
 
-	runner := d.cfg.Runners.Internal[0]
-
-	packet, err := d.db.GetTaskPacket(ctx, task.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get task packet: %w", err)
-	}
-
-	if packet == nil {
-		return nil, fmt.Errorf("no task packet found for task %s", task.ID)
-	}
-
-	taskPacket := map[string]interface{}{
-		"task_id": task.ID,
-		"prompt":  packet.Prompt,
-		"title":   packet.Title,
-	}
-
-	packetJSON, _ := json.Marshal(taskPacket)
-
-	log.Printf("Dispatcher: running local command: %s", runner.Command)
-
-	cmd := exec.CommandContext(ctx, runner.Command, "--task-packet", string(packetJSON))
-	
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return &types.DispatchResult{
-			TaskID:  task.ID,
-			Success: false,
-			Error:   fmt.Sprintf("command failed: %v\noutput: %s", err, string(output)),
-		}, nil
-	}
-
-	_, warnings := d.leakDetector.Scan(string(output))
+	clean, warnings := d.leakDetector.Scan(string(raw))
 	if len(warnings) > 0 {
-		log.Printf("Dispatcher: leak warnings for task %s: %+v", task.ID, warnings)
+		log.Printf("Dispatcher: leak warnings: %+v", warnings)
+	}
+	_ = clean
+
+	var result struct {
+		Content      string `json:"content"`
+		InputTokens  int    `json:"input_tokens"`
+		OutputTokens int    `json:"output_tokens"`
+	}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		output = string(raw)
+		tokensIn = len(prompt) / 4
+		tokensOut = len(output) / 4
+	} else {
+		output = result.Content
+		tokensIn = result.InputTokens
+		tokensOut = result.OutputTokens
 	}
 
-	return &types.DispatchResult{
-		TaskID:  task.ID,
-		Success: true,
-		Error:   "",
-	}, nil
+	return output, tokensIn, tokensOut, nil
 }
 
-func (d *Dispatcher) handleFailure(ctx context.Context, task types.Task, errMsg string) {
-	task.Status = types.StatusAvailable
-	task.Attempts++
-
-	if task.Attempts >= task.MaxAttempts {
-		log.Printf("Dispatcher: task %s exceeded max attempts (%d), escalating", task.ID, task.Attempts)
-		
-		if err := d.db.ResetTask(ctx, task.ID, true); err != nil {
-			log.Printf("Dispatcher: failed to escalate task %s: %v", task.ID, err)
-		}
+func (d *Dispatcher) handleFailure(ctx context.Context, task types.Task) {
+	taskPtr, err := d.db.GetTaskByID(ctx, task.ID)
+	if err != nil {
+		log.Printf("Dispatcher: failed to get task %s for failure handling: %v", task.ID[:8], err)
+		return
+	}
+	if taskPtr == nil {
 		return
 	}
 
-	log.Printf("Dispatcher: retrying task %s (attempt %d/%d)", task.ID, task.Attempts, task.MaxAttempts)
-	
-	if err := d.db.ResetTask(ctx, task.ID, false); err != nil {
-		log.Printf("Dispatcher: failed to reset task %s: %v", task.ID, err)
+	escalate := taskPtr.Attempts+1 >= taskPtr.MaxAttempts
+
+	if err := d.db.ResetTask(ctx, task.ID, escalate); err != nil {
+		log.Printf("Dispatcher: failed to reset task %s: %v", task.ID[:8], err)
+		return
+	}
+
+	if escalate {
+		log.Printf("Dispatcher: task %s escalated (max attempts)", task.ID[:8])
+	} else {
+		log.Printf("Dispatcher: task %s returned to queue", task.ID[:8])
 	}
 }

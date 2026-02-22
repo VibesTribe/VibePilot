@@ -56,7 +56,7 @@ func (s *Sentry) poll(ctx context.Context) {
 		return
 	}
 
-	tasks, err := s.db.GetAvailableTasks(ctx)
+	tasks, err := s.db.GetAvailableTasks(ctx, s.maxInFlight-inFlightCount)
 	if err != nil {
 		log.Printf("Sentry: failed to poll tasks: %v", err)
 		return
