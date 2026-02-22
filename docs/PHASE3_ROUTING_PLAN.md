@@ -476,12 +476,18 @@ func (j *Janitor) refreshLimits(ctx context.Context) {
 
 ### Manual Transitions (Human via Vibes)
 
+**Human required for:**
+- Money decisions (credit top-up, subscriptions)
+- System change decisions (architecture, new approaches)
+- Visual UI/UX decisions (dashboard changes, interface revisions)
+- Final approval on complex changes
+
 | From | To | Trigger | Resolution |
 |------|-----|---------|------------|
 | active | paused | Credit depleted | Human tops up credit |
 | paused | active | Credit added | Vibes updates DB |
-| active | benched | Poor performance | Council review |
-| benched | active | Council approves | Supervisor updates |
+| active | benched | Poor performance | Council review → Human approval |
+| benched | active | Council + Human approve | Supervisor updates |
 
 ### 80% Throttle Logic
 
