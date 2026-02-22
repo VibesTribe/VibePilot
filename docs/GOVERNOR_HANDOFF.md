@@ -439,6 +439,8 @@ Tokens: 11/265
 
 ## PHASE 3: INTELLIGENT ROUTING (NOT YET IMPLEMENTED)
 
+**Full plan: `docs/PHASE3_ROUTING_PLAN.md`**
+
 ### Current State (Placeholder)
 
 ```yaml
