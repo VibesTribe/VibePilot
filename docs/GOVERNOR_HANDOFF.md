@@ -437,11 +437,31 @@ Tokens: 11/265
 
 ---
 
-## PHASE 3: INTELLIGENT ROUTING (NOT YET IMPLEMENTED)
+## PHASE 3: INTELLIGENT ROUTING (IMPLEMENTED 2026-02-22)
 
-**Full plan: `docs/PHASE3_ROUTING_PLAN.md`**
+**Full plan:** `docs/PHASE3_ROUTING_PLAN.md`
 
-### Current State (Placeholder)
+### What's Now Working
+
+| Component | Status |
+|-----------|--------|
+| tools table | ✅ Created |
+| runners table | ✅ Created |
+| Model pool | ✅ DB-driven selection |
+| get_best_runner RPC | ✅ Routing by capability + cost + success |
+| record_runner_result RPC | ✅ Updates task_ratings |
+| refresh_limits RPC | ✅ Auto-clear cooldowns/rate limits |
+| 80% throttle | ✅ Triggers cooldown until midnight |
+| Janitor refresh | ✅ Every minute |
+
+### Schema Applied (needs to run in Supabase)
+
+```bash
+# Run in Supabase SQL Editor:
+docs/supabase-schema/021_phase3_routing.sql
+```
+
+### Current State (DB-Driven)
 
 ```yaml
 runners:
