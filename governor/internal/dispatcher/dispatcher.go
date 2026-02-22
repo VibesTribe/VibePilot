@@ -10,6 +10,7 @@ import (
 
 	"github.com/vibepilot/governor/internal/config"
 	"github.com/vibepilot/governor/internal/db"
+	"github.com/vibepilot/governor/internal/pool"
 	"github.com/vibepilot/governor/internal/security"
 	"github.com/vibepilot/governor/pkg/types"
 )
@@ -17,6 +18,7 @@ import (
 type Dispatcher struct {
 	db           *db.DB
 	cfg          *config.Config
+	pool         *pool.Pool
 	leakDetector *security.LeakDetector
 }
 
@@ -24,6 +26,7 @@ func New(database *db.DB, cfg *config.Config, leakDetector *security.LeakDetecto
 	return &Dispatcher{
 		db:           database,
 		cfg:          cfg,
+		pool:         pool.New(database),
 		leakDetector: leakDetector,
 	}
 }
@@ -43,15 +46,23 @@ func (d *Dispatcher) Run(ctx context.Context, dispatchCh <-chan types.Task) {
 }
 
 func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
-	log.Printf("Dispatcher: task %s (routing=%s)", task.ID[:8], task.RoutingFlag)
+	log.Printf("Dispatcher: task %s (routing=%s, type=%s)", task.ID[:8], task.RoutingFlag, task.Type)
 
-	modelID := d.selectModel()
-	if modelID == "" {
-		log.Printf("Dispatcher: no model available for task %s", task.ID[:8])
+	runner, err := d.pool.SelectBest(ctx, string(task.RoutingFlag), task.Type)
+	if err != nil {
+		log.Printf("Dispatcher: pool error for %s: %v", task.ID[:8], err)
+		d.handleFailure(ctx, task)
+		return
+	}
+	if runner == nil {
+		log.Printf("Dispatcher: no runner available for %s (routing=%s)", task.ID[:8], task.RoutingFlag)
+		d.handleFailure(ctx, task)
 		return
 	}
 
-	if err := d.db.ClaimTask(ctx, task.ID, modelID); err != nil {
+	log.Printf("Dispatcher: selected runner %s (model=%s, priority=%d)", runner.ID[:8], runner.ModelID, runner.CostPriority)
+
+	if err := d.db.ClaimTask(ctx, task.ID, runner.ModelID); err != nil {
 		log.Printf("Dispatcher: claim failed for %s: %v", task.ID[:8], err)
 		return
 	}
@@ -60,14 +71,16 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 	if err != nil || packet == nil {
 		log.Printf("Dispatcher: no packet for %s: %v", task.ID[:8], err)
 		d.handleFailure(ctx, task)
+		d.recordResult(ctx, runner.ID, task.Type, false, 0)
 		return
 	}
 
-	output, tokensIn, tokensOut, execErr := d.runOpenCode(ctx, packet.Prompt, 300)
+	output, tokensIn, tokensOut, execErr := d.runTool(ctx, runner.ToolID, packet.Prompt, 300)
 
+	success := execErr == nil
 	status := "success"
 	var result interface{}
-	if execErr != nil {
+	if !success {
 		status = "failed"
 		result = map[string]interface{}{"error": execErr.Error()}
 	} else {
@@ -76,9 +89,9 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 
 	runID, err := d.db.RecordTaskRun(ctx, &db.TaskRunInput{
 		TaskID:    task.ID,
-		ModelID:   modelID,
+		ModelID:   runner.ModelID,
 		Courier:   "governor",
-		Platform:  "internal",
+		Platform:  string(task.RoutingFlag),
 		Status:    status,
 		Result:    result,
 		TokensIn:  tokensIn,
@@ -92,9 +105,16 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 		}
 	}
 
-	if execErr != nil {
+	d.recordResult(ctx, runner.ID, task.Type, success, tokensIn+tokensOut)
+
+	if !success {
 		d.handleFailure(ctx, task)
 		return
+	}
+
+	if d.pool.ShouldThrottle(runner) {
+		d.pool.SetCooldown(ctx, runner.ID, d.timeUntilMidnight())
+		log.Printf("Dispatcher: runner %s at 80%% daily, cooling down", runner.ID[:8])
 	}
 
 	if err := d.db.UpdateTaskStatus(ctx, task.ID, types.StatusReview, result); err != nil {
@@ -109,30 +129,22 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 	log.Printf("Dispatcher: task %s completed successfully", task.ID[:8])
 }
 
-func (d *Dispatcher) selectModel() string {
-	if len(d.cfg.Runners.Internal) > 0 {
-		return d.cfg.Runners.Internal[0].ModelID
+func (d *Dispatcher) recordResult(ctx context.Context, runnerID string, taskType string, success bool, tokens int) {
+	if err := d.pool.RecordResult(ctx, runnerID, taskType, success, tokens); err != nil {
+		log.Printf("Dispatcher: failed to record runner result: %v", err)
 	}
-	return "glm-5"
 }
 
-func (d *Dispatcher) getTool() string {
-	if len(d.cfg.Runners.Internal) > 0 && d.cfg.Runners.Internal[0].Tool != "" {
-		return d.cfg.Runners.Internal[0].Tool
-	}
-	return "opencode"
-}
-
-func (d *Dispatcher) runOpenCode(ctx context.Context, prompt string, timeoutSec int) (output string, tokensIn, tokensOut int, err error) {
+func (d *Dispatcher) runTool(ctx context.Context, toolID string, prompt string, timeoutSec int) (output string, tokensIn, tokensOut int, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
 	defer cancel()
 
-	tool := d.getTool()
-	cmd := exec.CommandContext(ctx, tool, "run", "--format", "json", prompt)
+	cmdName := d.resolveToolCommand(toolID)
+	cmd := exec.CommandContext(ctx, cmdName, "run", "--format", "json", prompt)
 	raw, execErr := cmd.CombinedOutput()
 
 	if execErr != nil {
-		return "", 0, 0, fmt.Errorf("opencode: %w\noutput: %s", execErr, string(raw))
+		return "", 0, 0, fmt.Errorf("%s: %w\noutput: %s", cmdName, execErr, string(raw))
 	}
 
 	clean, warnings := d.leakDetector.Scan(string(raw))
@@ -157,6 +169,23 @@ func (d *Dispatcher) runOpenCode(ctx context.Context, prompt string, timeoutSec 
 	}
 
 	return output, tokensIn, tokensOut, nil
+}
+
+func (d *Dispatcher) resolveToolCommand(toolID string) string {
+	switch toolID {
+	case "opencode":
+		return "opencode"
+	case "kimi-cli":
+		return "kimi"
+	default:
+		return "opencode"
+	}
+}
+
+func (d *Dispatcher) timeUntilMidnight() time.Duration {
+	now := time.Now()
+	midnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+	return midnight.Sub(now)
 }
 
 func (d *Dispatcher) handleFailure(ctx context.Context, task types.Task) {

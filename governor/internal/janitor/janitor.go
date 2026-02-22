@@ -33,6 +33,7 @@ func (j *Janitor) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			j.resetStuckTasks(ctx)
+			j.refreshLimits(ctx)
 		}
 	}
 }
@@ -54,15 +55,21 @@ func (j *Janitor) resetStuckTasks(ctx context.Context) {
 		escalate := task.Attempts >= task.MaxAttempts-1
 
 		if escalate {
-			log.Printf("Janitor: escalating stuck task %s (attempts: %d/%d)", 
+			log.Printf("Janitor: escalating stuck task %s (attempts: %d/%d)",
 				task.ID, task.Attempts, task.MaxAttempts)
 		} else {
-			log.Printf("Janitor: resetting stuck task %s (attempts: %d/%d)", 
+			log.Printf("Janitor: resetting stuck task %s (attempts: %d/%d)",
 				task.ID, task.Attempts, task.MaxAttempts)
 		}
 
 		if err := j.db.ResetTask(ctx, task.ID, escalate); err != nil {
 			log.Printf("Janitor: failed to reset task %s: %v", task.ID, err)
 		}
+	}
+}
+
+func (j *Janitor) refreshLimits(ctx context.Context) {
+	if err := j.db.RefreshLimits(ctx); err != nil {
+		log.Printf("Janitor: failed to refresh limits: %v", err)
 	}
 }
