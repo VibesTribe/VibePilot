@@ -273,15 +273,14 @@ func (d *DB) GetStuckTasks(ctx context.Context, timeout time.Duration) ([]types.
 }
 
 type Runner struct {
-	ID              string
-	ModelID         string
-	ToolID          string
-	CostPriority    int
-	Strengths       []string
-	DailyUsed       int
-	DailyLimit      int
-	CooldownExpires *time.Time
-	RateLimitReset  *time.Time
+	ID              string     `json:"id"`
+	ModelID         string     `json:"model_id"`
+	ToolID          string     `json:"tool_id"`
+	CostPriority    int        `json:"cost_priority"`
+	DailyUsed       int        `json:"daily_used"`
+	DailyLimit      int        `json:"daily_limit"`
+	CooldownExpires *time.Time `json:"cooldown_expires_at"`
+	RateLimitReset  *time.Time `json:"rate_limit_reset_at"`
 }
 
 func (d *DB) GetBestRunner(ctx context.Context, routing string, taskType string) (*Runner, error) {
