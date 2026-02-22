@@ -12,16 +12,72 @@
 ---
 
 **Last Updated:** 2026-02-22
-**Updated By:** GLM-5 - Session 23: Go Iron Stack architecture decision
-**Session Focus:** Strategic pivot to Go, architecture spec created
-**Direction:** Building Go Governor to replace Python orchestrator
+**Updated By:** GLM-5 - Session 23: Phase 1 COMPLETE - Go Governor running
+**Session Focus:** Go Governor built, tested, connected to Supabase
+**Direction:** Phase 2 next - GitHub Actions integration
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Architecture decided, spec written, ready to build
+**Progress:** Phase 1 COMPLETE - Governor runs, connects to Supabase, API works
 
 ---
 
-# SESSION 23: GO IRON STACK DECISION (2026-02-22)
+# SESSION 23: GO IRON STACK - PHASE 1 COMPLETE (2026-02-22)
+
+## Phase 1 Status: ✅ COMPLETE
+
+**Built and tested:**
+- Go Governor binary: 6.5MB (target: <15MB) ✅
+- Connects to Supabase via REST API ✅
+- All components start: Sentry, Dispatcher, Janitor, Server ✅
+- HTTP API works: /api/tasks, /api/models ✅
+- Uses SUPABASE_SERVICE_KEY from vault/GitHub secrets ✅
+
+**Files created in `governor/`:**
+```
+governor/
+├── cmd/governor/main.go           # Entry point
+├── internal/
+│   ├── sentry/sentry.go           # Polls Supabase (15s, max 3)
+│   ├── dispatcher/dispatcher.go   # Routes to GitHub/CLI
+│   ├── janitor/janitor.go         # Resets stuck tasks
+│   ├── server/server.go           # HTTP API + WebSocket
+│   ├── config/config.go           # YAML config
+│   ├── db/supabase.go             # REST API client
+│   └── security/
+│       ├── leak_detector.go       # IronClaw pattern
+│       └── allowlist.go           # IronClaw pattern
+├── pkg/types/types.go             # Shared types
+├── go.mod                         # Minimal deps
+├── governor.yaml                  # Configuration
+└── Makefile
+```
+
+**Dependencies (minimal):**
+- gopkg.in/yaml.v3 - config parsing
+- github.com/gorilla/websocket - real-time updates
+- Standard library (net/http) - Supabase REST API
+
+**No external Postgres driver** - uses Supabase REST API like Python does.
+
+## Remaining Phases
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 1. Foundation | ✅ COMPLETE | Go scaffold, Sentry, Dispatcher, Janitor, Server |
+| 2. GitHub Integration | 🔄 NEXT | Actions dispatch, courier workflow, branch management |
+| 3. HTTP Server | Pending | Dashboard wiring, WebSocket real-time |
+| 4. Cutover | Pending | Parallel run with Python, verify, switch |
+
+## How to Run
+
+```bash
+cd ~/vibepilot/governor
+export SUPABASE_URL="https://qtpdzsinvifkgpxyxlaz.supabase.co"
+export SUPABASE_SERVICE_KEY="<from vault or GitHub secrets>"
+./governor
+```
+
+## Strategic Pivot (Context)
 
 ## Strategic Pivot
 
