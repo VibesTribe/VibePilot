@@ -2,237 +2,258 @@
 
 **Required reading: FIVE files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
-2. **`docs/WHAT_WHERE.md`** - Where everything is located
-3. **`docs/prd_v1.4.md`** - Complete system specification
+2. **`docs/SYSTEM_REFERENCE.md`** ← **WHAT WE HAVE AND HOW IT WORKS** (start here!)
+3. **`docs/GO_IRON_STACK.md`** ← **GO ARCHITECTURE SPEC** (the plan)
 4. **`docs/core_philosophy.md`** - Strategic mindset and inviolable principles
-5. **`CHANGELOG.md`** - History, changes, rollback commands
+5. **`docs/prd_v1.4.md`** - Complete system specification
 
 **Read all five → Know everything → Do anything**
 
 ---
 
-**Last Updated:** 2026-02-21 06:15 UTC
-**Updated By:** GLM-5 - Pipeline test day 1 complete, critical gaps identified
-**Session Focus:** Infrastructure wiring + first pipeline test revealed core gaps
+**Last Updated:** 2026-02-22
+**Updated By:** GLM-5 - Session 23: Go Iron Stack architecture decision
+**Session Focus:** Strategic pivot to Go, architecture spec created
+**Direction:** Building Go Governor to replace Python orchestrator
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Foundation wired, test revealed routing intelligence gaps
+**Progress:** Architecture decided, spec written, ready to build
 
 ---
 
-# SESSION 21 SUMMARY (2026-02-21)
+# SESSION 23: GO IRON STACK DECISION (2026-02-22)
 
-## Infrastructure Wiring Complete (GLM-5 + Kimi)
+## Strategic Pivot
 
-### 1. Supervisor Final Approval → Tasks Created ✅
-**Problem:** Council approves plan, but no trigger to create tasks
-**Solution:** `SupervisorAgent.approve_plan_and_create_tasks(plan_path)`
-**Key Insight:** Tasks created as "available" (not pending) because plan is already approved
-**Commit:** `e44ce394`
+**Problem:** 
+- GCE e2-standard-2: $64/mo (not sustainable)
+- OpenCode runner alone: 1.4GB RAM
+- Target: e2-micro (1GB total, free tier)
+- Python cannot scale to 18 concurrent agents on 1GB
 
-### 2. Maintenance Integrated in Orchestrator ✅
-**Problem:** Maintenance agent existed but never ran (commands queued forever)
-**Solution:** Added `_process_maintenance_commands()` to orchestrator._tick()
-**Decision:** Option B (integrated, not separate service) - if orchestrator dies, no git work anyway
-**Commit:** `9f7b1ae2`
+**Solution:** Go Iron Stack
+- Replace Python orchestrator with Go "Governor" (10-20MB)
+- Offload browser-use to GitHub Actions (7GB free runners)
+- Single binary deployment with embedded UI
+- Fits free tier perfectly
 
-### 3. State Machine Clarified ✅
-**Human Clarified:**
-- `approved` = tests pass, approved = ready for git
-- `merged` = git operations complete = FINAL STATUS
-- No `merged → complete` transition needed
+## Key Decisions
 
-### 4. First Pipeline Test Attempted ⚠️
-**Test Task:** Change "Vibeflow" to "VibePilot" in MissionHeader.tsx
-**PRD:** Created in `docs/prd/vibepilot-rename-dashboard-prd.md`
-**Plan:** Created in `docs/plans/vibeflow-test-plan.json`
-**Branch:** `vibeflow-test` in vibeflow repo
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Language | Go | 10-20MB vs 1.4GB, goroutines for concurrency |
+| Browser execution | GitHub Actions | 7GB free per runner, unlimited parallelism |
+| Task dispatch | Poll-based | No 429 rate limits, controlled drip-feed |
+| Deployment | Single binary | No venv/pip/drift |
 
----
+## What Stays (DO NOT TOUCH)
 
-## CRITICAL GAPS DISCOVERED (MUST FIX)
+- **Dashboard** - vibeflow repo, user is attached
+- **Agent prompts** - config/prompts/*.md preserved
+- **Architecture docs** - prd, philosophy, considerations
+- **Supabase schema** - no migrations needed
+- **Config files** - same JSON, Go reads them
 
-### Gap 1: Routing Intelligence Missing
+## What Changes
 
-**Problem:** Tasks have `routing_flag` but orchestrator doesn't make smart decisions
+- Python orchestrator → Go Governor
+- Local browsers → GitHub Actions
+- venv + pip → Single binary
 
-**What Happened:**
-- Task T001 created with `routing_flag="web"`
-- No runner supports "web" routing
-- Task escalated after max retries
+## New Files Created
 
-**What Should Happen:**
-- Orchestrator or Council analyzes task requirements
-- Dashboard work requires codebase access → should route to "internal" (Kimi/GLM-5)
-- System auto-selects appropriate routing based on task analysis
+| File | Purpose |
+|------|---------|
+| `docs/SYSTEM_REFERENCE.md` | Single source of truth for "what we have" |
+| `docs/GO_IRON_STACK.md` | Complete Go architecture specification |
 
-**Current Valid Routing Flags:** `internal`, `web`
-**Current Runners:** kimi-cli, opencode (both CLI with codebase), courier (browser, no codebase)
+## Migration Phases
 
-### Gap 2: Available Agent Awareness
-
-**Problem:** Orchestrator doesn't know which agents are actually available
-
-**What Happened:**
-- Kimi quota exceeded mid-test
-- Orchestrator kept trying to route to unavailable agents
-- Should have known only GLM-5 was available
-
-**What Should Happen:**
-- Orchestrator tracks agent availability (quota status, online/offline)
-- Routes only to available agents
-- Council/orchestrator considers "who's available" before routing
-
-### Gap 3: Multiple Parallel Tasks
-
-**Problem:** 17 available tasks in queue, orchestrator processing one at a time
-
-**What Should Happen:**
-- Orchestrator dispatches multiple tasks in parallel
-- Respects max_workers config
-- Handles old tasks + new tasks added dynamically
-
-### Gap 4: Planner Plan Parsing
-
-**Problem:** "Could not parse plan from LLM response"
-
-**What Happened:**
-- Planner (via kimi-cli) returned unparseable response
-- Idea processing failed repeatedly
-
-**What Should Happen:**
-- Robust plan parsing with validation
-- Fallback/retry with different model if parsing fails
-- Better error handling
+1. **Foundation** (1 session) - Go scaffold, Sentry, Dispatcher
+2. **GitHub Integration** (1 session) - Actions dispatch, workflows
+3. **HTTP Server** (1 session) - API, WebSocket, embedded UI
+4. **Cutover** (1 session) - Parallel run, verify, switch
 
 ---
 
-## WHAT NEEDS BUILDING (Priority Order)
+# SESSION 22 FULL SUMMARY (2026-02-21)
 
-### 1. Smart Routing Intelligence (CRITICAL)
-**Owner:** GLM-5 or Kimi (needs coordination)
+## Infrastructure Fixes ✅
 
-**Tasks:**
-- [ ] Orchestrator analyzes task before routing
-- [ ] Detects: needs codebase? needs browser? simple API?
-- [ ] Maps task type → appropriate routing_flag
-- [ ] Council catches bad routing decisions
+1. **OpenCode Runner Created** - Added to RUNNER_REGISTRY
+2. **Process Memory Leak Fixed** - Popen with process group cleanup
+3. **Models Table Status Respected** - Skips paused/benched in runner pool
+4. **RPC Missing result Column Fixed** - Use fallback query with select("*")
+5. **Escalation Preserves prompt_packet** - Merge, don't overwrite
+6. **Stuck Task Detection** - 10min timeout, auto-reset
+7. **Cooldown Auto-Reactivation** - Checks on startup + periodic
+8. **Robust Plan Parsing** - 5 extraction methods, retry logic
 
-**Example Logic:**
-```
-Task: "Edit React component in dashboard"
-Analysis: Requires codebase access, file editing
-Decision: route to "internal" (Kimi or GLM-5 with codebase)
+## Swaps Made ✅
 
-Task: "Research competitor pricing"
-Analysis: Needs web browsing, no codebase
-Decision: route to "courier" or "web"
-```
+- **Kimi CLI removed** - Subscription cancelled, not cost effective
+- **Kimi benched in DB** - Can reactivate via API later if needed
+- **GLM-5 only active runner** - OpenCode is heavy (1.4GB) but working
 
-### 2. Agent Availability Tracking
-**Owner:** GLM-5
+## System Baseline
 
-**Tasks:**
-- [ ] Track each agent's quota status
-- [ ] Track online/offline status
-- [ ] Only route to available agents
-- [ ] Alert when no agents available
-
-### 3. Parallel Task Dispatch
-**Owner:** GLM-5
-
-**Tasks:**
-- [ ] Verify max_workers respected
-- [ ] Multiple tasks dispatch simultaneously
-- [ ] Track each independently
-
-### 4. Robust Plan Parsing
-**Owner:** TBD
-
-**Tasks:**
-- [ ] Validate LLM response before accepting
-- [ ] Fallback to different model if parse fails
-- [ ] Better error messages
-
-### 5. Council Routing Review
-**Owner:** Kimi (front-end) + GLM-5 (back-end coordination)
-
-**Tasks:**
-- [ ] Council reviews routing decisions
-- [ ] Catches "web" routing for codebase tasks
-- [ ] Can veto and reroute
+| Component | Current | Target |
+|-----------|---------|--------|
+| GCE Instance | e2-standard-2 ($64/mo) | e2-micro (free) |
+| Orchestrator | 99 MB | Keep |
+| OpenCode session | 1.4 GB | Replace with lean runner |
+| VibePilot code | 16,106 lines Python | ~4k lines (Claw pattern) |
+| Runners | 1 active (GLM-5) | Multiple swappable |
 
 ---
 
-## CURRENT SYSTEM STATE
+# CLAW FRAMEWORK RESEARCH
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Orchestrator | ✅ Running | systemd service, polling every 2s |
-| Consultant | ✅ Wired | Routes through orchestrator |
-| Planner | ⚠️ Partial | Routes through orchestrator but parsing fails |
-| Council | ⚠️ Simplified | Placeholder, not full implementation |
-| Supervisor | ✅ Wired | approve_plan_and_create_tasks works |
-| Maintenance | ✅ Wired | Integrated in _tick() |
-| Executioner | ✅ Exists | Wired but not tested |
-| Runner Pool | ⚠️ Gaps | No smart routing, no availability tracking |
+## Deep Dive Findings
 
----
+### ZeroClaw (Rust, 8.8MB binary, 5MB RAM)
 
-## TEST TASK STATUS
+**What we should adopt:**
+- **Provider traits** - Config-driven LLM swapping, no code changes
+- **SQLite + FTS5** - Bundled, no external dependencies
+- **Hot-config reload** - Changes apply without restart
+- **Tool registry** - Tools self-describe, work with any LLM
+- **Size optimization** - 8.8MB binary, <10ms startup
 
-**Task T001:** Change brand name in MissionHeader
-- Status: `escalated` (failed after max retries)
-- Issue: Bad routing_flag, no available runner
-- Fix: Updated routing_flag to "internal"
-- Next: Reset and retry after smart routing built
+**Key code patterns:**
+```rust
+// Provider trait - swap LLMs via config
+pub trait Provider: Send + Sync {
+    async fn chat(&self, request: ChatRequest, model: &str) -> Result<ChatResponse>;
+    fn supports_native_tools(&self) -> bool;
+}
 
----
-
-## TOMORROW'S SESSION
-
-1. **Reset test tasks** - Clean state
-2. **Build smart routing** - Analyze task → pick right runner
-3. **Build agent availability tracking** - Know who's online
-4. **Retry pipeline test** - Verify end-to-end
-
----
-
-# ACTIVE MODELS (Current State)
-
-| Model ID | Status | Access Via | Notes |
-|----------|--------|------------|-------|
-| kimi-cli | quota_exceeded | kimi-cli | Was active, now paused |
-| glm-5 / opencode | active | opencode CLI | Only available agent |
-| gemini-api | paused | API | quota_exhausted |
-| deepseek-chat | paused | API | credit_needed |
-| gpt-4o, gpt-4o-mini | benched | N/A | Web platform only |
-| claude-sonnet-4-5, claude-haiku-4-5 | benched | N/A | Web platform only |
-
----
-
-# TASK STATUS FLOW
-
-```
-pending ──► approve_plan() ──┬──► available (no deps) ──► in_progress
-                             │
-                             └──► locked (has deps)
-                                        │
-                                        │ [parent task merges]
-                                        │ [unlock_dependent_tasks RPC fires]
-                                        ▼
-                                   available ──► in_progress
+// Config-driven selection
+default_provider = "openrouter"  // or "anthropic", "custom:https://..."
 ```
 
-**Full status lifecycle:**
-```
-pending → available → in_progress → review → testing → approved → merged (FINAL)
+### NanoClaw (TypeScript, ~4k lines, 17% LLM context)
 
-Special states:
-- locked: Awaiting dependencies
-- escalated: Max attempts exceeded
-- awaiting_human: Visual/manual testing needed
+**What we should adopt:**
+- **Fits in LLM context** - Entire codebase understandable by AI
+- **1 file per concern** - db.ts, config.ts, types.ts
+- **Skills over plugins** - Transform codebase, don't configure framework
+- **File-based IPC** - Simple, debuggable, no Redis
+- **SQLite direct** - No ORM, no abstraction
+
+**Why 4k lines works:**
+- No abstraction layers (no factories, managers)
+- Single responsibility files
+- Intentionally left out web dashboard, multiple channels, etc.
+
+### IronClaw (Rust, 20k lines, security-focused)
+
+**What we should adopt:**
+- **Leak detection** - Scan tool outputs for secret patterns (portable to Python)
+- **Credential injection** - Secrets injected at boundary, never in context
+- **Allowlist validation** - HTTP requests only to approved endpoints
+- **Docker sandbox** - Container-based isolation (not WASM for now)
+
+**Patterns portable to Python:**
+```python
+# Leak detection - direct port
+class LeakDetector:
+    PATTERNS = [
+        ("openai_key", r"sk-[a-zA-Z0-9]{20,}", "block"),
+        ("github_token", r"gh[pousr]_[A-Za-z0-9_]{36,}", "block"),
+    ]
 ```
+
+---
+
+## Patterns to Adopt in VibePilot
+
+| From | Pattern | VibePilot Application |
+|------|---------|----------------------|
+| **ZeroClaw** | Config-driven providers | models.json → hot-swap runners |
+| **ZeroClaw** | 5MB footprint | Audit and strip to essentials |
+| **NanoClaw** | 4k lines | Consolidate, one file per concern |
+| **NanoClaw** | Fits in context | AI can modify entire codebase |
+| **IronClaw** | Leak detection | Add to tool output processing |
+| **IronClaw** | Credential injection | Vault secrets at execution only |
+
+---
+
+## Current Codebase vs Claw Patterns
+
+| We Have | Claw Approach | Gap |
+|---------|---------------|-----|
+| Runner registry (hardcoded) | Config-driven factory | Need config swap |
+| Memory backend (pluggable) | SQLite only | Overengineered |
+| 16k lines Python | 4k lines focused | Bloat |
+| Vault (works) | Injection at boundary | Exposed in context |
+| No leak detection | Regex scanner | Missing |
+
+---
+
+## Path Forward
+
+### Option A: Test GLM Subscription Endpoint (10 min)
+- Verify `api.z.ai/api/anthropic` works with subscription
+- If yes → build lightweight runner
+
+### Option B: Python Refactor with Claw Patterns (1 session)
+- Audit 16k lines → identify dead code
+- Apply config-driven providers
+- Add leak detection
+- Consolidate to ~4k lines
+
+### Option C: Fork ZeroClaw, Customize (1-2 sessions)
+- Take proven Rust runner
+- Strip to core
+- Add VibePilot integrations (Supabase, GitHub)
+
+---
+
+## GLM Subscription Research (from Gemini)
+
+**Anthropic-compatible endpoint:**
+```
+Base URL: https://api.z.ai/api/anthropic
+Format: Anthropic "Messages" format
+Model: glm-4.7 or glm-5
+Billing: Uses subscription quota (not pay-per-token)
+```
+
+**Other platforms supported:**
+- Claude Code CLI (set ANTHROPIC_BASE_URL)
+- Kilo Code / Roo Code (pre-set for Z-AI)
+- Direct Python (anthropic library)
+
+---
+
+## Requirements for Web of Webs
+
+VibePilot must support building WoW - a massively scaleable, secure, multimodal social network:
+
+- ✅ Run on free tier with parallel agents
+- ✅ Track every token (task → module → project)
+- ✅ Track every model on every task
+- ✅ ROI calculator works
+- ✅ Farm to ANY web AI platform
+- ✅ Real task data (not benchmarks)
+- ✅ New strategies in minutes
+- ✅ Know each LLM's strengths/weaknesses
+- ✅ Never exceed free tier limits
+- ✅ Complex tasks → in-house only (triple checked)
+- ✅ Planner → 95% confidence, one-shot on weakest model
+- ✅ Parallel: free web models + in-house QC
+
+---
+
+# ACTIVE MODELS
+
+| Model ID | Status | Notes |
+|----------|--------|-------|
+| glm-5 (opencode) | ✅ ACTIVE | Only working runner (1.4GB) |
+| kimi-cli | BENCHED | Subscription cancelled |
+| gemini-api | PAUSED | Quota exhausted |
+| deepseek-chat | PAUSED | Credit needed |
 
 ---
 
@@ -241,37 +262,19 @@ Special states:
 | Command | Action |
 |---------|--------|
 | `cat CURRENT_STATE.md` | This file |
-| `cat AGENT_CHAT.md` | GLM-Kimi chat |
-| `git log --oneline -10` | Recent commits |
+| `cat AGENTS.md` | Mental model + workflow |
 | `sudo journalctl -u vibepilot-orchestrator -f` | Orchestrator logs |
-| `python -c "from agents.supervisor import SupervisorAgent; s=SupervisorAgent(); print(s.approve_plan_and_create_tasks('docs/plans/plan.json'))"` | Create tasks from plan |
+| `cd ~/vibepilot && source venv/bin/activate` | Activate venv |
 
 ---
 
 # FILES MODIFIED THIS SESSION
 
-| File | Change | Commit |
-|------|--------|--------|
-| `core/orchestrator.py` | Added `_process_maintenance_commands()` | `9f7b1ae2` |
-| `agents/maintenance.py` | Added `execute()` method | `9f7b1ae2` |
-| `agents/supervisor.py` | Added `approve_plan_and_create_tasks()` | `e44ce394` |
-| `agents/supervisor.py` | Added `set_orchestrator()` | `01ac0b1c` |
-| `prompts/consultant.md` | Added ZERO ASSUMPTIONS RULE | Session 19 |
-| `docs/plans/vibeflow-test-plan.json` | Test plan created | `5f91245f` |
-
----
-
-# KIMI USAGE PRIORITY
-
-**Kimi subscription: Currently quota exceeded**
-
-Use Kimi for (when available):
-- Research tasks (web access)
-- Parallel sub-agent tasks
-- Any task requiring browser/vision/multimodal
-- Front-end pipeline work
-
-GLM-5 handles:
-- Back-end infrastructure
-- Code wiring
-- Core orchestration
+| File | Change |
+|------|--------|
+| `runners/contract_runners.py` | Added OpenCodeContractRunner, process cleanup |
+| `core/orchestrator.py` | Model status check, stuck task detection, cooldown reactivation |
+| `agents/planner.py` | Robust plan parsing with retry |
+| `task_manager.py` | Preserve prompt_packet on escalation |
+| `AGENTS.md` | Added mental model section |
+| `CURRENT_STATE.md` | This update |
