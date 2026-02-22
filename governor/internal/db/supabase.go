@@ -271,3 +271,65 @@ func (d *DB) GetStuckTasks(ctx context.Context, timeout time.Duration) ([]types.
 	}
 	return tasks, nil
 }
+
+type Runner struct {
+	ID              string
+	ModelID         string
+	ToolID          string
+	CostPriority    int
+	Strengths       []string
+	DailyUsed       int
+	DailyLimit      int
+	CooldownExpires *time.Time
+	RateLimitReset  *time.Time
+}
+
+func (d *DB) GetBestRunner(ctx context.Context, routing string, taskType string) (*Runner, error) {
+	data, err := d.rpc(ctx, "get_best_runner", map[string]interface{}{
+		"p_routing":   routing,
+		"p_task_type": taskType,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var runners []Runner
+	if err := json.Unmarshal(data, &runners); err != nil {
+		return nil, fmt.Errorf("unmarshal runner: %w", err)
+	}
+	if len(runners) == 0 {
+		return nil, nil
+	}
+	return &runners[0], nil
+}
+
+func (d *DB) RecordRunnerResult(ctx context.Context, runnerID string, taskType string, success bool, tokens int) error {
+	_, err := d.rpc(ctx, "record_runner_result", map[string]interface{}{
+		"p_runner_id":   runnerID,
+		"p_task_type":   taskType,
+		"p_success":     success,
+		"p_tokens_used": tokens,
+	})
+	return err
+}
+
+func (d *DB) RefreshLimits(ctx context.Context) error {
+	_, err := d.rpc(ctx, "refresh_limits", nil)
+	return err
+}
+
+func (d *DB) SetRunnerCooldown(ctx context.Context, runnerID string, expiresAt time.Time) error {
+	_, err := d.rpc(ctx, "set_runner_cooldown", map[string]interface{}{
+		"p_runner_id":  runnerID,
+		"p_expires_at": expiresAt.Format(time.RFC3339),
+	})
+	return err
+}
+
+func (d *DB) SetRunnerRateLimited(ctx context.Context, runnerID string, resetAt time.Time) error {
+	_, err := d.rpc(ctx, "set_runner_rate_limited", map[string]interface{}{
+		"p_runner_id": runnerID,
+		"p_reset_at":  resetAt.Format(time.RFC3339),
+	})
+	return err
+}
