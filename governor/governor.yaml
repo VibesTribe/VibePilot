@@ -1,0 +1,44 @@
+governor:
+  poll_interval: 15s
+  max_concurrent: 3
+  stuck_timeout: 10m
+
+supabase:
+  url: ${SUPABASE_URL}
+  service_key: ${SUPABASE_SERVICE_KEY}
+
+github:
+  token: ${GITHUB_TOKEN}
+  owner: ${GITHUB_OWNER}
+  repo: ${GITHUB_REPO}
+  workflow: courier.yml
+
+runners:
+  internal:
+    - id: opencode
+      command: opencode
+      ram_limit_mb: 500
+
+courier:
+  driver_model: gemini-2.0-flash
+  platforms:
+    - id: chatgpt
+      url: https://chat.openai.com
+      daily_limit: 40
+    - id: claude
+      url: https://claude.ai
+      daily_limit: 10
+    - id: gemini
+      url: https://gemini.google.com
+      daily_limit: 100
+
+server:
+  addr: :8080
+  dashboard_dist: ./dist
+
+security:
+  allowed_hosts:
+    - api.supabase.co
+    - api.github.com
+    - api.anthropic.com
+    - api.openai.com
