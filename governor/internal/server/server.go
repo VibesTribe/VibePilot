@@ -112,7 +112,7 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	tasks, err := s.db.GetAvailableTasks(ctx)
+	tasks, err := s.db.GetAvailableTasks(ctx, 50)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -183,11 +183,11 @@ func (s *Server) handleROI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	roi := map[string]interface{}{
-		"total_tasks":     0,
-		"total_tokens":    0,
+		"total_tasks":      0,
+		"total_tokens":     0,
 		"theoretical_cost": 0.0,
-		"actual_cost":     0.0,
-		"savings":         0.0,
+		"actual_cost":      0.0,
+		"savings":          0.0,
 	}
 
 	s.jsonResponse(w, roi)
