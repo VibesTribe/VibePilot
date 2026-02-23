@@ -17,6 +17,10 @@ import (
 	"github.com/vibepilot/governor/pkg/types"
 )
 
+type TaskCompleter interface {
+	OnTaskComplete(ctx context.Context, taskID string, result interface{})
+}
+
 type Dispatcher struct {
 	db            *db.DB
 	cfg           *config.Config
@@ -24,6 +28,7 @@ type Dispatcher struct {
 	leakDetector  *security.LeakDetector
 	moduleLimiter *throttle.ModuleLimiter
 	courier       *courier.Dispatcher
+	completer     TaskCompleter
 }
 
 func New(database *db.DB, cfg *config.Config, leakDetector *security.LeakDetector, moduleLimiter *throttle.ModuleLimiter) *Dispatcher {
@@ -39,6 +44,10 @@ func New(database *db.DB, cfg *config.Config, leakDetector *security.LeakDetecto
 
 func (d *Dispatcher) SetCourier(c *courier.Dispatcher) {
 	d.courier = c
+}
+
+func (d *Dispatcher) SetOrchestrator(completer TaskCompleter) {
+	d.completer = completer
 }
 
 func (d *Dispatcher) Run(ctx context.Context, dispatchCh <-chan types.Task) {
@@ -137,14 +146,12 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 		log.Printf("Dispatcher: runner %s at 80%% daily, cooling down", runner.ID[:8])
 	}
 
-	if err := d.db.UpdateTaskStatus(ctx, task.ID, types.StatusReview, result); err != nil {
-		log.Printf("Dispatcher: failed to update status for %s: %v", task.ID[:8], err)
-		d.releaseSlot(task.SliceID)
-		return
-	}
-
-	if err := d.db.UnlockDependents(ctx, task.ID); err != nil {
-		log.Printf("Dispatcher: failed to unlock dependents for %s: %v", task.ID[:8], err)
+	if d.completer != nil {
+		d.completer.OnTaskComplete(ctx, task.ID, result)
+	} else {
+		if err := d.db.UpdateTaskStatus(ctx, task.ID, types.StatusReview, result); err != nil {
+			log.Printf("Dispatcher: failed to update status for %s: %v", task.ID[:8], err)
+		}
 	}
 
 	d.releaseSlot(task.SliceID)
@@ -303,12 +310,12 @@ func (d *Dispatcher) OnCourierResult(result courier.Result) {
 		return
 	}
 
-	if err := d.db.UpdateTaskStatus(ctx, result.TaskID, types.StatusReview, taskResult); err != nil {
-		log.Printf("Dispatcher: failed to update courier task status %s: %v", result.TaskID[:8], err)
-	}
-
-	if err := d.db.UnlockDependents(ctx, result.TaskID); err != nil {
-		log.Printf("Dispatcher: failed to unlock dependents for courier %s: %v", result.TaskID[:8], err)
+	if d.completer != nil {
+		d.completer.OnTaskComplete(ctx, result.TaskID, taskResult)
+	} else {
+		if err := d.db.UpdateTaskStatus(ctx, result.TaskID, types.StatusReview, taskResult); err != nil {
+			log.Printf("Dispatcher: failed to update courier task status %s: %v", result.TaskID[:8], err)
+		}
 	}
 
 	d.releaseSlot(task.SliceID)

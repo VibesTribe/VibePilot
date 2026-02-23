@@ -1,0 +1,491 @@
+{
+  "prd_ref": "PRD: VibePilot Dashboard Rebrand — vibeflow → vibepilot",
+  "planning_principles": [
+    "Isolation-first: Each slice operates on distinct file sets with no overlap",
+    "Cascade prevention: No cross-slice code dependencies",
+    "Atomic tasks: 95%+ confidence, one-shot capable",
+    "Text-only changes: Zero visual or functional modifications",
+    "Verification at every slice boundary"
+  ],
+  "slices": [
+    {
+      "slice_id": "dashboard-ui",
+      "name": "Dashboard UI (React)",
+      "description": "Updates the React dashboard component brand text from Vibeflow to VibePilot",
+      "owns": ["MissionHeader.tsx brand text", "React dashboard UI strings"],
+      "exposes": ["Branded header component for dashboard"],
+      "consumes": [],
+      "boundaries": "Does NOT touch terminal dashboard, documentation, or configuration files. Only affects React component at ~/vibeflow/apps/dashboard/components/MissionHeader.tsx",
+      "phases": [
+        {
+          "phase_id": "P1",
+          "name": "Foundation",
+          "tasks": [
+            {
+              "task_id": "DASHBOARD-P1-T001",
+              "slice_id": "dashboard-ui",
+              "phase": "P1",
+              "title": "Replace Vibeflow brand text in MissionHeader.tsx",
+              "purpose": "Primary rebrand: Update the dashboard header to display VibePilot instead of Vibeflow",
+              "objectives": [
+                "Locate line 308 in MissionHeader.tsx",
+                "Replace 'Vibeflow' with 'VibePilot' in the span element",
+                "Preserve all CSS classes and attributes exactly",
+                "Verify no other occurrences exist in the file"
+              ],
+              "prompt_packet": "CONTEXT: You are updating the brand name in a React TypeScript component. The file is at ~/vibeflow/apps/dashboard/components/MissionHeader.tsx. Line 308 currently contains: <span className=\"mission-header__brand\">Vibeflow</span>. This is a TEXT-ONLY change with zero visual modifications required.\n\nWHAT TO BUILD: Change the text content from 'Vibeflow' to 'VibePilot' on line 308. The CSS class 'mission-header__brand' must remain unchanged.\n\nACCEPTANCE CRITERIA:\n1. Line 308 reads: <span className=\"mission-header__brand\">VibePilot</span>\n2. All other code remains identical\n3. No changes to imports, types, or logic\n4. File builds successfully with 'npm run build'\n\nOUTPUT FORMAT: Confirm the exact line that was changed and provide the git diff output.",
+              "deliverables": ["Modified ~/vibeflow/apps/dashboard/components/MissionHeader.tsx"],
+              "expected_output": {
+                "files_created": [],
+                "files_modified": ["~/vibeflow/apps/dashboard/components/MissionHeader.tsx"],
+                "tests_pass": [],
+                "git_diff": "Line 308: 'Vibeflow' → 'VibePilot'"
+              },
+              "dependencies": [],
+              "dependency_type": "none",
+              "routing_flag": "internal",
+              "routing_flag_reason": "Touches existing file, needs precise line editing, requires git verification",
+              "slice_boundary": {
+                "touches_slices": [],
+                "exposes_to_slices": [],
+                "receives_from_slices": []
+              },
+              "confidence": 0.99,
+              "confidence_reasoning": "Single line text replacement with exact location known. No logic changes, no dependencies, trivial verification.",
+              "suggested_agent": "internal_cli",
+              "estimated_context": "2k tokens"
+            }
+          ]
+        },
+        {
+          "phase_id": "P2",
+          "name": "Verification",
+          "tasks": [
+            {
+              "task_id": "DASHBOARD-P2-T001",
+              "slice_id": "dashboard-ui",
+              "phase": "P2",
+              "title": "Build verification for React dashboard",
+              "purpose": "Ensure the text change does not break the build",
+              "objectives": [
+                "Run npm install if needed",
+                "Execute npm run build",
+                "Verify build completes without errors",
+                "Confirm no TypeScript compilation errors"
+              ],
+              "prompt_packet": "CONTEXT: You are verifying that a single-line text change in MissionHeader.tsx does not break the React dashboard build. The change was from 'Vibeflow' to 'VibePilot' on line 308.\n\nWHAT TO BUILD: Run the build process and verify it succeeds.\n\nACCEPTANCE CRITERIA:\n1. npm run build completes with exit code 0\n2. No TypeScript compilation errors\n3. No linting errors\n4. Build artifacts are generated\n\nOUTPUT FORMAT: Provide the build command output (last 20 lines) and confirm success.",
+              "deliverables": ["Build success confirmation"],
+              "expected_output": {
+                "files_created": [],
+                "files_modified": [],
+                "tests_pass": ["npm run build"],
+                "build_output": "Exit code 0, no errors"
+              },
+              "dependencies": [{"task_id": "DASHBOARD-P1-T001", "type": "code_context"}],
+              "dependency_type": "code_context",
+              "routing_flag": "internal",
+              "routing_flag_reason": "Needs codebase access to run build commands, depends on prior file modification",
+              "slice_boundary": {
+                "touches_slices": [],
+                "exposes_to_slices": [],
+                "receives_from_slices": []
+              },
+              "confidence": 0.97,
+              "confidence_reasoning": "Text-only change cannot break TypeScript types. Build verification is standard procedure.",
+              "suggested_agent": "internal_cli",
+              "estimated_context": "4k tokens"
+            },
+            {
+              "task_id": "DASHBOARD-P2-T002",
+              "slice_id": "dashboard-ui",
+              "phase": "P2",
+              "title": "Final grep validation for React dashboard",
+              "purpose": "Confirm zero remaining vibeflow occurrences in dashboard directory",
+              "objectives": [
+                "Run ripgrep for 'vibeflow' (case insensitive) in ~/vibeflow/apps/dashboard/",
+                "Verify count is zero",
+                "Report any remaining occurrences if found"
+              ],
+              "prompt_packet": "CONTEXT: Final validation step for the React dashboard rebrand. Need to confirm no 'vibeflow' text remains in the dashboard directory.\n\nWHAT TO BUILD: Execute a comprehensive grep search and report results.\n\nACCEPTANCE CRITERIA:\n1. rg -i 'vibeflow' ~/vibeflow/apps/dashboard/ returns zero results\n2. If any results found, list them with file paths and line numbers\n3. Confirm 'VibePilot' appears exactly once in MissionHeader.tsx\n\nOUTPUT FORMAT: Provide the grep command and its output (or 'No matches found').",
+              "deliverables": ["Grep validation report"],
+              "expected_output": {
+                "files_created": [],
+                "files_modified": [],
+                "tests_pass": ["Zero vibeflow occurrences"],
+                "grep_results": "0 matches"
+              },
+              "dependencies": [{"task_id": "DASHBOARD-P2-T001", "type": "summary"}],
+              "dependency_type": "summary",
+              "routing_flag": "internal",
+              "routing_flag_reason": "Needs filesystem access to run ripgrep, but simple validation only",
+              "slice_boundary": {
+                "touches_slices": [],
+                "exposes_to_slices": [],
+                "receives_from_slices": []
+              },
+              "confidence": 0.99,
+              "confidence_reasoning": "Simple grep command with clear pass/fail criteria. No ambiguity.",
+              "suggested_agent": "internal_cli",
+              "estimated_context": "2k tokens"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slice_id": "documentation",
+      "name": "Documentation Files",
+      "description": "Updates all markdown documentation files to use vibepilot instead of vibeflow",
+      "owns": ["docs/*.md content", "config/*.md content", "All markdown brand references"],
+      "exposes": ["Updated documentation with consistent branding"],
+      "consumes": [],
+      "boundaries": "Does NOT touch code files, JSON files, or the React dashboard. Only markdown content in docs/ and config/ directories.",
+      "phases": [
+        {
+          "phase_id": "P1",
+          "name": "Content Update",
+          "tasks": [
+            {
+              "task_id": "DOCS-P1-T001",
+              "slice_id": "documentation",
+              "phase": "P1",
+              "title": "Update docs/ directory markdown files",
+              "purpose": "Replace all vibeflow occurrences with vibepilot in documentation",
+              "objectives": [
+                "Find all .md files in docs/ containing 'vibeflow' (case insensitive)",
+                "Replace 'vibeflow' with 'vibepilot' (preserve case: Vibeflow → VibePilot)",
+                "Replace 'vibeflow' with 'vibepilot' (lowercase)",
+                "Verify replacements in each file"
+              ],
+              "prompt_packet": "CONTEXT: You are updating brand references in markdown documentation files. There are approximately 34 markdown files in the docs/ directory, with roughly 60+ occurrences of 'vibeflow' to replace. This is a bulk text replacement task.\n\nWHAT TO BUILD: Use sed or a Python script to replace all case-insensitive occurrences of 'vibeflow' with 'vibepilot' (preserving case: Vibeflow→VibePilot, vibeflow→vibepilot, VIBEFLOW→VIBE PILOT).\n\nACCEPTANCE CRITERIA:\n1. All .md files in docs/ processed\n2. Case-preserving replacement applied\n3. File structure and formatting unchanged\n4. grep -ri 'vibeflow' docs/ returns empty\n\nOUTPUT FORMAT: List all files modified with count of replacements per file.",
+              "deliverables": ["Updated docs/*.md files"],
+              "expected_output": {
+                "files_created": [],
+                "files_modified": ["All docs/*.md files containing vibeflow"],
+                "tests_pass": ["Zero vibeflow in docs/"],
+                "replacement_count": "60+ occurrences"
+              },
+              "dependencies": [],
+              "dependency_type": "none",
+              "routing_flag": "internal",
+              "routing_flag_reason": "Multiple file modifications, needs filesystem access for batch processing",
+              "slice_boundary": {
+                "touches_slices": [],
+                "exposes_to_slices": [],
+                "receives_from_slices": []
+              },
+              "confidence": 0.98,
+              "confidence_reasoning": "Standard find-and-replace operation. Case-preserving logic is well-established. Low complexity.",
+              "suggested_agent": "internal_cli",
+              "estimated_context": "6k tokens"
+            },
+            {
+              "task_id": "DOCS-P1-T002",
+              "slice_id": "documentation",
+              "phase": "P1",
+              "title": "Update config/prompts/ markdown files",
+              "purpose": "Replace vibeflow with vibepilot in prompt configuration files",
+              "objectives": [
+                "Process all .md files in config/prompts/",
+                "Apply case-preserving replacement",
+                "Verify config/researcher_context.md if it contains references",
+                "Validate zero remaining occurrences"
+              ],
+              "prompt_packet": "CONTEXT: Update brand references in configuration prompt files located in config/prompts/ and config/researcher_context.md. These files define agent behavior and may contain multiple vibeflow references.\n\nWHAT TO BUILD: Replace all vibeflow occurrences with vibepilot using case-preserving logic.\n\nACCEPTANCE CRITERIA:\n1. All config/prompts/*.md files processed\n2. config/researcher_context.md processed\n3. grep -ri 'vibeflow' config/ returns empty\n4. File content integrity maintained\n\nOUTPUT FORMAT: List modified files with replacement counts.",
+              "deliverables": ["Updated config/prompts/*.md files"],
+              "expected_output": {
+                "files_created": [],
+                "files_modified": ["config/prompts/*.md", "config/researcher_context.md"],
+                "tests_pass": ["Zero vibeflow in config/"],
+                "replacement_count": "Variable per file"
+              },
+              "dependencies": [],
+              "dependency_type": "none",
+              "routing_flag": "internal",
+              "routing_flag_reason": "Multiple file modifications in config directory",
+              "slice_boundary": {
+                "touches_slices": [],
+                "exposes_to_slices": [],
+                "receives_from_slices": []
+              },
+              "confidence": 0.98,
+              "confidence_reasoning": "Same pattern as docs/ slice. Proven find-and-replace methodology.",
+              "suggested_agent": "internal_cli",
+              "estimated_context": "4k tokens"
+            }
+          ]
+        },
+        {
+          "phase_id": "P2",
+          "name": "Validation",
+          "tasks": [
+            {
+              "task_id": "DOCS-P2-T001",
+              "slice_id": "documentation",
+              "phase": "P2",
+              "title": "Documentation grep validation",
+              "purpose": "Final verification that no vibeflow remains in docs/ or config/",
+              "objectives": [
+                "Run comprehensive grep across docs/ and config/",
+                "Confirm zero matches for 'vibeflow' (all cases)",
+                "Report any stragglers with exact locations"
+              ],
+              "prompt_packet": "CONTEXT: Final validation for documentation rebrand. Must confirm 100% of vibeflow references have been replaced.\n\nWHAT TO BUILD: Run grep commands and validate zero occurrences remain.\n\nACCEPTANCE CRITERIA:\n1. grep -ri 'vibeflow' docs/ returns empty\n2. grep -ri 'vibeflow' config/ returns empty\n3. Any remaining occurrences documented with file:line details\n\nOUTPUT FORMAT: Provide command outputs and confirmation status.",
+              "deliverables": ["Validation report"],
+              "expected_output": {
+                "files_created": [],
+                "files_modified": [],
+                "tests_pass": ["Zero vibeflow in docs/", "Zero vibeflow in config/"],
+                "grep_results": "0 matches in both directories"
+              },
+              "dependencies": [
+                {"task_id": "DOCS-P1-T001", "type": "summary"},
+                {"task_id": "DOCS-P1-T002", "type": "summary"}
+              ],
+              "dependency_type": "summary",
+              "routing_flag": "internal",
+              "routing_flag_reason": "Needs filesystem access for grep validation",
+              "slice_boundary": {
+                "touches_slices": [],
+                "exposes_to_slices": [],
+                "receives_from_slices": []
+              },
+              "confidence": 0.99,
+              "confidence_reasoning": "Simple grep validation with clear criteria. No complexity.",
+              "suggested_agent": "internal_cli",
+              "estimated_context": "2k tokens"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slice_id": "plans-config",
+      "name": "Plans and Config Files",
+      "description": "Updates JSON plan files and other configuration files with vibepilot branding",
+      "owns": ["plans/*.json files", "Non-markdown config files"],
+      "exposes": ["Updated plan metadata with consistent branding"],
+      "consumes": [],
+      "boundaries": "Does NOT touch markdown files (handled by documentation slice). Only JSON and other non-md config files.",
+      "phases": [
+        {
+          "phase_id": "P1",
+          "name": "JSON and Config Update",
+          "tasks": [
+            {
+              "task_id": "PLANS-P1-T001",
+              "slice_id": "plans-config",
+              "phase": "P1",
+              "title": "Update plans/*.json files",
+              "purpose": "Replace vibeflow with vibepilot in JSON plan files",
+              "objectives": [
+                "Identify all .json files in plans/ containing vibeflow",
+                "Apply case-preserving text replacement",
+                "Validate JSON remains parseable after changes",
+                "Confirm zero remaining occurrences"
+              ],
+              "prompt_packet": "CONTEXT: Update JSON plan files in the plans/ directory. Files like vibepilot_plan.json and vibepilot_prd.json may contain legacy 'vibeflow' references.\n\nWHAT TO BUILD: Replace all vibeflow occurrences with vibepilot while preserving JSON validity.\n\nACCEPTANCE CRITERIA:\n1. All plans/*.json files processed\n2. JSON remains valid (can be parsed by jq or Python json module)\n3. grep -i 'vibeflow' plans/*.json returns empty\n4. No structural changes to JSON objects\n\nOUTPUT FORMAT: List modified files and confirm JSON validity.",
+              "deliverables": ["Updated plans/*.json files"],
+              "expected_output": {
+                "files_created": [],
+                "files_modified": ["plans/vibepilot_plan.json", "plans/vibepilot_prd.json"],
+                "tests_pass": ["JSON parseable", "Zero vibeflow in plans/"],
+                "replacement_count": "2+ occurrences"
+              },
+              "dependencies": [],
+              "dependency_type": "none",
+              "routing_flag": "internal",
+              "routing_flag_reason": "JSON file modifications require careful handling to preserve validity",
+              "slice_boundary": {
+                "touches_slices": [],
+                "exposes_to_slices": [],
+                "receives_from_slices": []
+              },
+              "confidence": 0.97,
+              "confidence_reasoning": "Text replacement in JSON requires validation but is straightforward. Well-defined scope.",
+              "suggested_agent": "internal_cli",
+              "estimated_context": "3k tokens"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slice_id": "terminal-dashboard",
+      "name": "Terminal Dashboard Verification",
+      "description": "Verifies that terminal dashboard already uses VibePilot branding",
+      "owns": ["Terminal dashboard brand verification"],
+      "exposes": ["Confirmation of correct branding"],
+      "consumes": [],
+      "boundaries": "Read-only verification only. No modifications to terminal dashboard.",
+      "phases": [
+        {
+          "phase_id": "P1",
+          "name": "Verification",
+          "tasks": [
+            {
+              "task_id": "TERM-P1-T001",
+              "slice_id": "terminal-dashboard",
+              "phase": "P1",
+              "title": "Verify terminal dashboard uses VibePilot",
+              "purpose": "Confirm terminal dashboard already displays correct branding",
+              "objectives": [
+                "Check dashboard/terminal_dashboard.py for 'VibePilot'",
+                "Verify no 'Vibeflow' occurrences exist",
+                "Document the current state"
+              ],
+              "prompt_packet": "CONTEXT: Verify-only task for the terminal dashboard. According to the PRD, terminal_dashboard.py should already use 'VibePilot' branding.\n\nWHAT TO BUILD: Run grep commands to verify the current state. No file modifications.\n\nACCEPTANCE CRITERIA:\n1. grep -i 'vibepilot' dashboard/terminal_dashboard.py returns matches\n2. grep -i 'vibeflow' dashboard/terminal_dashboard.py returns empty\n3. Header displays 'VIBEPILOT DASHBOARD'\n\nOUTPUT FORMAT: Provide grep output and confirm status.",
+              "deliverables": ["Verification report"],
+              "expected_output": {
+                "files_created": [],
+                "files_modified": [],
+                "tests_pass": ["VibePilot confirmed", "No Vibeflow found"],
+                "verification_status": "Already correct - no changes needed"
+              },
+              "dependencies": [],
+              "dependency_type": "none",
+              "routing_flag": "internal",
+              "routing_flag_reason": "Needs filesystem access to read and grep the file",
+              "slice_boundary": {
+                "touches_slices": [],
+                "exposes_to_slices": [],
+                "receives_from_slices": []
+              },
+              "confidence": 0.99,
+              "confidence_reasoning": "Read-only verification task. Simple grep with no modifications.",
+              "suggested_agent": "internal_cli",
+              "estimated_context": "1k tokens"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slice_id": "validation",
+      "name": "Cross-Cutting Validation",
+      "description": "Final comprehensive validation across all slices and directories",
+      "owns": ["Final grep validation script", "Overall rebrand verification"],
+      "exposes": ["Final validation report"],
+      "consumes": ["Validation results from all other slices"],
+      "boundaries": "Read-only validation only. Depends on completion of all other slices.",
+      "phases": [
+        {
+          "phase_id": "P1",
+          "name": "Final Validation",
+          "tasks": [
+            {
+              "task_id": "VALID-P1-T001",
+              "slice_id": "validation",
+              "phase": "P1",
+              "title": "Create and run comprehensive validation script",
+              "purpose": "Final cross-cutting verification that no vibeflow remains anywhere",
+              "objectives": [
+                "Search ~/vibeflow/apps/dashboard/ for any vibeflow",
+                "Search docs/ for any vibeflow",
+                "Search config/ for any vibeflow",
+                "Search plans/ for any vibeflow",
+                "Search dashboard/ for any vibeflow",
+                "Generate comprehensive report"
+              ],
+              "prompt_packet": "CONTEXT: Final validation across all project directories. Must confirm 100% brand consistency with zero vibeflow occurrences remaining.\n\nWHAT TO BUILD: Run comprehensive grep across all relevant directories and generate a validation report.\n\nACCEPTANCE CRITERIA:\n1. ~/vibeflow/apps/dashboard/ - 0 occurrences\n2. docs/ - 0 occurrences\n3. config/ - 0 occurrences\n4. plans/ - 0 occurrences\n5. dashboard/ - 0 occurrences\n6. Any remaining occurrences documented with full context\n\nOUTPUT FORMAT: Provide directory-by-directory grep results and final PASS/FAIL status.",
+              "deliverables": ["Comprehensive validation report"],
+              "expected_output": {
+                "files_created": [],
+                "files_modified": [],
+                "tests_pass": ["Zero vibeflow across all directories"],
+                "validation_report": "Directory-by-directory results with final status"
+              },
+              "dependencies": [
+                {"task_id": "DASHBOARD-P2-T002", "type": "summary"},
+                {"task_id": "DOCS-P2-T001", "type": "summary"},
+                {"task_id": "PLANS-P1-T001", "type": "summary"},
+                {"task_id": "TERM-P1-T001", "type": "summary"}
+              ],
+              "dependency_type": "summary",
+              "routing_flag": "internal",
+              "routing_flag_reason": "4 dependencies, comprehensive cross-directory validation needed",
+              "slice_boundary": {
+                "touches_slices": ["Uses summary results from all slices"],
+                "exposes_to_slices": ["Final validation report"],
+                "receives_from_slices": ["Validation summaries from dashboard-ui, documentation, plans-config, terminal-dashboard"]
+              },
+              "confidence": 0.98,
+              "confidence_reasoning": "Aggregates results from validated slices. Simple report generation.",
+              "suggested_agent": "internal_cli",
+              "estimated_context": "3k tokens"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dependency_graph": {
+    "DASHBOARD-P1-T001": [],
+    "DASHBOARD-P2-T001": ["DASHBOARD-P1-T001"],
+    "DASHBOARD-P2-T002": ["DASHBOARD-P2-T001"],
+    "DOCS-P1-T001": [],
+    "DOCS-P1-T002": [],
+    "DOCS-P2-T001": ["DOCS-P1-T001", "DOCS-P1-T002"],
+    "PLANS-P1-T001": [],
+    "TERM-P1-T001": [],
+    "VALID-P1-T001": ["DASHBOARD-P2-T002", "DOCS-P2-T001", "PLANS-P1-T001", "TERM-P1-T001"]
+  },
+  "cross_slice_interfaces": [
+    {
+      "from_slice": "dashboard-ui",
+      "to_slice": "validation",
+      "interface": "grep validation results",
+      "purpose": "Validation slice aggregates results from dashboard slice"
+    },
+    {
+      "from_slice": "documentation",
+      "to_slice": "validation",
+      "interface": "grep validation results",
+      "purpose": "Validation slice aggregates results from docs slice"
+    },
+    {
+      "from_slice": "plans-config",
+      "to_slice": "validation",
+      "interface": "grep validation results",
+      "purpose": "Validation slice aggregates results from plans slice"
+    },
+    {
+      "from_slice": "terminal-dashboard",
+      "to_slice": "validation",
+      "interface": "verification status",
+      "purpose": "Validation slice includes terminal dashboard status"
+    }
+  ],
+  "parallel_groups": [
+    ["DASHBOARD-P1-T001", "DOCS-P1-T001", "DOCS-P1-T002", "PLANS-P1-T001", "TERM-P1-T001"],
+    ["DASHBOARD-P2-T001", "DOCS-P2-T001"],
+    ["DASHBOARD-P2-T002"],
+    ["VALID-P1-T001"]
+  ],
+  "isolation_validation": {
+    "all_tasks_single_slice": true,
+    "no_cross_slice_code_deps": true,
+    "interfaces_explicit": true,
+    "cascade_impossible": true,
+    "notes": [
+      "Each slice operates on distinct file paths with zero overlap",
+      "dashboard-ui: ~/vibeflow/apps/dashboard/components/MissionHeader.tsx only",
+      "documentation: docs/*.md and config/*.md only",
+      "plans-config: plans/*.json only",
+      "terminal-dashboard: read-only verification of dashboard/terminal_dashboard.py",
+      "validation: read-only aggregation of other slice results",
+      "No code imports between slices - only summary-level dependencies"
+    ]
+  },
+  "execution_summary": {
+    "total_slices": 5,
+    "total_tasks": 10,
+    "internal_flagged": 10,
+    "web_flagged": 0,
+    "mcp_flagged": 0,
+    "estimated_serial_time": "15 minutes",
+    "estimated_parallel_time": "8 minutes",
+    "risk_level": "Minimal",
+    "rollback_complexity": "Trivial (git revert)"
+  }
+}

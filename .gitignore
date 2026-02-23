@@ -94,3 +94,4 @@ list_models.py
 
 # Go binaries
 governor/governor
+governor/governor.yaml
