@@ -222,6 +222,17 @@ func (d *DB) UpdateTaskStatus(ctx context.Context, taskID string, status types.T
 	return err
 }
 
+func (d *DB) UpdateTaskBranch(ctx context.Context, taskID string, branchName string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	body := map[string]interface{}{
+		"branch_name": branchName,
+		"updated_at":  now,
+	}
+
+	_, err := d.rest(ctx, "PATCH", "tasks?id=eq."+taskID, body)
+	return err
+}
+
 func (d *DB) UnlockDependents(ctx context.Context, taskID string) error {
 	_, err := d.rpc(ctx, "unlock_dependent_tasks", map[string]interface{}{
 		"p_completed_task_id": taskID,

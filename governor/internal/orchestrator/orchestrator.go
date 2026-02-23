@@ -100,12 +100,15 @@ func (o *Orchestrator) OnTaskComplete(ctx context.Context, taskID string, result
 			return
 		}
 		task.BranchName = branchName
+		o.db.UpdateTaskBranch(ctx, taskID, branchName)
 	}
 
 	if err := o.maintenance.CommitOutput(ctx, task.BranchName, result); err != nil {
 		log.Printf("Orchestrator: failed to commit output for %s: %v", taskID[:8], err)
 		return
 	}
+
+	o.db.UpdateTaskStatus(ctx, taskID, types.StatusReview, result)
 
 	select {
 	case o.pendingReviews <- taskID:
