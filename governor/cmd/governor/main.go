@@ -13,9 +13,13 @@ import (
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/dispatcher"
 	"github.com/vibepilot/governor/internal/janitor"
+	"github.com/vibepilot/governor/internal/maintenance"
+	"github.com/vibepilot/governor/internal/orchestrator"
 	"github.com/vibepilot/governor/internal/security"
 	"github.com/vibepilot/governor/internal/sentry"
 	"github.com/vibepilot/governor/internal/server"
+	"github.com/vibepilot/governor/internal/supervisor"
+	"github.com/vibepilot/governor/internal/tester"
 	"github.com/vibepilot/governor/internal/throttle"
 	"github.com/vibepilot/governor/pkg/types"
 )
@@ -52,10 +56,16 @@ func main() {
 
 	moduleLimiter := throttle.NewModuleLimiter(cfg.Governor.MaxPerModule)
 
+	maint := maintenance.New(&maintenance.Config{RepoPath: "."})
+	sup := supervisor.New()
+	test := tester.New(&tester.Config{RepoPath: "."})
+	orch := orchestrator.New(database, maint, sup, test)
+
 	s := sentry.New(database, cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent, dispatchCh, moduleLimiter)
 	go s.Run(ctx)
 
 	d := dispatcher.New(database, cfg, leakDetector, moduleLimiter)
+	d.SetOrchestrator(orch)
 
 	if cfg.Courier.Enabled && cfg.GitHub.Token != "" {
 		courierDispatcher := courier.NewDispatcher(
@@ -72,6 +82,7 @@ func main() {
 	}
 
 	go d.Run(ctx, dispatchCh)
+	go orch.Run(ctx)
 
 	j := janitor.New(database, cfg.Governor.StuckTimeout)
 	go j.Run(ctx)

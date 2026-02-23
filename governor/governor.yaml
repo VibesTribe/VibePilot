@@ -2,35 +2,25 @@ governor:
   poll_interval: 15s
   max_concurrent: 3
   stuck_timeout: 10m
+  max_per_module: 8
 
 supabase:
-  url: ${SUPABASE_URL}
-  service_key: ${SUPABASE_SERVICE_KEY}
+  url: https://qtpdzsinvifkgpxyxlaz.supabase.co
+  service_key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0cGR6c2ludmlma2dweHl4bGF6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDY2MTU3MCwiZXhwIjoyMDg2MjM3NTcwfQ.7ixiABm_tE91p1RoUtT2z4E8eLiwTfD7RgIk6E87_yQ
 
 github:
-  token: ${GITHUB_TOKEN}
-  owner: ${GITHUB_OWNER}
-  repo: ${GITHUB_REPO}
+  token: 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
+  owner: VibesTribe
+  repo: VibePilot
   workflow: courier.yml
 
-runners:
-  internal:
-    - model_id: glm-5
-      tool: opencode
-      ram_limit_mb: 500
-
 courier:
+  enabled: false
+  max_in_flight: 3
+  stagger: 30s
+  callback_url: http://localhost:8080/webhook/courier
+  webhook_secret: ""
   driver_model: gemini-2.0-flash
-  platforms:
-    - id: chatgpt
-      url: https://chat.openai.com
-      daily_limit: 40
-    - id: claude
-      url: https://claude.ai
-      daily_limit: 10
-    - id: gemini
-      url: https://gemini.google.com
-      daily_limit: 100
 
 server:
   addr: :8080
@@ -40,5 +30,4 @@ security:
   allowed_hosts:
     - api.supabase.co
     - api.github.com
-    - api.anthropic.com
-    - api.openai.com
+    - generativelanguage.googleapis.com
