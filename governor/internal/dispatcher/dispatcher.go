@@ -14,7 +14,6 @@ import (
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/pool"
 	"github.com/vibepilot/governor/internal/security"
-	"github.com/vibepilot/governor/internal/throttle"
 	"github.com/vibepilot/governor/pkg/types"
 )
 
@@ -22,28 +21,31 @@ type TaskCompleter interface {
 	OnTaskComplete(ctx context.Context, taskID string, result interface{})
 }
 
+type TaskFinalizer interface {
+	Complete(taskID string, sliceID string)
+}
+
 type Dispatcher struct {
-	db            *db.DB
-	cfg           *config.Config
-	pool          *pool.Pool
-	leakDetector  *security.LeakDetector
-	moduleLimiter *throttle.ModuleLimiter
-	courier       *courier.Dispatcher
-	completer     TaskCompleter
-	maintenance   MaintenanceExecutor
+	db           *db.DB
+	cfg          *config.Config
+	pool         *pool.Pool
+	leakDetector *security.LeakDetector
+	courier      *courier.Dispatcher
+	completer    TaskCompleter
+	finalizer    TaskFinalizer
+	maintenance  MaintenanceExecutor
 }
 
 type MaintenanceExecutor interface {
 	ExecuteMerge(ctx context.Context, taskID, branchName string) error
 }
 
-func New(database *db.DB, cfg *config.Config, leakDetector *security.LeakDetector, moduleLimiter *throttle.ModuleLimiter) *Dispatcher {
+func New(database *db.DB, cfg *config.Config, leakDetector *security.LeakDetector) *Dispatcher {
 	d := &Dispatcher{
-		db:            database,
-		cfg:           cfg,
-		pool:          pool.New(database),
-		leakDetector:  leakDetector,
-		moduleLimiter: moduleLimiter,
+		db:           database,
+		cfg:          cfg,
+		pool:         pool.New(database),
+		leakDetector: leakDetector,
 	}
 	return d
 }
@@ -54,6 +56,10 @@ func (d *Dispatcher) SetCourier(c *courier.Dispatcher) {
 
 func (d *Dispatcher) SetOrchestrator(completer TaskCompleter) {
 	d.completer = completer
+}
+
+func (d *Dispatcher) SetFinalizer(f TaskFinalizer) {
+	d.finalizer = f
 }
 
 func (d *Dispatcher) SetMaintenance(m MaintenanceExecutor) {
@@ -91,13 +97,13 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 	if err != nil {
 		log.Printf("Dispatcher: pool error for %s: %v", task.ID[:8], err)
 		d.handleFailure(ctx, task)
-		d.releaseSlot(task.SliceID)
+		d.finalize(task.ID, task.SliceID)
 		return
 	}
 	if runner == nil {
 		log.Printf("Dispatcher: no runner available for %s (routing=%s)", task.ID[:8], task.RoutingFlag)
 		d.handleFailure(ctx, task)
-		d.releaseSlot(task.SliceID)
+		d.finalize(task.ID, task.SliceID)
 		return
 	}
 
@@ -105,7 +111,7 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 
 	if err := d.db.ClaimTask(ctx, task.ID, runner.ModelID); err != nil {
 		log.Printf("Dispatcher: claim failed for %s: %v", task.ID[:8], err)
-		d.releaseSlot(task.SliceID)
+		d.finalize(task.ID, task.SliceID)
 		return
 	}
 
@@ -114,7 +120,7 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 		log.Printf("Dispatcher: no packet for %s: %v", task.ID[:8], err)
 		d.handleFailure(ctx, task)
 		d.recordResult(ctx, runner.ID, task.Type, false, 0)
-		d.releaseSlot(task.SliceID)
+		d.finalize(task.ID, task.SliceID)
 		return
 	}
 
@@ -159,7 +165,7 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 
 	if !success {
 		d.handleFailure(ctx, task)
-		d.releaseSlot(task.SliceID)
+		d.finalize(task.ID, task.SliceID)
 		return
 	}
 
@@ -176,13 +182,13 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 		}
 	}
 
-	d.releaseSlot(task.SliceID)
+	d.finalize(task.ID, task.SliceID)
 	log.Printf("Dispatcher: task %s completed successfully", task.ID[:8])
 }
 
-func (d *Dispatcher) releaseSlot(sliceID string) {
-	if d.moduleLimiter != nil && sliceID != "" {
-		d.moduleLimiter.Release(sliceID)
+func (d *Dispatcher) finalize(taskID string, sliceID string) {
+	if d.finalizer != nil && sliceID != "" {
+		d.finalizer.Complete(taskID, sliceID)
 	}
 }
 
@@ -208,15 +214,14 @@ func (d *Dispatcher) runTool(ctx context.Context, toolID string, prompt string, 
 	if len(warnings) > 0 {
 		log.Printf("Dispatcher: leak warnings: %+v", warnings)
 	}
-	_ = clean
 
 	var result struct {
 		Content      string `json:"content"`
 		InputTokens  int    `json:"input_tokens"`
 		OutputTokens int    `json:"output_tokens"`
 	}
-	if err := json.Unmarshal(raw, &result); err != nil {
-		output = string(raw)
+	if err := json.Unmarshal([]byte(clean), &result); err != nil {
+		output = clean
 		tokensIn = len(prompt) / 4
 		tokensOut = len(output) / 4
 	} else {
@@ -251,9 +256,6 @@ func (d *Dispatcher) handleFailure(ctx context.Context, task types.Task) {
 		log.Printf("Dispatcher: failed to get task %s for failure handling: %v", task.ID[:8], err)
 		return
 	}
-	if taskPtr == nil {
-		return
-	}
 
 	escalate := taskPtr.Attempts+1 >= taskPtr.MaxAttempts
 
@@ -273,13 +275,13 @@ func (d *Dispatcher) dispatchToCourier(ctx context.Context, task types.Task) {
 	if d.courier == nil {
 		log.Printf("Dispatcher: courier not configured for %s", task.ID[:8])
 		d.handleFailure(ctx, task)
-		d.releaseSlot(task.SliceID)
+		d.finalize(task.ID, task.SliceID)
 		return
 	}
 
 	if err := d.db.ClaimTask(ctx, task.ID, "courier"); err != nil {
 		log.Printf("Dispatcher: courier claim failed for %s: %v", task.ID[:8], err)
-		d.releaseSlot(task.SliceID)
+		d.finalize(task.ID, task.SliceID)
 		return
 	}
 
@@ -321,7 +323,7 @@ func (d *Dispatcher) OnCourierResult(result courier.Result) {
 		task, _ := d.db.GetTaskByID(ctx, result.TaskID)
 		if task != nil {
 			d.handleFailure(ctx, *task)
-			d.releaseSlot(task.SliceID)
+			d.finalize(task.ID, task.SliceID)
 		}
 		return
 	}
@@ -340,7 +342,7 @@ func (d *Dispatcher) OnCourierResult(result courier.Result) {
 		}
 	}
 
-	d.releaseSlot(task.SliceID)
+	d.finalize(task.ID, task.SliceID)
 	log.Printf("Dispatcher: courier task %s completed successfully", result.TaskID[:8])
 }
 

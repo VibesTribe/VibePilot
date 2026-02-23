@@ -53,10 +53,23 @@ func (m *Maintenance) CommitOutput(ctx context.Context, branchName string, outpu
 	}
 
 	if files, ok := outputMap["files"]; ok {
-		for _, f := range files.([]interface{}) {
-			file := f.(map[string]interface{})
-			path := file["path"].(string)
-			content := file["content"].(string)
+		filesList, ok := files.([]interface{})
+		if !ok {
+			return fmt.Errorf("files must be an array")
+		}
+		for _, f := range filesList {
+			file, ok := f.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			path, ok := file["path"].(string)
+			if !ok {
+				continue
+			}
+			content, ok := file["content"].(string)
+			if !ok {
+				continue
+			}
 
 			fullPath := filepath.Join(m.repoPath, path)
 			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {

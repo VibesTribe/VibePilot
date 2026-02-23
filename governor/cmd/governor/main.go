@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -46,8 +45,6 @@ func main() {
 	log.Println("Connected to Supabase")
 
 	leakDetector := security.NewLeakDetector()
-	httpAllowlist := security.NewHTTPAllowlist(cfg.Security.AllowedHosts)
-	_ = httpAllowlist
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -69,9 +66,10 @@ func main() {
 	s := sentry.New(database, cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent, dispatchCh, moduleLimiter)
 	go s.Run(ctx)
 
-	d := dispatcher.New(database, cfg, leakDetector, moduleLimiter)
+	d := dispatcher.New(database, cfg, leakDetector)
 	d.SetOrchestrator(orch)
 	d.SetMaintenance(maint)
+	d.SetFinalizer(s)
 
 	if cfg.Courier.Enabled && cfg.GitHub.Token != "" {
 		courierDispatcher := courier.NewDispatcher(
@@ -113,19 +111,4 @@ func main() {
 	srv.Shutdown()
 
 	log.Println("Governor stopped.")
-}
-
-func printBanner() {
-	fmt.Printf(`
- _    _ _ _                          _____ _       
-| |  | (_) |                        / ____| |      
-| |  | |_| | _____      __ _ _ __  | |    | | _____ 
-| |/\| | | |/ _ \ \ /\ / / _  '_ \ | |    | |/ / __|
-\  /\  / | |  __/\ V  V /  __/ | | || |____|   <\__ \
- \/  \/|_|_|\___| \_/\_/ \___|_| |_| \_____|_|\_\___/
-                                                      
-Governor - The Iron Stack Orchestrator
-Version: %s (%s)
-Built: %s
-`, version, commit, date)
 }

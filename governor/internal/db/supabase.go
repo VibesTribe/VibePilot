@@ -101,7 +101,7 @@ func (d *DB) GetTaskByID(ctx context.Context, taskID string) (*types.Task, error
 		return nil, fmt.Errorf("unmarshal task: %w", err)
 	}
 	if len(tasks) == 0 {
-		return nil, nil
+		return nil, fmt.Errorf("task %s not found", taskID)
 	}
 	return &tasks[0], nil
 }
