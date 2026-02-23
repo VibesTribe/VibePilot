@@ -144,11 +144,19 @@ func (o *Orchestrator) processReview(ctx context.Context, taskID string) {
 
 	switch decision.Action {
 	case supervisor.ActionApprove:
-		log.Printf("Orchestrator: %s approved, routing to testing", taskID[:8])
-		o.db.UpdateTaskStatus(ctx, taskID, types.StatusTesting, nil)
-		select {
-		case o.pendingTests <- taskID:
-		default:
+		if task.Type == "test" || task.Type == "docs" {
+			log.Printf("Orchestrator: %s approved (no testing needed for %s type)", taskID[:8], task.Type)
+			select {
+			case o.pendingMerges <- taskID:
+			default:
+			}
+		} else {
+			log.Printf("Orchestrator: %s approved, routing to testing", taskID[:8])
+			o.db.UpdateTaskStatus(ctx, taskID, types.StatusTesting, nil)
+			select {
+			case o.pendingTests <- taskID:
+			default:
+			}
 		}
 
 	case supervisor.ActionReject:
