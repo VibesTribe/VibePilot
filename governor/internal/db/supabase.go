@@ -650,3 +650,64 @@ func (d *DB) GetAvailableModels(ctx context.Context, limit int) ([]Runner, error
 	}
 	return runners, nil
 }
+
+func (d *DB) GetTaskRuns(ctx context.Context, taskID string) ([]types.TaskRun, error) {
+	path := fmt.Sprintf("task_runs?task_id=eq.%s&order=created_at.desc", taskID)
+	data, err := d.rest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var runs []types.TaskRun
+	if err := json.Unmarshal(data, &runs); err != nil {
+		return nil, fmt.Errorf("unmarshal task runs: %w", err)
+	}
+	return runs, nil
+}
+
+func (d *DB) CreateResearchSuggestion(ctx context.Context, payload map[string]interface{}) (string, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	body := map[string]interface{}{
+		"task_id":     payload["task_id"],
+		"category":    payload["category"],
+		"root_cause":  payload["root_cause"],
+		"suggestions": payload["suggestions"],
+		"auto_retry":  payload["auto_retry"],
+		"new_model":   payload["new_model"],
+		"analyzed_at": payload["analyzed_at"],
+		"created_at":  now,
+	}
+
+	data, err := d.rest(ctx, "POST", "research_suggestions?select=id", body)
+	if err != nil {
+		return "", err
+	}
+
+	var result []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return "", fmt.Errorf("unmarshal research suggestion: %w", err)
+	}
+	if len(result) == 0 {
+		return "", fmt.Errorf("no ID returned from research suggestion creation")
+	}
+	return result[0].ID, nil
+}
+
+func (d *DB) GetResearchSuggestion(ctx context.Context, taskID string) (map[string]interface{}, error) {
+	path := fmt.Sprintf("research_suggestions?task_id=eq.%s&order=created_at.desc&limit=1", taskID)
+	data, err := d.rest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []map[string]interface{}
+	if err := json.Unmarshal(data, &results); err != nil {
+		return nil, fmt.Errorf("unmarshal research suggestion: %w", err)
+	}
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no research suggestion found for task %s", taskID)
+	}
+	return results[0], nil
+}
