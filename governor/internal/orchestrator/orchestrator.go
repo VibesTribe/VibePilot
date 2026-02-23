@@ -196,7 +196,10 @@ func (o *Orchestrator) processMerge(ctx context.Context, taskID string) {
 	targetBranch := "main"
 
 	if err := o.maintenance.MergeBranch(ctx, task.BranchName, targetBranch); err != nil {
-		log.Printf("Orchestrator: failed to merge %s: %v", taskID[:8], err)
+		log.Printf("Orchestrator: merge conflict for %s: %v", taskID[:8], err)
+		o.db.UpdateTaskStatus(ctx, taskID, types.StatusAwaitingHuman, map[string]interface{}{
+			"reason": fmt.Sprintf("Merge conflict: %v", err),
+		})
 		return
 	}
 
