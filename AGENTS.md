@@ -15,6 +15,21 @@
 
 ---
 
+## Credentials & Secrets
+
+**Where keys live:**
+
+| Secret Type | Location | Notes |
+|-------------|----------|-------|
+| `SUPABASE_URL` | GitHub Secrets | Bootstrap credential |
+| `SUPABASE_SERVICE_KEY` | GitHub Secrets | Service role for admin ops |
+| `VAULT_KEY` | GitHub Secrets | Decrypts Supabase vault |
+| **All other API keys** | Supabase Vault | Encrypted, retrieved via vault_manager.py |
+
+**Never hardcode secrets.** Use `vault_manager.py` to retrieve at runtime.
+
+---
+
 ## Agent Role → Branch Mapping
 
 ### System Researcher (Daily Research)
