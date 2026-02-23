@@ -233,6 +233,47 @@ func (d *DB) UpdateTaskBranch(ctx context.Context, taskID string, branchName str
 	return err
 }
 
+func (d *DB) CreateMergeTask(ctx context.Context, taskID, parentTaskID, sliceID, branchName, title string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	body := map[string]interface{}{
+		"id":             taskID,
+		"title":          "Merge: " + title,
+		"type":           "merge",
+		"status":         "available",
+		"priority":       1,
+		"routing_flag":   "internal",
+		"slice_id":       sliceID,
+		"parent_task_id": parentTaskID,
+		"branch_name":    branchName,
+		"max_attempts":   3,
+		"created_at":     now,
+		"updated_at":     now,
+	}
+
+	_, err := d.rest(ctx, "POST", "tasks", body)
+	return err
+}
+
+func (d *DB) GetMergePendingTasks(ctx context.Context, sliceID string) ([]types.Task, error) {
+	path := "tasks?type=eq.merge&status=neq.merged"
+	if sliceID != "" {
+		path += "&slice_id=eq." + sliceID
+	}
+
+	data, err := d.rest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var tasks []types.Task
+	if err := json.Unmarshal(data, &tasks); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
+}
+
 func (d *DB) UnlockDependents(ctx context.Context, taskID string) error {
 	_, err := d.rpc(ctx, "unlock_dependent_tasks", map[string]interface{}{
 		"p_completed_task_id": taskID,

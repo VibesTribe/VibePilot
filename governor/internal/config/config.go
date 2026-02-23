@@ -22,6 +22,7 @@ type GovernorConfig struct {
 	MaxConcurrent int           `yaml:"max_concurrent"`
 	StuckTimeout  time.Duration `yaml:"stuck_timeout"`
 	MaxPerModule  int           `yaml:"max_per_module"`
+	RepoPath      string        `yaml:"repo_path"`
 }
 
 type SupabaseConfig struct {

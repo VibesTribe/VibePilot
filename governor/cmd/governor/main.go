@@ -56,9 +56,14 @@ func main() {
 
 	moduleLimiter := throttle.NewModuleLimiter(cfg.Governor.MaxPerModule)
 
-	maint := maintenance.New(&maintenance.Config{RepoPath: "."})
+	repoPath := cfg.Governor.RepoPath
+	if repoPath == "" {
+		repoPath = "."
+	}
+
+	maint := maintenance.New(&maintenance.Config{RepoPath: repoPath})
 	sup := supervisor.New()
-	test := tester.New(&tester.Config{RepoPath: "."})
+	test := tester.New(&tester.Config{RepoPath: repoPath})
 	orch := orchestrator.New(database, maint, sup, test)
 
 	s := sentry.New(database, cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent, dispatchCh, moduleLimiter)
@@ -66,6 +71,7 @@ func main() {
 
 	d := dispatcher.New(database, cfg, leakDetector, moduleLimiter)
 	d.SetOrchestrator(orch)
+	d.SetMaintenance(maint)
 
 	if cfg.Courier.Enabled && cfg.GitHub.Token != "" {
 		courierDispatcher := courier.NewDispatcher(
