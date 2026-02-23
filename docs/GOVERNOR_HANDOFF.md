@@ -2,7 +2,7 @@
 
 **Session:** 2026-02-23
 **Purpose:** Full understanding captured for next session
-**Status:** Phase 4 IN PROGRESS - Full orchestrator architecture
+**Status:** Phase 4 COMPLETE - Full orchestrator architecture working
 
 ---
 
@@ -34,10 +34,10 @@ Server starting on :8080
 
 | Metric | Value | Target |
 |--------|-------|--------|
-| Total Go lines | ~3,100 | < 4,000 |
+| Total Go lines | ~2,700 | < 4,000 |
 | Binary size | ~10MB | < 15MB |
 | Dependencies | 3 direct | Minimal |
-| Packages | 15 | Lean |
+| Packages | 17 | Lean |
 
 ### What's Working
 
@@ -54,6 +54,10 @@ Server starting on :8080
 | Courier webhook | ✅ | `courier/webhook.go` |
 | WebSocket hub | ✅ | `server/hub.go` |
 | HTTP server + API | ✅ | `server/server.go` |
+| **Supervisor** | ✅ | `supervisor/supervisor.go` |
+| **Orchestrator** | ✅ | `orchestrator/orchestrator.go` |
+| **Maintenance** | ✅ | `maintenance/maintenance.go` |
+| **Tester** | ✅ | `tester/tester.go` |
 
 ### API Endpoints
 
@@ -292,8 +296,8 @@ Triggers on `repository_dispatch` event type `courier_task`:
 
 | Feature | Phase | Notes |
 |---------|-------|-------|
-| Supervisor logic | 5 | Quality gate, Council trigger |
-| Council deliberation | 5 | Multi-lens review |
+| Council deliberation | 5 | Multi-lens review (supervisor/council/council.go) |
+| Command queue polling | 5 | Maintenance polls maintenance_commands table |
 | Config hot-reload | 5 | fsnotify watcher |
 | Embedded React UI | Future | //go:embed dist/ |
 | Vibes interface | Future | Human chat interface |
@@ -301,24 +305,96 @@ Triggers on `repository_dispatch` event type `courier_task`:
 
 ---
 
+## SUPERVISOR (Implemented)
+
+### 4 Actions Only
+
+| Action | When | What Happens |
+|--------|------|--------------|
+| **APPROVE** | Output OK, all deliverables present | Route to Tester (or merge if test/docs type) |
+| **REJECT** | Missing deliverables, quality issues, secrets | Return to queue with notes: WHY | ISSUES | SUGGESTION |
+| **COUNCIL** | Security, auth, architecture, refactor, priority 1 | Route to Council → Human reviews recommendations |
+| **HUMAN** | Visual/ui_ux changes, council recommendations | Set status `awaiting_human` |
+
+### Quality Checks
+
+- All deliverables created?
+- Scope creep detected (extra files)?
+- Secrets detected (sk-, ghp_, AKIA, password literals)?
+- Code quality warnings (TODO, FIXME, print statements)
+
+### NeedsCouncil() Logic
+
+Triggers Council review when:
+- Task type is "security"
+- Title contains: auth, authentication, architecture, refactor
+- Priority <= 1 (critical tasks)
+
+---
+
+## MAINTENANCE (Implemented)
+
+### Operations
+
+| Operation | Function | Notes |
+|-----------|----------|-------|
+| Create branch | `CreateBranch()` | Creates from main, pushes to origin |
+| Commit output | `CommitOutput()` | Writes files, task_output.txt, commits, pushes |
+| Read output | `ReadBranchOutput()` | Returns list of changed files |
+| Merge branch | `MergeBranch()` | Merges task branch to target |
+| Delete branch | `DeleteBranch()` | Deletes local and remote |
+
+### Output Handling
+
+- If result has `files` key → writes each file
+- If result has `output` key → writes task_output.txt
+- If nothing to commit → returns error (task produced no output)
+
+---
+
+## ORCHESTRATOR (Implemented)
+
+### Flow
+
+```
+Task completes → OnTaskComplete()
+     ↓
+Create branch (if needed)
+     ↓
+Commit output to branch
+     ↓
+processSupervisorDecision()
+     ↓
+APPROVE → testing (or merge if test/docs)
+REJECT → back to queue with notes
+COUNCIL → awaiting_human (pending implementation)
+HUMAN → awaiting_human
+     ↓
+Merge → merged (or awaiting_human if conflict)
+```
+
+---
+
 ## PYTHON INTEGRATION
 
-### What Go Replaces
+### What Go Replaces (DONE)
 
 | Python | Go |
 |--------|-----|
-| `core/orchestrator.py` (task routing) | `dispatcher/` |
+| `core/orchestrator.py` (task routing) | `dispatcher/`, `orchestrator/` |
 | `task_manager.py` (claim/record) | `db/supabase.go` |
+| `agents/supervisor.py` | `supervisor/supervisor.go` |
+| `agents/maintenance.py` | `maintenance/maintenance.go` |
+| `agents/executioner.py` | `tester/tester.go` |
 | Polling loop | `sentry/sentry.go` |
 
 ### What Stays Python
 
 | Component | Why |
 |-----------|-----|
-| `agents/supervisor.py` | Review logic, Council coordination |
-| `agents/maintenance.py` | Git operations |
 | `agents/planner.py` | Task planning from PRD |
 | `agents/consultant.py` | PRD generation |
+| `agents/council.py` | Multi-lens deliberation (Phase 5) |
 | `runners/contract_runners.py` | Runner implementations |
 
 ---
