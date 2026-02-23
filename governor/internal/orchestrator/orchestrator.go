@@ -51,8 +51,8 @@ func (o *Orchestrator) Run(ctx context.Context) {
 
 func (o *Orchestrator) OnTaskComplete(ctx context.Context, taskID string, result interface{}) {
 	task, err := o.db.GetTaskByID(ctx, taskID)
-	if err != nil || task == nil {
-		log.Printf("Orchestrator: task %s not found", taskID[:8])
+	if err != nil {
+		log.Printf("Orchestrator: task %s not found: %v", taskID[:8], err)
 		return
 	}
 
@@ -156,7 +156,7 @@ func (o *Orchestrator) queueTest(taskID string) {
 
 func (o *Orchestrator) processTest(ctx context.Context, taskID string) {
 	task, err := o.db.GetTaskByID(ctx, taskID)
-	if err != nil || task == nil {
+	if err != nil {
 		return
 	}
 
@@ -185,7 +185,7 @@ func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, no
 	taskID := task.ID
 
 	currentTask, err := o.db.GetTaskByID(ctx, taskID)
-	if err != nil || currentTask == nil {
+	if err != nil {
 		return
 	}
 
@@ -223,6 +223,8 @@ func (o *Orchestrator) generateBranchName(task *types.Task) string {
 
 func generateID() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic("crypto/rand failed: " + err.Error())
+	}
 	return hex.EncodeToString(b)
 }
