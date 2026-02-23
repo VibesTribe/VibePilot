@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/vibepilot/governor/internal/config"
@@ -113,6 +114,13 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 		result = map[string]interface{}{"error": execErr.Error()}
 	} else {
 		result = map[string]interface{}{"output": output}
+	}
+
+	if success && strings.TrimSpace(output) == "" {
+		success = false
+		status = "failed"
+		result = map[string]interface{}{"error": "Empty output - task produced no response"}
+		log.Printf("Dispatcher: task %s produced empty output", task.ID[:8])
 	}
 
 	runID, err := d.db.RecordTaskRun(ctx, &db.TaskRunInput{

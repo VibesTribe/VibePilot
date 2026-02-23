@@ -3,6 +3,7 @@ package maintenance
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -27,11 +28,16 @@ func New(cfg *Config) *Maintenance {
 }
 
 func (m *Maintenance) CreateBranch(ctx context.Context, branchName string) error {
-	if err := m.gitCommand(ctx, "checkout", "-b", branchName).Run(); err != nil {
-		if strings.Contains(err.Error(), "already exists") {
+	var out bytes.Buffer
+	cmd := m.gitCommand(ctx, "checkout", "-b", branchName)
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+
+	if err := cmd.Run(); err != nil {
+		if strings.Contains(out.String(), "already exists") {
 			return m.gitCommand(ctx, "checkout", branchName).Run()
 		}
-		return fmt.Errorf("create branch: %w", err)
+		return fmt.Errorf("create branch: %w - %s", err, out.String())
 	}
 	return m.gitCommand(ctx, "push", "-u", "origin", branchName).Run()
 }
@@ -41,7 +47,12 @@ func (m *Maintenance) CommitOutput(ctx context.Context, branchName string, outpu
 		return fmt.Errorf("checkout branch: %w", err)
 	}
 
-	if files, ok := output.(map[string]interface{})["files"]; ok {
+	outputMap, ok := output.(map[string]interface{})
+	if !ok {
+		outputMap = make(map[string]interface{})
+	}
+
+	if files, ok := outputMap["files"]; ok {
 		for _, f := range files.([]interface{}) {
 			file := f.(map[string]interface{})
 			path := file["path"].(string)
@@ -57,14 +68,35 @@ func (m *Maintenance) CommitOutput(ctx context.Context, branchName string, outpu
 		}
 	}
 
-	if err := m.gitCommand(ctx, "add", ".").Run(); err != nil {
-		return fmt.Errorf("git add: %w", err)
+	if output, ok := outputMap["output"]; ok && outputMap["files"] == nil {
+		resultPath := filepath.Join(m.repoPath, "task_output.txt")
+		content, _ := json.MarshalIndent(output, "", "  ")
+		if err := os.WriteFile(resultPath, content, 0644); err != nil {
+			return fmt.Errorf("write result: %w", err)
+		}
 	}
 
-	if err := m.gitCommand(ctx, "commit", "-m", "task output").Run(); err != nil {
-		if !strings.Contains(err.Error(), "nothing to commit") {
-			return fmt.Errorf("git commit: %w", err)
+	if response, ok := outputMap["response"]; ok {
+		resultPath := filepath.Join(m.repoPath, "task_result.json")
+		content, _ := json.MarshalIndent(response, "", "  ")
+		if err := os.WriteFile(resultPath, content, 0644); err != nil {
+			return fmt.Errorf("write result: %w", err)
 		}
+	}
+
+	m.gitCommand(ctx, "add", ".").Run()
+
+	var commitOut bytes.Buffer
+	commitCmd := m.gitCommand(ctx, "commit", "-m", "task output")
+	commitCmd.Stdout = &commitOut
+	commitCmd.Stderr = &commitOut
+
+	if err := commitCmd.Run(); err != nil {
+		outStr := commitOut.String()
+		if strings.Contains(outStr, "nothing to commit") || strings.Contains(outStr, "no changes added") {
+			return fmt.Errorf("task produced no output: no files were created or modified")
+		}
+		return fmt.Errorf("git commit: %w - %s", err, outStr)
 	}
 
 	return m.gitCommand(ctx, "push").Run()
@@ -90,15 +122,16 @@ func (m *Maintenance) ReadBranchOutput(ctx context.Context, branchName string) (
 }
 
 func (m *Maintenance) MergeBranch(ctx context.Context, sourceBranch, targetBranch string) error {
-	if err := m.gitCommand(ctx, "checkout", targetBranch).Run(); err != nil {
-		return fmt.Errorf("checkout target: %w", err)
-	}
+	m.gitCommand(ctx, "checkout", targetBranch).Run()
+	m.gitCommand(ctx, "pull", "origin", targetBranch).Run()
 
-	if err := m.gitCommand(ctx, "pull", "origin", targetBranch).Run(); err != nil {
-	}
+	var out bytes.Buffer
+	cmd := m.gitCommand(ctx, "merge", sourceBranch)
+	cmd.Stdout = &out
+	cmd.Stderr = &out
 
-	if err := m.gitCommand(ctx, "merge", sourceBranch).Run(); err != nil {
-		return fmt.Errorf("merge: %w", err)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("merge: %w - %s", err, out.String())
 	}
 
 	return m.gitCommand(ctx, "push", "origin", targetBranch).Run()
@@ -106,7 +139,8 @@ func (m *Maintenance) MergeBranch(ctx context.Context, sourceBranch, targetBranc
 
 func (m *Maintenance) DeleteBranch(ctx context.Context, branchName string) error {
 	m.gitCommand(ctx, "branch", "-d", branchName).Run()
-	return m.gitCommand(ctx, "push", "origin", "--delete", branchName).Run()
+	m.gitCommand(ctx, "push", "origin", "--delete", branchName).Run()
+	return nil
 }
 
 func (m *Maintenance) gitCommand(ctx context.Context, args ...string) *exec.Cmd {
