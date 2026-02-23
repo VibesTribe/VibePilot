@@ -1,8 +1,8 @@
 # Governor Implementation Handoff Document
 
-**Session:** 2026-02-23
-**Purpose:** Full understanding captured for next session
-**Status:** Phase 4 COMPLETE - Full orchestrator architecture working
+**Session:** 2026-02-23 (Session 24)
+**Purpose:** Complete Go Governor with merge task system + wire merge pending UI
+**Status:** Phase 4 COMPLETE, merge pending UI WIRED
 
 ---
 
@@ -28,484 +28,668 @@ Server starting on :8080
 
 ---
 
-## CURRENT STATE
+# COMPLETE SYSTEM FLOW
 
-### Code Stats
-
-| Metric | Value | Target |
-|--------|-------|--------|
-| Total Go lines | ~2,700 | < 4,000 |
-| Binary size | ~10MB | < 15MB |
-| Dependencies | 3 direct | Minimal |
-| Packages | 17 | Lean |
-
-### What's Working
-
-| Component | Status | File |
-|-----------|--------|------|
-| Sentry (poller) | ✅ | `sentry/sentry.go` |
-| Dispatcher (router) | ✅ | `dispatcher/dispatcher.go` |
-| Janitor (cleanup) | ✅ | `janitor/janitor.go` |
-| DB client | ✅ | `db/supabase.go` |
-| Pool (model selection) | ✅ | `pool/model_pool.go` |
-| Security (leak detector) | ✅ | `security/leak_detector.go` |
-| Module limiter | ✅ | `throttle/module_limiter.go` |
-| Courier dispatcher | ✅ | `courier/dispatcher.go` |
-| Courier webhook | ✅ | `courier/webhook.go` |
-| WebSocket hub | ✅ | `server/hub.go` |
-| HTTP server + API | ✅ | `server/server.go` |
-| **Supervisor** | ✅ | `supervisor/supervisor.go` |
-| **Orchestrator** | ✅ | `orchestrator/orchestrator.go` |
-| **Maintenance** | ✅ | `maintenance/maintenance.go` |
-| **Tester** | ✅ | `tester/tester.go` |
-
-### API Endpoints
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/health` | GET | Health check |
-| `/api/stats` | GET | Quick stats overview |
-| `/api/tasks?status={status}` | GET | List tasks (default: available) |
-| `/api/task/{id}` | GET | Get task packet |
-| `/api/models` | GET | List active runners from DB |
-| `/api/platforms` | GET | List web platforms |
-| `/api/roi` | GET | ROI summary from task_runs |
-| `/api/limits` | GET | Per-module concurrent counts |
-| `/ws` | WS | Real-time task events |
-| `/webhook/courier` | POST | GitHub Actions callback |
-
----
-
-## ARCHITECTURE
-
-### Data Flow
+## Task Lifecycle (End to End)
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        GO GOVERNOR                                   │
-├─────────────────────────────────────────────────────────────────────┤
-│  SENTRY (poller)                                                     │
-│  - Polls every 15s                                                   │
-│  - Max 3 concurrent global                                           │
-│  - Max 8 per module (slice_id)                                       │
-│  - Acquires slot from ModuleLimiter                                  │
-│  - Sends to dispatch channel                                         │
-├─────────────────────────────────────────────────────────────────────┤
-│  DISPATCHER                                                          │
-│  - Receives task from channel                                        │
-│  - Checks routing_flag:                                              │
-│    - 'web' → Courier (GitHub Actions)                                │
-│    - 'internal' → Pool → Local CLI                                   │
-│  - Claims task, executes, records result                             │
-│  - Releases slot on completion/failure                               │
-├─────────────────────────────────────────────────────────────────────┤
-│  COURIER DISPATCHER (Phase 2)                                        │
-│  - Enqueues web tasks                                                │
-│  - Max 3 in-flight, 30s stagger                                      │
-│  - Dispatches to GitHub Actions                                      │
-│  - Webhook receives completion                                       │
-├─────────────────────────────────────────────────────────────────────┤
-│  JANITOR                                                             │
-│  - Resets stuck tasks (10min timeout)                                │
-│  - Calls refresh_limits RPC                                          │
-├─────────────────────────────────────────────────────────────────────┤
-│  SERVER (Phase 3)                                                    │
-│  - HTTP API endpoints                                                │
-│  - WebSocket hub for real-time updates                               │
-│  - Courier webhook handler                                           │
-└─────────────────────────────────────────────────────────────────────┘
-```
+1. SENTRY (sentry/sentry.go)
+   Polls Supabase every 15s for status=available tasks
+   → Checks module limits (max 8 per slice)
+   → Sends to Dispatcher channel
+   
+2. DISPATCHER (dispatcher/dispatcher.go)
+   Receives task from Sentry
+   → If type=merge: executeMerge() (skip to step 5)
+   → Select best runner from Pool
+   → Claim task in DB (status=in_progress)
+   → Run tool (opencode/kimi) with prompt
+   → Scan output for secrets (LeakDetector)
+   → Record task_run in DB
+   → Call OnTaskComplete() on Orchestrator
+   
+3. ORCHESTRATOR (orchestrator/orchestrator.go)
+   OnTaskComplete(taskID, result)
+   → Create branch (task/T###)
+   → Commit output to branch
+   → Call Supervisor.Review()
+   → Process Supervisor decision:
+      - APPROVE → status=approval, create merge task
+      - REJECT → handleRejection()
+      - HUMAN → status=awaiting_human
+      - COUNCIL → status=awaiting_human (stub)
+   → If APPROVE and type!=test/docs: queue for testing
+   
+4. SUPERVISOR (supervisor/supervisor.go)
+   Review(input) → Decision
+   → Check deliverables (expected vs actual files)
+   → Check code quality (secrets, TODOs, print statements)
+   → Return decision (APPROVE/REJECT/HUMAN/COUNCIL)
 
-### Module Limiter Flow
-
-```
-Sentry.poll()
-    ↓
-Check: CanDispatch(slice_id)?
-    ├── YES → Acquire(slice_id) → Dispatch
-    └── NO → Skip task (module at capacity)
-
-Dispatcher.execute()
-    ↓
-... task runs ...
-    ↓
-releaseSlot(slice_id) on ANY exit:
-- Success
-- Failure
-- Claim failed
-- No runner
-- No packet
+5. MERGE EXECUTION (dispatcher.executeMerge)
+   Dispatcher picks up merge task (type=merge)
+   → Get parent task from DB
+   → Maintenance.ExecuteMerge(parentID, branchName)
+   → On success: parent→merged, delete branch
+   → On failure: handleMergeFailure() → retry 3x then escalate
 ```
 
 ---
 
-## KEY PATTERNS
+# SUPERVISOR LOGIC (supervisor/supervisor.go)
 
-### 1. Module Limiter (8 per slice)
+## 4 Actions Only
+
+| Action | Constant | When Triggered |
+|--------|----------|----------------|
+| APPROVE | `ActionApprove` | All checks pass, no issues |
+| REJECT | `ActionReject` | Missing deliverables, secrets detected, quality issues |
+| HUMAN | `ActionHuman` | Visual/ui_ux changes detected |
+| COUNCIL | `ActionCouncil` | Security, auth, architecture, refactor, priority 1 |
+
+## Review() Function Flow
 
 ```go
-// throttle/module_limiter.go
-type ModuleLimiter struct {
-    maxPerModule int           // 8
-    active       map[string]int // slice_id -> count
+func (s *Supervisor) Review(ctx context.Context, input *ReviewInput) Decision {
+    // 1. Check deliverables
+    issues, warnings = s.checkDeliverables(input, issues, warnings)
+    
+    // 2. Check code quality (secrets, TODOs, etc)
+    issues = s.checkCodeQuality(input.OutputContent, issues, warnings)
+    
+    // 3. If issues exist → REJECT
+    if len(issues) > 0 {
+        return Decision{Action: ActionReject, Notes: formatNotes(issues), Issues: issues}
+    }
+    
+    // 4. If ui_ux or visual change → HUMAN
+    if input.TaskType == "ui_ux" || input.VisualChange {
+        return Decision{Action: ActionHuman, Reason: "Visual changes require human approval"}
+    }
+    
+    // 5. Otherwise → APPROVE
+    return Decision{Action: ActionApprove, Warnings: warnings}
 }
-
-// Acquire before dispatch
-if !limiter.Acquire(task.SliceID) {
-    continue // Skip, at capacity
-}
-
-// Release on any exit path
-defer limiter.Release(task.SliceID)
 ```
 
-### 2. Courier Dispatch (3 concurrent, staggered)
+## Deliverable Check (checkDeliverables)
 
-```go
-// courier/dispatcher.go
-type Dispatcher struct {
-    queue       chan Task
-    maxInFlight int           // 3
-    stagger     time.Duration // 30s
-}
+```
+Expected files: ["src/auth.py", "tests/test_auth.py"]
+Actual files:    ["src/auth.py", "src/utils.py"]
 
-// Stagger to avoid GitHub rate limits
-time.Sleep(d.stagger)
-d.client.Repositories.Dispatch(ctx, owner, repo, dispatch)
+Result:
+- ISSUES: "Missing deliverables: tests/test_auth.py"
+- WARNINGS: "Extra files created (scope creep): src/utils.py"
 ```
 
-### 3. WebSocket Hub
+## Code Quality Check (checkCodeQuality)
+
+**Blocks (causes REJECT):**
+- `sk-` (OpenAI key)
+- `ghp_` (GitHub token)
+- `AKIA` (AWS key)
+- `password = "` or `password='` literals
+
+**Warns (passes but flagged):**
+- `TODO` or `FIXME` comments
+- `print()` statements in functions
+- Output < 50 chars (truncated)
+
+## NeedsCouncil() Logic
 
 ```go
-// server/hub.go
-type Hub struct {
-    broadcast  chan []byte
-    register   chan *Client
-    unregister chan *Client
+func (s *Supervisor) NeedsCouncil(taskType, title string, priority int) bool {
+    if taskType == "security" { return true }
+    
+    titleLower := strings.ToLower(title)
+    if strings.Contains(titleLower, "auth") ||
+       strings.Contains(titleLower, "authentication") ||
+       strings.Contains(titleLower, "architecture") ||
+       strings.Contains(titleLower, "refactor") {
+        return true
+    }
+    
+    if priority <= 1 { return true }  // Critical tasks
+    
+    return false
 }
+```
 
-// Single goroutine owns the map (no mutex)
-func (h *Hub) Run() {
-    for {
-        select {
-        case msg := <-h.broadcast:
-            for client := range h.clients {
-                client.send <- msg
-            }
+---
+
+# ORCHESTRATOR LOGIC (orchestrator/orchestrator.go)
+
+## OnTaskComplete() Flow
+
+```go
+func (o *Orchestrator) OnTaskComplete(ctx context.Context, taskID string, result interface{}) {
+    // 1. Get task from DB
+    task, err := o.db.GetTaskByID(ctx, taskID)
+    
+    // 2. Create branch if needed
+    if task.BranchName == "" {
+        branchName := generateBranchName(task)  // "task/T###"
+        maintenance.CreateBranch(ctx, branchName)
+        task.BranchName = branchName
+        db.UpdateTaskBranch(ctx, taskID, branchName)
+    }
+    
+    // 3. Commit output to branch
+    maintenance.CommitOutput(ctx, task.BranchName, result)
+    
+    // 4. Process supervisor decision
+    o.processSupervisorDecision(ctx, task, result)
+}
+```
+
+## processSupervisorDecision() Flow
+
+```go
+func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *types.Task, result interface{}) {
+    // 1. Get prompt packet (for deliverables list)
+    packet := db.GetTaskPacket(ctx, taskID)
+    
+    // 2. Get actual files from branch
+    actualFiles := maintenance.ReadBranchOutput(ctx, task.BranchName)
+    
+    // 3. Build review input
+    reviewInput := &supervisor.ReviewInput{
+        TaskID:         taskID,
+        TaskType:       task.Type,
+        ExpectedFiles:  packet.Deliverables,
+        ActualFiles:    actualFiles,
+        VisualChange:   task.Type == "ui_ux",
+    }
+    
+    // 4. Get decision
+    decision := supervisor.Review(ctx, reviewInput)
+    
+    // 5. Override to COUNCIL if significant change
+    if decision.Action == ActionApprove && supervisor.NeedsCouncil(...) {
+        decision = Decision{Action: ActionCouncil}
+    }
+    
+    // 6. Execute decision
+    switch decision.Action {
+    case ActionApprove:
+        // Set status=approval
+        db.UpdateTaskStatus(ctx, taskID, StatusApproval, nil)
+        
+        // Create merge task
+        mergeTaskID := generateID()
+        db.CreateMergeTask(ctx, mergeTaskID, taskID, task.SliceID, task.BranchName, task.Title)
+        
+        // If not test/docs, run tests first
+        if task.Type != "test" && task.Type != "docs" {
+            db.UpdateTaskStatus(ctx, taskID, StatusTesting, result)
+            queueTest(taskID)
         }
+        
+    case ActionReject:
+        handleRejection(ctx, task, decision.Notes)
+        
+    case ActionHuman:
+        db.UpdateTaskStatus(ctx, taskID, StatusAwaitingHuman, {"reason": decision.Reason})
+        
+    case ActionCouncil:
+        // Stub - routes to human for now
+        db.UpdateTaskStatus(ctx, taskID, StatusAwaitingHuman, {"reason": "Council review needed"})
     }
 }
 ```
 
-### 4. Slot Release on All Paths
+## handleRejection() Logic
 
 ```go
-// dispatcher/dispatcher.go
-func (d *Dispatcher) execute(ctx context.Context, task Task) {
-    // Every error path must release slot
-    if err != nil {
-        d.releaseSlot(task.SliceID)
+func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, notes string) {
+    currentTask := db.GetTaskByID(ctx, taskID)
+    newAttempts := currentTask.Attempts + 1
+    escalate := newAttempts >= currentTask.MaxAttempts
+    
+    if escalate {
+        // Mark as escalated - AI will analyze
+        db.UpdateTaskStatus(ctx, taskID, StatusEscalated, {
+            "attempts": newAttempts,
+            "failure_notes": notes,
+        })
+        go handleEscalation(ctx, taskID, notes)
+    } else {
+        // Return to queue for retry
+        db.ResetTask(ctx, taskID, false)
+        db.UpdateTaskStatus(ctx, taskID, StatusAvailable, {
+            "attempts": newAttempts,
+            "failure_notes": notes,
+        })
+    }
+}
+```
+
+---
+
+# MERGE ERROR LOGIC (dispatcher/dispatcher.go)
+
+## executeMerge() Function
+
+```go
+func (d *Dispatcher) executeMerge(ctx context.Context, task types.Task) {
+    // task.Type == "merge"
+    // task.ParentTaskID = ID of implementation task
+    
+    log.Printf("Executing merge task %s for parent %s", task.ID[:8], task.ParentTaskID[:8])
+    
+    // 1. Mark merge task as in_progress
+    db.UpdateTaskStatus(ctx, task.ID, StatusInProgress, nil)
+    
+    // 2. Get parent task (the one that did the work)
+    parentTask := db.GetTaskByID(ctx, task.ParentTaskID)
+    if parentTask == nil {
+        handleMergeFailure(ctx, task, "Parent task not found")
         return
     }
     
-    // Success path also releases
-    d.releaseSlot(task.SliceID)
+    // 3. Check parent has a branch
+    if parentTask.BranchName == "" {
+        handleMergeFailure(ctx, task, "Parent task has no branch")
+        return
+    }
+    
+    // 4. Execute the merge
+    err := maintenance.ExecuteMerge(ctx, task.ParentTaskID, parentTask.BranchName)
+    if err != nil {
+        handleMergeFailure(ctx, task, err.Error())
+        return
+    }
+    
+    // 5. SUCCESS - update both tasks
+    db.UpdateTaskStatus(ctx, task.ID, StatusMerged, nil)  // Merge task done
+    db.UpdateTaskStatus(ctx, task.ParentTaskID, StatusMerged, {"merged_to": "main"})
+    db.UnlockDependents(ctx, task.ParentTaskID)  // Wake up blocked tasks
+}
+```
+
+## handleMergeFailure() Function
+
+```go
+func (d *Dispatcher) handleMergeFailure(ctx context.Context, task types.Task, errMsg string) {
+    attempts := task.Attempts + 1
+    
+    if attempts >= task.MaxAttempts {
+        // TRIED 3 TIMES - ESCALATE
+        // System Researcher should analyze and fix
+        log.Printf("Merge task %s ESCALATED after %d attempts", task.ID[:8], attempts)
+        db.UpdateTaskStatus(ctx, task.ID, StatusEscalated, {
+            "attempts": attempts,
+            "failure_notes": errMsg,
+        })
+    } else {
+        // RETRY - put back in queue
+        db.ResetTask(ctx, task.ID, false)
+        db.UpdateTaskStatus(ctx, task.ID, StatusAvailable, {
+            "attempts": attempts,
+            "failure_notes": errMsg,
+        })
+        log.Printf("Merge task %s returned to queue (attempt %d/%d)", task.ID[:8], attempts, task.MaxAttempts)
+    }
+}
+```
+
+## Merge Flow Diagram
+
+```
+Implementation task APPROVED
+         ↓
+  Status: approval
+         ↓
+  Orchestrator creates MERGE TASK
+  {
+    id: <new-id>,
+    type: "merge",
+    parent_task_id: <impl-task-id>,
+    branch_name: "task/T004",
+    status: "available",
+    max_attempts: 3
+  }
+         ↓
+  Sentry picks up merge task (status=available)
+         ↓
+  Dispatcher sees type=merge → executeMerge()
+         ↓
+  maintenance.ExecuteMerge()
+         ↓
+         ├─ SUCCESS ──────────────────────┐
+         │                                ↓
+         │   Merge task → status=merged
+         │   Parent task → status=merged
+         │   Delete branch
+         │   Unlock dependents
+         │
+         └─ FAIL (conflict, etc)
+              ↓
+         handleMergeFailure()
+              ↓
+         attempts++ (1 → 2 → 3)
+              ↓
+         ┌─ attempts < 3 ────────────────┐
+         │                               ↓
+         │   Reset merge task
+         │   status → available
+         │   (Sentry will retry)
+         │
+         └─ attempts >= 3 ───────────────┐
+                                         ↓
+            Merge task → status=escalated
+            (System Researcher handles)
+```
+
+---
+
+# MAINTENANCE OPERATIONS (maintenance/maintenance.go)
+
+## ExecuteMerge()
+
+```go
+func (m *Maintenance) ExecuteMerge(ctx context.Context, taskID, branchName string) error {
+    // 1. Merge branch to main
+    if err := m.MergeBranch(ctx, branchName, "main"); err != nil {
+        return err  // Merge conflict, etc - branch preserved
+    }
+    
+    // 2. Delete branch (only after successful merge)
+    m.DeleteBranch(ctx, branchName)
+    
+    return nil
+}
+```
+
+## MergeBranch()
+
+```go
+func (m *Maintenance) MergeBranch(ctx context.Context, sourceBranch, targetBranch string) error {
+    // 1. Checkout target
+    git("checkout", targetBranch)
+    git("pull", "origin", targetBranch)
+    
+    // 2. Merge source
+    cmd := git("merge", sourceBranch)
+    if err := cmd.Run(); err != nil {
+        return fmt.Errorf("merge: %w - %s", err, output)
+        // BRANCH PRESERVED - can retry
+    }
+    
+    // 3. Push
+    git("push", "origin", targetBranch)
+    return nil
+}
+```
+
+## DeleteBranch()
+
+```go
+func (m *Maintenance) DeleteBranch(ctx context.Context, branchName string) error {
+    git("branch", "-d", branchName)           // Local
+    git("push", "origin", "--delete", branchName)  // Remote
+    return nil
+}
+```
+
+## CommitOutput()
+
+```go
+func (m *Maintenance) CommitOutput(ctx context.Context, branchName string, output interface{}) error {
+    // 1. Checkout branch
+    git("checkout", branchName)
+    
+    // 2. Write files from output
+    if files, ok := output["files"]; ok {
+        for file := range files {
+            writeFile(file.path, file.content)
+        }
+    }
+    
+    // 3. If no files, write task_output.txt
+    if output["files"] == nil {
+        writeFile("task_output.txt", output["output"])
+    }
+    
+    // 4. Commit
+    git("add", ".")
+    cmd := git("commit", "-m", "task output")
+    if err := cmd.Run(); err != nil {
+        if "nothing to commit" {
+            return error("task produced no output")
+        }
+        return err
+    }
+    
+    // 5. Push
+    git("push")
 }
 ```
 
 ---
 
-## FILES STRUCTURE
+# DISPATCHER EXECUTION (dispatcher/dispatcher.go)
 
-```
-governor/
-├── cmd/governor/main.go          # Entry point
-├── internal/
-│   ├── config/config.go          # Config loading
-│   ├── db/supabase.go            # REST client + RPC calls
-│   ├── sentry/sentry.go          # Task poller
-│   ├── dispatcher/dispatcher.go  # Task router + executor
-│   ├── janitor/janitor.go        # Stuck task cleanup
-│   ├── pool/model_pool.go        # Runner selection
-│   ├── security/leak_detector.go # Secret scanning
-│   ├── throttle/
-│   │   └── module_limiter.go     # 8 per module enforcement
-│   ├── courier/
-│   │   ├── dispatcher.go         # GitHub Actions dispatch
-│   │   └── webhook.go            # Completion callback
-│   └── server/
-│       ├── server.go             # HTTP API
-│       └── hub.go                # WebSocket hub
-├── pkg/types/types.go            # Shared types
-├── governor.yaml.example         # Sample config
-└── go.mod                        # Dependencies
-```
+## execute() Function
 
----
-
-## CONFIGURATION
-
-```yaml
-# governor.yaml
-governor:
-  poll_interval: 15s
-  max_concurrent: 3
-  stuck_timeout: 10m
-  max_per_module: 8
-
-supabase:
-  url: ${SUPABASE_URL}
-  service_key: ${SUPABASE_SERVICE_KEY}
-
-github:
-  token: ${GITHUB_TOKEN}
-  owner: your-username
-  repo: vibepilot
-  workflow: courier.yml
-
-courier:
-  enabled: false  # Set true when GitHub secrets configured
-  max_in_flight: 3
-  stagger: 30s
-  callback_url: http://your-server:8080/webhook/courier
-
-server:
-  addr: :8080
-
-security:
-  allowed_hosts:
-    - api.supabase.co
-    - api.github.com
-```
-
----
-
-## GITHUB ACTIONS WORKFLOW
-
-**File:** `.github/workflows/courier.yml`
-
-Triggers on `repository_dispatch` event type `courier_task`:
-1. Checks out task branch
-2. Sets up Python + browser-use
-3. Executes browser automation with Gemini
-4. Posts result to callback URL
-
----
-
-## WHAT'S NOT YET IMPLEMENTED
-
-| Feature | Phase | Notes |
-|---------|-------|-------|
-| Council deliberation | 5 | Multi-lens review (supervisor/council/council.go) |
-| Command queue polling | 5 | Maintenance polls maintenance_commands table |
-| Config hot-reload | 5 | fsnotify watcher |
-| Embedded React UI | Future | //go:embed dist/ |
-| Vibes interface | Future | Human chat interface |
-| MCP server | Future | External tool access |
-
----
-
-## SUPERVISOR (Implemented)
-
-### 4 Actions Only
-
-| Action | When | What Happens |
-|--------|------|--------------|
-| **APPROVE** | Output OK, all deliverables present | Route to Tester (or merge if test/docs type) |
-| **REJECT** | Missing deliverables, quality issues, secrets | Return to queue with notes: WHY | ISSUES | SUGGESTION |
-| **COUNCIL** | Security, auth, architecture, refactor, priority 1 | Route to Council → Human reviews recommendations |
-| **HUMAN** | Visual/ui_ux changes, council recommendations | Set status `awaiting_human` |
-
-### Quality Checks
-
-- All deliverables created?
-- Scope creep detected (extra files)?
-- Secrets detected (sk-, ghp_, AKIA, password literals)?
-- Code quality warnings (TODO, FIXME, print statements)
-
-### NeedsCouncil() Logic
-
-Triggers Council review when:
-- Task type is "security"
-- Title contains: auth, authentication, architecture, refactor
-- Priority <= 1 (critical tasks)
-
----
-
-## MAINTENANCE (Implemented)
-
-### Operations
-
-| Operation | Function | Notes |
-|-----------|----------|-------|
-| Create branch | `CreateBranch()` | Creates from main, pushes to origin |
-| Commit output | `CommitOutput()` | Writes files, task_output.txt, commits, pushes |
-| Read output | `ReadBranchOutput()` | Returns list of changed files |
-| Merge branch | `MergeBranch()` | Merges task branch to target |
-| Delete branch | `DeleteBranch()` | Deletes local and remote |
-
-### Output Handling
-
-- If result has `files` key → writes each file
-- If result has `output` key → writes task_output.txt
-- If nothing to commit → returns error (task produced no output)
-
----
-
-## ORCHESTRATOR (Implemented)
-
-### Flow
-
-```
-Task completes → OnTaskComplete()
-     ↓
-Create branch (if needed)
-     ↓
-Commit output to branch
-     ↓
-processSupervisorDecision()
-     ↓
-APPROVE → testing (or merge if test/docs)
-REJECT → back to queue with notes
-COUNCIL → awaiting_human (pending implementation)
-HUMAN → awaiting_human
-     ↓
-Merge → merged (or awaiting_human if conflict)
+```go
+func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
+    log.Printf("Task %s (routing=%s, type=%s)", task.ID[:8], task.RoutingFlag, task.Type)
+    
+    // 1. MERGE TASK - special handling
+    if task.Type == "merge" {
+        d.executeMerge(ctx, task)
+        return
+    }
+    
+    // 2. WEB COURIER - dispatch to browser runner
+    if task.RoutingFlag == RoutingWeb && courier != nil {
+        d.dispatchToCourier(ctx, task)
+        return
+    }
+    
+    // 3. Select runner from pool
+    runner := pool.SelectBest(ctx, routingFlag, taskType)
+    if runner == nil {
+        d.handleFailure(ctx, task)
+        return
+    }
+    
+    // 4. Claim task
+    db.ClaimTask(ctx, task.ID, runner.ModelID)
+    
+    // 5. Get prompt packet
+    packet := db.GetTaskPacket(ctx, task.ID)
+    
+    // 6. Run tool
+    output, tokensIn, tokensOut, err := d.runTool(ctx, runner.ToolID, packet.Prompt, 300)
+    
+    // 7. EMPTY OUTPUT = FAILURE
+    if err == nil && strings.TrimSpace(output) == "" {
+        err = errors.New("Empty output - task produced no response")
+        success = false
+    }
+    
+    // 8. Record task_run
+    runID := db.RecordTaskRun(ctx, &TaskRunInput{
+        TaskID: task.ID,
+        ModelID: runner.ModelID,
+        Status: success ? "success" : "failed",
+        Result: result,
+        TokensIn: tokensIn,
+        TokensOut: tokensOut,
+    })
+    
+    // 9. Calculate ROI
+    db.CallROIRPC(ctx, runID)
+    
+    // 10. Handle failure or complete
+    if !success {
+        d.handleFailure(ctx, task)
+        return
+    }
+    
+    // 11. Throttle check (80% daily limit)
+    if pool.ShouldThrottle(runner) {
+        pool.SetCooldown(ctx, runner.ID, timeUntilMidnight())
+    }
+    
+    // 12. Notify orchestrator
+    if completer != nil {
+        completer.OnTaskComplete(ctx, task.ID, result)
+    }
+}
 ```
 
 ---
 
-## PYTHON INTEGRATION
+# DASHBOARD STATUS MAPPING
 
-### What Go Replaces (DONE)
+## vibepilotAdapter.ts
 
-| Python | Go |
-|--------|-----|
-| `core/orchestrator.py` (task routing) | `dispatcher/`, `orchestrator/` |
-| `task_manager.py` (claim/record) | `db/supabase.go` |
-| `agents/supervisor.py` | `supervisor/supervisor.go` |
-| `agents/maintenance.py` | `maintenance/maintenance.go` |
-| `agents/executioner.py` | `tester/tester.go` |
-| Polling loop | `sentry/sentry.go` |
-
-### What Stays Python
-
-| Component | Why |
-|-----------|-----|
-| `agents/planner.py` | Task planning from PRD |
-| `agents/consultant.py` | PRD generation |
-| `agents/council.py` | Multi-lens deliberation (Phase 5) |
-| `runners/contract_runners.py` | Runner implementations |
-
----
-
-## TESTING
-
-### Manual Test
-
-```bash
-# Create test task
-python -c "
-import os, json, uuid
-from supabase import create_client
-sb = create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_SERVICE_KEY'])
-task_id = str(uuid.uuid4())
-sb.table('tasks').insert({
-    'id': task_id,
-    'title': 'Test: Echo Hello',
-    'status': 'available',
-    'priority': 1,
-    'routing_flag': 'internal',
-    'slice_id': 'test-slice'
-}).execute()
-sb.table('task_packets').insert({
-    'task_id': task_id,
-    'prompt': json.dumps({'prompt': 'Echo: Hello World'}),
-    'version': 1
-}).execute()
-print(f'Created task {task_id}')
-"
-
-# Run governor
-./governor
-
-# Watch logs for:
-# - Sentry: dispatching task
-# - Dispatcher: selected runner
-# - Dispatcher: task completed successfully
+```typescript
+function mapTaskStatus(status: string): TaskSnapshot["status"] {
+  const statusMap = {
+    pending: "assigned",
+    available: "assigned",
+    in_progress: "in_progress",
+    awaiting_human: "supervisor_review",  // FLAGGED - human needed
+    testing: "testing",
+    approval: "supervisor_approval",       // Merge pending indicator
+    merged: "complete",
+    failed: "blocked",
+    escalated: "blocked",
+  };
+  return statusMap[status] || "assigned";
+}
 ```
 
-### Verify in Supabase
+## Merge Pending Logic
 
-```sql
-SELECT id, status, assigned_to FROM tasks WHERE title LIKE 'Test:%';
-SELECT * FROM task_runs ORDER BY created_at DESC LIMIT 1;
+```typescript
+// Task level
+function transformTasks(tasks) {
+  return tasks.map(task => ({
+    ...
+    mergePending: task.status === "approval",  // Approved but not merged
+  }));
+}
+
+// Slice level
+function transformSlices(tasks) {
+  for (task of tasks) {
+    if (task.status === "approval") {
+      stats.mergePending += 1;
+    }
+  }
+}
 ```
 
 ---
 
-## COMMON ISSUES
+# BRANCH LIFECYCLE (CRITICAL)
 
-### "no runner available"
-- Check `runners` table has active runners
-- Run `python scripts/admin_setup.py --create-runners`
-
-### "claim failed"
-- Task may have been claimed by another process
-- Check `status` is `available` before dispatch
-
-### "module at capacity"
-- 8 tasks already running in that slice
-- Wait for completion or increase `max_per_module`
-
-### "courier not configured"
-- Set `courier.enabled: true` in config
-- Set `GITHUB_TOKEN` environment variable
-
----
-
-## NEXT PHASES
-
-### Phase 4: Parallel Run
-1. Run Go and Python together
-2. Go marks tasks with `claimed_by='governor'`
-3. Compare 50+ task outcomes
-4. Verify ROI calculations match
-5. Switch to Go-only
-
-### Phase 5: Supervisor + Council
-1. Add `supervisor/reviewer.go`
-2. Add `council/deliberation.go`
-3. Config-driven prompts (load from files)
-4. Hot-reload with fsnotify
-
-### Future
-- Vibes interface (human chat)
-- MCP server (external access)
-- Voice interface
+```
+IMPLEMENTATION TASK STARTS
+         ↓
+Create branch: task/T###-desc
+         ↓
+Work happens (commits pushed)
+         ↓
+Task approved → status=approval
+         ↓
+Merge task created (type=merge)
+         ↓
+Merge task executes
+         ↓
+         ├─ SUCCESS ─────────────────┐
+         │                           ↓
+         │   Parent → status=merged
+         │   DELETE BRANCH
+         │
+         └─ FAIL ────────────────────┐
+                                     ↓
+            BRANCH PRESERVED
+            Retry merge (up to 3x)
+            
+BRANCH IS NEVER DELETED UNTIL AFTER MERGE SUCCEEDS
+```
 
 ---
 
-## FILES TO READ NEXT SESSION
+# KEY RULES
 
-1. This document: `docs/GOVERNOR_HANDOFF.md`
-2. Current state: `CURRENT_STATE.md`
-3. System reference: `docs/SYSTEM_REFERENCE.md`
-4. Core philosophy: `docs/core_philosophy.md`
-5. Full PRD: `docs/prd_v1.4.md`
-
----
-
-## SESSION HISTORY
-
-| Date | Phase | Changes |
-|------|-------|---------|
-| 2026-02-22 | 1 | Initial Sentry, Dispatcher, Janitor |
-| 2026-02-22 | 2 | Intelligent routing, model pool |
-| 2026-02-22 | 3 | Pool-based runner selection |
-| 2026-02-23 | 2 | Module limiter (8/slice), Courier dispatch |
-| 2026-02-23 | 3 | WebSocket hub, Real API endpoints, Health check |
+1. **4 Supervisor Actions ONLY**: approve, reject, council, human
+2. **Empty output = FAILURE** (not silent success)
+3. **`review` status should NEVER exist in DB** - process synchronously
+4. **Merge failures are SYSTEM problems** - Maintenance fixes, not human
+5. **Branch never deleted until merge succeeds** - Work is safe
+6. **Merge is separate from implementation** - Creates child task (type=merge)
+7. **`awaiting_human` triggers dashboard flag** - `review` does NOT
+8. **Merge retry limit: 3** - Then escalate to System Researcher
 
 ---
 
-**END OF HANDOFF**
+# FILES REFERENCE
+
+## Go Governor (go-governor branch)
+
+| File | Purpose |
+|------|---------|
+| `internal/supervisor/supervisor.go` | 4 actions, quality checks, NeedsCouncil |
+| `internal/orchestrator/orchestrator.go` | OnTaskComplete, processSupervisorDecision, handleRejection |
+| `internal/dispatcher/dispatcher.go` | execute, executeMerge, handleMergeFailure |
+| `internal/maintenance/maintenance.go` | CreateBranch, CommitOutput, MergeBranch, ExecuteMerge |
+| `internal/db/supabase.go` | CreateMergeTask, GetMergePendingTasks, ClaimTask, RecordTaskRun |
+| `pkg/types/types.go` | Task struct with ParentTaskID field |
+
+## Dashboard (vibeflow-test branch)
+
+| File | Purpose |
+|------|---------|
+| `apps/dashboard/lib/vibepilotAdapter.ts` | Status mapping, mergePending: status===approval |
+| `apps/dashboard/utils/mission.ts` | SliceCatalog.mergePending, deriveSlices count |
+| `apps/dashboard/components/SliceHub.tsx` | Merge pending badge on slice center |
+| `apps/dashboard/styles.css` | .slice-orbit__merge-pending styling |
+
+---
+
+# WHAT'S NOT DONE (Phase 5)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Council deliberation | Stub | Routes to human, multi-lens review not implemented |
+| Command queue polling | Not started | Maintenance should poll maintenance_commands table |
+| Config hot-reload | Not started | fsnotify watcher for governor.yaml |
+| System Researcher | Stub | handleEscalation just logs, needs AI analysis |
+
+---
+
+# TEST DATA
+
+```
+Task ID: 98805088-9b88-469c-be91-35f74ba27e7e
+Title: Test: Echo Response
+Status: approval
+Slice: phase4-test
+Branch: task/T004
+
+This task is approved (status=approval).
+Should show merge pending badge because merge task exists.
+```
+
+---
+
+# NEXT SESSION
+
+1. `cat docs/GOVERNOR_HANDOFF.md` - This file
+2. `cat CURRENT_STATE.md` - System state
+3. `cd ~/vibepilot/governor && go build ./...` - Verify builds
+4. `cd ~/vibeflow && npm run typecheck` - Verify dashboard
+5. Test merge pending flow with T004
+6. Implement Council deliberation (Phase 5)
+
+---
+
+**END OF HANDOFF - Session 24**
