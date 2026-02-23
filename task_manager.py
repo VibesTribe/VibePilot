@@ -385,7 +385,9 @@ class TaskManager:
         """
         self.logger.info(f"Escalation flow triggered for task {task_id}")
 
-        # Log escalation event for supervisor to pick up
+        task = self.get_task(task_id)
+        existing_result = task.get("result") or {}
+
         escalation_event = {
             "task_id": task_id,
             "triggered_at": datetime.utcnow().isoformat(),
@@ -394,8 +396,9 @@ class TaskManager:
             "options": ["reassign", "split", "refine_prompt", "council_review"],
         }
 
-        # Store in task result for supervisor visibility
-        db.table("tasks").update({"result": {"escalation": escalation_event}}).eq(
+        existing_result["escalation"] = escalation_event
+
+        db.table("tasks").update({"result": existing_result}).eq(
             "id", task_id
         ).execute()
 

@@ -12,6 +12,7 @@ import os
 import sys
 import json
 import time
+import signal
 import subprocess
 import logging
 from typing import Dict, Any, Optional
@@ -155,6 +156,169 @@ class KimiContractRunner(BaseRunner):
         return (tokens_in * self.COST_INPUT_PER_1K / 1000) + (
             tokens_out * self.COST_OUTPUT_PER_1K / 1000
         )
+
+
+class OpenCodeContractRunner(BaseRunner):
+    """
+    OpenCode CLI runner following the contract interface.
+
+    OpenCode is a CLI tool that can be configured with any LLM.
+    This runner calls the tool, not a specific model.
+    Model selection is handled by OpenCode's configuration.
+    """
+
+    VERSION = "1.0.0"
+    RUNNER_TYPE = "cli"
+
+    COST_INPUT_PER_1K = 0.0
+    COST_OUTPUT_PER_1K = 0.0
+
+    def __init__(self):
+        super().__init__(runner_id="opencode")
+        self.opencode_path = self._find_opencode()
+
+    def _find_opencode(self) -> str:
+        result = subprocess.run(["which", "opencode"], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+        return os.path.expanduser("~/.opencode/bin/opencode")
+
+    def probe(self) -> tuple[bool, str]:
+        try:
+            result = subprocess.run(
+                [self.opencode_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return True, "OK"
+            return False, f"PROBE_FAILED: OpenCode returned {result.returncode}"
+        except subprocess.TimeoutExpired:
+            return False, "PROBE_FAILED: Timeout checking OpenCode"
+        except FileNotFoundError:
+            return False, "PROBE_FAILED: OpenCode CLI not found"
+        except Exception as e:
+            return False, f"PROBE_FAILED: {e}"
+
+    def execute(self, task_packet: Dict[str, Any]) -> Dict[str, Any]:
+        task_id = task_packet.get("task_id", "unknown")
+        prompt = task_packet.get("prompt", "")
+        constraints = task_packet.get("constraints", {})
+        runner_context = task_packet.get("runner_context", {})
+
+        if not prompt or not prompt.strip():
+            self.logger.error(f"Empty prompt received for task {task_id}")
+            return self.build_failure_result(
+                task_id=task_id,
+                error_code="EMPTY_PROMPT",
+                error_message="No prompt provided in task_packet",
+                suggested_next_step="retry",
+            )
+
+        timeout = constraints.get("timeout_seconds", 300)
+        work_dir = runner_context.get("work_dir", os.getcwd())
+
+        codebase_files = task_packet.get("codebase_files", {})
+
+        full_prompt = prompt
+        if codebase_files:
+            file_context = "\n\n".join(
+                [
+                    f"--- {filename} ---\n{content}"
+                    for filename, content in codebase_files.items()
+                ]
+            )
+            full_prompt = f"Context files:\n\n{file_context}\n\n---\n\nTask:\n{prompt}"
+
+        cmd = [
+            self.opencode_path,
+            "run",
+            "--format",
+            "json",
+            full_prompt,
+        ]
+
+        start_time = time.time()
+        proc = None
+
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=work_dir,
+                start_new_session=True,
+            )
+
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                proc.wait()
+                return self.build_failure_result(
+                    task_id=task_id,
+                    error_code="TIMEOUT",
+                    error_message=f"Task timed out after {timeout}s",
+                    suggested_next_step="split",
+                )
+
+            duration = time.time() - start_time
+
+            if proc.returncode == 0:
+                output = stdout.strip()
+
+                try:
+                    parsed = json.loads(output)
+                    if isinstance(parsed, dict):
+                        text_output = parsed.get(
+                            "content", parsed.get("output", output)
+                        )
+                        tokens_in = parsed.get("input_tokens", len(full_prompt) // 4)
+                        tokens_out = parsed.get("output_tokens", len(text_output) // 4)
+                    else:
+                        text_output = output
+                        tokens_in = len(full_prompt) // 4
+                        tokens_out = len(text_output) // 4
+                except json.JSONDecodeError:
+                    text_output = output
+                    tokens_in = len(full_prompt) // 4
+                    tokens_out = len(text_output) // 4
+
+                return self.build_success_result(
+                    task_id=task_id,
+                    output=text_output,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    duration_seconds=duration,
+                    files_read=len(codebase_files),
+                    files_modified=0,
+                )
+            else:
+                error = stderr.strip() or f"OpenCode returned {proc.returncode}"
+                return self.build_failure_result(
+                    task_id=task_id,
+                    error_code="OPENCODE_ERROR",
+                    error_message=error,
+                    suggested_next_step="retry",
+                )
+
+        except Exception as e:
+            return self.build_failure_result(
+                task_id=task_id,
+                error_code="RUNNER_ERROR",
+                error_message=str(e),
+                suggested_next_step="retry",
+            )
+        finally:
+            if proc and proc.poll() is None:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    proc.wait()
+                except Exception:
+                    pass
+            self.logger.debug(f"Cleaned up opencode processes for task {task_id}")
 
 
 class DeepSeekContractRunner(BaseRunner):
@@ -439,6 +603,314 @@ class GeminiContractRunner(BaseRunner):
                 task_id=task_id,
                 error_code="TIMEOUT",
                 error_message=f"API request timed out after {timeout}s",
+                suggested_next_step="retry",
+            )
+        except Exception as e:
+            return self.build_failure_result(
+                task_id=task_id,
+                error_code="RUNNER_ERROR",
+                error_message=str(e),
+                suggested_next_step="retry",
+            )
+
+
+class GLMSubscriptionRunner(BaseRunner):
+    """
+    Lightweight runner for GLM subscription via Anthropic-compatible endpoint.
+
+    Uses subscription quota, not pay-per-token API.
+    Supports tool loop for internal tasks (read/write files, run commands).
+
+    Configurable endpoint = swappable to any Anthropic-compatible service.
+    """
+
+    VERSION = "1.0.0"
+    RUNNER_TYPE = "api"
+
+    COST_INPUT_PER_1K = 0.0
+    COST_OUTPUT_PER_1K = 0.0
+
+    ENDPOINTS = {
+        "glm_subscription": "https://api.z.ai/api/anthropic",
+        "glm_api": "https://api.z.ai/paas/v4/chat/completions",
+    }
+
+    def __init__(self, endpoint: str = "glm_subscription", model: str = "glm-5"):
+        super().__init__(runner_id=f"glm-sub-{model}")
+        self.endpoint = endpoint
+        self.model = model
+        self.api_key = self._get_api_key()
+        self.base_url = self.ENDPOINTS.get(endpoint, endpoint)
+        self.max_tool_iterations = 10
+
+    def _get_api_key(self) -> str:
+        try:
+            return get_api_key("GLM_API_KEY")
+        except Exception as e:
+            self.logger.error(f"Failed to get GLM API key: {e}")
+            return None
+
+    def probe(self) -> tuple[bool, str]:
+        if not self.api_key:
+            return False, "PROBE_FAILED: GLM_API_KEY not in vault"
+        return True, "OK"
+
+    def _execute_tool(self, tool_name: str, tool_input: Dict) -> Dict:
+        """Execute a tool call and return result."""
+        try:
+            if tool_name == "read_file":
+                path = tool_input.get("path")
+                if not path:
+                    return {"error": "Missing 'path' parameter"}
+                if not os.path.exists(path):
+                    return {"error": f"File not found: {path}"}
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                return {"content": content, "path": path}
+
+            elif tool_name == "write_file":
+                path = tool_input.get("path")
+                content = tool_input.get("content")
+                if not path or content is None:
+                    return {"error": "Missing 'path' or 'content' parameter"}
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(content)
+                return {"success": True, "path": path}
+
+            elif tool_name == "run_command":
+                cmd = tool_input.get("command")
+                cwd = tool_input.get("cwd", os.getcwd())
+                timeout = tool_input.get("timeout", 60)
+                if not cmd:
+                    return {"error": "Missing 'command' parameter"}
+                result = subprocess.run(
+                    cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    cwd=cwd,
+                )
+                return {
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "returncode": result.returncode,
+                }
+
+            elif tool_name == "list_files":
+                path = tool_input.get("path", ".")
+                pattern = tool_input.get("pattern", "*")
+                files = list(Path(path).glob(pattern))[:100]
+                return {"files": [str(f) for f in files]}
+
+            else:
+                return {"error": f"Unknown tool: {tool_name}"}
+
+        except subprocess.TimeoutExpired:
+            return {"error": f"Command timed out"}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def execute(self, task_packet: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute task with tool loop support."""
+        import requests
+
+        task_id = task_packet.get("task_id", "unknown")
+        prompt = task_packet.get("prompt", "")
+        constraints = task_packet.get("constraints", {})
+        codebase_files = task_packet.get("codebase_files", {})
+
+        if not self.api_key:
+            return self.build_failure_result(
+                task_id=task_id,
+                error_code="NO_API_KEY",
+                error_message="GLM API key not available",
+                suggested_next_step="reassign",
+            )
+
+        max_tokens = constraints.get("max_tokens", 4000)
+        timeout = constraints.get("timeout_seconds", 300)
+        work_dir = constraints.get("work_dir", os.getcwd())
+
+        full_prompt = prompt
+        if codebase_files:
+            file_context = "\n\n".join(
+                [
+                    f"--- {filename} ---\n{content}"
+                    for filename, content in codebase_files.items()
+                ]
+            )
+            full_prompt = f"Context files:\n\n{file_context}\n\n---\n\nTask:\n{prompt}"
+
+        tools = [
+            {
+                "name": "read_file",
+                "description": "Read a file from the filesystem",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Path to the file"}
+                    },
+                    "required": ["path"],
+                },
+            },
+            {
+                "name": "write_file",
+                "description": "Write content to a file",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Path to write to"},
+                        "content": {
+                            "type": "string",
+                            "description": "Content to write",
+                        },
+                    },
+                    "required": ["path", "content"],
+                },
+            },
+            {
+                "name": "run_command",
+                "description": "Run a shell command",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "command": {"type": "string", "description": "Command to run"},
+                        "cwd": {"type": "string", "description": "Working directory"},
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Timeout in seconds",
+                        },
+                    },
+                    "required": ["command"],
+                },
+            },
+            {
+                "name": "list_files",
+                "description": "List files matching a pattern",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Directory to search",
+                        },
+                        "pattern": {"type": "string", "description": "Glob pattern"},
+                    },
+                },
+            },
+        ]
+
+        messages = [{"role": "user", "content": full_prompt}]
+
+        start_time = time.time()
+        total_tokens_in = 0
+        total_tokens_out = 0
+        tool_calls_made = []
+
+        try:
+            for iteration in range(self.max_tool_iterations):
+                payload = {
+                    "model": self.model,
+                    "max_tokens": max_tokens,
+                    "messages": messages,
+                    "tools": tools,
+                }
+
+                headers = {
+                    "x-api-key": self.api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                }
+
+                response = requests.post(
+                    f"{self.base_url}/v1/messages",
+                    headers=headers,
+                    json=payload,
+                    timeout=timeout,
+                )
+
+                if response.status_code == 429:
+                    return self.build_failure_result(
+                        task_id=task_id,
+                        error_code="QUOTA_EXHAUSTED",
+                        error_message="Rate limit exhausted",
+                        suggested_next_step="wait",
+                    )
+                elif response.status_code != 200:
+                    return self.build_failure_result(
+                        task_id=task_id,
+                        error_code="API_ERROR",
+                        error_message=f"API error {response.status_code}: {response.text[:200]}",
+                        suggested_next_step="retry",
+                    )
+
+                data = response.json()
+                usage = data.get("usage", {})
+                total_tokens_in += usage.get("input_tokens", 0)
+                total_tokens_out += usage.get("output_tokens", 0)
+
+                content_blocks = data.get("content", [])
+
+                text_response = ""
+                tool_use_blocks = []
+
+                for block in content_blocks:
+                    if block.get("type") == "text":
+                        text_response += block.get("text", "")
+                    elif block.get("type") == "tool_use":
+                        tool_use_blocks.append(block)
+
+                if not tool_use_blocks:
+                    duration = time.time() - start_time
+                    return self.build_success_result(
+                        task_id=task_id,
+                        output=text_response,
+                        tokens_in=total_tokens_in,
+                        tokens_out=total_tokens_out,
+                        duration_seconds=duration,
+                        metadata={"tool_calls": tool_calls_made},
+                    )
+
+                assistant_message = {"role": "assistant", "content": content_blocks}
+                messages.append(assistant_message)
+
+                tool_results = []
+                for tool_block in tool_use_blocks:
+                    tool_name = tool_block.get("name")
+                    tool_input = tool_block.get("input", {})
+                    tool_id = tool_block.get("id")
+
+                    self.logger.info(f"Tool call: {tool_name}({tool_input})")
+
+                    tool_result = self._execute_tool(tool_name, tool_input)
+                    tool_calls_made.append(
+                        {"tool": tool_name, "input": tool_input, "result": tool_result}
+                    )
+
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_id,
+                            "content": json.dumps(tool_result),
+                        }
+                    )
+
+                messages.append({"role": "user", "content": tool_results})
+
+            return self.build_failure_result(
+                task_id=task_id,
+                error_code="MAX_ITERATIONS",
+                error_message=f"Exceeded max tool iterations ({self.max_tool_iterations})",
+                suggested_next_step="split",
+            )
+
+        except requests.Timeout:
+            return self.build_failure_result(
+                task_id=task_id,
+                error_code="TIMEOUT",
+                error_message=f"Request timed out after {timeout}s",
                 suggested_next_step="retry",
             )
         except Exception as e:
@@ -746,6 +1218,8 @@ RUNNER_REGISTRY = {
     "kimi": KimiContractRunner,
     "kimi-cli": KimiContractRunner,
     "kimi-internal": KimiContractRunner,
+    "opencode": OpenCodeContractRunner,
+    "glm-5": OpenCodeContractRunner,
     "deepseek": DeepSeekContractRunner,
     "deepseek-chat": DeepSeekContractRunner,
     "gemini": GeminiContractRunner,

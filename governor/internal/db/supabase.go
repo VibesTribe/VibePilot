@@ -332,3 +332,70 @@ func (d *DB) SetRunnerRateLimited(ctx context.Context, runnerID string, resetAt 
 	})
 	return err
 }
+
+func (d *DB) GetRunners(ctx context.Context) ([]Runner, error) {
+	data, err := d.rest(ctx, "GET", "runners?select=id,model_id,tool_id,cost_priority,status,daily_used,daily_limit&status=eq.active", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var runners []Runner
+	if err := json.Unmarshal(data, &runners); err != nil {
+		return nil, fmt.Errorf("unmarshal runners: %w", err)
+	}
+	return runners, nil
+}
+
+func (d *DB) GetTasksByStatus(ctx context.Context, status string, limit int) ([]types.Task, error) {
+	path := fmt.Sprintf("tasks?status=eq.%s&order=priority.asc,created_at.asc&limit=%d", status, limit)
+	data, err := d.rest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var tasks []types.Task
+	if err := json.Unmarshal(data, &tasks); err != nil {
+		return nil, fmt.Errorf("unmarshal tasks: %w", err)
+	}
+	return tasks, nil
+}
+
+type ROISummary struct {
+	TotalRuns       int     `json:"total_runs"`
+	TotalTokensIn   int     `json:"total_tokens_in"`
+	TotalTokensOut  int     `json:"total_tokens_out"`
+	TheoreticalCost float64 `json:"theoretical_cost"`
+	ActualCost      float64 `json:"actual_cost"`
+	Savings         float64 `json:"savings"`
+}
+
+func (d *DB) GetROISummary(ctx context.Context) (*ROISummary, error) {
+	data, err := d.rest(ctx, "GET", "task_runs?select=tokens_in,tokens_out,platform_theoretical_cost_usd,total_actual_cost_usd,total_savings_usd", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var rows []struct {
+		TokensIn                   int     `json:"tokens_in"`
+		TokensOut                  int     `json:"tokens_out"`
+		PlatformTheoreticalCostUsd float64 `json:"platform_theoretical_cost_usd"`
+		TotalActualCostUsd         float64 `json:"total_actual_cost_usd"`
+		TotalSavingsUsd            float64 `json:"total_savings_usd"`
+	}
+
+	if err := json.Unmarshal(data, &rows); err != nil {
+		return nil, fmt.Errorf("unmarshal roi rows: %w", err)
+	}
+
+	summary := &ROISummary{}
+	for _, row := range rows {
+		summary.TotalRuns++
+		summary.TotalTokensIn += row.TokensIn
+		summary.TotalTokensOut += row.TokensOut
+		summary.TheoreticalCost += row.PlatformTheoreticalCostUsd
+		summary.ActualCost += row.TotalActualCostUsd
+		summary.Savings += row.TotalSavingsUsd
+	}
+
+	return summary, nil
+}

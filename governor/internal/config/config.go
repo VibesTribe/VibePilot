@@ -21,6 +21,7 @@ type GovernorConfig struct {
 	PollInterval  time.Duration `yaml:"poll_interval"`
 	MaxConcurrent int           `yaml:"max_concurrent"`
 	StuckTimeout  time.Duration `yaml:"stuck_timeout"`
+	MaxPerModule  int           `yaml:"max_per_module"`
 }
 
 type SupabaseConfig struct {
@@ -51,8 +52,13 @@ type InternalRunner struct {
 }
 
 type CourierConfig struct {
-	DriverModel string            `yaml:"driver_model"`
-	Platforms   []CourierPlatform `yaml:"platforms"`
+	Enabled       bool              `yaml:"enabled"`
+	MaxInFlight   int               `yaml:"max_in_flight"`
+	Stagger       time.Duration     `yaml:"stagger"`
+	CallbackURL   string            `yaml:"callback_url"`
+	WebhookSecret string            `yaml:"webhook_secret"`
+	DriverModel   string            `yaml:"driver_model"`
+	Platforms     []CourierPlatform `yaml:"platforms"`
 }
 
 type CourierPlatform struct {
@@ -76,9 +82,15 @@ func Load(path string) (*Config, error) {
 			PollInterval:  15 * time.Second,
 			MaxConcurrent: 3,
 			StuckTimeout:  10 * time.Minute,
+			MaxPerModule:  8,
 		},
 		Server: ServerConfig{
 			Addr: ":8080",
+		},
+		Courier: CourierConfig{
+			Enabled:     false,
+			MaxInFlight: 3,
+			Stagger:     30 * time.Second,
 		},
 	}
 

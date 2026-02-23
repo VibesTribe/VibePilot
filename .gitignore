@@ -91,3 +91,6 @@ list_models.py
 # Temporary files
 *.tmp
 *.bak
+
+# Go binaries
+governor/governor

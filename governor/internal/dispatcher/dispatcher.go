@@ -9,26 +9,36 @@ import (
 	"time"
 
 	"github.com/vibepilot/governor/internal/config"
+	"github.com/vibepilot/governor/internal/courier"
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/pool"
 	"github.com/vibepilot/governor/internal/security"
+	"github.com/vibepilot/governor/internal/throttle"
 	"github.com/vibepilot/governor/pkg/types"
 )
 
 type Dispatcher struct {
-	db           *db.DB
-	cfg          *config.Config
-	pool         *pool.Pool
-	leakDetector *security.LeakDetector
+	db            *db.DB
+	cfg           *config.Config
+	pool          *pool.Pool
+	leakDetector  *security.LeakDetector
+	moduleLimiter *throttle.ModuleLimiter
+	courier       *courier.Dispatcher
 }
 
-func New(database *db.DB, cfg *config.Config, leakDetector *security.LeakDetector) *Dispatcher {
-	return &Dispatcher{
-		db:           database,
-		cfg:          cfg,
-		pool:         pool.New(database),
-		leakDetector: leakDetector,
+func New(database *db.DB, cfg *config.Config, leakDetector *security.LeakDetector, moduleLimiter *throttle.ModuleLimiter) *Dispatcher {
+	d := &Dispatcher{
+		db:            database,
+		cfg:           cfg,
+		pool:          pool.New(database),
+		leakDetector:  leakDetector,
+		moduleLimiter: moduleLimiter,
 	}
+	return d
+}
+
+func (d *Dispatcher) SetCourier(c *courier.Dispatcher) {
+	d.courier = c
 }
 
 func (d *Dispatcher) Run(ctx context.Context, dispatchCh <-chan types.Task) {
@@ -46,17 +56,24 @@ func (d *Dispatcher) Run(ctx context.Context, dispatchCh <-chan types.Task) {
 }
 
 func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
-	log.Printf("Dispatcher: task %s (routing=%s, type=%s)", task.ID[:8], task.RoutingFlag, task.Type)
+	log.Printf("Dispatcher: task %s (routing=%s, type=%s, slice=%s)", task.ID[:8], task.RoutingFlag, task.Type, task.SliceID)
+
+	if task.RoutingFlag == types.RoutingWeb && d.courier != nil && d.cfg.Courier.Enabled {
+		d.dispatchToCourier(ctx, task)
+		return
+	}
 
 	runner, err := d.pool.SelectBest(ctx, string(task.RoutingFlag), task.Type)
 	if err != nil {
 		log.Printf("Dispatcher: pool error for %s: %v", task.ID[:8], err)
 		d.handleFailure(ctx, task)
+		d.releaseSlot(task.SliceID)
 		return
 	}
 	if runner == nil {
 		log.Printf("Dispatcher: no runner available for %s (routing=%s)", task.ID[:8], task.RoutingFlag)
 		d.handleFailure(ctx, task)
+		d.releaseSlot(task.SliceID)
 		return
 	}
 
@@ -64,6 +81,7 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 
 	if err := d.db.ClaimTask(ctx, task.ID, runner.ModelID); err != nil {
 		log.Printf("Dispatcher: claim failed for %s: %v", task.ID[:8], err)
+		d.releaseSlot(task.SliceID)
 		return
 	}
 
@@ -72,6 +90,7 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 		log.Printf("Dispatcher: no packet for %s: %v", task.ID[:8], err)
 		d.handleFailure(ctx, task)
 		d.recordResult(ctx, runner.ID, task.Type, false, 0)
+		d.releaseSlot(task.SliceID)
 		return
 	}
 
@@ -109,6 +128,7 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 
 	if !success {
 		d.handleFailure(ctx, task)
+		d.releaseSlot(task.SliceID)
 		return
 	}
 
@@ -119,6 +139,7 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 
 	if err := d.db.UpdateTaskStatus(ctx, task.ID, types.StatusReview, result); err != nil {
 		log.Printf("Dispatcher: failed to update status for %s: %v", task.ID[:8], err)
+		d.releaseSlot(task.SliceID)
 		return
 	}
 
@@ -126,7 +147,14 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 		log.Printf("Dispatcher: failed to unlock dependents for %s: %v", task.ID[:8], err)
 	}
 
+	d.releaseSlot(task.SliceID)
 	log.Printf("Dispatcher: task %s completed successfully", task.ID[:8])
+}
+
+func (d *Dispatcher) releaseSlot(sliceID string) {
+	if d.moduleLimiter != nil && sliceID != "" {
+		d.moduleLimiter.Release(sliceID)
+	}
 }
 
 func (d *Dispatcher) recordResult(ctx context.Context, runnerID string, taskType string, success bool, tokens int) {
@@ -210,4 +238,79 @@ func (d *Dispatcher) handleFailure(ctx context.Context, task types.Task) {
 	} else {
 		log.Printf("Dispatcher: task %s returned to queue", task.ID[:8])
 	}
+}
+
+func (d *Dispatcher) dispatchToCourier(ctx context.Context, task types.Task) {
+	if d.courier == nil {
+		log.Printf("Dispatcher: courier not configured for %s", task.ID[:8])
+		d.handleFailure(ctx, task)
+		d.releaseSlot(task.SliceID)
+		return
+	}
+
+	if err := d.db.ClaimTask(ctx, task.ID, "courier"); err != nil {
+		log.Printf("Dispatcher: courier claim failed for %s: %v", task.ID[:8], err)
+		d.releaseSlot(task.SliceID)
+		return
+	}
+
+	d.courier.Enqueue(task)
+}
+
+func (d *Dispatcher) OnCourierResult(result courier.Result) {
+	ctx := context.Background()
+
+	success := result.Status == "success"
+	status := "success"
+	var taskResult interface{}
+	if !success {
+		status = "failed"
+		taskResult = map[string]interface{}{"error": result.Error, "output": result.Output}
+	} else {
+		taskResult = map[string]interface{}{"output": result.Output, "chat_url": result.ChatURL}
+	}
+
+	runID, err := d.db.RecordTaskRun(ctx, &db.TaskRunInput{
+		TaskID:    result.TaskID,
+		ModelID:   "courier",
+		Courier:   "browser-use",
+		Platform:  "web",
+		Status:    status,
+		Result:    taskResult,
+		TokensIn:  result.TokensIn,
+		TokensOut: result.TokensOut,
+	})
+	if err != nil {
+		log.Printf("Dispatcher: failed to record courier run for %s: %v", result.TaskID[:8], err)
+	} else {
+		if err := d.db.CallROIRPC(ctx, runID); err != nil {
+			log.Printf("Dispatcher: ROI RPC failed for courier run %s: %v", runID[:8], err)
+		}
+	}
+
+	if !success {
+		task, _ := d.db.GetTaskByID(ctx, result.TaskID)
+		if task != nil {
+			d.handleFailure(ctx, *task)
+			d.releaseSlot(task.SliceID)
+		}
+		return
+	}
+
+	task, err := d.db.GetTaskByID(ctx, result.TaskID)
+	if err != nil || task == nil {
+		log.Printf("Dispatcher: courier task %s not found for completion", result.TaskID[:8])
+		return
+	}
+
+	if err := d.db.UpdateTaskStatus(ctx, result.TaskID, types.StatusReview, taskResult); err != nil {
+		log.Printf("Dispatcher: failed to update courier task status %s: %v", result.TaskID[:8], err)
+	}
+
+	if err := d.db.UnlockDependents(ctx, result.TaskID); err != nil {
+		log.Printf("Dispatcher: failed to unlock dependents for courier %s: %v", result.TaskID[:8], err)
+	}
+
+	d.releaseSlot(task.SliceID)
+	log.Printf("Dispatcher: courier task %s completed successfully", result.TaskID[:8])
 }

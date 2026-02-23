@@ -119,14 +119,13 @@ Output valid JSON following the format in config/prompts/planner.md."""
         # This allows the orchestrator to choose between Kimi, GLM-5, etc.
         if self.orchestrator:
             result = self.orchestrator.run_agent_task(
-                agent_role="planner",
-                prompt=prompt,
-                max_tokens=max_tokens,
-                timeout=300
+                agent_role="planner", prompt=prompt, max_tokens=max_tokens, timeout=300
             )
-            
+
             if result.get("success"):
-                self.log(f"Planning completed using {result.get('model_used', 'unknown')}")
+                self.log(
+                    f"Planning completed using {result.get('model_used', 'unknown')}"
+                )
                 return result.get("output", "")
             else:
                 error = result.get("error", "Unknown error")
@@ -137,10 +136,12 @@ Output valid JSON following the format in config/prompts/planner.md."""
             # This should not happen in production - orchestrator should always wire agents
             self.log(
                 "WARNING: No orchestrator wired, using direct Kimi CLI fallback",
-                level="warning"
+                level="warning",
             )
-            result = kimi_runner.execute_task(prompt=prompt, timeout=300, auto_approve=True)
-            
+            result = kimi_runner.execute_task(
+                prompt=prompt, timeout=300, auto_approve=True
+            )
+
             if result["success"]:
                 return result["output"]
             else:
@@ -204,17 +205,18 @@ Remember:
 Return ONLY valid JSON following the output format specified above."""
 
         try:
-            # Call Kimi for planning
-            response = self._call_planner_llm(full_prompt)
-
-            # Parse JSON from response
-            plan = self._parse_plan(response)
+            # Call LLM for planning with retry logic
+            plan, raw_response = self._call_planner_with_retry(
+                full_prompt, max_retries=2
+            )
 
             if not plan:
                 return AgentResult(
                     success=False,
-                    output=None,
-                    error="Could not parse plan from LLM response",
+                    output={
+                        "raw_response": raw_response[:500] if raw_response else None
+                    },
+                    error=f"Could not parse plan from LLM response: {raw_response[:200] if raw_response else 'No response'}",
                 )
 
             # Extract all tasks from plan
@@ -435,37 +437,124 @@ Return JSON:
         return prompt_packet
 
     def _parse_plan(self, response: str) -> Optional[Dict]:
-        """Parse plan JSON from LLM response."""
+        """Parse plan JSON from LLM response with robust extraction."""
+        if not response or not response.strip():
+            return None
+
+        response = response.strip()
+
+        # Try 1: Direct JSON parse
         try:
             return json.loads(response)
         except json.JSONDecodeError:
-            # Try to extract JSON from response
-            start = response.find("{")
-            end = response.rfind("}") + 1
-            if start != -1 and end > start:
-                try:
-                    return json.loads(response[start:end])
-                except json.JSONDecodeError:
-                    pass
+            pass
 
-            # Try to find JSON array
-            start = response.find("[")
-            end = response.rfind("]") + 1
-            if start != -1 and end > start:
-                try:
-                    tasks = json.loads(response[start:end])
-                    return {
-                        "slices": [
-                            {
-                                "slice_id": "default",
-                                "phases": [{"phase_id": "P1", "tasks": tasks}],
+        # Try 2: Extract JSON object from markdown code block
+        import re
+
+        code_block_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response)
+        if code_block_match:
+            try:
+                return json.loads(code_block_match.group(1))
+            except json.JSONDecodeError:
+                pass
+
+        # Try 3: Find outermost JSON object
+        brace_count = 0
+        start_idx = None
+        for i, char in enumerate(response):
+            if char == "{":
+                if start_idx is None:
+                    start_idx = i
+                brace_count += 1
+            elif char == "}":
+                brace_count -= 1
+                if brace_count == 0 and start_idx is not None:
+                    try:
+                        return json.loads(response[start_idx : i + 1])
+                    except json.JSONDecodeError:
+                        start_idx = None
+                        continue
+
+        # Try 4: Extract JSON array and wrap
+        bracket_count = 0
+        start_idx = None
+        for i, char in enumerate(response):
+            if char == "[":
+                if start_idx is None:
+                    start_idx = i
+                bracket_count += 1
+            elif char == "]":
+                bracket_count -= 1
+                if bracket_count == 0 and start_idx is not None:
+                    try:
+                        tasks = json.loads(response[start_idx : i + 1])
+                        if isinstance(tasks, list):
+                            return {
+                                "slices": [
+                                    {
+                                        "slice_id": "default",
+                                        "phases": [{"phase_id": "P1", "tasks": tasks}],
+                                    }
+                                ]
                             }
-                        ]
-                    }
-                except json.JSONDecodeError:
-                    pass
+                    except json.JSONDecodeError:
+                        start_idx = None
+                        continue
 
-            return None
+        # Try 5: Fix common JSON issues and retry
+        try:
+            fixed = response
+            # Remove trailing commas
+            fixed = re.sub(r",\s*([}\]])", r"\1", fixed)
+            # Add missing quotes around keys
+            fixed = re.sub(r"(\w+)\s*:", r'"\1":', fixed)
+            return json.loads(fixed)
+        except json.JSONDecodeError:
+            pass
+
+        return None
+
+    def _call_planner_with_retry(
+        self, prompt: str, max_retries: int = 2
+    ) -> tuple[Optional[Dict], str]:
+        """
+        Call planner LLM with retry logic and fallback models.
+
+        Returns: (parsed_plan, raw_response)
+        """
+        last_error = None
+
+        for attempt in range(max_retries):
+            try:
+                response = self._call_planner_llm(prompt)
+
+                if not response or not response.strip():
+                    last_error = "Empty response from LLM"
+                    continue
+
+                plan = self._parse_plan(response)
+
+                if plan:
+                    return plan, response
+
+                last_error = "Could not parse JSON from response"
+                self.log(
+                    f"Parse attempt {attempt + 1} failed, retrying...", level="warning"
+                )
+
+                # Add explicit JSON instruction for retry
+                if attempt < max_retries - 1:
+                    prompt = (
+                        prompt
+                        + "\n\nIMPORTANT: Your previous response could not be parsed as JSON. Return ONLY valid JSON with no markdown formatting, no explanation, just the JSON object."
+                    )
+
+            except Exception as e:
+                last_error = str(e)
+                self.log(f"LLM call attempt {attempt + 1} failed: {e}", level="warning")
+
+        return None, last_error or "Unknown error"
 
     def _validate_plan_structure(self, plan: Dict) -> Dict:
         """Validate plan has required structure."""
