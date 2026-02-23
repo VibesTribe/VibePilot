@@ -451,3 +451,205 @@ func (d *DB) GetROISummary(ctx context.Context) (*ROISummary, error) {
 
 	return summary, nil
 }
+
+type CouncilReviewInput struct {
+	PlanID             string
+	Round              int
+	ModelID            string
+	Lens               string
+	Vote               string
+	Confidence         float64
+	Approach           string
+	UserIntentCheck    string
+	TechDriftCheck     string
+	DependenciesCheck  string
+	PreventativeIssues []string
+	Concerns           []string
+	Suggestions        []string
+}
+
+type CouncilReview struct {
+	ID                 string   `json:"id"`
+	PlanID             string   `json:"plan_id"`
+	Round              int      `json:"round"`
+	ModelID            string   `json:"model_id"`
+	Lens               string   `json:"lens"`
+	Vote               string   `json:"vote"`
+	Confidence         float64  `json:"confidence"`
+	Approach           string   `json:"approach"`
+	UserIntentCheck    string   `json:"user_intent_check"`
+	TechDriftCheck     string   `json:"tech_drift_check"`
+	DependenciesCheck  string   `json:"dependencies_check"`
+	PreventativeIssues []string `json:"preventative_issues"`
+	Concerns           []string `json:"concerns"`
+	Suggestions        []string `json:"suggestions"`
+}
+
+type CouncilSummary struct {
+	PlanID         string          `json:"plan_id"`
+	Round          int             `json:"round"`
+	Reviews        []CouncilReview `json:"reviews"`
+	Consensus      string          `json:"consensus"`
+	AllApproved    bool            `json:"all_approved"`
+	AnyBlocked     bool            `json:"any_blocked"`
+	CommonConcerns []string        `json:"common_concerns"`
+	AllSuggestions []string        `json:"all_suggestions"`
+}
+
+func (d *DB) SubmitCouncilReview(ctx context.Context, input *CouncilReviewInput) (string, error) {
+	data, err := d.rpc(ctx, "submit_council_review", map[string]interface{}{
+		"p_plan_id":             input.PlanID,
+		"p_round":               input.Round,
+		"p_model_id":            input.ModelID,
+		"p_lens":                input.Lens,
+		"p_vote":                input.Vote,
+		"p_confidence":          input.Confidence,
+		"p_approach":            input.Approach,
+		"p_user_intent_check":   input.UserIntentCheck,
+		"p_tech_drift_check":    input.TechDriftCheck,
+		"p_dependencies_check":  input.DependenciesCheck,
+		"p_preventative_issues": input.PreventativeIssues,
+		"p_concerns":            input.Concerns,
+		"p_suggestions":         input.Suggestions,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	var result string
+	if err := json.Unmarshal(data, &result); err != nil {
+		return "", fmt.Errorf("unmarshal council review id: %w", err)
+	}
+	return result, nil
+}
+
+func (d *DB) GetCouncilSummary(ctx context.Context, planID string, round int) (*CouncilSummary, error) {
+	data, err := d.rpc(ctx, "get_council_summary", map[string]interface{}{
+		"p_plan_id": planID,
+		"p_round":   round,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var summary CouncilSummary
+	if err := json.Unmarshal(data, &summary); err != nil {
+		return nil, fmt.Errorf("unmarshal council summary: %w", err)
+	}
+	return &summary, nil
+}
+
+func (d *DB) NeedsNextRound(ctx context.Context, planID string, currentRound int) (bool, error) {
+	data, err := d.rpc(ctx, "needs_next_round", map[string]interface{}{
+		"p_plan_id":       planID,
+		"p_current_round": currentRound,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	var result bool
+	if err := json.Unmarshal(data, &result); err != nil {
+		return false, fmt.Errorf("unmarshal needs_next_round: %w", err)
+	}
+	return result, nil
+}
+
+func (d *DB) GetRoundFeedback(ctx context.Context, planID string, round int) (map[string]interface{}, error) {
+	data, err := d.rpc(ctx, "get_round_feedback", map[string]interface{}{
+		"p_plan_id": planID,
+		"p_round":   round,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal round feedback: %w", err)
+	}
+	return result, nil
+}
+
+type MaintenanceCommand struct {
+	ID             string                 `json:"id"`
+	CommandType    string                 `json:"command_type"`
+	Payload        map[string]interface{} `json:"payload"`
+	Status         string                 `json:"status"`
+	IdempotencyKey string                 `json:"idempotency_key"`
+	ApprovedBy     string                 `json:"approved_by"`
+	ExecutedBy     string                 `json:"executed_by"`
+	Result         map[string]interface{} `json:"result"`
+	ErrorMessage   string                 `json:"error_message"`
+	RetryCount     int                    `json:"retry_count"`
+}
+
+func (d *DB) CreateMaintenanceCommand(ctx context.Context, commandType, idempotencyKey, approvedBy string, payload map[string]interface{}) (string, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	body := map[string]interface{}{
+		"command_type":    commandType,
+		"payload":         payload,
+		"idempotency_key": idempotencyKey,
+		"approved_by":     approvedBy,
+		"created_at":      now,
+		"updated_at":      now,
+	}
+
+	data, err := d.rest(ctx, "POST", "maintenance_commands", body)
+	if err != nil {
+		return "", err
+	}
+
+	var result []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return "", fmt.Errorf("unmarshal command result: %w", err)
+	}
+	if len(result) == 0 {
+		return "", fmt.Errorf("no command ID returned")
+	}
+	return result[0].ID, nil
+}
+
+func (d *DB) ClaimNextCommand(ctx context.Context, agentID string) (*MaintenanceCommand, error) {
+	data, err := d.rpc(ctx, "claim_next_command", map[string]interface{}{
+		"p_agent_id": agentID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var commands []MaintenanceCommand
+	if err := json.Unmarshal(data, &commands); err != nil {
+		return nil, fmt.Errorf("unmarshal command: %w", err)
+	}
+	if len(commands) == 0 {
+		return nil, nil
+	}
+	return &commands[0], nil
+}
+
+func (d *DB) CompleteCommand(ctx context.Context, commandID string, success bool, result map[string]interface{}, errorMessage string) error {
+	_, err := d.rpc(ctx, "complete_command", map[string]interface{}{
+		"p_command_id":    commandID,
+		"p_success":       success,
+		"p_result":        result,
+		"p_error_message": errorMessage,
+	})
+	return err
+}
+
+func (d *DB) GetAvailableModels(ctx context.Context, limit int) ([]Runner, error) {
+	path := fmt.Sprintf("runners?status=eq.active&order=cost_priority.asc&limit=%d", limit)
+	data, err := d.rest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var runners []Runner
+	if err := json.Unmarshal(data, &runners); err != nil {
+		return nil, fmt.Errorf("unmarshal runners: %w", err)
+	}
+	return runners, nil
+}

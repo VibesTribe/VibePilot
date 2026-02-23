@@ -11,7 +11,14 @@ const (
 	ActionApprove Action = "approve"
 	ActionReject  Action = "reject"
 	ActionHuman   Action = "human"
-	ActionCouncil Action = "council"
+)
+
+type PlanAction string
+
+const (
+	PlanActionApprove PlanAction = "approve"
+	PlanActionReject  PlanAction = "reject"
+	PlanActionCouncil PlanAction = "council"
 )
 
 type Decision struct {
@@ -22,6 +29,14 @@ type Decision struct {
 	Reason   string
 }
 
+type PlanDecision struct {
+	Action     PlanAction
+	Notes      string
+	Issues     []string
+	Warnings   []string
+	CouncilFor string
+}
+
 type ReviewInput struct {
 	TaskID         string
 	TaskType       string
@@ -30,6 +45,18 @@ type ReviewInput struct {
 	OutputContent  string
 	VisualChange   bool
 	SecurityImpact bool
+}
+
+type PlanReviewInput struct {
+	PlanID       string
+	PlanType     string
+	Title        string
+	Description  string
+	TaskCount    int
+	HasAuth      bool
+	HasSecurity  bool
+	HasMigration bool
+	Priority     int
 }
 
 type Supervisor struct{}
@@ -157,22 +184,85 @@ func (s *Supervisor) formatNotes(issues []string) string {
 	return strings.Join(notes, " | ")
 }
 
-func (s *Supervisor) NeedsCouncil(taskType string, title string, priority int) bool {
-	if taskType == "security" {
+func (s *Supervisor) ReviewPlan(ctx context.Context, input *PlanReviewInput) PlanDecision {
+	var issues []string
+	var warnings []string
+
+	if input.Title == "" {
+		issues = append(issues, "Plan has no title")
+	}
+	if input.Description == "" {
+		issues = append(issues, "Plan has no description")
+	}
+	if input.TaskCount == 0 {
+		issues = append(issues, "Plan has no tasks defined")
+	}
+
+	if len(issues) > 0 {
+		return PlanDecision{
+			Action: PlanActionReject,
+			Notes:  s.formatNotes(issues),
+			Issues: issues,
+		}
+	}
+
+	if s.needsCouncil(input) {
+		reason := s.determineCouncilReason(input)
+		return PlanDecision{
+			Action:     PlanActionCouncil,
+			CouncilFor: reason,
+			Warnings:   warnings,
+		}
+	}
+
+	return PlanDecision{
+		Action:   PlanActionApprove,
+		Warnings: warnings,
+	}
+}
+
+func (s *Supervisor) needsCouncil(input *PlanReviewInput) bool {
+	if input.PlanType == "system_improvement" {
+		return true
+	}
+	if input.HasAuth || input.HasSecurity {
+		return true
+	}
+	if input.HasMigration {
+		return true
+	}
+	if input.TaskCount > 5 {
+		return true
+	}
+	if input.Priority <= 1 {
 		return true
 	}
 
-	titleLower := strings.ToLower(title)
-	if strings.Contains(titleLower, "auth") ||
-		strings.Contains(titleLower, "authentication") ||
-		strings.Contains(titleLower, "architecture") ||
-		strings.Contains(titleLower, "refactor") {
-		return true
-	}
-
-	if priority <= 1 {
+	titleLower := strings.ToLower(input.Title)
+	if strings.Contains(titleLower, "architecture") ||
+		strings.Contains(titleLower, "refactor") ||
+		strings.Contains(titleLower, "redesign") {
 		return true
 	}
 
 	return false
+}
+
+func (s *Supervisor) determineCouncilReason(input *PlanReviewInput) string {
+	switch {
+	case input.PlanType == "system_improvement":
+		return "System improvement requires council vetting"
+	case input.HasAuth:
+		return "Authentication changes require security review"
+	case input.HasSecurity:
+		return "Security-related changes require review"
+	case input.HasMigration:
+		return "Data migration requires reversibility review"
+	case input.TaskCount > 5:
+		return "Complex plan with many tasks requires review"
+	case input.Priority <= 1:
+		return "Critical priority requires council oversight"
+	default:
+		return "Significant change requires council review"
+	}
 }
