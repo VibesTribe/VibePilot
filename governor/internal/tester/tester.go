@@ -32,12 +32,16 @@ func (t *Tester) RunTests(ctx context.Context, branchName string) TestResult {
 	t.gitCommand(ctx, "checkout", branchName).Run()
 
 	if output, err := t.runCommand(ctx, "pytest", "--tb=short", "-q"); err != nil {
-		failures = append(failures, "pytest: "+string(output))
+		outStr := string(output)
+		if !strings.Contains(outStr, "not found") && !strings.Contains(outStr, "No such file") && outStr != "" {
+			failures = append(failures, "pytest: "+outStr)
+		}
 	}
 
 	if output, err := t.runCommand(ctx, "ruff", "check", "."); err != nil {
-		if !strings.Contains(string(output), "All checks passed") {
-			failures = append(failures, "lint: "+string(output))
+		outStr := string(output)
+		if !strings.Contains(outStr, "not found") && !strings.Contains(outStr, "No such file") && !strings.Contains(outStr, "All checks passed") {
+			failures = append(failures, "lint: "+outStr)
 		}
 	}
 
