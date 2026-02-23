@@ -114,7 +114,8 @@ func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *type
 	switch decision.Action {
 	case supervisor.ActionApprove:
 		if task.Type == "test" || task.Type == "docs" {
-			log.Printf("Orchestrator: %s approved (no testing needed for %s type)", taskID[:8], task.Type)
+			log.Printf("Orchestrator: %s approved, queueing merge", taskID[:8])
+			o.db.UpdateTaskStatus(ctx, taskID, types.StatusApproval, nil)
 			o.queueMerge(taskID)
 		} else {
 			log.Printf("Orchestrator: %s approved, routing to testing", taskID[:8])
@@ -196,10 +197,11 @@ func (o *Orchestrator) processMerge(ctx context.Context, taskID string) {
 	targetBranch := "main"
 
 	if err := o.maintenance.MergeBranch(ctx, task.BranchName, targetBranch); err != nil {
-		log.Printf("Orchestrator: merge conflict for %s: %v", taskID[:8], err)
-		o.db.UpdateTaskStatus(ctx, taskID, types.StatusAwaitingHuman, map[string]interface{}{
-			"reason": fmt.Sprintf("Merge conflict: %v", err),
+		log.Printf("Orchestrator: merge failed for %s: %v", taskID[:8], err)
+		o.db.UpdateTaskStatus(ctx, taskID, types.StatusApproval, map[string]interface{}{
+			"failure_notes": fmt.Sprintf("Merge pending: %v", err),
 		})
+		go o.handleMergeFailure(ctx, taskID, err.Error())
 		return
 	}
 
@@ -244,6 +246,10 @@ func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, no
 
 func (o *Orchestrator) handleEscalation(ctx context.Context, taskID string, failureNotes string) {
 	log.Printf("Orchestrator: Analyzing escalation for %s: %s", taskID[:8], failureNotes)
+}
+
+func (o *Orchestrator) handleMergeFailure(ctx context.Context, taskID string, mergeError string) {
+	log.Printf("Orchestrator: Analyzing merge failure for %s: %s", taskID[:8], mergeError)
 }
 
 func (o *Orchestrator) generateBranchName(task *types.Task) string {
