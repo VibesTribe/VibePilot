@@ -1,674 +1,434 @@
 # Governor Implementation Handoff Document
 
-**Session:** 2026-02-22
+**Session:** 2026-02-23
 **Purpose:** Full understanding captured for next session
-**Status:** Phase 3 COMPLETE - Intelligent routing working
+**Status:** Phase 2 & Phase 3 COMPLETE
 
 ---
 
-## REPLACEMENT SUMMARY (What Go Replaces)
+## QUICK START
 
-### Code Size Reduction
-
-| Component | Python | Go | Reduction |
-|-----------|--------|-----|-----------|
-| Core logic | 3,422 lines | 781 lines | **77% less** |
-| Dependencies | 759MB (venv) | 0 (static binary) | **100% less** |
-| Binary size | N/A | 9.6MB | — |
-
-### Memory Usage
-
-| Component | Python Stack | Go Binary |
-|-----------|-------------|-----------|
-| Orchestrator | ~94MB | ~10MB |
-| venv | 759MB | 0 |
-| **Total runtime** | ~850MB+ | ~10-20MB |
-
-### Cost Impact
-
-| Server | Monthly Cost | Can Run |
-|--------|-------------|---------|
-| e2-standard-2 (Python) | $64/mo | Python + OpenCode (barely) |
-| e2-micro (Go) | **$0/mo** | Go Governor + GitHub Actions offload |
-
-**Savings: $768/year**
-
-### What Go Governor Replaces
-
-| Python File | Lines | Go Equivalent |
-|-------------|-------|---------------|
-| `core/orchestrator.py` | 2,872 | `governor/` (781 lines total) |
-| `task_manager.py` | 550 | Built into dispatcher |
-| `venv/` | 759MB | Static binary (9.6MB) |
-
-### What Stays Python (Decision Layer)
-
-| Component | Why Not Replaced |
-|-----------|------------------|
-| `agents/supervisor.py` | Review logic, Council coordination |
-| `agents/maintenance.py` | Git operations |
-| `agents/consultant.py` | PRD generation |
-| `agents/planner.py` | Task planning |
-| `vault_manager.py` | Secret management |
-| `runners/contract_runners.py` | Runner implementations |
-
-**Go = Execution. Python = Decisions.**
-
----
-
-## WHY WE BUILT GO GOVERNOR
-
-### The Problem
-| Current State | Problem |
-|---------------|---------|
-| Python orchestrator + OpenCode | 1.5GB RAM total |
-| e2-micro free tier | 1GB RAM limit |
-| **Result** | **Won't fit on free tier** |
-
-### The Solution
-| Component | Python (Current) | Go (Target) |
-|-----------|------------------|-------------|
-| RAM usage | 150MB base + 1.4GB OpenCode | 10-20MB binary |
-| GCE cost | $64/mo (e2-standard-2) | $0 (e2-micro free tier) |
-| Deployment | venv + pip + drift | Single static binary |
-| Concurrency | GIL limits threads | Goroutines (2KB stack each) |
-
-### What Go Enables
-1. **Free tier operation** - 9.6MB binary vs 1.5GB Python stack
-2. **100+ concurrent tasks** - Goroutines scale efficiently
-3. **GitHub Actions offload** - Browser-use tasks on 7GB free runners
-4. **Zero dependency deploy** - Single binary, no venv drift
-
----
-
-## THE FULL SYSTEM (What Python Does)
-
-### Agent Hierarchy
-
-| Category | Agent | Role | Model | Can Decide | Can Execute | Git Write |
-|----------|-------|------|-------|------------|-------------|-----------|
-| **Decision** | orchestrator | Routing | gemini-2.0-flash | Yes | No | No |
-| | council (3) | Plan Review | gemini-2.0-flash | Yes | No | No |
-| | supervisor | Quality Gate | gemini-2.0-flash | Yes | No | No |
-| **Execution** | courier | Web browser | browser-use-gemini | No | Yes | No |
-| | internal_cli | CLI tasks | opencode/kimi | No | Yes | No |
-| | internal_api | API calls | gemini-api | No | Yes | No |
-| | tester_code | Code tests | opencode | No | Yes | No |
-| | **maintenance** | Git operator | opencode | No | Yes | **YES (ONLY)** |
-| **Support** | vibes | Human interface | gemini | No | No | No |
-| | researcher | Daily intel | gemini | No | No | No |
-| | consultant | PRD generation | gemini | No | No | No |
-| | planner | Task planning | kimi | No | No | No |
-
-**CRITICAL: Only `maintenance` agent has git write access. All git operations go through `maintenance_commands` table.**
-
-### Task Lifecycle
-
-```
-1. IDEA → Consultant creates PRD
-   ↓
-2. PRD → Planner creates TASKS (vertical slices, each with full prompt_packet)
-   ↓
-3. TASKS → Council reviews (3 lenses: user_alignment, architecture, feasibility)
-   ↓
-4. Council APPROVES → Supervisor locks in tasks to Supabase
-   ↓
-5. Orchestrator DISPATCHES task:
-   - routing_flag='web' → Courier on browser
-   - routing_flag='internal' → CLI tool (opencode)
-   ↓
-6. Task EXECUTES, writes result to task_runs
-   ↓
-7. calculate_enhanced_task_roi(run_id) RPC called
-   ↓
-8. Task status → 'review', Supervisor reviews output
-   ↓
-9. If approved → 'testing', Tester runs tests
-   ↓
-10. If tests pass → 'approval', Supervisor commands merge
-    ↓
-11. Maintenance agent reads maintenance_commands, executes git merge
-    ↓
-12. Task → 'merged', unlock_dependent_tasks RPC called
+```bash
+cd ~/vibepilot/governor
+go build -o governor ./cmd/governor
+./governor
 ```
 
-### GitHub Branch Strategy
-
+**Expected output:**
 ```
-main
-├── task/uuid-001  (Task #1 working branch)
-├── task/uuid-002  (Task #2 working branch)
-└── task/uuid-003  (Task #3 working branch)
-```
-
-**Branch Lifecycle:**
-1. **Dispatch** → Create `task/{task_id}` from main
-2. **Execute** → Courier works in branch
-3. **Review** → Supervisor reviews in Supabase
-4. **Approve** → Supervisor writes to `maintenance_commands`
-5. **Merge** → Maintenance agent executes merge
-6. **Cleanup** → GitHub auto-deletes merged branches
-
----
-
-## THE ROI SYSTEM (DO NOT BREAK)
-
-### What Gets Recorded (task_runs table)
-
-| Column | Purpose | Source |
-|--------|---------|--------|
-| task_id | Which task | orchestrator |
-| model_id | Which AI model | runner |
-| courier | Tool name | runner |
-| platform | Web platform or "internal" | runner |
-| status | "success" or "failed" | runner |
-| result | Full output as JSONB | runner |
-| tokens_in | Input tokens | runner |
-| tokens_out | Output tokens | runner |
-| tokens_used | Total | calculated |
-
-### What Gets Calculated (by RPC)
-
-**Function:** `calculate_enhanced_task_roi(p_run_id)`
-
-1. Gets tokens_in, tokens_out, platform from run
-2. Looks up platform's `theoretical_cost_input_per_1k_usd` and `theoretical_cost_output_per_1k_usd`
-3. Calculates:
-   ```
-   theoretical = (tokens_in/1000 * cost_in) + (tokens_out/1000 * cost_out)
-   ```
-4. If courier_model_id exists, adds courier costs
-5. Calculates:
-   ```
-   savings = theoretical - actual
-   ```
-6. Updates task_runs with:
-   - `platform_theoretical_cost_usd`
-   - `total_actual_cost_usd`
-   - `total_savings_usd`
-7. Updates projects cumulative totals
-
-### What Dashboard Reads (vibeflow/apps/dashboard/lib/vibepilotAdapter.ts)
-
-- `tokens_in`, `tokens_out`, `tokens_used`
-- `courier_tokens`, `courier_cost_usd`
-- `platform_theoretical_cost_usd`, `total_actual_cost_usd`, `total_savings_usd`
-
-**If Go doesn't create task_runs correctly OR doesn't call ROI RPC → Dashboard shows $0 → Months of ROI work broken.**
-
----
-
-## KEY STORAGE
-
-### Bootstrap Keys (.env - only 3 needed)
-```
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_KEY=eyJ...  # anon key
-VAULT_KEY=LgbwdSxx...  # encryption key
-```
-
-### Secrets Vault (secrets_vault table, encrypted)
-- `DEEPSEEK_API_KEY`
-- `GITHUB_TOKEN`
-- `GEMINI_API_KEY` (to be added)
-
-### Access Pattern
-```python
-from vault_manager import get_api_key
-key = get_api_key('DEEPSEEK_API_KEY')
-```
-
-**Go will need to implement vault access or receive keys via environment.**
-
----
-
-## SUPABASE PATTERNS (Critical for Go)
-
-### What DOESN'T Work via REST
-```go
-// WRONG - SQL expressions are string literals, not evaluated
-body := map[string]interface{}{
-    "attempts": "attempts + 1",  // ERROR: invalid input syntax
-}
-```
-
-### What DOES Work
-```go
-// RIGHT - Fetch, calculate in Go, write back
-task, _ := db.GetTaskByID(ctx, taskID)
-newAttempts := task.Attempts + 1
-body := map[string]interface{}{
-    "attempts": newAttempts,  // Integer value
-}
-```
-
-### Key RPC Functions
-
-| Function | Purpose |
-|----------|---------|
-| `claim_next_task(courier, platform, model_id)` | Atomic claim with FOR UPDATE SKIP LOCKED |
-| `calculate_enhanced_task_roi(run_id)` | Calculate and store ROI (MUST CALL) |
-| `unlock_dependent_tasks(completed_task_id)` | Unlock waiting tasks |
-| `claim_next_command(agent_id)` | Maintenance agent claims git command |
-
----
-
-## TASK PACKET PARSING
-
-### Database Structure
-```
-task_packets.prompt is a TEXT column containing a JSON STRING
-```
-
-### Example
-```json
-// This is what's stored in the prompt column:
-{"task_id": "uuid", "prompt": "Say hello", "title": "Test", "constraints": {"max_tokens": 50}}
-```
-
-### WRONG Approach
-```go
-var packet PromptPacket
-json.Unmarshal(data, &packet)
-// packet.Prompt == "{\"task_id\": \"uuid\", \"prompt\": \"Say hello\"...}"
-// Wrong - it's the whole JSON string!
-```
-
-### RIGHT Approach
-```go
-type TaskPacketRow struct {
-    Prompt string `json:"prompt"`  // JSON string
-}
-var rows []TaskPacketRow
-json.Unmarshal(data, &rows)
-
-var packet PromptPacket
-json.Unmarshal([]byte(rows[0].Prompt), &packet)
-// packet.Prompt == "Say hello"
-// Correct - the actual prompt text!
+VibePilot Governor dev starting...
+Poll interval: 15s, Max concurrent: 3, Max per module: 8
+Connected to Supabase
+Sentry started: polling every 15s, max 3 concurrent, 8 per module
+Dispatcher started
+Janitor started: stuck timeout 10m0s
+Server starting on :8080
 ```
 
 ---
 
-## OPENCODE EXECUTION
+## CURRENT STATE
 
-### WRONG (what I did)
-```go
-cmd := exec.Command("opencode", "--task-packet", packetJSON)
-// --task-packet flag doesn't exist
-```
+### Code Stats
 
-### RIGHT (from contract_runners.py:234-240)
-```go
-prompt := "The actual prompt text"
-cmd := exec.CommandContext(ctx, "opencode", "run", "--format", "json", prompt)
-output, _ := cmd.CombinedOutput()
-
-var result struct {
-    Content      string `json:"content"`
-    InputTokens  int    `json:"input_tokens"`
-    OutputTokens int    `json:"output_tokens"`
-}
-json.Unmarshal(output, &result)
-```
-
----
-
-## CURRENT GO GOVERNOR STATE (Phase 3 COMPLETE)
+| Metric | Value | Target |
+|--------|-------|--------|
+| Total Go lines | 2,287 | < 3,000 |
+| Binary size | 10MB | < 15MB |
+| Dependencies | 3 direct | Minimal |
+| Packages | 11 | Lean |
 
 ### What's Working
 
-| Component | Status |
-|-----------|--------|
-| Sentry polls | ✅ Every 15s, max 3 concurrent |
-| Model pool | ✅ DB-driven selection (no hardcoded config) |
-| get_best_runner RPC | ✅ Returns best available by cost + success rate |
-| Task claiming | ✅ Atomic REST with status filter |
-| Packet parsing | ✅ Two-step JSON unmarshal |
-| OpenCode execution | ✅ `opencode run --format json "prompt"` |
-| task_runs recording | ✅ All fields: model_id, tokens, status, result |
-| ROI RPC | ✅ calculate_enhanced_task_roi |
-| Learning | ✅ task_ratings updated after each task |
-| 80% throttle | ✅ Triggers cooldown until midnight |
-| Janitor refresh | ✅ Auto-clears cooldowns/rate limits |
-| Binary | 9.6MB |
+| Component | Status | File |
+|-----------|--------|------|
+| Sentry (poller) | ✅ | `sentry/sentry.go` |
+| Dispatcher (router) | ✅ | `dispatcher/dispatcher.go` |
+| Janitor (cleanup) | ✅ | `janitor/janitor.go` |
+| DB client | ✅ | `db/supabase.go` |
+| Pool (model selection) | ✅ | `pool/model_pool.go` |
+| Security (leak detector) | ✅ | `security/leak_detector.go` |
+| Module limiter | ✅ | `throttle/module_limiter.go` |
+| Courier dispatcher | ✅ | `courier/dispatcher.go` |
+| Courier webhook | ✅ | `courier/webhook.go` |
+| WebSocket hub | ✅ | `server/hub.go` |
+| HTTP server + API | ✅ | `server/server.go` |
 
-### Verified Test Results
+### API Endpoints
 
-```
-Dispatcher: selected runner 77e3ca45 (model=glm-5, priority=0)
-Dispatcher: task completed successfully
-
-task_runs:
-  glm-5 | success | tokens: 11/265
-
-runners.task_ratings:
-  glm-5: {'test': {'success': 2, 'fail': 0}}
-```
-
-### Admin Commands
-
-```bash
-# Create runners for active models (uses vault for service key)
-python scripts/admin_setup.py --create-runners
-
-# Verify runners and RPCs
-python scripts/admin_setup.py --verify
-```
-
-### What's NOT Yet Implemented
-
-| Feature | Status |
-|---------|--------|
-| Web routing (courier) | Phase 4 |
-| GitHub Actions dispatch | Phase 4 |
-| Supervisor integration | Python handles |
-| Maintenance integration | Python handles |
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/health` | GET | Health check |
+| `/api/stats` | GET | Quick stats overview |
+| `/api/tasks?status={status}` | GET | List tasks (default: available) |
+| `/api/task/{id}` | GET | Get task packet |
+| `/api/models` | GET | List active runners from DB |
+| `/api/platforms` | GET | List web platforms |
+| `/api/roi` | GET | ROI summary from task_runs |
+| `/api/limits` | GET | Per-module concurrent counts |
+| `/ws` | WS | Real-time task events |
+| `/webhook/courier` | POST | GitHub Actions callback |
 
 ---
 
-## WHAT GOVERNOR MUST DO (Phase 2)
+## ARCHITECTURE
 
-### Minimal Working Implementation
+### Data Flow
 
-1. **Claim task** - Use REST with filter OR call `claim_next_task` RPC
-2. **Fetch packet** - Parse JSON string to get actual prompt
-3. **Execute opencode** - `opencode run --format json "prompt"`
-4. **Parse output** - Extract tokens_in, tokens_out, content
-5. **Insert task_run** with ALL fields:
-   - task_id, model_id, courier, platform
-   - status, result (JSONB)
-   - tokens_in, tokens_out, tokens_used
-6. **Call ROI RPC** - `calculate_enhanced_task_roi(run_id)`
-7. **Update task** - status='review' or handle_failure
-8. **Unlock dependents** - Call `unlock_dependent_tasks(task_id)`
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        GO GOVERNOR                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│  SENTRY (poller)                                                     │
+│  - Polls every 15s                                                   │
+│  - Max 3 concurrent global                                           │
+│  - Max 8 per module (slice_id)                                       │
+│  - Acquires slot from ModuleLimiter                                  │
+│  - Sends to dispatch channel                                         │
+├─────────────────────────────────────────────────────────────────────┤
+│  DISPATCHER                                                          │
+│  - Receives task from channel                                        │
+│  - Checks routing_flag:                                              │
+│    - 'web' → Courier (GitHub Actions)                                │
+│    - 'internal' → Pool → Local CLI                                   │
+│  - Claims task, executes, records result                             │
+│  - Releases slot on completion/failure                               │
+├─────────────────────────────────────────────────────────────────────┤
+│  COURIER DISPATCHER (Phase 2)                                        │
+│  - Enqueues web tasks                                                │
+│  - Max 3 in-flight, 30s stagger                                      │
+│  - Dispatches to GitHub Actions                                      │
+│  - Webhook receives completion                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  JANITOR                                                             │
+│  - Resets stuck tasks (10min timeout)                                │
+│  - Calls refresh_limits RPC                                          │
+├─────────────────────────────────────────────────────────────────────┤
+│  SERVER (Phase 3)                                                    │
+│  - HTTP API endpoints                                                │
+│  - WebSocket hub for real-time updates                               │
+│  - Courier webhook handler                                           │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-### Failure Handling Pattern
+### Module Limiter Flow
+
+```
+Sentry.poll()
+    ↓
+Check: CanDispatch(slice_id)?
+    ├── YES → Acquire(slice_id) → Dispatch
+    └── NO → Skip task (module at capacity)
+
+Dispatcher.execute()
+    ↓
+... task runs ...
+    ↓
+releaseSlot(slice_id) on ANY exit:
+- Success
+- Failure
+- Claim failed
+- No runner
+- No packet
+```
+
+---
+
+## KEY PATTERNS
+
+### 1. Module Limiter (8 per slice)
+
 ```go
-func (d *DB) handleFailure(taskID string) error {
-    // 1. Fetch current attempts
-    task, err := d.GetTaskByID(ctx, taskID)
-    if err != nil { return err }
-    
-    // 2. Increment in Go
-    newAttempts := task.Attempts + 1
-    
-    // 3. Decide status
-    status := "available"
-    if newAttempts >= task.MaxAttempts {
-        status = "escalated"
+// throttle/module_limiter.go
+type ModuleLimiter struct {
+    maxPerModule int           // 8
+    active       map[string]int // slice_id -> count
+}
+
+// Acquire before dispatch
+if !limiter.Acquire(task.SliceID) {
+    continue // Skip, at capacity
+}
+
+// Release on any exit path
+defer limiter.Release(task.SliceID)
+```
+
+### 2. Courier Dispatch (3 concurrent, staggered)
+
+```go
+// courier/dispatcher.go
+type Dispatcher struct {
+    queue       chan Task
+    maxInFlight int           // 3
+    stagger     time.Duration // 30s
+}
+
+// Stagger to avoid GitHub rate limits
+time.Sleep(d.stagger)
+d.client.Repositories.Dispatch(ctx, owner, repo, dispatch)
+```
+
+### 3. WebSocket Hub
+
+```go
+// server/hub.go
+type Hub struct {
+    broadcast  chan []byte
+    register   chan *Client
+    unregister chan *Client
+}
+
+// Single goroutine owns the map (no mutex)
+func (h *Hub) Run() {
+    for {
+        select {
+        case msg := <-h.broadcast:
+            for client := range h.clients {
+                client.send <- msg
+            }
+        }
+    }
+}
+```
+
+### 4. Slot Release on All Paths
+
+```go
+// dispatcher/dispatcher.go
+func (d *Dispatcher) execute(ctx context.Context, task Task) {
+    // Every error path must release slot
+    if err != nil {
+        d.releaseSlot(task.SliceID)
+        return
     }
     
-    // 4. Write back with calculated value
-    body := map[string]interface{}{
-        "status": status,
-        "attempts": newAttempts,
-        "assigned_to": nil,
-    }
-    return d.Update(ctx, "tasks", taskID, body)
+    // Success path also releases
+    d.releaseSlot(task.SliceID)
 }
 ```
 
 ---
 
-## FILES THAT WOULD BE TOUCHED
+## FILES STRUCTURE
 
-| File | Changes Needed |
-|------|----------------|
-| `governor/internal/db/supabase.go` | Add GetTaskByID, RecordTaskRun, CallRPC, fix packet parsing |
-| `governor/internal/dispatcher/dispatcher.go` | Fix opencode command, add recording, fix failure |
-| `governor/pkg/types/types.go` | Ensure TaskRun has all ROI fields |
-
-## FILES THAT MUST NOT BE TOUCHED
-
-| File | Why |
-|------|-----|
-| `docs/supabase-schema/*.sql` | Schema works, don't break |
-| `vibeflow/apps/dashboard/*` | Reads from DB, if Go writes correctly it works |
-| `config/prompts/*.md` | Agent prompts preserved |
-| `runners/contract_runners.py` | Still used, Go calls same tools |
+```
+governor/
+├── cmd/governor/main.go          # Entry point
+├── internal/
+│   ├── config/config.go          # Config loading
+│   ├── db/supabase.go            # REST client + RPC calls
+│   ├── sentry/sentry.go          # Task poller
+│   ├── dispatcher/dispatcher.go  # Task router + executor
+│   ├── janitor/janitor.go        # Stuck task cleanup
+│   ├── pool/model_pool.go        # Runner selection
+│   ├── security/leak_detector.go # Secret scanning
+│   ├── throttle/
+│   │   └── module_limiter.go     # 8 per module enforcement
+│   ├── courier/
+│   │   ├── dispatcher.go         # GitHub Actions dispatch
+│   │   └── webhook.go            # Completion callback
+│   └── server/
+│       ├── server.go             # HTTP API
+│       └── hub.go                # WebSocket hub
+├── pkg/types/types.go            # Shared types
+├── governor.yaml.example         # Sample config
+└── go.mod                        # Dependencies
+```
 
 ---
 
-## TESTING STRATEGY
+## CONFIGURATION
 
-### Before Any Code
-1. Create tiny test task with Python
-2. Observe ALL DB writes (task_runs, ROI fields)
-3. Document exact field values
+```yaml
+# governor.yaml
+governor:
+  poll_interval: 15s
+  max_concurrent: 3
+  stuck_timeout: 10m
+  max_per_module: 8
 
-### After Go Changes
-1. Create identical test task
-2. Run Go Governor
-3. Compare DB state field-by-field
-4. Verify dashboard shows same ROI
+supabase:
+  url: ${SUPABASE_URL}
+  service_key: ${SUPABASE_SERVICE_KEY}
 
-### Tiny Test Task
-```python
+github:
+  token: ${GITHUB_TOKEN}
+  owner: your-username
+  repo: vibepilot
+  workflow: courier.yml
+
+courier:
+  enabled: false  # Set true when GitHub secrets configured
+  max_in_flight: 3
+  stagger: 30s
+  callback_url: http://your-server:8080/webhook/courier
+
+server:
+  addr: :8080
+
+security:
+  allowed_hosts:
+    - api.supabase.co
+    - api.github.com
+```
+
+---
+
+## GITHUB ACTIONS WORKFLOW
+
+**File:** `.github/workflows/courier.yml`
+
+Triggers on `repository_dispatch` event type `courier_task`:
+1. Checks out task branch
+2. Sets up Python + browser-use
+3. Executes browser automation with Gemini
+4. Posts result to callback URL
+
+---
+
+## WHAT'S NOT YET IMPLEMENTED
+
+| Feature | Phase | Notes |
+|---------|-------|-------|
+| Supervisor logic | 5 | Quality gate, Council trigger |
+| Council deliberation | 5 | Multi-lens review |
+| Config hot-reload | 5 | fsnotify watcher |
+| Embedded React UI | Future | //go:embed dist/ |
+| Vibes interface | Future | Human chat interface |
+| MCP server | Future | External tool access |
+
+---
+
+## PYTHON INTEGRATION
+
+### What Go Replaces
+
+| Python | Go |
+|--------|-----|
+| `core/orchestrator.py` (task routing) | `dispatcher/` |
+| `task_manager.py` (claim/record) | `db/supabase.go` |
+| Polling loop | `sentry/sentry.go` |
+
+### What Stays Python
+
+| Component | Why |
+|-----------|-----|
+| `agents/supervisor.py` | Review logic, Council coordination |
+| `agents/maintenance.py` | Git operations |
+| `agents/planner.py` | Task planning from PRD |
+| `agents/consultant.py` | PRD generation |
+| `runners/contract_runners.py` | Runner implementations |
+
+---
+
+## TESTING
+
+### Manual Test
+
+```bash
+# Create test task
+python -c "
+import os, json, uuid
+from supabase import create_client
+sb = create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_SERVICE_KEY'])
 task_id = str(uuid.uuid4())
 sb.table('tasks').insert({
     'id': task_id,
-    'title': 'TEST: Echo',
+    'title': 'Test: Echo Hello',
     'status': 'available',
     'priority': 1,
     'routing_flag': 'internal',
+    'slice_id': 'test-slice'
 }).execute()
-
 sb.table('task_packets').insert({
     'task_id': task_id,
-    'prompt': json.dumps({
-        'task_id': task_id,
-        'prompt': 'Echo: Hello World'
-    }),
-    'version': 1,
+    'prompt': json.dumps({'prompt': 'Echo: Hello World'}),
+    'version': 1
 }).execute()
+print(f'Created task {task_id}')
+"
+
+# Run governor
+./governor
+
+# Watch logs for:
+# - Sentry: dispatching task
+# - Dispatcher: selected runner
+# - Dispatcher: task completed successfully
 ```
 
----
-
-## OPEN QUESTIONS
-
-1. **Where does Go stop and Python take over?**
-   - Go executes tasks and records results
-   - Python Supervisor still reviews?
-   - Python Maintenance still merges?
-
-2. **How does courier/browser-use work on GitHub Actions?**
-   - Workflow file needed: `.github/workflows/courier.yml`
-   - Browser setup in runner
-   - How does result get back to Supabase?
-
-3. **Key management for Go?**
-   - Go needs VAULT_KEY to decrypt secrets
-   - Or pass keys via environment at startup
-   - Or implement vault decryption in Go
-
----
-
-## PHASE 2 COMPLETE (2026-02-22)
-
-### What's Now Working
-
-| Component | Status |
-|-----------|--------|
-| Sentry polling | ✅ Every 15s, max 3 concurrent |
-| Task claiming | ✅ REST with status filter |
-| Packet parsing | ✅ Two-step JSON unmarshal |
-| OpenCode execution | ✅ `opencode run --format json "prompt"` |
-| task_run recording | ✅ All fields: model_id, courier, tokens, status |
-| ROI RPC call | ✅ calculate_enhanced_task_roi (needs service key) |
-| Task status update | ✅ → review on success |
-| Dependency unlock | ✅ unlock_dependent_tasks RPC |
-| Failure handling | ✅ Fetch-then-update attempts |
-
-### Test Results
-
-```
-Task: GLM-5 Test: Say Hello
-Status: review
-Model: glm-5
-Courier: governor
-Tokens: 11/265
-```
-
-### Binary Size
-
-9.6MB - fits free tier comfortably
-
----
-
-## PHASE 3: INTELLIGENT ROUTING (IMPLEMENTED 2026-02-22)
-
-**Full plan:** `docs/PHASE3_ROUTING_PLAN.md`
-
-### What's Now Working
-
-| Component | Status |
-|-----------|--------|
-| tools table | ✅ Created |
-| runners table | ✅ Created |
-| Model pool | ✅ DB-driven selection |
-| get_best_runner RPC | ✅ Routing by capability + cost + success |
-| record_runner_result RPC | ✅ Updates task_ratings |
-| refresh_limits RPC | ✅ Auto-clear cooldowns/rate limits |
-| 80% throttle | ✅ Triggers cooldown until midnight |
-| Janitor refresh | ✅ Every minute |
-
-### Schema Applied
-
-```bash
-# Schema file (applied to Supabase):
-docs/supabase-schema/021_phase3_routing.sql
-
-# Create runners for active models:
-python scripts/admin_setup.py --create-runners
-```
-
-### Runners Created Dynamically
-
-No hardcoded config. Runners created from active models in DB.
+### Verify in Supabase
 
 ```sql
--- Current runners (created via admin_setup.py):
-SELECT model_id, tool_id, cost_priority, status, task_ratings FROM runners;
-
--- Results:
--- glm-5 / opencode | priority=0 (subscription) | active | {'test': {'success': 2}}
--- gemini-api / opencode | priority=1 (free tier) | active | {'test': {'success': 1}}
+SELECT id, status, assigned_to FROM tasks WHERE title LIKE 'Test:%';
+SELECT * FROM task_runs ORDER BY created_at DESC LIMIT 1;
 ```
-
-### Routing Logic (Implemented)
-
-```
-1. Call get_best_runner RPC
-2. RPC queries runners WHERE status='active' AND model.status='active'
-3. Filters by routing_capability, cooldown, rate limits, daily limits
-4. Orders by cost_priority ASC, task_ratings DESC
-5. Returns best runner or NULL
-6. If NULL → tasks wait until runner available
-```
-   - browser capability bonus for web routing
-
-4. Return best score or None if no runners available
-
-5. FALLBACK CHAIN (example):
-   - Web platform over 80% daily? → skip
-   - gemini-api rate limited? → skip
-   - deepseek-api dead? → skip
-   - internal via opencode available? → use it
-   - Nothing available? → return None, task waits
-```
-
-### Models Table Fields (for routing)
-
-| Field | Purpose |
-|-------|---------|
-| `status` | active/paused/benched |
-| `status_reason` | Why paused |
-| `success_rate` | Historical performance |
-| `tasks_completed` | Count |
-| `tasks_failed` | Count |
-| `cooldown_expires_at` | Rate limit cooldown |
-| `cost_priority` | 0=subscription, 1=free, 2=paid |
-
-### NEVER Assume
-
-- "glm via opencode is always available" - WRONG
-- "opencode will exist tomorrow" - WRONG
-- "current model will be best forever" - WRONG
-
-**System must work with whatever models exist in DB at runtime.**
 
 ---
 
-## SESSION NOTES
+## COMMON ISSUES
 
-### What Went Wrong (First 4 Hours)
-1. Started coding within 2 minutes without reading
-2. Made broken changes to dispatcher and db
-3. Used wrong patterns (SQL expressions, wrong flags)
-4. Wasted time and tokens on broken code
-5. Had to roll back everything
+### "no runner available"
+- Check `runners` table has active runners
+- Run `python scripts/admin_setup.py --create-runners`
 
-### What Went Right (After Homework)
-1. Rolled back cleanly
-2. Did actual homework (4 hours)
-3. Read every relevant file
-4. Created implementation patterns doc
-5. Clean rewrites (8 minutes)
-6. Working test immediately
+### "claim failed"
+- Task may have been claimed by another process
+- Check `status` is `available` before dispatch
 
-### The Numbers
-- Wrong approach: 2 min coding + 4 hours debugging = disaster
-- Right approach: 4 hours homework + 8 min coding = working
-- Context used for broken code: 58%
-- Context used for working code: 7%
+### "module at capacity"
+- 8 tasks already running in that slice
+- Wait for completion or increase `max_per_module`
 
-### Key Lesson
-**Never code until you understand everything.**
-3. Read: orchestrator.py, task_manager.py, contract_runners.py, supervisor.py, maintenance.py, council/*, base_runner.py, vault_manager.py, ROI schema, adapter.ts
-4. Created IMPLEMENTATION_PATTERNS.md (useful)
-5. This handoff document
-
-### For Next Session
-1. **READ THIS DOCUMENT FIRST**
-2. Read any additional files needed
-3. Plan implementation step by step
-4. Test with tiny task, compare to Python
-5. **NO CODE until plan approved**
+### "courier not configured"
+- Set `courier.enabled: true` in config
+- Set `GITHUB_TOKEN` environment variable
 
 ---
 
-## FILES READ THIS SESSION
+## NEXT PHASES
 
-- `CURRENT_STATE.md`
-- `docs/SYSTEM_REFERENCE.md`
-- `docs/GO_IRON_STACK.md`
-- `docs/core_philosophy.md`
-- `docs/WHAT_WHERE.md`
-- `docs/supabase-schema/schema_v1.4_roi_enhanced.sql`
-- `docs/supabase-schema/014_maintenance_commands.sql`
-- `core/orchestrator.py` (full)
-- `task_manager.py` (full)
-- `runners/contract_runners.py` (full)
-- `runners/base_runner.py` (full)
-- `agents/supervisor.py`
-- `agents/consultant.py`
-- `agents/planner.py`
-- `agents/maintenance.py`
-- `agents/council/__init__.py`
-- `agents/council/architect.py`
-- `agents/council/security.py`
-- `prompts/supervisor.md`
-- `prompts/testers.md`
-- `prompts/system_researcher.md`
-- `vault_manager.py`
-- `vibeflow/apps/dashboard/lib/vibepilotAdapter.ts`
-- `.env`
-- `governor/internal/db/supabase.go`
-- `governor/internal/dispatcher/dispatcher.go`
-- `governor/pkg/types/types.go`
+### Phase 4: Parallel Run
+1. Run Go and Python together
+2. Go marks tasks with `claimed_by='governor'`
+3. Compare 50+ task outcomes
+4. Verify ROI calculations match
+5. Switch to Go-only
+
+### Phase 5: Supervisor + Council
+1. Add `supervisor/reviewer.go`
+2. Add `council/deliberation.go`
+3. Config-driven prompts (load from files)
+4. Hot-reload with fsnotify
+
+### Future
+- Vibes interface (human chat)
+- MCP server (external access)
+- Voice interface
 
 ---
 
-**END OF HANDOFF - Next session starts here**
+## FILES TO READ NEXT SESSION
+
+1. This document: `docs/GOVERNOR_HANDOFF.md`
+2. Current state: `CURRENT_STATE.md`
+3. System reference: `docs/SYSTEM_REFERENCE.md`
+4. Core philosophy: `docs/core_philosophy.md`
+5. Full PRD: `docs/prd_v1.4.md`
+
+---
+
+## SESSION HISTORY
+
+| Date | Phase | Changes |
+|------|-------|---------|
+| 2026-02-22 | 1 | Initial Sentry, Dispatcher, Janitor |
+| 2026-02-22 | 2 | Intelligent routing, model pool |
+| 2026-02-22 | 3 | Pool-based runner selection |
+| 2026-02-23 | 2 | Module limiter (8/slice), Courier dispatch |
+| 2026-02-23 | 3 | WebSocket hub, Real API endpoints, Health check |
+
+---
+
+**END OF HANDOFF**

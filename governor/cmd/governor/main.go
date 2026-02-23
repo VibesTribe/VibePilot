@@ -9,12 +9,14 @@ import (
 	"syscall"
 
 	"github.com/vibepilot/governor/internal/config"
+	"github.com/vibepilot/governor/internal/courier"
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/dispatcher"
 	"github.com/vibepilot/governor/internal/janitor"
 	"github.com/vibepilot/governor/internal/security"
 	"github.com/vibepilot/governor/internal/sentry"
 	"github.com/vibepilot/governor/internal/server"
+	"github.com/vibepilot/governor/internal/throttle"
 	"github.com/vibepilot/governor/pkg/types"
 )
 
@@ -31,40 +33,52 @@ func main() {
 	}
 
 	log.Printf("VibePilot Governor %s starting...", version)
-	log.Printf("Poll interval: %v, Max concurrent: %d", cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent)
+	log.Printf("Poll interval: %v, Max concurrent: %d, Max per module: %d",
+		cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent, cfg.Governor.MaxPerModule)
 
-	// Initialize database connection
 	database := db.New(cfg.Supabase.URL, cfg.Supabase.ServiceKey)
 	defer database.Close()
 
 	log.Println("Connected to Supabase")
 
-	// Initialize security components
 	leakDetector := security.NewLeakDetector()
 	httpAllowlist := security.NewHTTPAllowlist(cfg.Security.AllowedHosts)
-	_ = httpAllowlist // Used by dispatcher for URL validation
+	_ = httpAllowlist
 
-	// Create context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Channel for task dispatch
 	dispatchCh := make(chan types.Task, 10)
 
-	// Start Sentry (poller)
-	s := sentry.New(database, cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent, dispatchCh)
+	moduleLimiter := throttle.NewModuleLimiter(cfg.Governor.MaxPerModule)
+
+	s := sentry.New(database, cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent, dispatchCh, moduleLimiter)
 	go s.Run(ctx)
 
-	// Start Dispatcher
-	d := dispatcher.New(database, cfg, leakDetector)
+	d := dispatcher.New(database, cfg, leakDetector, moduleLimiter)
+
+	if cfg.Courier.Enabled && cfg.GitHub.Token != "" {
+		courierDispatcher := courier.NewDispatcher(
+			cfg.GitHub.Token,
+			cfg.GitHub.Owner,
+			cfg.GitHub.Repo,
+			cfg.GitHub.Workflow,
+			cfg.Courier.CallbackURL,
+			cfg.Courier.MaxInFlight,
+		)
+		go courierDispatcher.Start(ctx)
+		d.SetCourier(courierDispatcher)
+		log.Println("Courier enabled: GitHub Actions dispatch active")
+	}
+
 	go d.Run(ctx, dispatchCh)
 
-	// Start Janitor
 	j := janitor.New(database, cfg.Governor.StuckTimeout)
 	go j.Run(ctx)
 
-	// Start HTTP server
 	srv := server.New(&cfg.Server, database)
+	srv.SetCourierCallback(d.OnCourierResult)
+	srv.SetModuleCountsGetter(s.ModuleCounts)
 	go func() {
 		if err := srv.Start(); err != nil {
 			log.Printf("Server error: %v", err)
@@ -73,7 +87,6 @@ func main() {
 
 	log.Println("Governor started. Press Ctrl+C to stop.")
 
-	// Wait for shutdown signal
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh

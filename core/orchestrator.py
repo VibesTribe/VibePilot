@@ -64,19 +64,75 @@ class CooldownManager:
         self.logger = logging.getLogger("VibePilot.Cooldown")
 
     def is_in_cooldown(self, runner_id: str) -> bool:
-        """Check if runner is in cooldown."""
+        """Check if runner is in cooldown. Clears cooldown (and DB) if expired."""
         with self.lock:
             if runner_id not in self.cooldowns:
                 return False
 
             expires_at = self.cooldowns[runner_id]
             if datetime.utcnow() >= expires_at:
-                # Cooldown expired
                 del self.cooldowns[runner_id]
                 self.logger.info(f"Cooldown expired for {runner_id}")
+                self._clear_cooldown_in_db(runner_id)
                 return False
 
             return True
+
+    def _clear_cooldown_in_db(self, runner_id: str):
+        """Update database to reactivate a runner after cooldown."""
+        try:
+            db.table("models").update(
+                {
+                    "status": "active",
+                    "status_reason": None,
+                    "cooldown_expires_at": None,
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+            ).eq("id", runner_id).execute()
+            self.logger.info(f"Reactivated {runner_id} in database after cooldown")
+        except Exception as e:
+            self.logger.warning(f"Could not reactivate {runner_id} in DB: {e}")
+
+    def check_expired_db_cooldowns(self):
+        """
+        Check database for models with expired cooldowns and reactivate them.
+        Call on startup and periodically to handle orchestrator restarts.
+        """
+        try:
+            result = (
+                db.table("models")
+                .select("id, cooldown_expires_at")
+                .eq("status", "paused")
+                .not_.is_("cooldown_expires_at", "null")
+                .execute()
+            )
+
+            reactivated = []
+            for model in result.data or []:
+                model_id = model["id"]
+                expires_at_str = model.get("cooldown_expires_at")
+                if not expires_at_str:
+                    continue
+
+                try:
+                    expires_at = datetime.fromisoformat(
+                        expires_at_str.replace("Z", "+00:00")
+                    )
+                    if datetime.utcnow() >= expires_at.replace(tzinfo=None):
+                        self._clear_cooldown_in_db(model_id)
+                        reactivated.append(model_id)
+                except Exception as e:
+                    self.logger.warning(f"Error parsing cooldown for {model_id}: {e}")
+
+            if reactivated:
+                self.logger.info(
+                    f"Reactivated {len(reactivated)} models with expired cooldowns: {reactivated}"
+                )
+
+            return reactivated
+        except Exception as e:
+            self.logger.error(f"Error checking expired cooldowns: {e}")
+            return []
 
     def get_cooldown_remaining(self, runner_id: str) -> Optional[int]:
         """Get seconds remaining in cooldown, or None if not in cooldown."""
@@ -351,6 +407,18 @@ class RunnerPool:
     def _load_from_database(self):
         """Load active access methods from new access table."""
         try:
+            models_status = {}
+            try:
+                status_res = (
+                    db.table("models")
+                    .select("id, status, status_reason, cooldown_expires_at")
+                    .execute()
+                )
+                for m in status_res.data or []:
+                    models_status[m["id"]] = m
+            except Exception as e:
+                logger.warning(f"Could not load model status: {e}")
+
             res = (
                 db.table("access")
                 .select(
@@ -374,6 +442,15 @@ class RunnerPool:
                 tool_id = access["tool_id"]
                 method = access["method"]
                 priority = access["priority"]
+
+                model_info = models_status.get(model_id, {})
+                model_status = model_info.get("status", "active")
+                if model_status in ("paused", "benched", "offline"):
+                    reason = model_info.get("status_reason", "unknown")
+                    logger.debug(
+                        f"Skipping {model_id}:{tool_id} - model status={model_status} ({reason})"
+                    )
+                    continue
 
                 capabilities = model.get("capabilities", []) or []
                 has_browser = tool.get("has_browser_control", False) or False
@@ -842,8 +919,12 @@ class ConcurrentOrchestrator:
         self.executor = ThreadPoolExecutor(max_workers=max_w)
 
         self.logger.info(f"Orchestrator started with up to {max_w} workers (dynamic)")
+
+        self.cooldown_manager.check_expired_db_cooldowns()
+
         self.logger.info(f"Available runners: {len(self.runner_pool.get_available())}")
 
+        self._tick_count = 0
         try:
             while self.running:
                 self._tick()
@@ -877,7 +958,13 @@ class ConcurrentOrchestrator:
 
     def _tick(self):
         """Main orchestrator tick - dispatch tasks and check results."""
+        self._tick_count = getattr(self, "_tick_count", 0) + 1
+
         self._check_completed_futures()
+
+        if self._tick_count % 30 == 0:
+            self.cooldown_manager.check_expired_db_cooldowns()
+            self._check_stuck_tasks()
 
         self._process_pending_ideas()
 
@@ -907,6 +994,71 @@ class ConcurrentOrchestrator:
 
         for task in tasks:
             self._dispatch_task(task)
+
+    def _check_stuck_tasks(self, timeout_minutes: int = 10):
+        """
+        Find and reset tasks stuck in in_progress for too long.
+
+        This handles cases where:
+        - Runner crashed mid-task
+        - Quota exhausted without proper failure report
+        - Network/timeout issues prevented completion
+
+        Stuck tasks are reset to 'available' and runner may be flagged.
+        """
+        try:
+            cutoff = datetime.utcnow() - timedelta(minutes=timeout_minutes)
+
+            stuck_tasks = (
+                db.table("tasks")
+                .select("id, task_number, assigned_to, updated_at")
+                .eq("status", "in_progress")
+                .lt("updated_at", cutoff.isoformat())
+                .execute()
+            )
+
+            if not stuck_tasks.data:
+                return []
+
+            reset_count = 0
+            for task in stuck_tasks.data:
+                task_id = task["id"]
+                task_number = task.get("task_number", "unknown")
+                assigned_to = task.get("assigned_to", "unknown")
+
+                attempts = task.get("attempts", 0) + 1
+                max_attempts = task.get("max_attempts", 3)
+
+                if attempts >= max_attempts:
+                    new_status = "escalated"
+                    reason = f"Stuck task exceeded max attempts after {timeout_minutes}min timeout"
+                else:
+                    new_status = "available"
+                    reason = f"Task stuck for >{timeout_minutes}min, resetting"
+
+                db.table("tasks").update(
+                    {
+                        "status": new_status,
+                        "attempts": attempts,
+                        "assigned_to": None,
+                        "failure_notes": f"TIMEOUT: {reason}",
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                ).eq("id", task_id).execute()
+
+                self.logger.warning(
+                    f"Stuck task {task_number} reset: {assigned_to} → {new_status} ({reason})"
+                )
+                reset_count += 1
+
+            if reset_count > 0:
+                self.logger.info(f"Reset {reset_count} stuck tasks")
+
+            return [t["id"] for t in stuck_tasks.data]
+
+        except Exception as e:
+            self.logger.error(f"Error checking stuck tasks: {e}")
+            return []
 
     def _process_maintenance_commands(self, max_commands: int = 5):
         """Process pending maintenance commands (git operations, system updates)."""
@@ -1082,17 +1234,10 @@ class ConcurrentOrchestrator:
 
         try:
             # Try using the RPC function first
-            res = db.rpc(
-                "get_available_for_routing",
-                {
-                    "p_can_web": can_web,
-                    "p_can_internal": can_internal,
-                    "p_can_mcp": can_mcp,
-                },
-            ).execute()
-
-            if res.data:
-                return res.data[:limit]
+            # NOTE: RPC only returns limited columns (id, title, routing_flag, priority)
+            # We need the full task including 'result' for prompt_packet
+            # So we skip RPC and use fallback query instead
+            pass
         except Exception as e:
             self.logger.debug(f"RPC get_available_for_routing not available: {e}")
 
@@ -1105,6 +1250,10 @@ class ConcurrentOrchestrator:
             .limit(limit)
             .execute()
         )
+
+        self.logger.info(f"Fallback query returned {len(res.data or [])} tasks")
+        if res.data:
+            self.logger.info(f"First task has keys: {list(res.data[0].keys())}")
 
         tasks = []
         for task in res.data or []:
@@ -1189,8 +1338,20 @@ class ConcurrentOrchestrator:
                 },
             ) as span:
                 packet = self.task_manager.get_task_packet(task_id)
+
+                self.logger.info(
+                    f"Task {task_id[:8]}: packet={packet is not None}, result keys={list(task.get('result', {}).keys())}"
+                )
+
                 prompt = (
-                    packet.get("prompt") if packet else task.get("prompt_packet", "")
+                    packet.get("prompt")
+                    if packet
+                    else task.get("prompt_packet")
+                    or task.get("result", {}).get("prompt_packet", "")
+                )
+
+                self.logger.info(
+                    f"Task {task_id[:8]}: extracted prompt len={len(prompt) if prompt else 0}"
                 )
 
                 result = self._call_runner(runner_id, prompt, task)
@@ -1313,6 +1474,10 @@ class ConcurrentOrchestrator:
         """Call the appropriate runner for the task using contract runners."""
         from runners.contract_runners import get_runner
 
+        self.logger.info(
+            f"_call_runner: prompt length = {len(prompt) if prompt else 0}, prompt preview = {repr(prompt[:50]) if prompt else 'EMPTY'}"
+        )
+
         task_packet = {
             "task_id": task.get("id"),
             "prompt": prompt,
@@ -1333,7 +1498,7 @@ class ConcurrentOrchestrator:
         if tool_id == "kimi-cli" or "kimi" in tool_id.lower():
             runner_type = "kimi"
         elif tool_id == "opencode":
-            runner_type = "kimi"
+            runner_type = "opencode"
         elif tool_id == "direct-api":
             if "deepseek" in model_id.lower():
                 runner_type = "deepseek"
