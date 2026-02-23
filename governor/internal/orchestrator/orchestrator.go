@@ -10,6 +10,7 @@ import (
 
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/maintenance"
+	"github.com/vibepilot/governor/internal/researcher"
 	"github.com/vibepilot/governor/internal/supervisor"
 	"github.com/vibepilot/governor/internal/tester"
 	"github.com/vibepilot/governor/internal/visual"
@@ -22,17 +23,19 @@ type Orchestrator struct {
 	supervisor   *supervisor.Supervisor
 	tester       *tester.Tester
 	visualTester *visual.VisualTester
+	researcher   *researcher.Researcher
 
 	pendingTests chan string
 }
 
-func New(database *db.DB, maint *maintenance.Maintenance, sup *supervisor.Supervisor, test *tester.Tester, visTest *visual.VisualTester) *Orchestrator {
+func New(database *db.DB, maint *maintenance.Maintenance, sup *supervisor.Supervisor, test *tester.Tester, visTest *visual.VisualTester, res *researcher.Researcher) *Orchestrator {
 	return &Orchestrator{
 		db:           database,
 		maintenance:  maint,
 		supervisor:   sup,
 		tester:       test,
 		visualTester: visTest,
+		researcher:   res,
 		pendingTests: make(chan string, 20),
 	}
 }
@@ -213,6 +216,60 @@ func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, no
 
 func (o *Orchestrator) handleEscalation(ctx context.Context, taskID string, failureNotes string) {
 	log.Printf("Orchestrator: Analyzing escalation for %s: %s", taskID[:8], failureNotes)
+
+	if o.researcher == nil {
+		log.Printf("Orchestrator: No researcher configured, cannot analyze escalation")
+		return
+	}
+
+	result, err := o.researcher.AnalyzeEscalation(ctx, taskID, failureNotes)
+	if err != nil {
+		log.Printf("Orchestrator: Researcher analysis failed for %s: %v", taskID[:8], err)
+		return
+	}
+
+	if err := o.researcher.RecordAnalysis(ctx, taskID, result); err != nil {
+		log.Printf("Orchestrator: Failed to record analysis for %s: %v", taskID[:8], err)
+	}
+
+	log.Printf("Orchestrator: Analysis complete for %s - Category: %s, RootCause: %s",
+		taskID[:8], result.Category, result.RootCause)
+
+	switch result.Category {
+	case researcher.CategoryModelIssue:
+		if result.AutoRetry && result.NewModel != "" {
+			log.Printf("Orchestrator: Auto-retrying %s with alternative model %s", taskID[:8], result.NewModel)
+			o.db.UpdateTaskStatus(ctx, taskID, types.StatusAvailable, map[string]interface{}{
+				"attempts":        0,
+				"assigned_to":     nil,
+				"failure_notes":   "",
+				"suggested_model": result.NewModel,
+			})
+			return
+		}
+		fallthrough
+
+	case researcher.CategoryTaskDefinition, researcher.CategoryDependency:
+		log.Printf("Orchestrator: %s requires human review - routing to awaiting_human", taskID[:8])
+		o.db.UpdateTaskStatus(ctx, taskID, types.StatusAwaitingHuman, map[string]interface{}{
+			"reason":           "Escalated after analysis: " + result.RootCause,
+			"research_summary": o.researcher.FormatAnalysisForHuman(result),
+		})
+
+	case researcher.CategoryInfrastructure:
+		log.Printf("Orchestrator: Infrastructure issue for %s - will retry after cooldown", taskID[:8])
+		o.db.UpdateTaskStatus(ctx, taskID, types.StatusAvailable, map[string]interface{}{
+			"attempts":      0,
+			"failure_notes": "",
+		})
+
+	default:
+		log.Printf("Orchestrator: Unknown category for %s - defaulting to human review", taskID[:8])
+		o.db.UpdateTaskStatus(ctx, taskID, types.StatusAwaitingHuman, map[string]interface{}{
+			"reason":           "Escalated after 3 failures - unknown category",
+			"research_summary": o.researcher.FormatAnalysisForHuman(result),
+		})
+	}
 }
 
 func (o *Orchestrator) generateBranchName(task *types.Task) string {
