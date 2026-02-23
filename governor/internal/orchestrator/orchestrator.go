@@ -92,7 +92,23 @@ func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *type
 		return
 	}
 
-	decision := o.supervisor.Review(ctx, task, packet, output)
+	reviewInput := &supervisor.ReviewInput{
+		TaskID:         taskID,
+		TaskType:       task.Type,
+		ExpectedFiles:  packet.Deliverables,
+		ActualFiles:    output,
+		VisualChange:   task.Type == "ui_ux",
+		SecurityImpact: false,
+	}
+
+	decision := o.supervisor.Review(ctx, reviewInput)
+
+	if decision.Action == supervisor.ActionApprove && o.supervisor.NeedsCouncil(task.Type, task.Title, task.Priority) {
+		decision = supervisor.Decision{
+			Action: supervisor.ActionCouncil,
+			Reason: "Significant change requires council review",
+		}
+	}
 
 	switch decision.Action {
 	case supervisor.ActionApprove:
@@ -110,9 +126,13 @@ func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *type
 		o.handleRejection(ctx, task, decision.Notes)
 
 	case supervisor.ActionHuman:
+		reason := decision.Reason
+		if reason == "" {
+			reason = decision.Notes
+		}
 		log.Printf("Orchestrator: %s awaiting human review", taskID[:8])
 		o.db.UpdateTaskStatus(ctx, taskID, types.StatusAwaitingHuman, map[string]interface{}{
-			"reason": decision.Notes,
+			"reason": reason,
 		})
 
 	case supervisor.ActionCouncil:
