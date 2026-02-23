@@ -61,10 +61,16 @@ func (m *Maintenance) CommitOutput(ctx context.Context, branchName string, outpu
 		return fmt.Errorf("git add: %w", err)
 	}
 
-	if err := m.gitCommand(ctx, "commit", "-m", "task output").Run(); err != nil {
-		if !strings.Contains(err.Error(), "nothing to commit") {
-			return fmt.Errorf("git commit: %w", err)
+	var commitOut bytes.Buffer
+	commitCmd := m.gitCommand(ctx, "commit", "-m", "task output")
+	commitCmd.Stdout = &commitOut
+	commitCmd.Stderr = &commitOut
+
+	if err := commitCmd.Run(); err != nil {
+		if strings.Contains(commitOut.String(), "nothing to commit") {
+			return nil
 		}
+		return fmt.Errorf("git commit: %w - %s", err, commitOut.String())
 	}
 
 	return m.gitCommand(ctx, "push").Run()
