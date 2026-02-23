@@ -286,9 +286,6 @@ func (d *DB) ResetTask(ctx context.Context, taskID string, escalate bool) error 
 	if err != nil {
 		return err
 	}
-	if task == nil {
-		return fmt.Errorf("task %s not found", taskID)
-	}
 
 	status := "available"
 	if escalate {

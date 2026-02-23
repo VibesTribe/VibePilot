@@ -124,7 +124,12 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 		return
 	}
 
-	output, tokensIn, tokensOut, execErr := d.runTool(ctx, runner.ToolID, packet.Prompt, 300)
+	taskTimeout := d.cfg.Governor.TaskTimeoutSec
+	if taskTimeout <= 0 {
+		taskTimeout = 300
+	}
+
+	output, tokensIn, tokensOut, execErr := d.runTool(ctx, runner.ToolID, packet.Prompt, taskTimeout)
 
 	success := execErr == nil
 	status := "success"
