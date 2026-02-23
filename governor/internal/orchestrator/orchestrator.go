@@ -12,24 +12,27 @@ import (
 	"github.com/vibepilot/governor/internal/maintenance"
 	"github.com/vibepilot/governor/internal/supervisor"
 	"github.com/vibepilot/governor/internal/tester"
+	"github.com/vibepilot/governor/internal/visual"
 	"github.com/vibepilot/governor/pkg/types"
 )
 
 type Orchestrator struct {
-	db          *db.DB
-	maintenance *maintenance.Maintenance
-	supervisor  *supervisor.Supervisor
-	tester      *tester.Tester
+	db           *db.DB
+	maintenance  *maintenance.Maintenance
+	supervisor   *supervisor.Supervisor
+	tester       *tester.Tester
+	visualTester *visual.VisualTester
 
 	pendingTests chan string
 }
 
-func New(database *db.DB, maint *maintenance.Maintenance, sup *supervisor.Supervisor, test *tester.Tester) *Orchestrator {
+func New(database *db.DB, maint *maintenance.Maintenance, sup *supervisor.Supervisor, test *tester.Tester, visTest *visual.VisualTester) *Orchestrator {
 	return &Orchestrator{
 		db:           database,
 		maintenance:  maint,
 		supervisor:   sup,
 		tester:       test,
+		visualTester: visTest,
 		pendingTests: make(chan string, 20),
 	}
 }
@@ -101,13 +104,6 @@ func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *type
 
 	decision := o.supervisor.Review(ctx, reviewInput)
 
-	if decision.Action == supervisor.ActionApprove && o.supervisor.NeedsCouncil(task.Type, task.Title, task.Priority) {
-		decision = supervisor.Decision{
-			Action: supervisor.ActionCouncil,
-			Reason: "Significant change requires council review",
-		}
-	}
-
 	switch decision.Action {
 	case supervisor.ActionApprove:
 		o.db.UpdateTaskStatus(ctx, taskID, types.StatusApproval, nil)
@@ -133,15 +129,21 @@ func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *type
 		if reason == "" {
 			reason = decision.Notes
 		}
+
+		if task.Type == "ui_ux" && o.visualTester != nil {
+			visualResult := o.visualTester.TestVisual(ctx, task.BranchName, packet.Deliverables)
+			if !visualResult.Passed {
+				log.Printf("Orchestrator: %s visual testing failed: %v", taskID[:8], visualResult.Failures)
+				notes := "Visual testing failed: " + strings.Join(visualResult.Failures, "; ")
+				o.handleRejection(ctx, task, notes)
+				return
+			}
+			log.Printf("Orchestrator: %s visual testing passed, routing to human", taskID[:8])
+		}
+
 		log.Printf("Orchestrator: %s awaiting human review", taskID[:8])
 		o.db.UpdateTaskStatus(ctx, taskID, types.StatusAwaitingHuman, map[string]interface{}{
 			"reason": reason,
-		})
-
-	case supervisor.ActionCouncil:
-		log.Printf("Orchestrator: %s needs council review (not yet implemented)", taskID[:8])
-		o.db.UpdateTaskStatus(ctx, taskID, types.StatusAwaitingHuman, map[string]interface{}{
-			"reason": "Council review needed - pending implementation",
 		})
 	}
 }

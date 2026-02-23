@@ -20,6 +20,7 @@ import (
 	"github.com/vibepilot/governor/internal/supervisor"
 	"github.com/vibepilot/governor/internal/tester"
 	"github.com/vibepilot/governor/internal/throttle"
+	"github.com/vibepilot/governor/internal/visual"
 	"github.com/vibepilot/governor/pkg/types"
 )
 
@@ -61,7 +62,8 @@ func main() {
 	maint := maintenance.New(&maintenance.Config{RepoPath: repoPath})
 	sup := supervisor.New()
 	test := tester.New(&tester.Config{RepoPath: repoPath})
-	orch := orchestrator.New(database, maint, sup, test)
+	visTest := visual.New(&visual.Config{RepoPath: repoPath})
+	orch := orchestrator.New(database, maint, sup, test, visTest)
 
 	s := sentry.New(database, cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent, dispatchCh, moduleLimiter)
 	go s.Run(ctx)
