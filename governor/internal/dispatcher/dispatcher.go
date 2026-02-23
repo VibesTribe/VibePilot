@@ -30,6 +30,11 @@ type Dispatcher struct {
 	moduleLimiter *throttle.ModuleLimiter
 	courier       *courier.Dispatcher
 	completer     TaskCompleter
+	maintenance   MaintenanceExecutor
+}
+
+type MaintenanceExecutor interface {
+	ExecuteMerge(ctx context.Context, taskID, branchName string) error
 }
 
 func New(database *db.DB, cfg *config.Config, leakDetector *security.LeakDetector, moduleLimiter *throttle.ModuleLimiter) *Dispatcher {
@@ -51,6 +56,10 @@ func (d *Dispatcher) SetOrchestrator(completer TaskCompleter) {
 	d.completer = completer
 }
 
+func (d *Dispatcher) SetMaintenance(m MaintenanceExecutor) {
+	d.maintenance = m
+}
+
 func (d *Dispatcher) Run(ctx context.Context, dispatchCh <-chan types.Task) {
 	log.Println("Dispatcher started")
 
@@ -67,6 +76,11 @@ func (d *Dispatcher) Run(ctx context.Context, dispatchCh <-chan types.Task) {
 
 func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 	log.Printf("Dispatcher: task %s (routing=%s, type=%s, slice=%s)", task.ID[:8], task.RoutingFlag, task.Type, task.SliceID)
+
+	if task.Type == "merge" {
+		d.executeMerge(ctx, task)
+		return
+	}
 
 	if task.RoutingFlag == types.RoutingWeb && d.courier != nil && d.cfg.Courier.Enabled {
 		d.dispatchToCourier(ctx, task)
@@ -328,4 +342,62 @@ func (d *Dispatcher) OnCourierResult(result courier.Result) {
 
 	d.releaseSlot(task.SliceID)
 	log.Printf("Dispatcher: courier task %s completed successfully", result.TaskID[:8])
+}
+
+func (d *Dispatcher) executeMerge(ctx context.Context, task types.Task) {
+	log.Printf("Dispatcher: executing merge task %s for parent %s", task.ID[:8], task.ParentTaskID[:8])
+
+	d.db.UpdateTaskStatus(ctx, task.ID, types.StatusInProgress, nil)
+
+	parentTask, err := d.db.GetTaskByID(ctx, task.ParentTaskID)
+	if err != nil || parentTask == nil {
+		log.Printf("Dispatcher: parent task %s not found for merge", task.ParentTaskID[:8])
+		d.handleMergeFailure(ctx, task, "Parent task not found")
+		return
+	}
+
+	if parentTask.BranchName == "" {
+		log.Printf("Dispatcher: parent task %s has no branch", task.ParentTaskID[:8])
+		d.handleMergeFailure(ctx, task, "Parent task has no branch")
+		return
+	}
+
+	if d.maintenance == nil {
+		log.Printf("Dispatcher: maintenance not configured")
+		d.handleMergeFailure(ctx, task, "Maintenance not configured")
+		return
+	}
+
+	if err := d.maintenance.ExecuteMerge(ctx, task.ParentTaskID, parentTask.BranchName); err != nil {
+		log.Printf("Dispatcher: merge failed for %s: %v", task.ID[:8], err)
+		d.handleMergeFailure(ctx, task, err.Error())
+		return
+	}
+
+	d.db.UpdateTaskStatus(ctx, task.ID, types.StatusMerged, nil)
+	d.db.UpdateTaskStatus(ctx, task.ParentTaskID, types.StatusMerged, map[string]interface{}{
+		"merged_to": "main",
+	})
+	d.db.UnlockDependents(ctx, task.ParentTaskID)
+
+	log.Printf("Dispatcher: merge task %s completed, parent %s merged", task.ID[:8], task.ParentTaskID[:8])
+}
+
+func (d *Dispatcher) handleMergeFailure(ctx context.Context, task types.Task, errMsg string) {
+	attempts := task.Attempts + 1
+
+	if attempts >= task.MaxAttempts {
+		log.Printf("Dispatcher: merge task %s escalated after %d attempts", task.ID[:8], attempts)
+		d.db.UpdateTaskStatus(ctx, task.ID, types.StatusEscalated, map[string]interface{}{
+			"attempts":      attempts,
+			"failure_notes": errMsg,
+		})
+	} else {
+		d.db.ResetTask(ctx, task.ID, false)
+		d.db.UpdateTaskStatus(ctx, task.ID, types.StatusAvailable, map[string]interface{}{
+			"attempts":      attempts,
+			"failure_notes": errMsg,
+		})
+		log.Printf("Dispatcher: merge task %s returned to queue (attempt %d/%d)", task.ID[:8], attempts, task.MaxAttempts)
+	}
 }

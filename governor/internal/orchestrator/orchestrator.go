@@ -2,6 +2,8 @@ package orchestrator
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"strings"
@@ -19,18 +21,16 @@ type Orchestrator struct {
 	supervisor  *supervisor.Supervisor
 	tester      *tester.Tester
 
-	pendingTests  chan string
-	pendingMerges chan string
+	pendingTests chan string
 }
 
 func New(database *db.DB, maint *maintenance.Maintenance, sup *supervisor.Supervisor, test *tester.Tester) *Orchestrator {
 	return &Orchestrator{
-		db:            database,
-		maintenance:   maint,
-		supervisor:    sup,
-		tester:        test,
-		pendingTests:  make(chan string, 20),
-		pendingMerges: make(chan string, 20),
+		db:           database,
+		maintenance:  maint,
+		supervisor:   sup,
+		tester:       test,
+		pendingTests: make(chan string, 20),
 	}
 }
 
@@ -45,9 +45,6 @@ func (o *Orchestrator) Run(ctx context.Context) {
 
 		case taskID := <-o.pendingTests:
 			go o.processTest(ctx, taskID)
-
-		case taskID := <-o.pendingMerges:
-			go o.processMerge(ctx, taskID)
 		}
 	}
 }
@@ -113,12 +110,16 @@ func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *type
 
 	switch decision.Action {
 	case supervisor.ActionApprove:
-		if task.Type == "test" || task.Type == "docs" {
-			log.Printf("Orchestrator: %s approved, queueing merge", taskID[:8])
-			o.db.UpdateTaskStatus(ctx, taskID, types.StatusApproval, nil)
-			o.queueMerge(taskID)
+		o.db.UpdateTaskStatus(ctx, taskID, types.StatusApproval, nil)
+
+		mergeTaskID := generateID()
+		if err := o.db.CreateMergeTask(ctx, mergeTaskID, taskID, task.SliceID, task.BranchName, task.Title); err != nil {
+			log.Printf("Orchestrator: failed to create merge task for %s: %v", taskID[:8], err)
 		} else {
-			log.Printf("Orchestrator: %s approved, routing to testing", taskID[:8])
+			log.Printf("Orchestrator: %s approved, created merge task %s", taskID[:8], mergeTaskID[:8])
+		}
+
+		if task.Type != "test" && task.Type != "docs" {
 			o.db.UpdateTaskStatus(ctx, taskID, types.StatusTesting, result)
 			o.queueTest(taskID)
 		}
@@ -153,14 +154,6 @@ func (o *Orchestrator) queueTest(taskID string) {
 	}
 }
 
-func (o *Orchestrator) queueMerge(taskID string) {
-	select {
-	case o.pendingMerges <- taskID:
-	default:
-		log.Printf("Orchestrator: merge queue full, %s will retry", taskID[:8])
-	}
-}
-
 func (o *Orchestrator) processTest(ctx context.Context, taskID string) {
 	task, err := o.db.GetTaskByID(ctx, taskID)
 	if err != nil || task == nil {
@@ -174,46 +167,18 @@ func (o *Orchestrator) processTest(ctx context.Context, taskID string) {
 	result := o.tester.RunTests(ctx, task.BranchName)
 
 	if result.Passed {
-		log.Printf("Orchestrator: %s tests passed, queueing for merge", taskID[:8])
-		o.queueMerge(taskID)
+		log.Printf("Orchestrator: %s tests passed, creating merge task", taskID[:8])
+		o.db.UpdateTaskStatus(ctx, taskID, types.StatusApproval, nil)
+
+		mergeTaskID := generateID()
+		if err := o.db.CreateMergeTask(ctx, mergeTaskID, taskID, task.SliceID, task.BranchName, task.Title); err != nil {
+			log.Printf("Orchestrator: failed to create merge task for %s: %v", taskID[:8], err)
+		}
 	} else {
 		log.Printf("Orchestrator: %s tests failed: %v", taskID[:8], result.Failures)
 		notes := "Tests failed: " + strings.Join(result.Failures, "; ")
 		o.handleRejection(ctx, task, notes)
 	}
-}
-
-func (o *Orchestrator) processMerge(ctx context.Context, taskID string) {
-	task, err := o.db.GetTaskByID(ctx, taskID)
-	if err != nil || task == nil {
-		return
-	}
-
-	if task.BranchName == "" {
-		log.Printf("Orchestrator: %s has no branch to merge", taskID[:8])
-		return
-	}
-
-	targetBranch := "main"
-
-	if err := o.maintenance.MergeBranch(ctx, task.BranchName, targetBranch); err != nil {
-		log.Printf("Orchestrator: merge failed for %s: %v", taskID[:8], err)
-		o.db.UpdateTaskStatus(ctx, taskID, types.StatusApproval, map[string]interface{}{
-			"failure_notes": fmt.Sprintf("Merge pending: %v", err),
-		})
-		go o.handleMergeFailure(ctx, taskID, err.Error())
-		return
-	}
-
-	o.maintenance.DeleteBranch(ctx, task.BranchName)
-
-	o.db.UpdateTaskStatus(ctx, taskID, types.StatusMerged, map[string]interface{}{
-		"merged_to": targetBranch,
-	})
-
-	o.db.UnlockDependents(ctx, taskID)
-
-	log.Printf("Orchestrator: %s merged successfully", taskID[:8])
 }
 
 func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, notes string) {
@@ -248,14 +213,16 @@ func (o *Orchestrator) handleEscalation(ctx context.Context, taskID string, fail
 	log.Printf("Orchestrator: Analyzing escalation for %s: %s", taskID[:8], failureNotes)
 }
 
-func (o *Orchestrator) handleMergeFailure(ctx context.Context, taskID string, mergeError string) {
-	log.Printf("Orchestrator: Analyzing merge failure for %s: %s", taskID[:8], mergeError)
-}
-
 func (o *Orchestrator) generateBranchName(task *types.Task) string {
 	taskNum := task.TaskNumber
 	if taskNum == "" {
 		taskNum = task.ID[:8]
 	}
 	return fmt.Sprintf("task/%s", taskNum)
+}
+
+func generateID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }

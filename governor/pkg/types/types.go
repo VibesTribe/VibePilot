@@ -40,6 +40,7 @@ type Task struct {
 	Phase        string        `json:"phase"`
 	TaskNumber   string        `json:"task_number"`
 	BranchName   string        `json:"branch_name"`
+	ParentTaskID string        `json:"parent_task_id"`
 	Attempts     int           `json:"attempts"`
 	MaxAttempts  int           `json:"max_attempts"`
 	PromptPacket *PromptPacket `json:"prompt_packet"`

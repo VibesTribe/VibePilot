@@ -143,6 +143,15 @@ func (m *Maintenance) DeleteBranch(ctx context.Context, branchName string) error
 	return nil
 }
 
+func (m *Maintenance) ExecuteMerge(ctx context.Context, taskID, branchName string) error {
+	if err := m.MergeBranch(ctx, branchName, "main"); err != nil {
+		return err
+	}
+
+	m.DeleteBranch(ctx, branchName)
+	return nil
+}
+
 func (m *Maintenance) gitCommand(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = m.repoPath
