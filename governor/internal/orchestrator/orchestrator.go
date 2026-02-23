@@ -70,7 +70,8 @@ func (o *Orchestrator) OnTaskComplete(ctx context.Context, taskID string, result
 	}
 
 	if err := o.maintenance.CommitOutput(ctx, task.BranchName, result); err != nil {
-		log.Printf("Orchestrator: failed to commit output for %s: %v", taskID[:8], err)
+		log.Printf("Orchestrator: commit failed for %s: %v", taskID[:8], err)
+		o.handleRejection(ctx, task, fmt.Sprintf("Commit failed: %v", err))
 		return
 	}
 
