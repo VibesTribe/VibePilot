@@ -59,6 +59,23 @@ type PlanReviewInput struct {
 	Priority     int
 }
 
+type ResearchReviewInput struct {
+	SuggestionID   string
+	SuggestionType string
+	Title          string
+	Description    string
+	IsSimple       bool
+	AffectsCore    bool
+}
+
+type ResearchDecision struct {
+	Action     PlanAction
+	Notes      string
+	Issues     []string
+	Warnings   []string
+	CouncilFor string
+}
+
 type Supervisor struct{}
 
 func New() *Supervisor {
@@ -264,5 +281,74 @@ func (s *Supervisor) determineCouncilReason(input *PlanReviewInput) string {
 		return "Critical priority requires council oversight"
 	default:
 		return "Significant change requires council review"
+	}
+}
+
+func (s *Supervisor) ReviewResearch(ctx context.Context, input *ResearchReviewInput) ResearchDecision {
+	var issues []string
+	var warnings []string
+
+	if input.Title == "" {
+		issues = append(issues, "Research suggestion has no title")
+	}
+	if input.Description == "" {
+		issues = append(issues, "Research suggestion has no description")
+	}
+
+	if len(issues) > 0 {
+		return ResearchDecision{
+			Action: PlanActionReject,
+			Notes:  s.formatNotes(issues),
+			Issues: issues,
+		}
+	}
+
+	if s.researchNeedsCouncil(input) {
+		reason := s.determineResearchCouncilReason(input)
+		return ResearchDecision{
+			Action:     PlanActionCouncil,
+			CouncilFor: reason,
+			Warnings:   warnings,
+		}
+	}
+
+	return ResearchDecision{
+		Action:   PlanActionApprove,
+		Warnings: warnings,
+		Notes:    "Ready for Planner",
+	}
+}
+
+func (s *Supervisor) researchNeedsCouncil(input *ResearchReviewInput) bool {
+	if input.IsSimple {
+		return false
+	}
+
+	if input.AffectsCore {
+		return true
+	}
+
+	switch input.SuggestionType {
+	case "new_platform", "add_model", "add_api_key":
+		return false
+	case "new_strategy", "architecture_change", "new_technique":
+		return true
+	default:
+		return true
+	}
+}
+
+func (s *Supervisor) determineResearchCouncilReason(input *ResearchReviewInput) string {
+	switch {
+	case input.AffectsCore:
+		return "Change affects core system - requires council vetting"
+	case input.SuggestionType == "new_strategy":
+		return "New strategy requires principle alignment review"
+	case input.SuggestionType == "architecture_change":
+		return "Architecture changes require integration and reversibility review"
+	case input.SuggestionType == "new_technique":
+		return "New technique requires technical and principle review"
+	default:
+		return "Significant improvement requires council review"
 	}
 }

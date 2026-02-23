@@ -57,6 +57,18 @@ type PlanTask struct {
 	Dependencies []string
 }
 
+type ResearchSuggestionInput struct {
+	SuggestionID   string
+	SuggestionType string
+	Title          string
+	Description    string
+	Impact         string
+	Source         string
+	Rationale      string
+	Risks          []string
+	Benefits       []string
+}
+
 type DeliberationResult struct {
 	PlanID         string
 	Approved       bool
@@ -122,6 +134,199 @@ func (c *Council) ReviewPlan(ctx context.Context, input *PlanReviewInput) (*Deli
 
 	log.Printf("Council: plan %s no consensus after %d rounds", input.PlanID[:8], c.maxRounds)
 	return c.buildResult(input.PlanID, false, "no_consensus", c.maxRounds, allReviews), nil
+}
+
+func (c *Council) ReviewResearchSuggestion(ctx context.Context, input *ResearchSuggestionInput) (*DeliberationResult, error) {
+	log.Printf("Council: reviewing research suggestion %s (%s)", input.SuggestionID[:8], input.SuggestionType)
+
+	lenses := c.determineResearchLenses(input)
+
+	models, err := c.db.GetAvailableModels(ctx, len(lenses))
+	if err != nil {
+		return nil, fmt.Errorf("get available models: %w", err)
+	}
+	if len(models) == 0 {
+		return nil, fmt.Errorf("no models available for council review")
+	}
+
+	var allReviews []ReviewResult
+	round := 1
+
+	for round <= c.maxRounds {
+		log.Printf("Council: round %d for suggestion %s", round, input.SuggestionID[:8])
+
+		roundReviews := c.executeResearchRound(ctx, input, lenses, models, round, allReviews)
+		allReviews = append(allReviews, roundReviews...)
+
+		consensus := c.checkConsensus(roundReviews)
+		if consensus == "APPROVED" {
+			log.Printf("Council: suggestion %s approved in round %d", input.SuggestionID[:8], round)
+			return c.buildResult(input.SuggestionID, true, "unanimous", round, allReviews), nil
+		}
+		if consensus == "BLOCKED" {
+			log.Printf("Council: suggestion %s blocked in round %d", input.SuggestionID[:8], round)
+			return c.buildResult(input.SuggestionID, false, "blocked", round, allReviews), nil
+		}
+
+		round++
+	}
+
+	log.Printf("Council: suggestion %s no consensus after %d rounds", input.SuggestionID[:8], c.maxRounds)
+	return c.buildResult(input.SuggestionID, false, "no_consensus", c.maxRounds, allReviews), nil
+}
+
+func (c *Council) determineResearchLenses(input *ResearchSuggestionInput) []Lens {
+	switch input.SuggestionType {
+	case "new_platform":
+		return []Lens{LensIntegration, LensPrincipleAlign, LensTechnicalSecurity}
+	case "new_strategy":
+		return []Lens{LensIdealVision, LensPrincipleAlign, LensReversibility}
+	case "architecture_change":
+		return []Lens{LensIntegration, LensReversibility, LensTechnicalSecurity}
+	case "new_technique":
+		return []Lens{LensIdealVision, LensTechnicalSecurity, LensPrincipleAlign}
+	default:
+		return []Lens{LensPrincipleAlign, LensIntegration, LensReversibility}
+	}
+}
+
+func (c *Council) executeResearchRound(ctx context.Context, input *ResearchSuggestionInput, lenses []Lens, models []db.Runner, round int, previousReviews []ReviewResult) []ReviewResult {
+	var reviews []ReviewResult
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	prompt := c.buildResearchPrompt(input, round, previousReviews)
+
+	for i, lens := range lenses {
+		wg.Add(1)
+		go func(idx int, l Lens) {
+			defer wg.Done()
+
+			modelIdx := idx % len(models)
+			model := models[modelIdx]
+
+			lensPrompt := c.addResearchLensContext(prompt, l, input)
+			output, _, _, err := c.toolExecutor.Execute(ctx, model.ToolID, lensPrompt, 120)
+			if err != nil {
+				log.Printf("Council: model %s failed for lens %s: %v", model.ModelID, l, err)
+				return
+			}
+
+			review := c.parseReviewOutput(output, model.ModelID, l)
+			mu.Lock()
+			reviews = append(reviews, review)
+			mu.Unlock()
+
+			_, err = c.db.SubmitCouncilReview(ctx, &db.CouncilReviewInput{
+				PlanID:      input.SuggestionID,
+				Round:       round,
+				ModelID:     model.ModelID,
+				Lens:        string(l),
+				Vote:        string(review.Vote),
+				Confidence:  review.Confidence,
+				Approach:    review.Analysis,
+				Concerns:    review.Concerns,
+				Suggestions: review.Suggestions,
+			})
+			if err != nil {
+				log.Printf("Council: failed to store review: %v", err)
+			}
+		}(i, lens)
+	}
+
+	wg.Wait()
+	return reviews
+}
+
+func (c *Council) buildResearchPrompt(input *ResearchSuggestionInput, round int, previousReviews []ReviewResult) string {
+	var sb strings.Builder
+
+	sb.WriteString("COUNCIL SYSTEM IMPROVEMENT REVIEW\n\n")
+	sb.WriteString("This is a suggestion from the System Researcher to improve VibePilot.\n\n")
+	sb.WriteString(fmt.Sprintf("Suggestion Type: %s\n", input.SuggestionType))
+	sb.WriteString(fmt.Sprintf("Title: %s\n", input.Title))
+	sb.WriteString(fmt.Sprintf("Description: %s\n\n", input.Description))
+
+	if input.Impact != "" {
+		sb.WriteString(fmt.Sprintf("Expected Impact: %s\n\n", input.Impact))
+	}
+
+	if input.Source != "" {
+		sb.WriteString(fmt.Sprintf("Source: %s\n", input.Source))
+	}
+	if input.Rationale != "" {
+		sb.WriteString(fmt.Sprintf("Rationale: %s\n\n", input.Rationale))
+	}
+
+	if len(input.Risks) > 0 {
+		sb.WriteString("Identified Risks:\n")
+		for _, risk := range input.Risks {
+			sb.WriteString(fmt.Sprintf("- %s\n", risk))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(input.Benefits) > 0 {
+		sb.WriteString("Expected Benefits:\n")
+		for _, benefit := range input.Benefits {
+			sb.WriteString(fmt.Sprintf("- %s\n", benefit))
+		}
+		sb.WriteString("\n")
+	}
+
+	if round > 1 && len(previousReviews) > 0 {
+		sb.WriteString("PREVIOUS ROUND FEEDBACK:\n")
+		for _, rev := range previousReviews {
+			sb.WriteString(fmt.Sprintf("- %s (%s): %s\n", rev.ModelID, rev.Lens, rev.Vote))
+			if len(rev.Concerns) > 0 {
+				sb.WriteString(fmt.Sprintf("  Concerns: %s\n", strings.Join(rev.Concerns, ", ")))
+			}
+			if len(rev.Suggestions) > 0 {
+				sb.WriteString(fmt.Sprintf("  Suggestions: %s\n", strings.Join(rev.Suggestions, ", ")))
+			}
+		}
+	}
+
+	sb.WriteString("\nREVIEW INSTRUCTIONS:\n")
+	sb.WriteString("Analyze this system improvement suggestion from your assigned lens.\n")
+	sb.WriteString("Consider: alignment with VibePilot principles, integration impact, reversibility.\n")
+	sb.WriteString("If approved, this will go to HUMAN for final review before implementation.\n")
+	sb.WriteString("Respond in JSON format:\n")
+	sb.WriteString("{\n")
+	sb.WriteString("  \"vote\": \"APPROVED\" | \"REVISION_NEEDED\" | \"BLOCKED\",\n")
+	sb.WriteString("  \"confidence\": 0.0-1.0,\n")
+	sb.WriteString("  \"analysis\": \"Brief assessment\",\n")
+	sb.WriteString("  \"concerns\": [\"list of concerns\"],\n")
+	sb.WriteString("  \"suggestions\": [\"list of suggestions\"]\n")
+	sb.WriteString("}\n")
+
+	return sb.String()
+}
+
+func (c *Council) addResearchLensContext(prompt string, lens Lens, input *ResearchSuggestionInput) string {
+	var lensContext string
+
+	switch lens {
+	case LensUserAlignment:
+		lensContext = "\n\nYOUR LENS: USER ALIGNMENT\nConsider: Does this improve the user experience? Will users benefit directly?"
+
+	case LensIdealVision:
+		lensContext = "\n\nYOUR LENS: IDEAL VISION\nConsider: Does this move VibePilot toward its ideal state? Is this the right direction?"
+
+	case LensTechnicalSecurity:
+		lensContext = "\n\nYOUR LENS: TECHNICAL & SECURITY\nConsider: Is this technically sound? Any security implications? Performance impact?"
+
+	case LensIntegration:
+		lensContext = "\n\nYOUR LENS: INTEGRATION\nConsider: How does this fit with existing system? Breaking changes? Dependencies?"
+
+	case LensReversibility:
+		lensContext = "\n\nYOUR LENS: REVERSIBILITY\nConsider: Can this be undone if problems arise? What's the rollback strategy?"
+
+	case LensPrincipleAlign:
+		lensContext = "\n\nYOUR LENS: PRINCIPLE ALIGNMENT\nConsider: Does this follow VibePilot principles? Zero lock-in? Modular? Exit ready? Agnostic?"
+	}
+
+	return prompt + lensContext
 }
 
 func (c *Council) determineLenses(input *PlanReviewInput) []Lens {
