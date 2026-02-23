@@ -226,15 +226,36 @@ func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, no
 		return
 	}
 
-	escalate := taskPtr.Attempts+1 >= taskPtr.MaxAttempts
-
-	o.db.ResetTask(ctx, task.ID, escalate)
+	newAttempts := taskPtr.Attempts + 1
+	escalate := newAttempts >= taskPtr.MaxAttempts
 
 	if escalate {
-		log.Printf("Orchestrator: %s escalated after rejection", task.ID[:8])
+		log.Printf("Orchestrator: %s escalated (3+ failures) - AI will analyze and resolve", task.ID[:8])
+		o.db.UpdateTaskStatus(ctx, task.ID, types.StatusEscalated, map[string]interface{}{
+			"attempts":      newAttempts,
+			"failure_notes": notes,
+		})
+		go o.handleEscalation(ctx, task.ID, notes)
 	} else {
-		log.Printf("Orchestrator: %s returned to queue", task.ID[:8])
+		o.db.ResetTask(ctx, task.ID, false)
+		o.db.UpdateTaskStatus(ctx, task.ID, types.StatusAvailable, map[string]interface{}{
+			"attempts":      newAttempts,
+			"failure_notes": notes,
+		})
+		log.Printf("Orchestrator: %s returned to queue (attempt %d/%d)", task.ID[:8], newAttempts, taskPtr.MaxAttempts)
 	}
+}
+
+func (o *Orchestrator) handleEscalation(ctx context.Context, taskID string, failureNotes string) {
+	log.Printf("Orchestrator: Analyzing escalation for %s: %s", taskID[:8], failureNotes)
+
+	// TODO: Route to research/solution model to analyze failure and propose fix
+	// For now, log the escalation for analysis
+	// Future:
+	// - Check if platform was down -> retry with different platform
+	// - Check if task too large -> call planner to split
+	// - Check if prompt was bad -> regenerate prompt
+	// - Send to research model for solution
 }
 
 func (o *Orchestrator) generateBranchName(task *types.Task) string {
