@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/maintenance"
@@ -21,29 +19,23 @@ type Orchestrator struct {
 	supervisor  *supervisor.Supervisor
 	tester      *tester.Tester
 
-	pendingReviews chan string
-	pendingTests   chan string
-	pendingMerges  chan string
-
-	state sync.Map
+	pendingTests  chan string
+	pendingMerges chan string
 }
 
 func New(database *db.DB, maint *maintenance.Maintenance, sup *supervisor.Supervisor, test *tester.Tester) *Orchestrator {
 	return &Orchestrator{
-		db:             database,
-		maintenance:    maint,
-		supervisor:     sup,
-		tester:         test,
-		pendingReviews: make(chan string, 20),
-		pendingTests:   make(chan string, 20),
-		pendingMerges:  make(chan string, 20),
+		db:            database,
+		maintenance:   maint,
+		supervisor:    sup,
+		tester:        test,
+		pendingTests:  make(chan string, 20),
+		pendingMerges: make(chan string, 20),
 	}
 }
 
 func (o *Orchestrator) Run(ctx context.Context) {
 	log.Println("Orchestrator started")
-
-	go o.pollReviews(ctx)
 
 	for {
 		select {
@@ -51,37 +43,11 @@ func (o *Orchestrator) Run(ctx context.Context) {
 			log.Println("Orchestrator shutting down")
 			return
 
-		case taskID := <-o.pendingReviews:
-			go o.processReview(ctx, taskID)
-
 		case taskID := <-o.pendingTests:
 			go o.processTest(ctx, taskID)
 
 		case taskID := <-o.pendingMerges:
 			go o.processMerge(ctx, taskID)
-		}
-	}
-}
-
-func (o *Orchestrator) pollReviews(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			tasks, err := o.db.GetTasksByStatus(ctx, string(types.StatusReview), 10)
-			if err != nil {
-				continue
-			}
-			for _, t := range tasks {
-				select {
-				case o.pendingReviews <- t.ID:
-				default:
-				}
-			}
 		}
 	}
 }
@@ -100,6 +66,7 @@ func (o *Orchestrator) OnTaskComplete(ctx context.Context, taskID string, result
 			return
 		}
 		task.BranchName = branchName
+		o.db.UpdateTaskBranch(ctx, taskID, branchName)
 	}
 
 	if err := o.maintenance.CommitOutput(ctx, task.BranchName, result); err != nil {
@@ -107,27 +74,15 @@ func (o *Orchestrator) OnTaskComplete(ctx context.Context, taskID string, result
 		return
 	}
 
-	select {
-	case o.pendingReviews <- taskID:
-		log.Printf("Orchestrator: queued %s for review", taskID[:8])
-	default:
-		log.Printf("Orchestrator: review queue full, %s will be polled", taskID[:8])
-	}
+	o.processSupervisorDecision(ctx, task, result)
 }
 
-func (o *Orchestrator) processReview(ctx context.Context, taskID string) {
-	task, err := o.db.GetTaskByID(ctx, taskID)
-	if err != nil || task == nil {
-		return
-	}
-
-	if task.Status != types.StatusReview {
-		return
-	}
+func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *types.Task, result interface{}) {
+	taskID := task.ID
 
 	packet, err := o.db.GetTaskPacket(ctx, taskID)
 	if err != nil || packet == nil {
-		log.Printf("Orchestrator: no packet for review %s", taskID[:8])
+		log.Printf("Orchestrator: no packet for task %s", taskID[:8])
 		return
 	}
 
@@ -141,11 +96,13 @@ func (o *Orchestrator) processReview(ctx context.Context, taskID string) {
 
 	switch decision.Action {
 	case supervisor.ActionApprove:
-		log.Printf("Orchestrator: %s approved, routing to testing", taskID[:8])
-		o.db.UpdateTaskStatus(ctx, taskID, types.StatusTesting, nil)
-		select {
-		case o.pendingTests <- taskID:
-		default:
+		if task.Type == "test" || task.Type == "docs" {
+			log.Printf("Orchestrator: %s approved (no testing needed for %s type)", taskID[:8], task.Type)
+			o.queueMerge(taskID)
+		} else {
+			log.Printf("Orchestrator: %s approved, routing to testing", taskID[:8])
+			o.db.UpdateTaskStatus(ctx, taskID, types.StatusTesting, result)
+			o.queueTest(taskID)
 		}
 
 	case supervisor.ActionReject:
@@ -166,6 +123,22 @@ func (o *Orchestrator) processReview(ctx context.Context, taskID string) {
 	}
 }
 
+func (o *Orchestrator) queueTest(taskID string) {
+	select {
+	case o.pendingTests <- taskID:
+	default:
+		log.Printf("Orchestrator: test queue full, %s will retry", taskID[:8])
+	}
+}
+
+func (o *Orchestrator) queueMerge(taskID string) {
+	select {
+	case o.pendingMerges <- taskID:
+	default:
+		log.Printf("Orchestrator: merge queue full, %s will retry", taskID[:8])
+	}
+}
+
 func (o *Orchestrator) processTest(ctx context.Context, taskID string) {
 	task, err := o.db.GetTaskByID(ctx, taskID)
 	if err != nil || task == nil {
@@ -180,10 +153,7 @@ func (o *Orchestrator) processTest(ctx context.Context, taskID string) {
 
 	if result.Passed {
 		log.Printf("Orchestrator: %s tests passed, queueing for merge", taskID[:8])
-		select {
-		case o.pendingMerges <- taskID:
-		default:
-		}
+		o.queueMerge(taskID)
 	} else {
 		log.Printf("Orchestrator: %s tests failed: %v", taskID[:8], result.Failures)
 		notes := "Tests failed: " + strings.Join(result.Failures, "; ")
@@ -221,41 +191,35 @@ func (o *Orchestrator) processMerge(ctx context.Context, taskID string) {
 }
 
 func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, notes string) {
-	taskPtr, _ := o.db.GetTaskByID(ctx, task.ID)
-	if taskPtr == nil {
+	taskID := task.ID
+
+	currentTask, err := o.db.GetTaskByID(ctx, taskID)
+	if err != nil || currentTask == nil {
 		return
 	}
 
-	newAttempts := taskPtr.Attempts + 1
-	escalate := newAttempts >= taskPtr.MaxAttempts
+	newAttempts := currentTask.Attempts + 1
+	escalate := newAttempts >= currentTask.MaxAttempts
 
 	if escalate {
-		log.Printf("Orchestrator: %s escalated (3+ failures) - AI will analyze and resolve", task.ID[:8])
-		o.db.UpdateTaskStatus(ctx, task.ID, types.StatusEscalated, map[string]interface{}{
+		log.Printf("Orchestrator: %s escalated (%d/%d failures) - AI will analyze and resolve", taskID[:8], newAttempts, currentTask.MaxAttempts)
+		o.db.UpdateTaskStatus(ctx, taskID, types.StatusEscalated, map[string]interface{}{
 			"attempts":      newAttempts,
 			"failure_notes": notes,
 		})
-		go o.handleEscalation(ctx, task.ID, notes)
+		go o.handleEscalation(ctx, taskID, notes)
 	} else {
-		o.db.ResetTask(ctx, task.ID, false)
-		o.db.UpdateTaskStatus(ctx, task.ID, types.StatusAvailable, map[string]interface{}{
+		o.db.ResetTask(ctx, taskID, false)
+		o.db.UpdateTaskStatus(ctx, taskID, types.StatusAvailable, map[string]interface{}{
 			"attempts":      newAttempts,
 			"failure_notes": notes,
 		})
-		log.Printf("Orchestrator: %s returned to queue (attempt %d/%d)", task.ID[:8], newAttempts, taskPtr.MaxAttempts)
+		log.Printf("Orchestrator: %s returned to queue (attempt %d/%d)", taskID[:8], newAttempts, currentTask.MaxAttempts)
 	}
 }
 
 func (o *Orchestrator) handleEscalation(ctx context.Context, taskID string, failureNotes string) {
 	log.Printf("Orchestrator: Analyzing escalation for %s: %s", taskID[:8], failureNotes)
-
-	// TODO: Route to research/solution model to analyze failure and propose fix
-	// For now, log the escalation for analysis
-	// Future:
-	// - Check if platform was down -> retry with different platform
-	// - Check if task too large -> call planner to split
-	// - Check if prompt was bad -> regenerate prompt
-	// - Send to research model for solution
 }
 
 func (o *Orchestrator) generateBranchName(task *types.Task) string {
