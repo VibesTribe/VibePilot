@@ -45,6 +45,7 @@ var upgrader = websocket.Upgrader{
 
 type Server struct {
 	cfg          *config.ServerConfig
+	govCfg       *config.GovernorConfig
 	db           *db.DB
 	server       *http.Server
 	hub          *Hub
@@ -52,11 +53,12 @@ type Server struct {
 	moduleCounts func() map[string]int
 }
 
-func New(cfg *config.ServerConfig, database *db.DB) *Server {
+func New(cfg *config.ServerConfig, govCfg *config.GovernorConfig, database *db.DB) *Server {
 	return &Server{
-		cfg: cfg,
-		db:  database,
-		hub: NewHub(),
+		cfg:    cfg,
+		govCfg: govCfg,
+		db:     database,
+		hub:    NewHub(),
 	}
 }
 
@@ -288,8 +290,13 @@ func (s *Server) handleLimits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	maxPerModule := 8
+	if s.govCfg != nil && s.govCfg.MaxPerModule > 0 {
+		maxPerModule = s.govCfg.MaxPerModule
+	}
+
 	limits := map[string]interface{}{
-		"max_per_module": 8,
+		"max_per_module": maxPerModule,
 		"active_counts":  map[string]int{},
 		"ws_clients":     s.hub.ClientCount(),
 	}
@@ -360,6 +367,11 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 
 	runners, _ := s.db.GetRunners(ctx)
 
+	maxPerModule := 8
+	if s.govCfg != nil && s.govCfg.MaxPerModule > 0 {
+		maxPerModule = s.govCfg.MaxPerModule
+	}
+
 	stats := map[string]interface{}{
 		"tasks": map[string]int{
 			"available":   len(availableTasks),
@@ -373,7 +385,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		},
 		"runners":        len(runners),
 		"ws_clients":     s.hub.ClientCount(),
-		"max_per_module": 8,
+		"max_per_module": maxPerModule,
 	}
 
 	if s.moduleCounts != nil {

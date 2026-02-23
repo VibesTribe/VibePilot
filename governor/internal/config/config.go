@@ -18,11 +18,13 @@ type Config struct {
 }
 
 type GovernorConfig struct {
-	PollInterval  time.Duration `yaml:"poll_interval"`
-	MaxConcurrent int           `yaml:"max_concurrent"`
-	StuckTimeout  time.Duration `yaml:"stuck_timeout"`
-	MaxPerModule  int           `yaml:"max_per_module"`
-	RepoPath      string        `yaml:"repo_path"`
+	PollInterval     time.Duration `yaml:"poll_interval"`
+	MaxConcurrent    int           `yaml:"max_concurrent"`
+	StuckTimeout     time.Duration `yaml:"stuck_timeout"`
+	MaxPerModule     int           `yaml:"max_per_module"`
+	RepoPath         string        `yaml:"repo_path"`
+	TaskTimeoutSec   int           `yaml:"task_timeout_sec"`
+	CouncilMaxRounds int           `yaml:"council_max_rounds"`
 }
 
 type SupabaseConfig struct {
@@ -80,10 +82,12 @@ func Load(path string) (*Config, error) {
 
 	cfg := &Config{
 		Governor: GovernorConfig{
-			PollInterval:  15 * time.Second,
-			MaxConcurrent: 3,
-			StuckTimeout:  10 * time.Minute,
-			MaxPerModule:  8,
+			PollInterval:     15 * time.Second,
+			MaxConcurrent:    3,
+			StuckTimeout:     10 * time.Minute,
+			MaxPerModule:     8,
+			TaskTimeoutSec:   300,
+			CouncilMaxRounds: 4,
 		},
 		Server: ServerConfig{
 			Addr: ":8080",

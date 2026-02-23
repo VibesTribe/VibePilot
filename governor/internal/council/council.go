@@ -89,11 +89,14 @@ type ToolExecutor interface {
 	Execute(ctx context.Context, toolID, prompt string, timeoutSec int) (output string, tokensIn, tokensOut int, err error)
 }
 
-func New(database *db.DB, executor ToolExecutor) *Council {
+func New(database *db.DB, executor ToolExecutor, maxRounds int) *Council {
+	if maxRounds <= 0 {
+		maxRounds = 4
+	}
 	return &Council{
 		db:           database,
 		toolExecutor: executor,
-		maxRounds:    4,
+		maxRounds:    maxRounds,
 	}
 }
 

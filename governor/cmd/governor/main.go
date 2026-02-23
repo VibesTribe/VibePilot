@@ -93,7 +93,7 @@ func main() {
 	j := janitor.New(database, cfg.Governor.StuckTimeout)
 	go j.Run(ctx)
 
-	srv := server.New(&cfg.Server, database)
+	srv := server.New(&cfg.Server, &cfg.Governor, database)
 	srv.SetCourierCallback(d.OnCourierResult)
 	srv.SetModuleCountsGetter(s.ModuleCounts)
 	go func() {
