@@ -711,3 +711,92 @@ func (d *DB) GetResearchSuggestion(ctx context.Context, taskID string) (map[stri
 	}
 	return results[0], nil
 }
+
+func (d *DB) REST(ctx context.Context, method, path string, body interface{}) ([]byte, error) {
+	return d.rest(ctx, method, path, body)
+}
+
+func (d *DB) RPC(ctx context.Context, name string, params interface{}) ([]byte, error) {
+	return d.rpc(ctx, name, params)
+}
+
+func (d *DB) LogOrchestratorEvent(ctx context.Context, eventType, taskID, runnerID, fromRunnerID, toRunnerID, modelID, reason string, details map[string]interface{}) error {
+	params := map[string]interface{}{
+		"p_event_type":     eventType,
+		"p_task_id":        nil,
+		"p_runner_id":      nil,
+		"p_from_runner_id": nil,
+		"p_to_runner_id":   nil,
+		"p_model_id":       nil,
+		"p_reason":         nil,
+		"p_details":        nil,
+	}
+	if taskID != "" {
+		params["p_task_id"] = taskID
+	}
+	if runnerID != "" {
+		params["p_runner_id"] = runnerID
+	}
+	if fromRunnerID != "" {
+		params["p_from_runner_id"] = fromRunnerID
+	}
+	if toRunnerID != "" {
+		params["p_to_runner_id"] = toRunnerID
+	}
+	if modelID != "" {
+		params["p_model_id"] = modelID
+	}
+	if reason != "" {
+		params["p_reason"] = reason
+	}
+	if details != nil {
+		params["p_details"] = details
+	}
+	_, err := d.rpc(ctx, "log_orchestrator_event", params)
+	return err
+}
+
+func (d *DB) AppendRoutingHistory(ctx context.Context, taskID, fromModel, toModel, reason string) error {
+	_, err := d.rpc(ctx, "append_routing_history", map[string]interface{}{
+		"p_task_id":    taskID,
+		"p_from_model": fromModel,
+		"p_to_model":   toModel,
+		"p_reason":     reason,
+	})
+	return err
+}
+
+func (d *DB) IncrementInFlight(ctx context.Context, runnerID string) (bool, error) {
+	data, err := d.rpc(ctx, "increment_in_flight", map[string]interface{}{
+		"p_runner_id": runnerID,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	var result bool
+	if err := json.Unmarshal(data, &result); err != nil {
+		return false, fmt.Errorf("unmarshal increment_in_flight: %w", err)
+	}
+	return result, nil
+}
+
+func (d *DB) DecrementInFlight(ctx context.Context, runnerID string) error {
+	_, err := d.rpc(ctx, "decrement_in_flight", map[string]interface{}{
+		"p_runner_id": runnerID,
+	})
+	return err
+}
+
+func (d *DB) GetSystemState(ctx context.Context) (map[string]interface{}, error) {
+	data, err := d.rpc(ctx, "get_system_state", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal system state: %w", err)
+	}
+	return result, nil
+}

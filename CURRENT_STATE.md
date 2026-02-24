@@ -11,59 +11,92 @@
 
 ---
 
-**Last Updated:** 2026-02-23
-**Updated By:** GLM-5 - Session 26: System Researcher
-**Session Focus:** Implemented Researcher for escalated task analysis
-**Direction:** System Researcher COMPLETE - Visual Testing stub remains
+**Last Updated:** 2026-02-24
+**Updated By:** GLM-5 - Session 27: Stateless Orchestrator
+**Session Focus:** Event logging, vault access, concurrent tracking, security hardening
+**Direction:** Phase 6 COMPLETE - Orchestrator is stateless DB-driven brain
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Go Governor Phase 1-5 COMPLETE + System Researcher
+**Progress:** Go Governor Phase 1-6 COMPLETE
 
 ---
 
-# SESSION 26: SYSTEM RESEARCHER (2026-02-23)
+# SESSION 27: STATELESS ORCHESTRATOR (2026-02-24)
 
 ## What We Did
 
-### System Researcher - AI Analysis for Escalated Tasks
+### 1. Schema Migration (023_orchestrator_state.sql)
 
-When a task fails 3x and escalates, the Researcher:
-1. Analyzes failure notes, task runs, and prompt packet
-2. Categorizes the issue (model, task definition, dependency, infrastructure)
-3. Decides action: auto-retry, human review, or wait
+**New columns:**
+- `runners.max_concurrent` - Maximum concurrent tasks per runner
+- `runners.current_in_flight` - Current tasks in progress
+- `tasks.routing_history` - JSONB array of routing decisions
 
-### Files Changed
+**New tables:**
+- `orchestrator_events` - Audit trail of all orchestrator decisions
+- `security_audit` - Sensitive operation tracking
 
-| File | Lines | Change |
-|------|-------|--------|
-| `internal/researcher/researcher.go` | 300 | NEW - Escalated task analysis |
-| `internal/orchestrator/orchestrator.go` | 289 | Wired researcher into handleEscalation |
-| `internal/db/supabase.go` | 713 | Added GetTaskRuns, CreateResearchSuggestion, GetResearchSuggestion |
-| `cmd/governor/main.go` | 118 | Wired researcher in startup |
+**New RPCs:**
+- `log_orchestrator_event` - Record decision to event log
+- `append_routing_history` - Add routing step to task
+- `increment_in_flight` - Atomic concurrent capacity check
+- `decrement_in_flight` - Release concurrent slot
+- `get_system_state` - Full snapshot for orchestrator
+- `log_security_audit` - Track vault access
+
+**Security:**
+- Vault RLS hardened (no bulk export/delete for authenticated)
+
+### 2. Vault Module (internal/vault/vault.go)
+
+Go Governor can now access encrypted secrets:
+- Fernet decryption (matches Python vault_manager.py)
+- In-memory caching (5 min TTL)
+- Audit logging to security_audit table
+
+### 3. Orchestrator Event Logging
+
+Every decision logged:
+- task_dispatched, runner_selected, task_complete
+- supervisor_approve, supervisor_reject, awaiting_human
+- visual_test_passed, visual_test_failed
+- escalated, analysis_complete, rerouted
+
+### 4. Concurrent Tracking
+
+Dispatcher uses atomic RPCs:
+- `increment_in_flight(runner_id)` before task
+- `decrement_in_flight(runner_id)` after completion
+
+### 5. Systemd Service
+
+Created `scripts/governor.service` for production deployment.
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `docs/supabase-schema/023_orchestrator_state.sql` | NEW - Schema migration |
+| `internal/vault/vault.go` | NEW - Vault access module |
+| `internal/orchestrator/orchestrator.go` | Event logging added |
+| `internal/dispatcher/dispatcher.go` | In-flight tracking + event logging |
+| `internal/db/supabase.go` | New RPCs for events/concurrent |
+| `scripts/governor.service` | NEW - Systemd service |
 
 ## Final Code Stats
 
 ```
-Total Go files: 22
-Total lines:   4,502
+Total Go files: 24
+Total lines:   4,901
 Build:         ✅ Clean
 Vet:           ✅ No issues
 ```
-
-## Researcher Categories
-
-| Category | Action |
-|----------|--------|
-| `model_issue` | Auto-retry with different model |
-| `task_definition` | Route to human with analysis |
-| `dependency_issue` | Route to human with analysis |
-| `infrastructure` | Reset and retry (rate limits, git errors) |
 
 ## Branch Status
 
 | Repo | Branch | Status |
 |------|--------|--------|
-| vibepilot | `go-governor` | System Researcher complete, ready to push |
+| vibepilot | `go-governor` | Phase 6 complete, ready to push |
 | vibeflow | `main` | Production with merge pending UI |
 | vibeflow | `vibeflow-test` | Staging (can merge to main) |
 
@@ -78,7 +111,11 @@ See `docs/GOVERNOR_HANDOFF.md` for full details.
 - Visual testing agent (stub) before human review
 - System Researcher for escalated task analysis
 - All hardcoded values configurable
-- Clean code audit passed
+- Event logging to orchestrator_events
+- Concurrent capacity tracking
+- Vault access from Go
+- Security audit trail
+- Systemd service
 
 **Stub Remaining:**
 - `visual/visual.go` - `TestVisual()` passes by default (needs real implementation)
@@ -92,13 +129,15 @@ governor:
   max_concurrent: 3
   stuck_timeout: 10m
   max_per_module: 8
-  task_timeout_sec: 300        # NEW - task execution timeout
-  council_max_rounds: 4        # NEW - deliberation rounds
+  task_timeout_sec: 300
+  council_max_rounds: 4
 ```
 
 ## Dashboard Status
 
 **Live at Vercel** - auto-deploys from `main` branch.
+
+**Event log now available:** `orchestrator_events` table feeds dashboard logs modal.
 
 **Key status mappings:**
 | DB Status | Dashboard Status | Flags? |
@@ -122,9 +161,10 @@ governor:
 
 # NEXT SESSION
 
-1. Implement real visual testing in `visual/visual.go`
-2. Wire Maintenance to poll `maintenance_commands` table
-3. Add config hot-reload with fsnotify (optional)
+1. Wire `orchestrator_events` to dashboard logs modal
+2. Implement real visual testing in `visual/visual.go`
+3. Wire Maintenance to poll `maintenance_commands` table
+4. Create `config/tools.yaml` for tool allowlist
 
 ---
 
@@ -144,7 +184,10 @@ governor:
 
 | File | Change |
 |------|--------|
-| `governor/internal/researcher/researcher.go` | NEW - Escalated task analysis |
-| `governor/internal/orchestrator/orchestrator.go` | Wired researcher, implemented handleEscalation |
-| `governor/internal/db/supabase.go` | Added GetTaskRuns, CreateResearchSuggestion, GetResearchSuggestion |
-| `governor/cmd/governor/main.go` | Wired researcher |
+| `docs/supabase-schema/023_orchestrator_state.sql` | NEW - Schema migration |
+| `governor/internal/vault/vault.go` | NEW - Vault access module |
+| `governor/internal/orchestrator/orchestrator.go` | Event logging |
+| `governor/internal/dispatcher/dispatcher.go` | In-flight tracking + event logging |
+| `governor/internal/db/supabase.go` | New RPCs |
+| `scripts/governor.service` | NEW - Systemd service |
+| `docs/GOVERNOR_HANDOFF.md` | Updated for Session 27 |
