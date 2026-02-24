@@ -118,17 +118,32 @@ func (e *AgentExecutor) buildPrompt(role *Role, basePrompt string, context map[s
 	return sb.String()
 }
 
-func (e *AgentExecutor) runTool(ctx context.Context, toolID string, prompt string) (output string, tokensIn, tokensOut int, err error) {
+func (e *AgentExecutor) runTool(ctx context.Context, destID string, prompt string) (output string, tokensIn, tokensOut int, err error) {
 	timeout := e.timeoutSec
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	cmdName := e.resolveToolCommand(toolID)
-	cmd := exec.CommandContext(ctx, cmdName, "run", "--format", "json", prompt)
+	dest, err := e.db.GetDestination(ctx, destID)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("get destination %s: %w", destID, err)
+	}
+
+	switch dest.Type {
+	case "cli":
+		return e.executeCLI(ctx, dest.Command, prompt)
+	case "api", "api_free", "api_credit":
+		return "", 0, 0, fmt.Errorf("API execution not supported in agent executor yet")
+	default:
+		return "", 0, 0, fmt.Errorf("unsupported destination type: %s", dest.Type)
+	}
+}
+
+func (e *AgentExecutor) executeCLI(ctx context.Context, command string, prompt string) (output string, tokensIn, tokensOut int, err error) {
+	cmd := exec.CommandContext(ctx, command, "run", "--format", "json", prompt)
 	raw, execErr := cmd.CombinedOutput()
 
 	if execErr != nil {
-		return "", 0, 0, fmt.Errorf("%s: %w\noutput: %s", cmdName, execErr, string(raw))
+		return "", 0, 0, fmt.Errorf("%s: %w\noutput: %s", command, execErr, string(raw))
 	}
 
 	clean, warnings := e.leakDetector.Scan(string(raw))
@@ -153,17 +168,6 @@ func (e *AgentExecutor) runTool(ctx context.Context, toolID string, prompt strin
 	}
 
 	return output, tokensIn, tokensOut, nil
-}
-
-func (e *AgentExecutor) resolveToolCommand(toolID string) string {
-	switch toolID {
-	case "opencode":
-		return "opencode"
-	case "kimi-cli":
-		return "kimi"
-	default:
-		return "opencode"
-	}
 }
 
 func (e *AgentExecutor) ExecuteWithJSON(ctx context.Context, role *Role, prompt string, context map[string]interface{}, target interface{}) (*Result, error) {

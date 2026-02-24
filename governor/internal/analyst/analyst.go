@@ -216,23 +216,35 @@ Respond ONLY with valid JSON.`, string(dataJSON))
 }
 
 func (a *Analyst) callLLM(ctx context.Context, prompt string) (string, error) {
+	dest, err := a.db.GetDestination(ctx, "opencode")
+	if err != nil {
+		dest, err = a.db.GetDestination(ctx, "gemini-api")
+		if err != nil {
+			return "", fmt.Errorf("no available destination: %w", err)
+		}
+	}
+
 	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(timeoutCtx, "opencode", "run", "--format", "json", prompt)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("opencode: %w - %s", err, string(output))
+	if dest.Type == "cli" {
+		cmd := exec.CommandContext(timeoutCtx, dest.Command, "run", "--format", "json", prompt)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%s: %w - %s", dest.Command, err, string(output))
+		}
+
+		var result struct {
+			Content string `json:"content"`
+		}
+		if err := json.Unmarshal(output, &result); err != nil {
+			return string(output), nil
+		}
+
+		return result.Content, nil
 	}
 
-	var result struct {
-		Content string `json:"content"`
-	}
-	if err := json.Unmarshal(output, &result); err != nil {
-		return string(output), nil
-	}
-
-	return result.Content, nil
+	return "", fmt.Errorf("destination type %s not supported for analyst", dest.Type)
 }
 
 func (a *Analyst) parseOutput(output string) (*AnalysisReport, error) {
