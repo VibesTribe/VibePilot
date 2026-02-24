@@ -206,13 +206,18 @@ func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, no
 		return
 	}
 
+	failureType, failureCategory := classifyFailure(notes)
+	o.recordFailure(ctx, currentTask, failureType, failureCategory, notes)
+
 	newAttempts := currentTask.Attempts + 1
 	escalate := newAttempts >= currentTask.MaxAttempts
 
 	o.db.LogOrchestratorEvent(ctx, "task_rejected", taskID, "", "", "", currentTask.AssignedTo, notes, map[string]interface{}{
-		"attempt":      newAttempts,
-		"max_attempts": currentTask.MaxAttempts,
-		"escalate":     escalate,
+		"attempt":          newAttempts,
+		"max_attempts":     currentTask.MaxAttempts,
+		"escalate":         escalate,
+		"failure_type":     failureType,
+		"failure_category": failureCategory,
 	})
 
 	if escalate {
@@ -319,4 +324,55 @@ func generateID() string {
 		panic("crypto/rand failed: " + err.Error())
 	}
 	return hex.EncodeToString(b)
+}
+
+func (o *Orchestrator) recordFailure(ctx context.Context, task *types.Task, failureType, failureCategory, notes string) {
+	record := &db.FailureRecord{
+		TaskID:          task.ID,
+		FailureType:     failureType,
+		FailureCategory: failureCategory,
+		TaskType:        task.Type,
+		Details: map[string]interface{}{
+			"notes":   notes,
+			"attempt": task.Attempts + 1,
+		},
+	}
+	if task.AssignedTo != "" {
+		record.ModelID = task.AssignedTo
+	}
+
+	if _, err := o.db.RecordFailure(ctx, record); err != nil {
+		log.Printf("Orchestrator: failed to record failure for %s: %v", task.ID[:8], err)
+	}
+}
+
+func classifyFailure(notes string) (failureType, failureCategory string) {
+	notesLower := strings.ToLower(notes)
+
+	if strings.Contains(notesLower, "timeout") || strings.Contains(notesLower, "timed out") {
+		return "timeout", "model_issue"
+	}
+	if strings.Contains(notesLower, "rate limit") || strings.Contains(notesLower, "429") {
+		return "rate_limited", "platform_issue"
+	}
+	if strings.Contains(notesLower, "context") || strings.Contains(notesLower, "token limit") {
+		return "context_exceeded", "model_issue"
+	}
+	if strings.Contains(notesLower, "platform") && strings.Contains(notesLower, "down") {
+		return "platform_down", "platform_issue"
+	}
+	if strings.Contains(notesLower, "test") && strings.Contains(notesLower, "fail") {
+		return "test_failed", "quality_issue"
+	}
+	if strings.Contains(notesLower, "empty") || strings.Contains(notesLower, "no output") {
+		return "empty_output", "model_issue"
+	}
+	if strings.Contains(notesLower, "deliverable") || strings.Contains(notesLower, "missing") {
+		return "quality_rejected", "quality_issue"
+	}
+	if strings.Contains(notesLower, "latency") || strings.Contains(notesLower, "slow") {
+		return "latency_high", "platform_issue"
+	}
+
+	return "unknown", "task_issue"
 }

@@ -808,3 +808,204 @@ func (d *DB) GetSystemState(ctx context.Context) (map[string]interface{}, error)
 	}
 	return result, nil
 }
+
+type FailureRecord struct {
+	TaskID          string                 `json:"task_id,omitempty"`
+	TaskRunID       string                 `json:"task_run_id,omitempty"`
+	FailureType     string                 `json:"failure_type"`
+	FailureCategory string                 `json:"failure_category"`
+	Details         map[string]interface{} `json:"failure_details,omitempty"`
+	ModelID         string                 `json:"model_id,omitempty"`
+	Platform        string                 `json:"platform,omitempty"`
+	RunnerID        string                 `json:"runner_id,omitempty"`
+	TaskType        string                 `json:"task_type,omitempty"`
+	TokensUsed      int                    `json:"tokens_used,omitempty"`
+	DurationSec     int                    `json:"duration_sec,omitempty"`
+}
+
+func (d *DB) RecordFailure(ctx context.Context, record *FailureRecord) (string, error) {
+	params := map[string]interface{}{
+		"p_failure_type":     record.FailureType,
+		"p_failure_category": record.FailureCategory,
+	}
+	if record.TaskID != "" {
+		params["p_task_id"] = record.TaskID
+	}
+	if record.TaskRunID != "" {
+		params["p_task_run_id"] = record.TaskRunID
+	}
+	if record.Details != nil {
+		params["p_failure_details"] = record.Details
+	}
+	if record.ModelID != "" {
+		params["p_model_id"] = record.ModelID
+	}
+	if record.Platform != "" {
+		params["p_platform"] = record.Platform
+	}
+	if record.RunnerID != "" {
+		params["p_runner_id"] = record.RunnerID
+	}
+	if record.TaskType != "" {
+		params["p_task_type"] = record.TaskType
+	}
+	if record.TokensUsed > 0 {
+		params["p_tokens_used"] = record.TokensUsed
+	}
+	if record.DurationSec > 0 {
+		params["p_duration_sec"] = record.DurationSec
+	}
+
+	data, err := d.rpc(ctx, "record_failure", params)
+	if err != nil {
+		return "", err
+	}
+
+	var id string
+	if err := json.Unmarshal(data, &id); err != nil {
+		return "", fmt.Errorf("unmarshal failure id: %w", err)
+	}
+	return id, nil
+}
+
+type Heuristic struct {
+	ID             string                 `json:"id"`
+	TaskType       string                 `json:"task_type,omitempty"`
+	Condition      map[string]interface{} `json:"condition,omitempty"`
+	PreferredModel string                 `json:"preferred_model"`
+	Action         map[string]interface{} `json:"action,omitempty"`
+	Confidence     float64                `json:"confidence"`
+}
+
+func (d *DB) GetHeuristic(ctx context.Context, taskType string, condition map[string]interface{}) (*Heuristic, error) {
+	params := map[string]interface{}{}
+	if taskType != "" {
+		params["p_task_type"] = taskType
+	}
+	if condition != nil {
+		params["p_condition"] = condition
+	}
+
+	data, err := d.rpc(ctx, "get_heuristic", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var heuristics []Heuristic
+	if err := json.Unmarshal(data, &heuristics); err != nil {
+		return nil, fmt.Errorf("unmarshal heuristic: %w", err)
+	}
+	if len(heuristics) == 0 {
+		return nil, nil
+	}
+	return &heuristics[0], nil
+}
+
+func (d *DB) RecordHeuristicResult(ctx context.Context, heuristicID string, success bool) error {
+	_, err := d.rpc(ctx, "record_heuristic_result", map[string]interface{}{
+		"p_heuristic_id": heuristicID,
+		"p_success":      success,
+	})
+	return err
+}
+
+type ProblemSolution struct {
+	ID              string                 `json:"id"`
+	SolutionType    string                 `json:"solution_type"`
+	SolutionModel   string                 `json:"solution_model,omitempty"`
+	SolutionDetails map[string]interface{} `json:"solution_details,omitempty"`
+	SuccessRate     float64                `json:"success_rate"`
+}
+
+func (d *DB) GetProblemSolution(ctx context.Context, failureType, taskType string, keywords []string) (*ProblemSolution, error) {
+	params := map[string]interface{}{}
+	if failureType != "" {
+		params["p_failure_type"] = failureType
+	}
+	if taskType != "" {
+		params["p_task_type"] = taskType
+	}
+	if keywords != nil {
+		params["p_keywords"] = keywords
+	}
+
+	data, err := d.rpc(ctx, "get_problem_solution", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var solutions []ProblemSolution
+	if err := json.Unmarshal(data, &solutions); err != nil {
+		return nil, fmt.Errorf("unmarshal problem solution: %w", err)
+	}
+	if len(solutions) == 0 {
+		return nil, nil
+	}
+	return &solutions[0], nil
+}
+
+func (d *DB) RecordSolutionResult(ctx context.Context, solutionID string, success bool) error {
+	_, err := d.rpc(ctx, "record_solution_result", map[string]interface{}{
+		"p_solution_id": solutionID,
+		"p_success":     success,
+	})
+	return err
+}
+
+type RecentFailure struct {
+	ModelID      string `json:"model_id"`
+	Platform     string `json:"platform,omitempty"`
+	FailureType  string `json:"failure_type"`
+	FailureCount int    `json:"failure_count"`
+}
+
+func (d *DB) GetRecentFailures(ctx context.Context, taskType string, sinceMinutes int) ([]RecentFailure, error) {
+	params := map[string]interface{}{}
+	if taskType != "" {
+		params["p_task_type"] = taskType
+	}
+	if sinceMinutes > 0 {
+		params["p_since"] = fmt.Sprintf("NOW() - INTERVAL '%d minutes'", sinceMinutes)
+	}
+
+	data, err := d.rpc(ctx, "get_recent_failures", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var failures []RecentFailure
+	if err := json.Unmarshal(data, &failures); err != nil {
+		return nil, fmt.Errorf("unmarshal recent failures: %w", err)
+	}
+	return failures, nil
+}
+
+func (d *DB) UpsertHeuristic(ctx context.Context, taskType string, condition map[string]interface{}, preferredModel string, action map[string]interface{}, confidence float64, source string) (string, error) {
+	params := map[string]interface{}{
+		"p_preferred_model": preferredModel,
+		"p_confidence":      confidence,
+	}
+	if taskType != "" {
+		params["p_task_type"] = taskType
+	}
+	if condition != nil {
+		params["p_condition"] = condition
+	}
+	if action != nil {
+		params["p_action"] = action
+	}
+	if source != "" {
+		params["p_source"] = source
+	}
+
+	data, err := d.rpc(ctx, "upsert_heuristic", params)
+	if err != nil {
+		return "", err
+	}
+
+	var id string
+	if err := json.Unmarshal(data, &id); err != nil {
+		return "", fmt.Errorf("unmarshal heuristic id: %w", err)
+	}
+	return id, nil
+}
