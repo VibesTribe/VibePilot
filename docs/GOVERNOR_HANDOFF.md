@@ -1,8 +1,10 @@
 # Governor Implementation Handoff Document
 
-**Session:** 2026-02-24 (Session 27)
-**Purpose:** Stateless orchestrator, event logging, vault access, concurrent tracking
-**Status:** Phase 6 COMPLETE - Orchestrator is now stateless DB-driven brain
+**Session:** 2026-02-24 (Session 28)
+**Purpose:** Learning system - heuristics, failure tracking, problem/solutions
+**Status:** Phase 1 IN PROGRESS - Learning infrastructure schema created
+
+**Previous Session (27):** Stateless orchestrator, event logging, vault access, concurrent tracking
 
 ---
 
@@ -510,12 +512,93 @@ Task fails 3x → status=escalated → Researcher.AnalyzeEscalation()
 
 ---
 
-# NEXT SESSION
+# LEARNING SYSTEM (NEW - Session 28)
 
-1. **Visual testing** - Implement real UI testing in `visual/visual.go`
-2. **Maintenance command polling** - Poll `maintenance_commands` table
-3. **Tool allowlist** - Create `config/tools.yaml` for security
+## Overview
+
+Full plan in `docs/LEARNING_SYSTEM_PLAN.md`
+
+**Goal:** Orchestrator learns from every outcome, routes smarter over time.
+
+## Architecture
+
+```
+Go (90%) = Fast, deterministic routing
+LLM (10%) = Daily analysis + escalations
+Supabase = Truth (all learning stored here)
+```
+
+## New Tables (024_learning_system.sql)
+
+| Table | Purpose |
+|-------|---------|
+| `learned_heuristics` | Model preferences per task type |
+| `failure_records` | Structured failure logging |
+| `problem_solutions` | What fixed what |
+
+## Failure Types
+
+| Type | Category | Example |
+|------|----------|---------|
+| `timeout` | model_issue | Exceeded time limit |
+| `rate_limited` | platform_issue | 429 from API |
+| `context_exceeded` | model_issue | Token limit |
+| `platform_down` | platform_issue | No response |
+| `quality_rejected` | quality_issue | Missing deliverables |
+| `test_failed` | quality_issue | Tests failed |
+| `empty_output` | model_issue | Nothing returned |
+| `latency_high` | platform_issue | Slow response |
+
+## New RPCs
+
+| RPC | Purpose |
+|-----|---------|
+| `record_failure` | Log structured failure |
+| `get_heuristic` | Get routing preference |
+| `get_problem_solution` | Find proven fix |
+| `record_heuristic_result` | Track if heuristic helped |
+| `record_solution_result` | Track if solution worked |
+| `get_recent_failures` | For routing exclusions |
+| `upsert_heuristic` | LLM updates heuristics |
+
+## Routing Flow (Enhanced)
+
+```
+Task needs routing:
+1. Check learned_heuristics (any preference for this task type?)
+2. If heuristic found and model available → use preferred
+3. Check recent failures (any models failing this task type?)
+4. Get best runner excluding failed models
+5. Record outcome for future learning
+```
+
+## Implementation Phases
+
+1. **Phase 1 (Current):** Core tables + Go routing changes
+2. **Phase 2:** Planner learning (from council/supervisor)
+3. **Phase 3:** Tester/Supervisor learning
+4. **Phase 4:** Daily LLM analysis
+5. **Phase 5:** Depreciation/Revival system
 
 ---
 
-**END OF HANDOFF - Session 27**
+# NEXT SESSION
+
+## Learning System Phase 1 (In Progress)
+1. **Apply migration** `024_learning_system.sql` to Supabase
+2. **Go changes:**
+   - Add failure recording to `orchestrator.go`
+   - Add heuristic checking to `pool/model_pool.go`
+   - Add problem/solutions lookup
+   - Exclude recently failed models from routing
+3. **Test:** Verify structured failures are recorded and used
+
+## Later Phases
+4. **Visual testing** - Implement real UI testing in `visual/visual.go`
+5. **Maintenance command polling** - Poll `maintenance_commands` table
+6. **Planner learning** - Immediate learning from council/supervisor feedback
+7. **Daily LLM analysis** - Self-optimization
+
+---
+
+**END OF HANDOFF - Session 28**
