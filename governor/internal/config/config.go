@@ -9,13 +9,27 @@ import (
 )
 
 type Config struct {
-	Governor GovernorConfig `yaml:"governor"`
-	Supabase SupabaseConfig `yaml:"supabase"`
-	GitHub   GitHubConfig   `yaml:"github"`
-	Server   ServerConfig   `yaml:"server"`
-	Runners  RunnersConfig  `yaml:"runners"`
-	Courier  CourierConfig  `yaml:"courier"`
-	Security SecurityConfig `yaml:"security"`
+	Governor    GovernorConfig    `yaml:"governor"`
+	Supabase    SupabaseConfig    `yaml:"supabase"`
+	GitHub      GitHubConfig      `yaml:"github"`
+	Server      ServerConfig      `yaml:"server"`
+	Runners     RunnersConfig     `yaml:"runners"`
+	Courier     CourierConfig     `yaml:"courier"`
+	Security    SecurityConfig    `yaml:"security"`
+	Deprecation DeprecationConfig `yaml:"depreciation"`
+	Analyst     AnalystConfig     `yaml:"analyst"`
+}
+
+type DeprecationConfig struct {
+	Enabled          bool    `yaml:"enabled"`
+	ArchiveThreshold float64 `yaml:"archive_threshold"`
+	MinAttempts      int     `yaml:"min_attempts"`
+	CooldownHours    int     `yaml:"cooldown_hours"`
+}
+
+type AnalystConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Schedule string `yaml:"schedule"`
 }
 
 type GovernorConfig struct {
@@ -97,6 +111,16 @@ func Load(path string) (*Config, error) {
 			Enabled:     false,
 			MaxInFlight: 3,
 			Stagger:     30 * time.Second,
+		},
+		Deprecation: DeprecationConfig{
+			Enabled:          true,
+			ArchiveThreshold: 0.7,
+			MinAttempts:      5,
+			CooldownHours:    24,
+		},
+		Analyst: AnalystConfig{
+			Enabled:  true,
+			Schedule: "00:00",
 		},
 	}
 
