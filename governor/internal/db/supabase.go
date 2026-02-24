@@ -680,21 +680,6 @@ func (d *DB) CompleteCommand(ctx context.Context, commandID string, success bool
 	return err
 }
 
-func (d *DB) RetryCommand(ctx context.Context, commandID string) (bool, error) {
-	data, err := d.rpc(ctx, "retry_command", map[string]interface{}{
-		"p_command_id": commandID,
-	})
-	if err != nil {
-		return false, err
-	}
-
-	var canRetry bool
-	if err := json.Unmarshal(data, &canRetry); err != nil {
-		return false, fmt.Errorf("unmarshal retry result: %w", err)
-	}
-	return canRetry, nil
-}
-
 func (d *DB) GetAvailableModels(ctx context.Context, limit int) ([]Runner, error) {
 	path := fmt.Sprintf("runners?status=eq.active&order=cost_priority.asc&limit=%d", limit)
 	data, err := d.rest(ctx, "GET", path, nil)
