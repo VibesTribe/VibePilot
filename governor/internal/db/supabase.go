@@ -1057,3 +1057,105 @@ func (d *DB) ReviveRunner(ctx context.Context, runnerID, reason string) error {
 	})
 	return err
 }
+
+type PlannerRule struct {
+	ID                  string                 `json:"id"`
+	AppliesTo           string                 `json:"applies_to"`
+	RuleType            string                 `json:"rule_type"`
+	RuleText            string                 `json:"rule_text"`
+	Details             map[string]interface{} `json:"details"`
+	Source              string                 `json:"source"`
+	Priority            int                    `json:"priority"`
+	TimesApplied        int                    `json:"times_applied"`
+	TimesPreventedIssue int                    `json:"times_prevented_issue"`
+	EffectivenessScore  float64                `json:"effectiveness_score"`
+}
+
+func (d *DB) GetPlannerRules(ctx context.Context, appliesTo string, limit int) ([]PlannerRule, error) {
+	params := map[string]interface{}{
+		"p_limit": limit,
+	}
+	if appliesTo != "" {
+		params["p_applies_to"] = appliesTo
+	}
+
+	data, err := d.rpc(ctx, "get_planner_rules", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var rules []PlannerRule
+	if err := json.Unmarshal(data, &rules); err != nil {
+		return nil, fmt.Errorf("unmarshal planner rules: %w", err)
+	}
+	return rules, nil
+}
+
+func (d *DB) CreatePlannerRule(ctx context.Context, appliesTo, ruleType, ruleText, source string, details map[string]interface{}, sourceTaskID, sourceReviewType *string, priority int) (string, error) {
+	params := map[string]interface{}{
+		"p_applies_to": appliesTo,
+		"p_rule_type":  ruleType,
+		"p_rule_text":  ruleText,
+		"p_source":     source,
+		"p_details":    details,
+		"p_priority":   priority,
+	}
+	if sourceTaskID != nil {
+		params["p_source_task_id"] = *sourceTaskID
+	}
+	if sourceReviewType != nil {
+		params["p_source_review_type"] = *sourceReviewType
+	}
+
+	data, err := d.rpc(ctx, "create_planner_rule", params)
+	if err != nil {
+		return "", err
+	}
+
+	var ruleID string
+	if err := json.Unmarshal(data, &ruleID); err != nil {
+		return "", fmt.Errorf("unmarshal rule id: %w", err)
+	}
+	return ruleID, nil
+}
+
+func (d *DB) RecordPlannerRuleApplied(ctx context.Context, ruleID string) error {
+	_, err := d.rpc(ctx, "record_planner_rule_applied", map[string]interface{}{
+		"p_rule_id": ruleID,
+	})
+	return err
+}
+
+func (d *DB) RecordPlannerRulePreventedIssue(ctx context.Context, ruleID string) error {
+	_, err := d.rpc(ctx, "record_planner_rule_prevented_issue", map[string]interface{}{
+		"p_rule_id": ruleID,
+	})
+	return err
+}
+
+func (d *DB) DeactivatePlannerRule(ctx context.Context, ruleID, reason string) error {
+	_, err := d.rpc(ctx, "deactivate_planner_rule", map[string]interface{}{
+		"p_rule_id": ruleID,
+		"p_reason":  reason,
+	})
+	return err
+}
+
+func (d *DB) CreateRuleFromRejection(ctx context.Context, taskID, rejectionType, rejectionReason, appliesTo, source string) (string, error) {
+	data, err := d.rpc(ctx, "create_rule_from_rejection", map[string]interface{}{
+		"p_task_id":          taskID,
+		"p_rejection_type":   rejectionType,
+		"p_rejection_reason": rejectionReason,
+		"p_applies_to":       appliesTo,
+		"p_source":           source,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	var ruleID string
+	if err := json.Unmarshal(data, &ruleID); err != nil {
+		return "", fmt.Errorf("unmarshal rule id: %w", err)
+	}
+	return ruleID, nil
+}
