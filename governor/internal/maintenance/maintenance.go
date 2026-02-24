@@ -97,7 +97,9 @@ func (m *Maintenance) CommitOutput(ctx context.Context, branchName string, outpu
 		}
 	}
 
-	m.gitCommand(ctx, "add", ".").Run()
+	if err := m.gitCommand(ctx, "add", ".").Run(); err != nil {
+		return fmt.Errorf("git add: %w", err)
+	}
 
 	var commitOut bytes.Buffer
 	commitCmd := m.gitCommand(ctx, "commit", "-m", "task output")

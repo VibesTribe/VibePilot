@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -25,20 +26,26 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		host := r.Header.Get("Origin")
-		if host == "" {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
 			return true
 		}
-		allowedOrigins := []string{
-			"localhost",
-			"127.0.0.1",
-			".vercel.app",
+
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
 		}
-		for _, allowed := range allowedOrigins {
-			if strings.HasSuffix(host, allowed) {
-				return true
-			}
+
+		host := u.Hostname()
+
+		if host == "localhost" || host == "127.0.0.1" {
+			return true
 		}
+
+		if host == "vercel.app" || strings.HasSuffix(host, ".vercel.app") {
+			return true
+		}
+
 		return false
 	},
 }

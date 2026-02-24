@@ -333,7 +333,8 @@ func (d *Dispatcher) dispatchToCourier(ctx context.Context, task types.Task) {
 }
 
 func (d *Dispatcher) OnCourierResult(result courier.Result) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	success := result.Status == "success"
 	status := "success"

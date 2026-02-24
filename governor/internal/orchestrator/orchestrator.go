@@ -26,6 +26,7 @@ type Orchestrator struct {
 	researcher   *researcher.Researcher
 
 	pendingTests chan string
+	ctx          context.Context
 }
 
 func New(database *db.DB, maint *maintenance.Maintenance, sup *supervisor.Supervisor, test *tester.Tester, visTest *visual.VisualTester, res *researcher.Researcher) *Orchestrator {
@@ -41,6 +42,7 @@ func New(database *db.DB, maint *maintenance.Maintenance, sup *supervisor.Superv
 }
 
 func (o *Orchestrator) Run(ctx context.Context) {
+	o.ctx = ctx
 	log.Println("Orchestrator started")
 
 	for {
@@ -219,7 +221,9 @@ func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, no
 			"attempts":      newAttempts,
 			"failure_notes": notes,
 		})
-		go o.handleEscalation(ctx, taskID, notes)
+		if o.ctx != nil {
+			go o.handleEscalation(o.ctx, taskID, notes)
+		}
 	} else {
 		o.db.ResetTask(ctx, taskID, false)
 		o.db.UpdateTaskStatus(ctx, taskID, types.StatusAvailable, map[string]interface{}{

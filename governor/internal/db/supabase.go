@@ -66,10 +66,18 @@ func (d *DB) rest(ctx context.Context, method, path string, body interface{}) ([
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("supabase %d: %s", resp.StatusCode, string(data))
+		return nil, fmt.Errorf("supabase %d: %s", resp.StatusCode, sanitizeErrorBody(data))
 	}
 
 	return data, nil
+}
+
+func sanitizeErrorBody(data []byte) string {
+	s := string(data)
+	if len(s) > 200 {
+		s = s[:200] + "...(truncated)"
+	}
+	return s
 }
 
 func (d *DB) rpc(ctx context.Context, name string, params interface{}) ([]byte, error) {

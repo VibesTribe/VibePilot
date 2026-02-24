@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -105,7 +106,21 @@ func Load(path string) (*Config, error) {
 
 	cfg.expandEnv()
 
+	if err := cfg.validate(); err != nil {
+		return nil, fmt.Errorf("config validation: %w", err)
+	}
+
 	return cfg, nil
+}
+
+func (c *Config) validate() error {
+	if c.Supabase.URL == "" {
+		return fmt.Errorf("supabase.url is required")
+	}
+	if c.Supabase.ServiceKey == "" {
+		return fmt.Errorf("supabase.service_key is required")
+	}
+	return nil
 }
 
 func (c *Config) expandEnv() {
