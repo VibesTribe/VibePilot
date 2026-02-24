@@ -1,0 +1,29 @@
+[Unit]
+Description=VibePilot Go Governor Service
+Documentation=https://github.com/vibepilot/vibepilot
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mjlockboxsocial
+Group=mjlockboxsocial
+WorkingDirectory=/home/mjlockboxsocial/vibepilot/governor
+EnvironmentFile=/home/mjlockboxsocial/vibepilot/.env
+
+ExecStart=/home/mjlockboxsocial/vibepilot/governor/governor
+
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=governor
+
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

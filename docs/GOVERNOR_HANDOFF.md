@@ -1,8 +1,8 @@
 # Governor Implementation Handoff Document
 
-**Session:** 2026-02-23 (Session 26)
-**Purpose:** System Researcher implemented - handles escalated task analysis
-**Status:** System Researcher COMPLETE, Visual Testing stub remains
+**Session:** 2026-02-24 (Session 27)
+**Purpose:** Stateless orchestrator, event logging, vault access, concurrent tracking
+**Status:** Phase 6 COMPLETE - Orchestrator is now stateless DB-driven brain
 
 ---
 
@@ -30,36 +30,37 @@ Server starting on :8080
 
 ## CODEBASE OVERVIEW
 
-### Files (22 Go files, 4,502 lines)
+### Files (24 Go files, 4,901 lines)
 
 ```
 governor/
-├── cmd/governor/main.go           # Entry point, wires all components (118 lines)
+├── cmd/governor/main.go           # Entry point, wires all components
 ├── internal/
-│   ├── sentry/sentry.go           # Polls Supabase for available tasks (136 lines)
-│   ├── dispatcher/dispatcher.go   # Routes tasks to runners (410 lines)
-│   ├── orchestrator/orchestrator.go # Coordinates supervisor/maintenance (289 lines)
-│   ├── supervisor/supervisor.go   # Quality control for tasks/plans (354 lines)
-│   ├── council/council.go         # Multi-lens plan review (565 lines)
-│   ├── researcher/researcher.go   # Escalated task analysis (300 lines) ← NEW
-│   ├── maintenance/maintenance.go # Git operations (172 lines)
-│   ├── tester/tester.go           # pytest/lint execution (60 lines)
-│   ├── visual/visual.go           # Visual UI testing (31 lines)
-│   ├── janitor/janitor.go         # Resets stuck tasks (75 lines)
-│   ├── pool/model_pool.go         # Runner selection (53 lines)
-│   ├── throttle/module_limiter.go # Per-slice rate limiting (67 lines)
+│   ├── sentry/sentry.go           # Polls Supabase for available tasks
+│   ├── dispatcher/dispatcher.go   # Routes tasks to runners (in-flight tracking)
+│   ├── orchestrator/orchestrator.go # Stateless brain + event logging
+│   ├── supervisor/supervisor.go   # Quality control for tasks/plans
+│   ├── council/council.go         # Multi-lens plan review
+│   ├── researcher/researcher.go   # Escalated task analysis
+│   ├── vault/vault.go             # Encrypted secret access ← NEW
+│   ├── maintenance/maintenance.go # Git operations
+│   ├── tester/tester.go           # pytest/lint execution
+│   ├── visual/visual.go           # Visual UI testing (stub)
+│   ├── janitor/janitor.go         # Resets stuck tasks
+│   ├── pool/model_pool.go         # Runner selection
+│   ├── throttle/module_limiter.go # Per-slice rate limiting
 │   ├── security/
-│   │   ├── leak_detector.go       # Secret scanning (69 lines)
-│   │   └── allowlist.go           # HTTP origin validation (61 lines)
+│   │   ├── leak_detector.go       # Secret scanning
+│   │   └── allowlist.go           # HTTP origin validation
 │   ├── courier/
-│   │   ├── dispatcher.go          # Web platform routing (136 lines)
-│   │   └── webhook.go             # Courier callback handler (87 lines)
+│   │   ├── dispatcher.go          # Web platform routing
+│   │   └── webhook.go             # Courier callback handler
 │   ├── server/
-│   │   ├── server.go              # HTTP API + WebSocket (396 lines)
-│   │   └── hub.go                 # WebSocket broadcast (138 lines)
-│   ├── db/supabase.go             # Database operations (713 lines)
-│   └── config/config.go           # YAML configuration (115 lines)
-├── pkg/types/types.go             # Shared types (157 lines)
+│   │   ├── server.go              # HTTP API + WebSocket
+│   │   └── hub.go                 # WebSocket broadcast
+│   ├── db/supabase.go             # Database operations + new RPCs
+│   └── config/config.go           # YAML configuration
+├── pkg/types/types.go             # Shared types
 ├── go.mod                         # Dependencies
 ├── governor.yaml                  # Configuration
 └── Makefile
@@ -361,10 +362,114 @@ governor:
 9. **Council reviews PLANS, not task outputs**
 10. **Visual changes: visual test → human, NOT human → visual test**
 11. **Escalated tasks are analyzed by Researcher** - AI decides: auto-retry, human review, or infrastructure wait
+12. **All orchestrator decisions logged to `orchestrator_events`** (Session 27)
+13. **Concurrent capacity tracked via `increment_in_flight` / `decrement_in_flight`** (Session 27)
 
 ---
 
-# SYSTEM RESEARCHER (NEW - Session 26)
+# STATELESS ORCHESTRATOR (NEW - Session 27)
+
+## Core Principle
+
+**DB is source of truth. Orchestrator is stateless.**
+
+Orchestrator reads state from DB on each cycle. If it crashes, restarts, or moves hosting - it just reconnects and continues.
+
+## Event Logging
+
+Every orchestrator decision is logged to `orchestrator_events`:
+- `task_dispatched` - Task picked up for execution
+- `runner_selected` - Runner chosen for task
+- `task_complete` - Task execution finished
+- `supervisor_approve` / `supervisor_reject` - Supervisor decision
+- `awaiting_human` - Routed to human review
+- `visual_test_passed` / `visual_test_failed` - Visual testing result
+- `task_rejected` - Task failed, may retry
+- `escalated` - Task hit max attempts
+- `analysis_complete` - Researcher analyzed escalation
+- `rerouted` - Task routed to alternative model
+
+## Concurrent Tracking
+
+Runners have `max_concurrent` and `current_in_flight` columns:
+- `increment_in_flight(runner_id)` → returns FALSE if at capacity
+- `decrement_in_flight(runner_id)` → called on task completion
+
+## New RPCs
+
+| RPC | Purpose |
+|-----|---------|
+| `log_orchestrator_event` | Record decision to event log |
+| `append_routing_history` | Add routing step to task history |
+| `increment_in_flight` | Atomically check + increment concurrent |
+| `decrement_in_flight` | Release concurrent slot |
+| `get_system_state` | Get full snapshot for orchestrator brain |
+| `log_security_audit` | Track sensitive operations |
+
+---
+
+# VAULT MODULE (NEW - Session 27)
+
+## Purpose
+
+Go Governor can now access encrypted secrets from `secrets_vault` table.
+
+## Usage
+
+```go
+import "github.com/vibepilot/governor/internal/vault"
+
+vault := vault.New(db)
+apiKey, err := vault.GetSecret(ctx, "GEMINI_API_KEY")
+```
+
+## Features
+
+- In-memory caching (5 min TTL)
+- Audit logging to `security_audit` table
+- Fernet decryption (matches Python vault_manager.py)
+- `GetEnvOrVault()` helper for fallback
+
+---
+
+# SECURITY HARDENING (NEW - Session 27)
+
+## Vault RLS
+
+```sql
+-- Service role: full access
+-- Authenticated: read-only, single key at a time
+-- No DELETE, INSERT, UPDATE for authenticated users
+```
+
+## Security Audit Table
+
+All vault access logged:
+- `operation`: vault_access, vault_read
+- `key_name`: which secret
+- `allowed`: true/false
+- `reason`: cache_hit, success, decrypt_failed, etc.
+
+---
+
+# SYSTEMD SERVICE
+
+**File:** `scripts/governor.service`
+
+```bash
+# Install
+sudo cp scripts/governor.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable governor
+sudo systemctl start governor
+
+# Monitor
+journalctl -u governor -f
+```
+
+---
+
+# SYSTEM RESEARCHER (Session 26)
 
 ## Purpose
 
@@ -394,13 +499,6 @@ Task fails 3x → status=escalated → Researcher.AnalyzeEscalation()
 | `dependency_issue` | Human review | Dependencies wrong or blocked |
 | `infrastructure` | Wait and retry | Rate limits, git failures, transient errors |
 
-## Analysis Factors
-
-- Failure notes patterns (timeout, rate limit, missing file)
-- Task run history (which models failed)
-- Prompt packet quality (missing prompt/deliverables)
-- Context size (large context may overwhelm model)
-
 ---
 
 # STUBS REMAINING
@@ -416,8 +514,8 @@ Task fails 3x → status=escalated → Researcher.AnalyzeEscalation()
 
 1. **Visual testing** - Implement real UI testing in `visual/visual.go`
 2. **Maintenance command polling** - Poll `maintenance_commands` table
-3. **Config hot-reload** - fsnotify watcher (optional)
+3. **Tool allowlist** - Create `config/tools.yaml` for security
 
 ---
 
-**END OF HANDOFF - Session 26**
+**END OF HANDOFF - Session 27**

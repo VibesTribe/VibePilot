@@ -83,12 +83,19 @@ func (d *Dispatcher) Run(ctx context.Context, dispatchCh <-chan types.Task) {
 func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 	log.Printf("Dispatcher: task %s (routing=%s, type=%s, slice=%s)", task.ID[:8], task.RoutingFlag, task.Type, task.SliceID)
 
+	d.db.LogOrchestratorEvent(ctx, "task_dispatched", task.ID, "", "", "", string(task.RoutingFlag), "", map[string]interface{}{
+		"type":     task.Type,
+		"slice_id": task.SliceID,
+		"routing":  string(task.RoutingFlag),
+	})
+
 	if task.Type == "merge" {
 		d.executeMerge(ctx, task)
 		return
 	}
 
 	if task.RoutingFlag == types.RoutingWeb && d.courier != nil && d.cfg.Courier.Enabled {
+		d.db.LogOrchestratorEvent(ctx, "routed_to_courier", task.ID, "", "", "", string(task.RoutingFlag), "Routing to web courier", nil)
 		d.dispatchToCourier(ctx, task)
 		return
 	}
@@ -96,18 +103,50 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 	runner, err := d.pool.SelectBest(ctx, string(task.RoutingFlag), task.Type)
 	if err != nil {
 		log.Printf("Dispatcher: pool error for %s: %v", task.ID[:8], err)
+		d.db.LogOrchestratorEvent(ctx, "pool_error", task.ID, "", "", "", "", err.Error(), nil)
 		d.handleFailure(ctx, task)
 		d.finalize(task.ID, task.SliceID)
 		return
 	}
 	if runner == nil {
 		log.Printf("Dispatcher: no runner available for %s (routing=%s)", task.ID[:8], task.RoutingFlag)
+		d.db.LogOrchestratorEvent(ctx, "no_runner", task.ID, "", "", "", string(task.RoutingFlag), "No runner available", nil)
 		d.handleFailure(ctx, task)
 		d.finalize(task.ID, task.SliceID)
 		return
 	}
 
 	log.Printf("Dispatcher: selected runner %s (model=%s, priority=%d)", runner.ID[:8], runner.ModelID, runner.CostPriority)
+	d.db.LogOrchestratorEvent(ctx, "runner_selected", task.ID, runner.ID, "", "", runner.ModelID, "", map[string]interface{}{
+		"priority": runner.CostPriority,
+	})
+
+	canRun, err := d.db.IncrementInFlight(ctx, runner.ID)
+	if err != nil {
+		log.Printf("Dispatcher: in-flight check failed for %s: %v", task.ID[:8], err)
+	}
+	if !canRun {
+		log.Printf("Dispatcher: runner %s at max concurrent capacity, selecting alternative", runner.ID[:8])
+		altRunner, altErr := d.pool.SelectBest(ctx, string(task.RoutingFlag), task.Type)
+		if altErr != nil || altRunner == nil || altRunner.ID == runner.ID {
+			d.handleFailure(ctx, task)
+			d.finalize(task.ID, task.SliceID)
+			return
+		}
+		runner = altRunner
+		canRun, _ = d.db.IncrementInFlight(ctx, runner.ID)
+		if !canRun {
+			d.handleFailure(ctx, task)
+			d.finalize(task.ID, task.SliceID)
+			return
+		}
+	}
+
+	defer func() {
+		if err := d.db.DecrementInFlight(ctx, runner.ID); err != nil {
+			log.Printf("Dispatcher: failed to decrement in-flight for %s: %v", runner.ID[:8], err)
+		}
+	}()
 
 	if err := d.db.ClaimTask(ctx, task.ID, runner.ModelID); err != nil {
 		log.Printf("Dispatcher: claim failed for %s: %v", task.ID[:8], err)
