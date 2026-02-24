@@ -1,10 +1,13 @@
 package dispatcher
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os/exec"
 	"strings"
 	"time"
@@ -14,6 +17,7 @@ import (
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/pool"
 	"github.com/vibepilot/governor/internal/security"
+	"github.com/vibepilot/governor/internal/vault"
 	"github.com/vibepilot/governor/pkg/types"
 )
 
@@ -34,6 +38,7 @@ type Dispatcher struct {
 	completer    TaskCompleter
 	finalizer    TaskFinalizer
 	maintenance  MaintenanceExecutor
+	vault        *vault.Vault
 }
 
 type MaintenanceExecutor interface {
@@ -64,6 +69,10 @@ func (d *Dispatcher) SetFinalizer(f TaskFinalizer) {
 
 func (d *Dispatcher) SetMaintenance(m MaintenanceExecutor) {
 	d.maintenance = m
+}
+
+func (d *Dispatcher) SetVault(v *vault.Vault) {
+	d.vault = v
 }
 
 func (d *Dispatcher) Run(ctx context.Context, dispatchCh <-chan types.Task) {
@@ -242,16 +251,33 @@ func (d *Dispatcher) recordResult(ctx context.Context, runnerID string, taskType
 	}
 }
 
-func (d *Dispatcher) runTool(ctx context.Context, toolID string, prompt string, timeoutSec int) (output string, tokensIn, tokensOut int, err error) {
+func (d *Dispatcher) runTool(ctx context.Context, destID string, prompt string, timeoutSec int) (output string, tokensIn, tokensOut int, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
 	defer cancel()
 
-	cmdName := d.resolveToolCommand(toolID)
-	cmd := exec.CommandContext(ctx, cmdName, "run", "--format", "json", prompt)
+	dest, err := d.db.GetDestination(ctx, destID)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("get destination %s: %w", destID, err)
+	}
+
+	switch dest.Type {
+	case "cli":
+		return d.executeCLI(ctx, dest.Command, prompt)
+	case "api", "api_free", "api_credit":
+		return d.executeAPI(ctx, dest, prompt)
+	case "web":
+		return "", 0, 0, fmt.Errorf("web destinations use courier, not direct execution")
+	default:
+		return "", 0, 0, fmt.Errorf("unknown destination type: %s", dest.Type)
+	}
+}
+
+func (d *Dispatcher) executeCLI(ctx context.Context, command string, prompt string) (output string, tokensIn, tokensOut int, err error) {
+	cmd := exec.CommandContext(ctx, command, "run", "--format", "json", prompt)
 	raw, execErr := cmd.CombinedOutput()
 
 	if execErr != nil {
-		return "", 0, 0, fmt.Errorf("%s: %w\noutput: %s", cmdName, execErr, string(raw))
+		return "", 0, 0, fmt.Errorf("%s: %w\noutput: %s", command, execErr, string(raw))
 	}
 
 	clean, warnings := d.leakDetector.Scan(string(raw))
@@ -277,15 +303,137 @@ func (d *Dispatcher) runTool(ctx context.Context, toolID string, prompt string, 
 	return output, tokensIn, tokensOut, nil
 }
 
-func (d *Dispatcher) resolveToolCommand(toolID string) string {
-	switch toolID {
-	case "opencode":
-		return "opencode"
-	case "kimi-cli":
-		return "kimi"
-	default:
-		return "opencode"
+func (d *Dispatcher) executeAPI(ctx context.Context, dest *db.Destination, prompt string) (output string, tokensIn, tokensOut int, err error) {
+	apiKey := ""
+	if dest.APIKeyRef != "" {
+		apiKey = d.getAPIKey(dest.APIKeyRef)
 	}
+
+	var reqBody interface{}
+	var endpoint string
+	var headers map[string]string
+
+	if strings.Contains(dest.Endpoint, "generativelanguage.googleapis.com") {
+		endpoint = dest.Endpoint + "/models/gemini-2.0-flash:generateContent?key=" + apiKey
+		reqBody = map[string]interface{}{
+			"contents": []map[string]interface{}{
+				{"parts": []map[string]string{{"text": prompt}}},
+			},
+		}
+		headers = map[string]string{
+			"Content-Type": "application/json",
+		}
+	} else if strings.Contains(dest.Endpoint, "deepseek.com") {
+		endpoint = dest.Endpoint + "/chat/completions"
+		reqBody = map[string]interface{}{
+			"model": "deepseek-chat",
+			"messages": []map[string]string{
+				{"role": "user", "content": prompt},
+			},
+		}
+		headers = map[string]string{
+			"Content-Type":  "application/json",
+			"Authorization": "Bearer " + apiKey,
+		}
+	} else {
+		endpoint = dest.Endpoint + "/chat/completions"
+		reqBody = map[string]interface{}{
+			"messages": []map[string]string{
+				{"role": "user", "content": prompt},
+			},
+		}
+		headers = map[string]string{
+			"Content-Type":  "application/json",
+			"Authorization": "Bearer " + apiKey,
+		}
+	}
+
+	bodyBytes, _ := json.Marshal(reqBody)
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("create request: %w", err)
+	}
+
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return "", 0, 0, fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	output, tokensIn, tokensOut = d.parseAPIResponse(dest.Endpoint, respBody)
+
+	clean, warnings := d.leakDetector.Scan(output)
+	if len(warnings) > 0 {
+		log.Printf("Dispatcher: leak warnings: %+v", warnings)
+	}
+
+	return clean, tokensIn, tokensOut, nil
+}
+
+func (d *Dispatcher) getAPIKey(keyRef string) string {
+	if d.vault != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		key, err := d.vault.GetSecret(ctx, keyRef)
+		if err == nil {
+			return key
+		}
+		log.Printf("Dispatcher: failed to get API key %s from vault: %v", keyRef, err)
+	}
+	return ""
+}
+
+func (d *Dispatcher) parseAPIResponse(endpoint string, body []byte) (output string, tokensIn, tokensOut int) {
+	if strings.Contains(endpoint, "generativelanguage.googleapis.com") {
+		var gemini struct {
+			Candidates []struct {
+				Content struct {
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"content"`
+			} `json:"candidates"`
+			UsageMetadata struct {
+				PromptTokenCount     int `json:"promptTokenCount"`
+				CandidatesTokenCount int `json:"candidatesTokenCount"`
+			} `json:"usageMetadata"`
+		}
+		if err := json.Unmarshal(body, &gemini); err == nil && len(gemini.Candidates) > 0 && len(gemini.Candidates[0].Content.Parts) > 0 {
+			return gemini.Candidates[0].Content.Parts[0].Text,
+				gemini.UsageMetadata.PromptTokenCount,
+				gemini.UsageMetadata.CandidatesTokenCount
+		}
+	}
+
+	var generic struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+		Usage struct {
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal(body, &generic); err == nil && len(generic.Choices) > 0 {
+		return generic.Choices[0].Message.Content, generic.Usage.PromptTokens, generic.Usage.CompletionTokens
+	}
+
+	return string(body), 0, 0
 }
 
 func (d *Dispatcher) timeUntilMidnight() time.Duration {

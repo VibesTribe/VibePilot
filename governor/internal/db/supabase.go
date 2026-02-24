@@ -340,6 +340,41 @@ type Runner struct {
 	RateLimitReset  *time.Time `json:"rate_limit_reset_at"`
 }
 
+type Destination struct {
+	ID              string                 `json:"id"`
+	Name            string                 `json:"name"`
+	Type            string                 `json:"type"`
+	Status          string                 `json:"status"`
+	Command         string                 `json:"command"`
+	Endpoint        string                 `json:"endpoint"`
+	APIKeyRef       string                 `json:"api_key_ref"`
+	URL             string                 `json:"url"`
+	NewChatURL      string                 `json:"new_chat_url"`
+	CostCategory    string                 `json:"cost_category"`
+	RateLimits      map[string]interface{} `json:"rate_limits"`
+	Throttle        map[string]interface{} `json:"throttle"`
+	ModelsAvailable []string               `json:"models_available"`
+	Config          map[string]interface{} `json:"config"`
+}
+
+func (d *DB) GetDestination(ctx context.Context, destID string) (*Destination, error) {
+	data, err := d.rpc(ctx, "get_destination", map[string]interface{}{
+		"p_id": destID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var dest Destination
+	if err := json.Unmarshal(data, &dest); err != nil {
+		return nil, fmt.Errorf("unmarshal destination: %w", err)
+	}
+	if dest.ID == "" {
+		return nil, fmt.Errorf("destination %s not found or inactive", destID)
+	}
+	return &dest, nil
+}
+
 func (d *DB) GetBestRunner(ctx context.Context, routing string, taskType string) (*Runner, error) {
 	data, err := d.rpc(ctx, "get_best_runner", map[string]interface{}{
 		"p_routing":   routing,
