@@ -15,12 +15,6 @@ CREATE POLICY "anon_read_orchestrator_events" ON orchestrator_events
   TO anon
   USING (true);
 
--- Also ensure authenticated can read
-CREATE POLICY IF NOT EXISTS "authenticated_read_orchestrator_events" ON orchestrator_events
-  FOR SELECT
-  TO authenticated
-  USING (true);
-
 -- Verify
 DO $$
 BEGIN
