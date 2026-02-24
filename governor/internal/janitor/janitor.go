@@ -5,18 +5,21 @@ import (
 	"log"
 	"time"
 
+	"github.com/vibepilot/governor/internal/config"
 	"github.com/vibepilot/governor/internal/db"
 )
 
 type Janitor struct {
 	db           *db.DB
 	stuckTimeout time.Duration
+	depreciation config.DeprecationConfig
 }
 
-func New(database *db.DB, stuckTimeout time.Duration) *Janitor {
+func New(database *db.DB, stuckTimeout time.Duration, depreciation config.DeprecationConfig) *Janitor {
 	return &Janitor{
 		db:           database,
 		stuckTimeout: stuckTimeout,
+		depreciation: depreciation,
 	}
 }
 
@@ -24,7 +27,7 @@ func (j *Janitor) Run(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
-	log.Printf("Janitor started: stuck timeout %v", j.stuckTimeout)
+	log.Printf("Janitor started: stuck timeout %v, depreciation enabled=%v", j.stuckTimeout, j.depreciation.Enabled)
 
 	for {
 		select {
@@ -34,6 +37,9 @@ func (j *Janitor) Run(ctx context.Context) {
 		case <-ticker.C:
 			j.resetStuckTasks(ctx)
 			j.refreshLimits(ctx)
+			if j.depreciation.Enabled {
+				j.checkDepreciation(ctx)
+			}
 		}
 	}
 }
@@ -71,5 +77,30 @@ func (j *Janitor) resetStuckTasks(ctx context.Context) {
 func (j *Janitor) refreshLimits(ctx context.Context) {
 	if err := j.db.RefreshLimits(ctx); err != nil {
 		log.Printf("Janitor: failed to refresh limits: %v", err)
+	}
+}
+
+func (j *Janitor) checkDepreciation(ctx context.Context) {
+	runners, err := j.db.GetRunnersToArchive(
+		ctx,
+		j.depreciation.ArchiveThreshold,
+		j.depreciation.MinAttempts,
+		j.depreciation.CooldownHours,
+	)
+	if err != nil {
+		log.Printf("Janitor: failed to get runners to archive: %v", err)
+		return
+	}
+
+	if len(runners) == 0 {
+		return
+	}
+
+	for _, r := range runners {
+		log.Printf("Janitor: archiving runner %s (model: %s) - depreciation_score=%.2f, attempts=%d",
+			r.ID[:8], r.ModelID, r.DepreciationScore, r.TotalAttempts)
+		if err := j.db.ArchiveRunner(ctx, r.ID, "depreciation_threshold"); err != nil {
+			log.Printf("Janitor: failed to archive runner %s: %v", r.ID[:8], err)
+		}
 	}
 }

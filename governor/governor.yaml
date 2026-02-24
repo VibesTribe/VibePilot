@@ -31,3 +31,13 @@ security:
     - api.supabase.co
     - api.github.com
     - generativelanguage.googleapis.com
+
+depreciation:
+  enabled: true
+  archive_threshold: 0.7
+  min_attempts: 5
+  cooldown_hours: 24
+
+analyst:
+  enabled: true
+  schedule: "00:00"

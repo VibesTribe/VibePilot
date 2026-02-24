@@ -1009,3 +1009,51 @@ func (d *DB) UpsertHeuristic(ctx context.Context, taskType string, condition map
 	}
 	return id, nil
 }
+
+type RunnerToArchive struct {
+	ID                string     `json:"id"`
+	ModelID           string     `json:"model_id"`
+	DepreciationScore float64    `json:"depreciation_score"`
+	TotalAttempts     int        `json:"total_attempts"`
+	LastSuccessAt     *time.Time `json:"last_success_at"`
+}
+
+func (d *DB) GetRunnersToArchive(ctx context.Context, threshold float64, minAttempts, cooldownHours int) ([]RunnerToArchive, error) {
+	data, err := d.rpc(ctx, "get_runners_to_archive", map[string]interface{}{
+		"p_threshold":      threshold,
+		"p_min_attempts":   minAttempts,
+		"p_cooldown_hours": cooldownHours,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var runners []RunnerToArchive
+	if err := json.Unmarshal(data, &runners); err != nil {
+		return nil, fmt.Errorf("unmarshal runners to archive: %w", err)
+	}
+	return runners, nil
+}
+
+func (d *DB) ArchiveRunner(ctx context.Context, runnerID, reason string) error {
+	_, err := d.rpc(ctx, "archive_runner", map[string]interface{}{
+		"p_runner_id": runnerID,
+		"p_reason":    reason,
+	})
+	return err
+}
+
+func (d *DB) BoostRunner(ctx context.Context, runnerID string) error {
+	_, err := d.rpc(ctx, "boost_runner", map[string]interface{}{
+		"p_runner_id": runnerID,
+	})
+	return err
+}
+
+func (d *DB) ReviveRunner(ctx context.Context, runnerID, reason string) error {
+	_, err := d.rpc(ctx, "revive_runner", map[string]interface{}{
+		"p_runner_id": runnerID,
+		"p_reason":    reason,
+	})
+	return err
+}

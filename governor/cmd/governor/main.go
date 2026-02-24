@@ -92,7 +92,7 @@ func main() {
 	go d.Run(ctx, dispatchCh)
 	go orch.Run(ctx)
 
-	j := janitor.New(database, cfg.Governor.StuckTimeout)
+	j := janitor.New(database, cfg.Governor.StuckTimeout, cfg.Deprecation)
 	go j.Run(ctx)
 
 	srv := server.New(&cfg.Server, &cfg.Governor, database)
