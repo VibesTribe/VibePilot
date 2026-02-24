@@ -612,7 +612,7 @@ func (d *DB) GetRoundFeedback(ctx context.Context, planID string, round int) (ma
 }
 
 type MaintenanceCommand struct {
-	ID             string                 `json:"id"`
+	ID             string                 `json:"command_id"`
 	CommandType    string                 `json:"command_type"`
 	Payload        map[string]interface{} `json:"payload"`
 	Status         string                 `json:"status"`
@@ -678,6 +678,21 @@ func (d *DB) CompleteCommand(ctx context.Context, commandID string, success bool
 		"p_error_message": errorMessage,
 	})
 	return err
+}
+
+func (d *DB) RetryCommand(ctx context.Context, commandID string) (bool, error) {
+	data, err := d.rpc(ctx, "retry_command", map[string]interface{}{
+		"p_command_id": commandID,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	var canRetry bool
+	if err := json.Unmarshal(data, &canRetry); err != nil {
+		return false, fmt.Errorf("unmarshal retry result: %w", err)
+	}
+	return canRetry, nil
 }
 
 func (d *DB) GetAvailableModels(ctx context.Context, limit int) ([]Runner, error) {
