@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/vibepilot/governor/internal/analyst"
 	"github.com/vibepilot/governor/internal/config"
 	"github.com/vibepilot/governor/internal/courier"
 	"github.com/vibepilot/governor/internal/db"
@@ -94,6 +95,9 @@ func main() {
 
 	j := janitor.New(database, cfg.Governor.StuckTimeout, cfg.Deprecation)
 	go j.Run(ctx)
+
+	analystSvc := analyst.New(database, cfg.Analyst, cfg.GitHub, repoPath)
+	go analystSvc.Run(ctx)
 
 	srv := server.New(&cfg.Server, &cfg.Governor, database)
 	srv.SetCourierCallback(d.OnCourierResult)
