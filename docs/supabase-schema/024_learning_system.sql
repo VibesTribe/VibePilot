@@ -144,10 +144,10 @@ COMMENT ON COLUMN problem_solutions.solution_type IS 'Type of solution that work
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION record_failure(
-  p_task_id UUID,
+  p_task_id UUID DEFAULT NULL,
   p_task_run_id UUID DEFAULT NULL,
-  p_failure_type TEXT,
-  p_failure_category TEXT,
+  p_failure_type TEXT DEFAULT NULL,
+  p_failure_category TEXT DEFAULT NULL,
   p_failure_details JSONB DEFAULT '{}',
   p_model_id TEXT DEFAULT NULL,
   p_platform TEXT DEFAULT NULL,
@@ -176,7 +176,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION get_heuristic(
-  p_task_type TEXT,
+  p_task_type TEXT DEFAULT NULL,
   p_condition JSONB DEFAULT '{}'
 ) RETURNS TABLE(
   id UUID,
@@ -209,7 +209,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION get_problem_solution(
-  p_failure_type TEXT,
+  p_failure_type TEXT DEFAULT NULL,
   p_task_type TEXT DEFAULT NULL,
   p_keywords TEXT[] DEFAULT '{}'
 ) RETURNS TABLE(
@@ -315,9 +315,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION upsert_heuristic(
-  p_task_type TEXT,
-  p_condition JSONB,
-  p_preferred_model TEXT,
+  p_task_type TEXT DEFAULT NULL,
+  p_condition JSONB DEFAULT '{}',
+  p_preferred_model TEXT DEFAULT NULL,
   p_action JSONB DEFAULT '{}',
   p_confidence FLOAT DEFAULT 0.5,
   p_source TEXT DEFAULT 'llm_analysis'
