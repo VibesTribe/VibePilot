@@ -21,6 +21,7 @@ type Vault struct {
 	cache    map[string]*cachedSecret
 	mu       sync.RWMutex
 	auditLog bool
+	vaultKey []byte
 }
 
 type cachedSecret struct {
@@ -48,19 +49,32 @@ type SecretRecord struct {
 const defaultCacheTTL = 5 * time.Minute
 
 func New(database *db.DB) *Vault {
-	return &Vault{
+	v := &Vault{
 		db:       database,
 		cache:    make(map[string]*cachedSecret),
 		auditLog: true,
 	}
+	v.vaultKey = v.loadVaultKey()
+	return v
 }
 
 func NewWithoutAudit(database *db.DB) *Vault {
-	return &Vault{
+	v := &Vault{
 		db:       database,
 		cache:    make(map[string]*cachedSecret),
 		auditLog: false,
 	}
+	v.vaultKey = v.loadVaultKey()
+	return v
+}
+
+func (v *Vault) loadVaultKey() []byte {
+	key := os.Getenv("VAULT_KEY")
+	if key == "" {
+		log.Printf("Vault: WARNING - VAULT_KEY not set, decryption will fail")
+		return nil
+	}
+	return deriveKey(key)
 }
 
 func (v *Vault) GetSecret(ctx context.Context, keyName string) (string, error) {
@@ -135,14 +149,11 @@ func (v *Vault) fetchFromDB(ctx context.Context, keyName string) (*SecretRecord,
 }
 
 func (v *Vault) decrypt(encrypted string) (string, error) {
-	vaultKey := os.Getenv("VAULT_KEY")
-	if vaultKey == "" {
-		return "", fmt.Errorf("VAULT_KEY not set")
+	if v.vaultKey == nil {
+		return "", fmt.Errorf("VAULT_KEY not configured")
 	}
 
-	keyBytes := deriveKey(vaultKey)
-
-	block, err := aes.NewCipher(keyBytes)
+	block, err := aes.NewCipher(v.vaultKey)
 	if err != nil {
 		return "", fmt.Errorf("create cipher: %w", err)
 	}
