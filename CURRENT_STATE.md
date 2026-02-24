@@ -12,12 +12,102 @@
 ---
 
 **Last Updated:** 2026-02-24
-**Updated By:** GLM-5 - Session 27: Stateless Orchestrator
-**Session Focus:** Event logging, vault access, concurrent tracking, security hardening
-**Direction:** Phase 6 COMPLETE - Orchestrator is stateless DB-driven brain
+**Updated By:** GLM-5 - Session 28: Learning System
+**Session Focus:** Security audit + Learning system architecture (Phase 1)
+**Direction:** Learning infrastructure schema created, ready for Go implementation
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Go Governor Phase 1-6 COMPLETE
+**Progress:** Go Governor Phase 1-6 COMPLETE, Learning Phase 1 Schema READY
+
+---
+
+# SESSION 28: LEARNING SYSTEM (2026-02-24)
+
+## What We Did
+
+### 1. Security Audit + Fixes
+
+**7 security hardening fixes committed:**
+- Vault key caching at init (not per-decrypt)
+- WebSocket origin check fix (prevent `evil-vercel.app` bypass)
+- Config validation (fail fast on missing Supabase creds)
+- Error body truncation (prevent secret leaks in logs)
+- Courier result timeout (30s context)
+- Orchestrator goroutine lifecycle (clean shutdown)
+- Git add error checking (no silent failures)
+
+**1 race condition fix:**
+- Hub RLock → Lock when modifying clients map
+
+### 2. Learning System Architecture
+
+**Full plan:** `docs/LEARNING_SYSTEM_PLAN.md`
+
+**Core principle:**
+- Go = Fast, deterministic, free (90%)
+- LLM = Smart, adaptive, costs tokens (10%)
+- Supabase = Truth (everything here)
+
+### 3. Phase 1 Schema Created
+
+**File:** `docs/supabase-schema/024_learning_system.sql`
+
+**New tables:**
+| Table | Purpose |
+|-------|---------|
+| `learned_heuristics` | Model preferences per task type |
+| `failure_records` | Structured failure logging |
+| `problem_solutions` | What fixed what |
+
+**New RPCs:**
+- `record_failure` - Log structured failure
+- `get_heuristic` - Get routing preference
+- `get_problem_solution` - Find proven fix
+- `record_heuristic_result` - Track heuristic success
+- `record_solution_result` - Track solution success
+- `get_recent_failures` - For routing exclusions
+- `upsert_heuristic` - LLM updates heuristics
+
+## Files Changed This Session
+
+| File | Change |
+|------|--------|
+| `governor/internal/vault/vault.go` | Cache vault key at init |
+| `governor/internal/server/server.go` | WebSocket origin fix |
+| `governor/internal/config/config.go` | Required field validation |
+| `governor/internal/db/supabase.go` | Error body truncation |
+| `governor/internal/dispatcher/dispatcher.go` | Timeout context |
+| `governor/internal/orchestrator/orchestrator.go` | Goroutine lifecycle |
+| `governor/internal/maintenance/maintenance.go` | Git add error check |
+| `governor/internal/server/hub.go` | RLock → Lock fix |
+| `docs/LEARNING_SYSTEM_PLAN.md` | NEW - Full implementation plan |
+| `docs/supabase-schema/024_learning_system.sql` | NEW - Phase 1 schema |
+| `docs/GOVERNOR_HANDOFF.md` | Updated for Session 28 |
+
+## Commits
+
+```
+5f537459 fix: use Lock instead of RLock when modifying hub clients map
+0b30e3bc Security hardening and defensive fixes
+```
+
+## Code Stats
+
+```
+Total Go files: 24
+Total lines:   4,949 (+48 from Session 27)
+Build:         ✅ Clean
+Vet:           ✅ No issues
+```
+
+## Next Steps (Phase 1 Implementation)
+
+1. **Apply migration** `024_learning_system.sql` to Supabase
+2. **Go changes:**
+   - Add failure recording to `orchestrator.go`
+   - Add heuristic checking to `pool/model_pool.go`
+   - Add problem/solutions lookup
+   - Exclude recently failed models from routing
 
 ---
 
@@ -161,10 +251,15 @@ governor:
 
 # NEXT SESSION
 
-1. Wire `orchestrator_events` to dashboard logs modal
-2. Implement real visual testing in `visual/visual.go`
-3. Wire Maintenance to poll `maintenance_commands` table
-4. Create `config/tools.yaml` for tool allowlist
+1. **Apply `024_learning_system.sql`** to Supabase
+2. **Go implementation:**
+   - Add `RecordFailure()` to db/supabase.go
+   - Add `GetHeuristic()` to db/supabase.go  
+   - Add `GetProblemSolution()` to db/supabase.go
+   - Modify `pool/model_pool.go` to check heuristics + recent failures
+   - Modify `orchestrator.go` to record structured failures
+3. **Test:** Verify routing uses learned patterns
+4. **Later:** Visual testing, maintenance polling, planner learning
 
 ---
 
