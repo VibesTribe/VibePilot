@@ -18,6 +18,14 @@ type Config struct {
 	Security    SecurityConfig    `yaml:"security"`
 	Deprecation DeprecationConfig `yaml:"depreciation"`
 	Analyst     AnalystConfig     `yaml:"analyst"`
+	Agents      AgentsConfig      `yaml:"agents"`
+}
+
+type AgentsConfig struct {
+	ConfigDir      string `yaml:"config_dir"`
+	PromptsDir     string `yaml:"prompts_dir"`
+	ParallelMax    int    `yaml:"parallel_max"`
+	SequentialMode bool   `yaml:"sequential_mode"`
 }
 
 type DeprecationConfig struct {
@@ -121,6 +129,12 @@ func Load(path string) (*Config, error) {
 		Analyst: AnalystConfig{
 			Enabled:  true,
 			Schedule: "00:00",
+		},
+		Agents: AgentsConfig{
+			ConfigDir:      "./config",
+			PromptsDir:     "./config/prompts",
+			ParallelMax:    50,
+			SequentialMode: false,
 		},
 	}
 
