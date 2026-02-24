@@ -13,11 +13,11 @@
 
 **Last Updated:** 2026-02-24
 **Updated By:** GLM-5 - Session 28: Learning System
-**Session Focus:** Security audit + Learning system architecture (Phase 1)
-**Direction:** Learning infrastructure schema created, ready for Go implementation
+**Session Focus:** Security audit + Learning system (Phase 1 COMPLETE)
+**Direction:** Orchestrator now learns from failures, routes smarter
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Go Governor Phase 1-6 COMPLETE, Learning Phase 1 Schema READY
+**Progress:** Go Governor Phase 1-6 COMPLETE, Learning Phase 1 COMPLETE
 
 ---
 
@@ -25,9 +25,9 @@
 
 ## What We Did
 
-### 1. Security Audit + Fixes
+### 1. Security Audit + Fixes (8 commits)
 
-**7 security hardening fixes committed:**
+**7 security hardening fixes:**
 - Vault key caching at init (not per-decrypt)
 - WebSocket origin check fix (prevent `evil-vercel.app` bypass)
 - Config validation (fail fast on missing Supabase creds)
@@ -39,18 +39,9 @@
 **1 race condition fix:**
 - Hub RLock → Lock when modifying clients map
 
-### 2. Learning System Architecture
+### 2. Learning System Phase 1 COMPLETE
 
-**Full plan:** `docs/LEARNING_SYSTEM_PLAN.md`
-
-**Core principle:**
-- Go = Fast, deterministic, free (90%)
-- LLM = Smart, adaptive, costs tokens (10%)
-- Supabase = Truth (everything here)
-
-### 3. Phase 1 Schema Created
-
-**File:** `docs/supabase-schema/024_learning_system.sql`
+**Schema:** `docs/supabase-schema/024_learning_system.sql` (applied)
 
 **New tables:**
 | Table | Purpose |
@@ -59,7 +50,7 @@
 | `failure_records` | Structured failure logging |
 | `problem_solutions` | What fixed what |
 
-**New RPCs:**
+**New RPCs (7):**
 - `record_failure` - Log structured failure
 - `get_heuristic` - Get routing preference
 - `get_problem_solution` - Find proven fix
@@ -68,25 +59,45 @@
 - `get_recent_failures` - For routing exclusions
 - `upsert_heuristic` - LLM updates heuristics
 
-## Files Changed This Session
+**Go implementation:**
 
-| File | Change |
-|------|--------|
-| `governor/internal/vault/vault.go` | Cache vault key at init |
-| `governor/internal/server/server.go` | WebSocket origin fix |
-| `governor/internal/config/config.go` | Required field validation |
-| `governor/internal/db/supabase.go` | Error body truncation |
-| `governor/internal/dispatcher/dispatcher.go` | Timeout context |
-| `governor/internal/orchestrator/orchestrator.go` | Goroutine lifecycle |
-| `governor/internal/maintenance/maintenance.go` | Git add error check |
-| `governor/internal/server/hub.go` | RLock → Lock fix |
-| `docs/LEARNING_SYSTEM_PLAN.md` | NEW - Full implementation plan |
-| `docs/supabase-schema/024_learning_system.sql` | NEW - Phase 1 schema |
-| `docs/GOVERNOR_HANDOFF.md` | Updated for Session 28 |
+| File | Changes |
+|------|---------|
+| `db/supabase.go` | 7 new methods for learning (RecordFailure, GetHeuristic, etc.) |
+| `pool/model_pool.go` | Heuristic-aware routing, fallback logic, failure exclusion |
+| `orchestrator/orchestrator.go` | Structured failure recording, failure classification |
 
-## Commits
+### 3. Routing Flow (Enhanced)
 
 ```
+Task needs routing:
+1. Check learned_heuristics (preferred model for this task type?)
+2. If found and model available → use preferred
+3. Get recent failures (any models failing this type?)
+4. Exclude failed models from selection
+5. Get best runner from remaining
+6. On failure: record to failure_records with type/category
+```
+
+### 4. Failure Classification
+
+| Failure Type | Category | Detected By |
+|--------------|----------|-------------|
+| `timeout` | model_issue | "timeout", "timed out" |
+| `rate_limited` | platform_issue | "rate limit", "429" |
+| `context_exceeded` | model_issue | "context", "token limit" |
+| `platform_down` | platform_issue | "platform down" |
+| `test_failed` | quality_issue | "test fail" |
+| `empty_output` | model_issue | "empty", "no output" |
+| `quality_rejected` | quality_issue | "deliverable", "missing" |
+| `latency_high` | platform_issue | "latency", "slow" |
+
+## Commits This Session
+
+```
+35a7e8a3 feat: Learning system Phase 1 - Go implementation
+8589deba fix: add defaults to all function parameters in learning schema
+5cd99d73 docs: Learning system implementation plan + Phase 1 schema
 5f537459 fix: use Lock instead of RLock when modifying hub clients map
 0b30e3bc Security hardening and defensive fixes
 ```
@@ -95,19 +106,22 @@
 
 ```
 Total Go files: 24
-Total lines:   4,949 (+48 from Session 27)
+Total lines:   5,303 (+354 from Session 27)
 Build:         ✅ Clean
 Vet:           ✅ No issues
 ```
 
-## Next Steps (Phase 1 Implementation)
+## Reassignment Tracking
 
-1. **Apply migration** `024_learning_system.sql` to Supabase
-2. **Go changes:**
-   - Add failure recording to `orchestrator.go`
-   - Add heuristic checking to `pool/model_pool.go`
-   - Add problem/solutions lookup
-   - Exclude recently failed models from routing
+Task reassignments ARE tracked in `tasks.routing_history` JSONB:
+```json
+[
+  {"from": "glm-4", "to": "kimi", "reason": "timeout", "at": "2026-02-24T..."},
+  {"from": "kimi", "to": "deepseek", "reason": "rate limited", "at": "..."}
+]
+```
+
+Dashboard can display this in task details.
 
 ---
 
@@ -251,15 +265,17 @@ governor:
 
 # NEXT SESSION
 
-1. **Apply `024_learning_system.sql`** to Supabase
-2. **Go implementation:**
-   - Add `RecordFailure()` to db/supabase.go
-   - Add `GetHeuristic()` to db/supabase.go  
-   - Add `GetProblemSolution()` to db/supabase.go
-   - Modify `pool/model_pool.go` to check heuristics + recent failures
-   - Modify `orchestrator.go` to record structured failures
-3. **Test:** Verify routing uses learned patterns
-4. **Later:** Visual testing, maintenance polling, planner learning
+**Phase 1 COMPLETE.** Remaining phases from `docs/LEARNING_SYSTEM_PLAN.md`:
+
+1. **Phase 2:** Planner learning (from council/supervisor feedback)
+2. **Phase 3:** Tester/Supervisor learning
+3. **Phase 4:** Daily LLM analysis (self-optimization)
+4. **Phase 5:** Deprecation/Revival system
+
+**Other pending:**
+- Visual testing implementation
+- Maintenance command polling
+- Dashboard: Display `routing_history` in task details
 
 ---
 
