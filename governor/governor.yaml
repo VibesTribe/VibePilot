@@ -47,3 +47,10 @@ agents:
   prompts_dir: "../config/prompts"
   parallel_max: 50
   sequential_mode: false
+
+git:
+  protected_branches:
+    - main
+    - master
+    - research
+    - go-governor

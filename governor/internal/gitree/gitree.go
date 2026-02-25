@@ -12,22 +12,50 @@ import (
 )
 
 type Gitree struct {
-	repoPath string
+	repoPath          string
+	protectedBranches map[string]bool
 }
 
 type Config struct {
-	RepoPath string
+	RepoPath          string
+	ProtectedBranches []string
 }
 
 func New(cfg *Config) *Gitree {
-	if cfg == nil || cfg.RepoPath == "" {
-		cwd, _ := os.Getwd()
-		return &Gitree{repoPath: cwd}
+	if cfg == nil {
+		cfg = &Config{}
 	}
-	return &Gitree{repoPath: cfg.RepoPath}
+
+	repoPath := cfg.RepoPath
+	if repoPath == "" {
+		cwd, _ := os.Getwd()
+		repoPath = cwd
+	}
+
+	protected := make(map[string]bool)
+	for _, branch := range cfg.ProtectedBranches {
+		protected[strings.TrimSpace(branch)] = true
+	}
+
+	return &Gitree{
+		repoPath:          repoPath,
+		protectedBranches: protected,
+	}
+}
+
+func (g *Gitree) isProtected(branchName string) bool {
+	return g.protectedBranches[branchName]
+}
+
+func (g *Gitree) isTaskOrModuleBranch(branchName string) bool {
+	return strings.HasPrefix(branchName, "task/") || strings.HasPrefix(branchName, "module/")
 }
 
 func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
+	if g.isProtected(branchName) {
+		return fmt.Errorf("cannot create branch: '%s' is protected", branchName)
+	}
+
 	var out bytes.Buffer
 
 	cmd := g.gitCommand(ctx, "checkout", "--orphan", branchName)
@@ -144,6 +172,10 @@ func (g *Gitree) ReadBranchOutput(ctx context.Context, branchName string) ([]str
 }
 
 func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch string) error {
+	if g.isProtected(targetBranch) && !g.isTaskOrModuleBranch(sourceBranch) {
+		return fmt.Errorf("cannot merge '%s' to protected branch '%s': only module/* branches can merge to protected branches", sourceBranch, targetBranch)
+	}
+
 	g.gitCommand(ctx, "checkout", targetBranch).Run()
 	g.gitCommand(ctx, "pull", "origin", targetBranch).Run()
 
@@ -160,12 +192,23 @@ func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch str
 }
 
 func (g *Gitree) DeleteBranch(ctx context.Context, branchName string) error {
+	if g.isProtected(branchName) {
+		return fmt.Errorf("cannot delete protected branch: %s", branchName)
+	}
+
 	g.gitCommand(ctx, "branch", "-D", branchName).Run()
 	g.gitCommand(ctx, "push", "origin", "--delete", branchName).Run()
 	return nil
 }
 
 func (g *Gitree) ClearBranch(ctx context.Context, branchName string) error {
+	if g.isProtected(branchName) {
+		return fmt.Errorf("cannot clear protected branch: %s", branchName)
+	}
+	if !g.isTaskOrModuleBranch(branchName) {
+		return fmt.Errorf("can only clear task/* or module/* branches, got: %s", branchName)
+	}
+
 	if err := g.gitCommand(ctx, "checkout", branchName).Run(); err != nil {
 		return fmt.Errorf("checkout branch: %w", err)
 	}
