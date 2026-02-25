@@ -582,19 +582,179 @@ Task needs routing:
 
 ---
 
-# NEXT SESSION
+# SESSION 29 (2026-02-25)
 
-## Learning System - Future Phases
-1. **Phase 2:** Planner learning (from council/supervisor feedback)
-2. **Phase 3:** Tester/Supervisor learning
-3. **Phase 4:** Daily LLM analysis (self-optimization)
-4. **Phase 5:** Deprecation/Revival system
+## What Was Done
 
-## Other Pending
-5. **Visual testing** - Implement real UI testing in `visual/visual.go`
-6. **Maintenance command polling** - Poll `maintenance_commands` table
-7. **Dashboard** - Display `routing_history` in task details
+### 1. Config-Driven Destinations (Zero Hardcoded Tools)
+
+**Problem:** `dispatcher.go` had hardcoded switch statement for tool commands:
+```go
+switch toolID {
+case "opencode": return "opencode"
+case "kimi-cli": return "kimi"
+default: return "opencode"  // ← System breaks if opencode gone
+}
+```
+
+**Solution:** Destinations now loaded from DB at runtime.
+
+**Files Changed:**
+| File | Change |
+|------|--------|
+| `docs/supabase-schema/026_destinations.sql` | NEW - destinations table + updated get_best_runner |
+| `scripts/sync_config_to_supabase.py` | Added `import_destinations()` |
+| `governor/internal/db/supabase.go` | Added `Destination` struct + `GetDestination()` |
+| `governor/internal/dispatcher/dispatcher.go` | Removed hardcoded switch, added `executeCLI()`, `executeAPI()` |
+| `governor/internal/agent/executor.go` | Same fix - config-driven |
+| `governor/internal/analyst/analyst.go` | Same fix - config-driven |
+
+**Flow Now:**
+```
+destinations.json → sync script → destinations table
+        ↓
+get_best_runner JOINs destinations WHERE status='active'
+        ↓
+Dispatcher calls GetDestination() → executes by type (cli/api)
+```
+
+**To swap/add/remove a destination:**
+1. Edit `config/destinations.json`
+2. Run `python scripts/sync_config_to_supabase.py`
+3. Done. Zero code changes.
+
+### 2. Planner Learning Schema (Phase 2)
+
+**File:** `docs/supabase-schema/025_planner_learning.sql`
+
+**Table:** `planner_learned_rules` - Stores rules learned from council/supervisor feedback
+
+**RPCs:**
+- `create_planner_rule()` - Create new rule
+- `get_planner_rules()` - Get active rules for context
+- `record_planner_rule_applied()` - Track usage
+- `record_planner_rule_prevented_issue()` - Track effectiveness
+- `create_rule_from_rejection()` - Auto-create from rejection
+
+### 3. Vibes Agent Created
+
+**File:** `governor/internal/vibes/vibes.go` (408 lines)
+
+Human interface agent - status reports, ROI, daily briefings, consultation.
+
+### 4. Agents Created This Session
+
+| Agent | Lines | Status |
+|-------|-------|--------|
+| consultant | 351 | ✅ DONE |
+| planner | 537 | ✅ DONE |
+| council | 565 | ✅ DONE |
+| vibes | 408 | ✅ DONE |
+
+## What Was Rolled Back
+
+### Maintenance Agent - WRONG IMPLEMENTATION
+
+**What I wrongly built:**
+- Polling loop in `maintenance.go`
+- `Run()`, `pollAndExecute()`, `executeCommand()` methods
+- Bypassed agent architecture entirely
+
+**Why it was wrong:**
+- Maintenance should be an AGENT like all others
+- Receives tasks via Orchestrator → Dispatcher → pool.SelectBest()
+- NOT a separate polling process
+
+**What was rolled back (commit `90b22984`):**
+- Removed polling loop from maintenance.go
+- Removed merge special case from dispatcher.go
+- Removed executeMerge() and handleMergeFailure()
+
+**What remains (correct):**
+- maintenance.go = git utility functions only (CreateBranch, CommitOutput, MergeBranch, etc.)
+
+## What's Still NOT Done
+
+### Maintenance Agent - CORRECT Implementation Needed
+
+**What Maintenance actually is:**
+- An AGENT (role + skills + tools + brain assigned at runtime)
+- The ONLY role that touches VibePilot system files
+- Receives tasks like any other agent via normal flow
+
+**What's missing:**
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Branch creation timing | ❌ WRONG | Should happen at task ASSIGNMENT, not completion |
+| Merge task target | ❌ MISSING | No `target_branch` field (module vs main) |
+| Task→module merge | ❌ NOT IMPLEMENTED | After task approved+tested |
+| Module completion detection | ❌ MISSING | Detect when all tasks in slice complete |
+| Module→main merge | ❌ NOT IMPLEMENTED | After module complete+tested |
+| maintenance.md prompt | ❌ WRONG | Still describes polling architecture |
+
+**Correct merge architecture:**
+```
+1. Task assigned → Create branch immediately
+2. Task executes → Output to branch
+3. Supervisor approves → Tests run
+4. Tests pass → Merge task created: task/T001 → module/{slice_id}
+5. Maintenance executes merge, deletes task branch
+6. All tasks in module complete → Module tests run
+7. Module tests pass → Merge task created: module/{slice_id} → main
+8. Maintenance executes merge, deletes module branch
+```
+
+## Commits This Session
+
+```
+90b22984 fix: revert maintenance polling, route merge through agent flow
+f6cc19b9 feat: add maintenance polling loop (ROLLED BACK - wrong architecture)
+8f3c2529 fix: remove remaining hardcoded tool references
+85c63da9 feat: config-driven destinations (zero hardcoded tools)
+690bbf9c feat: add planner learning (Phase 2) schema and RPCs
+b82d18dd feat: add Vibes agent for human interface
+```
+
+## Code Stats
+
+```
+Total Go files: 28
+Total lines:   ~6,000
+Build:         ✅ Clean
+Vet:           ✅ No issues
+```
+
+## Branch Status
+
+| Repo | Branch | Status |
+|------|--------|--------|
+| vibepilot | `go-governor` | 7 commits ahead of origin |
 
 ---
 
-**END OF HANDOFF - Session 28**
+# NEXT SESSION
+
+## Priority: Maintenance Agent - CORRECT Implementation
+
+1. **Fix branch creation timing** - Create at task assignment, not completion
+2. **Add target_branch to merge tasks** - module/{slice_id} vs main
+3. **Implement task→module merge** - After single task approved+tested
+4. **Implement module completion detection** - Query tasks in slice
+5. **Implement module→main merge** - After all tasks complete
+6. **Update maintenance.md prompt** - Correct agent architecture
+
+## Key Understanding Required
+
+**Every agent = role + skills + tools + brain (assigned at runtime)**
+
+- Role: `config/roles.json` + `config/prompts/*.md`
+- Brain: Selected by `pool.SelectBest()` at execution time
+- Tools: `config/tools.json` + `config/destinations.json`
+- Execution: Orchestrator → Dispatcher → pool → model (wearing role hat)
+
+**Maintenance is NOT special.** It follows the same pattern as consultant, planner, council, etc.
+
+---
+
+**END OF HANDOFF - Session 29**
