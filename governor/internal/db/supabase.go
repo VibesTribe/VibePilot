@@ -1194,3 +1194,200 @@ func (d *DB) CreateRuleFromRejection(ctx context.Context, taskID, rejectionType,
 	}
 	return ruleID, nil
 }
+
+type TesterRule struct {
+	ID             string `json:"id"`
+	AppliesTo      string `json:"applies_to"`
+	TestType       string `json:"test_type"`
+	TestCommand    string `json:"test_command"`
+	TriggerPattern string `json:"trigger_pattern,omitempty"`
+	Priority       int    `json:"priority"`
+	CaughtBugs     int    `json:"caught_bugs"`
+	FalsePositives int    `json:"false_positives"`
+}
+
+func (d *DB) GetTesterRules(ctx context.Context, appliesTo string, limit int) ([]TesterRule, error) {
+	params := map[string]interface{}{
+		"p_limit": limit,
+	}
+	if appliesTo != "" {
+		params["p_applies_to"] = appliesTo
+	}
+
+	data, err := d.rpc(ctx, "get_tester_rules", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var rules []TesterRule
+	if err := json.Unmarshal(data, &rules); err != nil {
+		return nil, fmt.Errorf("unmarshal tester rules: %w", err)
+	}
+	return rules, nil
+}
+
+func (d *DB) CreateTesterRule(ctx context.Context, appliesTo, testType, testCommand, source string, triggerPattern *string, priority int, sourceTaskID *string, sourceDetails map[string]interface{}) (string, error) {
+	params := map[string]interface{}{
+		"p_applies_to":   appliesTo,
+		"p_test_type":    testType,
+		"p_test_command": testCommand,
+		"p_source":       source,
+		"p_priority":     priority,
+	}
+	if triggerPattern != nil {
+		params["p_trigger_pattern"] = *triggerPattern
+	}
+	if sourceTaskID != nil {
+		params["p_source_task_id"] = *sourceTaskID
+	}
+	if sourceDetails != nil {
+		params["p_source_details"] = sourceDetails
+	}
+
+	data, err := d.rpc(ctx, "create_tester_rule", params)
+	if err != nil {
+		return "", err
+	}
+
+	var ruleID string
+	if err := json.Unmarshal(data, &ruleID); err != nil {
+		return "", fmt.Errorf("unmarshal tester rule id: %w", err)
+	}
+	return ruleID, nil
+}
+
+func (d *DB) RecordTesterRuleCaughtBug(ctx context.Context, ruleID string) error {
+	_, err := d.rpc(ctx, "record_tester_rule_caught_bug", map[string]interface{}{
+		"p_rule_id": ruleID,
+	})
+	return err
+}
+
+func (d *DB) RecordTesterRuleFalsePositive(ctx context.Context, ruleID string) error {
+	_, err := d.rpc(ctx, "record_tester_rule_false_positive", map[string]interface{}{
+		"p_rule_id": ruleID,
+	})
+	return err
+}
+
+type SupervisorRule struct {
+	ID               string                 `json:"id"`
+	TriggerPattern   string                 `json:"trigger_pattern"`
+	TriggerCondition map[string]interface{} `json:"trigger_condition,omitempty"`
+	Action           string                 `json:"action"`
+	Reason           string                 `json:"reason"`
+	TimesCaughtIssue int                    `json:"times_caught_issue"`
+}
+
+func (d *DB) GetSupervisorRules(ctx context.Context, taskType string, limit int) ([]SupervisorRule, error) {
+	params := map[string]interface{}{
+		"p_limit": limit,
+	}
+	if taskType != "" {
+		params["p_task_type"] = taskType
+	}
+
+	data, err := d.rpc(ctx, "get_supervisor_rules", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var rules []SupervisorRule
+	if err := json.Unmarshal(data, &rules); err != nil {
+		return nil, fmt.Errorf("unmarshal supervisor rules: %w", err)
+	}
+	return rules, nil
+}
+
+func (d *DB) CreateSupervisorRule(ctx context.Context, triggerPattern, action, reason, source string, triggerCondition map[string]interface{}, sourceTaskID *string) (string, error) {
+	params := map[string]interface{}{
+		"p_trigger_pattern": triggerPattern,
+		"p_action":          action,
+		"p_reason":          reason,
+		"p_source":          source,
+	}
+	if triggerCondition != nil {
+		params["p_trigger_condition"] = triggerCondition
+	}
+	if sourceTaskID != nil {
+		params["p_source_task_id"] = *sourceTaskID
+	}
+
+	data, err := d.rpc(ctx, "create_supervisor_rule", params)
+	if err != nil {
+		return "", err
+	}
+
+	var ruleID string
+	if err := json.Unmarshal(data, &ruleID); err != nil {
+		return "", fmt.Errorf("unmarshal supervisor rule id: %w", err)
+	}
+	return ruleID, nil
+}
+
+func (d *DB) RecordSupervisorRuleTriggered(ctx context.Context, ruleID string, caughtIssue bool) error {
+	_, err := d.rpc(ctx, "record_supervisor_rule_triggered", map[string]interface{}{
+		"p_rule_id":      ruleID,
+		"p_caught_issue": caughtIssue,
+	})
+	return err
+}
+
+func (d *DB) CreateRuleFromSupervisorRejection(ctx context.Context, taskID, issuePattern, issueText string, taskType *string) (string, error) {
+	params := map[string]interface{}{
+		"p_task_id":       taskID,
+		"p_issue_pattern": issuePattern,
+		"p_issue_text":    issueText,
+	}
+	if taskType != nil {
+		params["p_task_type"] = *taskType
+	}
+
+	data, err := d.rpc(ctx, "create_rule_from_supervisor_rejection", params)
+	if err != nil {
+		return "", err
+	}
+
+	var ruleID string
+	if err := json.Unmarshal(data, &ruleID); err != nil {
+		return "", fmt.Errorf("unmarshal rule id: %w", err)
+	}
+	return ruleID, nil
+}
+
+func (d *DB) DeactivateTesterRule(ctx context.Context, ruleID, reason string) error {
+	_, err := d.rpc(ctx, "deactivate_tester_rule", map[string]interface{}{
+		"p_rule_id": ruleID,
+		"p_reason":  reason,
+	})
+	return err
+}
+
+func (d *DB) DeactivateSupervisorRule(ctx context.Context, ruleID, reason string) error {
+	_, err := d.rpc(ctx, "deactivate_supervisor_rule", map[string]interface{}{
+		"p_rule_id": ruleID,
+		"p_reason":  reason,
+	})
+	return err
+}
+
+type LearningStats struct {
+	TableName         string `json:"table_name"`
+	TotalRules        int    `json:"total_rules"`
+	ActiveRules       int    `json:"active_rules"`
+	TotalApplications int    `json:"total_applications"`
+	TotalIssuesCaught int    `json:"total_issues_caught"`
+}
+
+func (d *DB) GetLearningStats(ctx context.Context) ([]LearningStats, error) {
+	data, err := d.rpc(ctx, "get_learning_stats", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var stats []LearningStats
+	if err := json.Unmarshal(data, &stats); err != nil {
+		return nil, fmt.Errorf("unmarshal learning stats: %w", err)
+	}
+	return stats, nil
+}
