@@ -43,11 +43,7 @@ type Dispatcher struct {
 
 type Gitree interface {
 	CreateBranch(ctx context.Context, branchName string) error
-	ClearBranch(ctx context.Context, branchName string, baseBranch string) error
-}
-
-type GitreeExecutor interface {
-	ExecuteMerge(ctx context.Context, taskID, branchName string) error
+	ClearBranch(ctx context.Context, branchName string) error
 }
 
 func New(database *db.DB, cfg *config.Config, leakDetector *security.LeakDetector) *Dispatcher {

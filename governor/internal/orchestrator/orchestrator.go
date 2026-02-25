@@ -91,7 +91,7 @@ func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *type
 		return
 	}
 
-	output, err := o.gitree.ReadBranchOutput(ctx, task.BranchName, "")
+	output, err := o.gitree.ReadBranchOutput(ctx, task.BranchName)
 	if err != nil {
 		log.Printf("Orchestrator: failed to read branch output %s: %v", taskID[:8], err)
 		return
@@ -299,7 +299,7 @@ func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, no
 		}
 	} else {
 		if currentTask.BranchName != "" && o.gitree != nil {
-			if err := o.gitree.ClearBranch(ctx, currentTask.BranchName, ""); err != nil {
+			if err := o.gitree.ClearBranch(ctx, currentTask.BranchName); err != nil {
 				log.Printf("Orchestrator: failed to clear branch %s: %v", currentTask.BranchName, err)
 			} else {
 				log.Printf("Orchestrator: cleared branch %s for retry", currentTask.BranchName)
