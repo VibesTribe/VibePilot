@@ -11,13 +11,101 @@
 
 ---
 
-**Last Updated:** 2026-02-24
-**Updated By:** GLM-5 - Session 28: Learning System
-**Session Focus:** Security audit + Learning system (Phase 1 COMPLETE)
-**Direction:** Orchestrator now learns from failures, routes smarter
+**Last Updated:** 2026-02-25
+**Updated By:** GLM-5 - Session 29
+**Session Focus:** Config-driven destinations + Agent architecture cleanup
+**Direction:** Zero hardcoded tools, maintenance agent needs proper implementation
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Go Governor Phase 1-6 COMPLETE, Learning Phase 1 COMPLETE
+**Progress:** Go Governor Phase 1-6 COMPLETE, Learning Phase 1-2 COMPLETE
+
+---
+
+# SESSION 29: CONFIG-DRIVEN DESTINATIONS (2026-02-25)
+
+## What We Did
+
+### 1. Config-Driven Destinations (Zero Hardcoded Tools)
+
+**Removed hardcoded switch statement** in dispatcher.go that would break if opencode disappeared.
+
+**New schema:** `docs/supabase-schema/026_destinations.sql`
+- `destinations` table with id, type, status, command/endpoint
+- Updated `get_best_runner` to JOIN destinations WHERE status='active'
+
+**Sync script updated:** `import_destinations()` added
+
+**Go changes:**
+- `Destination` struct + `GetDestination()` in db/supabase.go
+- `executeCLI()`, `executeAPI()` in dispatcher.go
+- Same fixes in agent/executor.go and analyst/analyst.go
+
+**Result:** Change destinations.json → sync → system uses what's available. Zero code changes.
+
+### 2. Planner Learning Schema (Phase 2)
+
+**Schema:** `docs/supabase-schema/025_planner_learning.sql`
+
+**Table:** `planner_learned_rules` - Rules learned from rejections
+
+**RPCs:** create_planner_rule, get_planner_rules, record_planner_rule_applied, create_rule_from_rejection
+
+### 3. Agents Created
+
+| Agent | Lines | Status |
+|-------|-------|--------|
+| consultant | 351 | ✅ DONE |
+| planner | 537 | ✅ DONE |
+| council | 565 | ✅ DONE |
+| vibes | 408 | ✅ DONE |
+
+### 4. What Was Rolled Back
+
+**Maintenance polling loop** - WRONG architecture, rolled back via commit `90b22984`
+
+Maintenance should be an agent like all others, NOT a separate polling process.
+
+## What's NOT Done
+
+### Maintenance Agent - Needs Correct Implementation
+
+**Current gaps:**
+- Branch creation happens AFTER task completes (should be at ASSIGNMENT)
+- No `target_branch` in merge tasks (module vs main)
+- No task→module merge logic
+- No module completion detection
+- No module→main merge logic
+- maintenance.md still describes wrong polling architecture
+
+**Correct architecture:**
+- Maintenance = agent (role + tools + brain at runtime)
+- Receives tasks via Orchestrator → Dispatcher → pool.SelectBest()
+- Like consultant, planner, council - not special
+
+**Merge flow needed:**
+```
+Task approved+tested → merge task/T001 → module/{slice}
+All tasks in slice complete → merge module/{slice} → main
+```
+
+## Commits This Session
+
+```
+90b22984 fix: revert maintenance polling, route merge through agent flow
+8f3c2529 fix: remove remaining hardcoded tool references
+85c63da9 feat: config-driven destinations (zero hardcoded tools)
+690bbf9c feat: add planner learning (Phase 2) schema and RPCs
+b82d18dd feat: add Vibes agent for human interface
+```
+
+## Code Stats
+
+```
+Total Go files: 28
+Total lines:   ~6,000
+Build:         ✅ Clean
+Vet:           ✅ No issues
+```
 
 ---
 
