@@ -261,13 +261,16 @@ func (m *Maintenance) auditLog(change *Change, result *ExecutionResult) {
 		change.ID, change.Type, change.Target, change.Action, result.Success, result.TestsPassed)
 
 	if m.db != nil {
-		m.db.LogOrchestratorEvent(context.Background(), "maintenance_change", change.ID, "", "", "", "",
-			fmt.Sprintf("type=%s target=%s action=%s", change.Type, change.Target, change.Action),
-			map[string]interface{}{
+		m.db.RPC(context.Background(), "log_orchestrator_event", map[string]interface{}{
+			"p_event_type": "maintenance_change",
+			"p_task_id":    change.ID,
+			"p_message":    fmt.Sprintf("type=%s target=%s action=%s", change.Type, change.Target, change.Action),
+			"p_details": map[string]interface{}{
 				"success":      result.Success,
 				"tests_passed": result.TestsPassed,
 				"backup_path":  change.BackupPath,
-			})
+			},
+		})
 	}
 }
 
@@ -276,14 +279,24 @@ func (m *Maintenance) CheckApprovalChain(ctx context.Context, change *Change) er
 		return nil
 	}
 
-	approvals, err := m.db.GetChangeApprovals(ctx, change.ID)
+	var approvals []map[string]interface{}
+	err := m.db.CallRPCInto(ctx, "get_change_approvals", map[string]any{"p_change_id": change.ID}, &approvals)
 	if err != nil {
 		return fmt.Errorf("get approvals: %w", err)
 	}
 
+	approvalMap := make(map[string]bool)
+	for _, a := range approvals {
+		if approver, ok := a["approver"].(string); ok {
+			if approved, ok := a["approved"].(bool); ok {
+				approvalMap[approver] = approved
+			}
+		}
+	}
+
 	required := m.requiredApprovals(change)
 	for _, req := range required {
-		if !approvals[req] {
+		if !approvalMap[req] {
 			return fmt.Errorf("missing required approval: %s", req)
 		}
 	}
