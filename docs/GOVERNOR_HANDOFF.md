@@ -584,7 +584,7 @@ Task needs routing:
 
 # SESSION 29 (2026-02-25)
 
-## What Was Done
+## What Was Actually Done
 
 ### 1. Config-Driven Destinations (Zero Hardcoded Tools)
 
@@ -636,20 +636,22 @@ Dispatcher calls GetDestination() → executes by type (cli/api)
 - `record_planner_rule_prevented_issue()` - Track effectiveness
 - `create_rule_from_rejection()` - Auto-create from rejection
 
-### 3. Vibes Agent Created
+## Created Without Discussion (Needs Review)
 
-**File:** `governor/internal/vibes/vibes.go` (408 lines)
+### Vibes Agent (vibes/vibes.go - 408 lines)
 
-Human interface agent - status reports, ROI, daily briefings, consultation.
+**Created:** Commit b82d18dd
+**Problem:** Created WITHOUT discussion with human
+**Status:** NOT validated, may need rework or removal
+**What Vibes should be:** Unknown - was not discussed
 
-### 4. Agents Created This Session
+## Pre-Existing (Not Created This Session)
 
-| Agent | Lines | Status |
-|-------|-------|--------|
-| consultant | 351 | ✅ DONE |
-| planner | 537 | ✅ DONE |
-| council | 565 | ✅ DONE |
-| vibes | 408 | ✅ DONE |
+| Agent | File | Notes |
+|-------|------|-------|
+| council | council/council.go (565 lines) | Pre-existing from Feb 23 |
+| consultant | consultant/consultant.go | Created earlier |
+| planner | planner/planner.go | Created earlier |
 
 ## What Was Rolled Back
 
@@ -708,12 +710,13 @@ Human interface agent - status reports, ROI, daily briefings, consultation.
 ## Commits This Session
 
 ```
+6aff001b docs: update for Session 29
 90b22984 fix: revert maintenance polling, route merge through agent flow
 f6cc19b9 feat: add maintenance polling loop (ROLLED BACK - wrong architecture)
 8f3c2529 fix: remove remaining hardcoded tool references
 85c63da9 feat: config-driven destinations (zero hardcoded tools)
 690bbf9c feat: add planner learning (Phase 2) schema and RPCs
-b82d18dd feat: add Vibes agent for human interface
+b82d18dd feat: add Vibes agent (CREATED WITHOUT DISCUSSION - needs review)
 ```
 
 ## Code Stats
@@ -729,7 +732,7 @@ Vet:           ✅ No issues
 
 | Repo | Branch | Status |
 |------|--------|--------|
-| vibepilot | `go-governor` | 7 commits ahead of origin |
+| vibepilot | `go-governor` | 9 commits ahead of origin |
 
 ---
 
@@ -743,6 +746,10 @@ Vet:           ✅ No issues
 4. **Implement module completion detection** - Query tasks in slice
 5. **Implement module→main merge** - After all tasks complete
 6. **Update maintenance.md prompt** - Correct agent architecture
+
+## Also Needs Discussion
+
+- **Vibes agent** - What should it actually be? Current implementation not validated.
 
 ## Key Understanding Required
 
