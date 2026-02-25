@@ -15,11 +15,9 @@ import (
 	"github.com/vibepilot/governor/internal/gitree"
 	"github.com/vibepilot/governor/internal/janitor"
 	"github.com/vibepilot/governor/internal/orchestrator"
-	"github.com/vibepilot/governor/internal/researcher"
 	"github.com/vibepilot/governor/internal/security"
 	"github.com/vibepilot/governor/internal/sentry"
 	"github.com/vibepilot/governor/internal/server"
-	"github.com/vibepilot/governor/internal/supervisor"
 	"github.com/vibepilot/governor/internal/tester"
 	"github.com/vibepilot/governor/internal/throttle"
 	"github.com/vibepilot/governor/internal/visual"
@@ -65,13 +63,10 @@ func main() {
 		RepoPath:          repoPath,
 		ProtectedBranches: cfg.Git.ProtectedBranches,
 	})
-	sup := supervisor.New()
 	test := tester.New(&tester.Config{RepoPath: repoPath})
 	visTest := visual.New(&visual.Config{RepoPath: repoPath})
-	res := researcher.New(database)
-	orch := orchestrator.New(database, git, sup, test, visTest, res)
+	orch := orchestrator.New(database, git, test, visTest)
 
-	sup.SetRuleProvider(&supervisorRuleAdapter{db: database})
 	test.SetRuleProvider(&testerRuleAdapter{db: database})
 
 	s := sentry.New(database, cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent, dispatchCh, moduleLimiter)
@@ -125,33 +120,6 @@ func main() {
 	srv.Shutdown()
 
 	log.Println("Governor stopped.")
-}
-
-type supervisorRuleAdapter struct {
-	db *db.DB
-}
-
-func (a *supervisorRuleAdapter) GetSupervisorRules(ctx context.Context, taskType string, limit int) ([]supervisor.SupervisorRule, error) {
-	rules, err := a.db.GetSupervisorRules(ctx, taskType, limit)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]supervisor.SupervisorRule, len(rules))
-	for i, r := range rules {
-		result[i] = supervisor.SupervisorRule{
-			ID:               r.ID,
-			TriggerPattern:   r.TriggerPattern,
-			TriggerCondition: r.TriggerCondition,
-			Action:           r.Action,
-			Reason:           r.Reason,
-			TimesCaughtIssue: r.TimesCaughtIssue,
-		}
-	}
-	return result, nil
-}
-
-func (a *supervisorRuleAdapter) RecordSupervisorRuleTriggered(ctx context.Context, ruleID string, caughtIssue bool) error {
-	return a.db.RecordSupervisorRuleTriggered(ctx, ruleID, caughtIssue)
 }
 
 type testerRuleAdapter struct {

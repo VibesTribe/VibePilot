@@ -13,15 +13,17 @@ import (
 )
 
 type DB struct {
-	url    string
-	key    string
-	client *http.Client
+	url          string
+	key          string
+	client       *http.Client
+	rpcAllowlist *RPCAllowlist
 }
 
 func New(url, key string) *DB {
 	return &DB{
-		url: url,
-		key: key,
+		url:          url,
+		key:          key,
+		rpcAllowlist: NewRPCAllowlist(),
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -112,6 +114,34 @@ func (d *DB) GetTaskByID(ctx context.Context, taskID string) (*types.Task, error
 		return nil, fmt.Errorf("task %s not found", taskID)
 	}
 	return &tasks[0], nil
+}
+
+func (d *DB) CreateTask(ctx context.Context, task *types.Task) error {
+	body := map[string]interface{}{
+		"id":             task.ID,
+		"title":          task.Title,
+		"type":           task.Type,
+		"priority":       task.Priority,
+		"status":         string(task.Status),
+		"routing_flag":   string(task.RoutingFlag),
+		"slice_id":       task.SliceID,
+		"parent_task_id": task.ParentTaskID,
+		"branch_name":    task.BranchName,
+		"max_attempts":   task.MaxAttempts,
+		"created_at":     task.CreatedAt.Format(time.RFC3339),
+		"updated_at":     task.UpdatedAt.Format(time.RFC3339),
+	}
+
+	if task.PromptPacket != nil {
+		packetJSON, err := json.Marshal(task.PromptPacket)
+		if err != nil {
+			return fmt.Errorf("marshal prompt packet: %w", err)
+		}
+		body["prompt_packet"] = string(packetJSON)
+	}
+
+	_, err := d.rest(ctx, "POST", "tasks", body)
+	return err
 }
 
 type taskPacketRow struct {
@@ -1224,4 +1254,27 @@ func (d *DB) GetLearningStats(ctx context.Context) ([]LearningStats, error) {
 		return nil, fmt.Errorf("unmarshal learning stats: %w", err)
 	}
 	return stats, nil
+}
+
+func (d *DB) GetChangeApprovals(ctx context.Context, changeID string) (map[string]bool, error) {
+	approvals := make(map[string]bool)
+
+	task, err := d.GetTaskByID(ctx, changeID)
+	if err != nil {
+		return approvals, nil
+	}
+
+	if task.Status == "approval" || task.Status == "merged" {
+		approvals["supervisor"] = true
+	}
+
+	if task.Status == "awaiting_human" || task.Status == "approval" || task.Status == "merged" {
+		approvals["council"] = true
+	}
+
+	if task.Status == "approval" || task.Status == "merged" {
+		approvals["human"] = true
+	}
+
+	return approvals, nil
 }

@@ -13,11 +13,11 @@
 
 **Last Updated:** 2026-02-25
 **Updated By:** GLM-5 - Session 30
-**Session Focus:** GOVERNOR REBUILD - 8k → 2.5k lines
+**Session Focus:** GOVERNOR REBUILD Phase 1 COMPLETE
 **Direction:** Agent logic moves to prompts, Go becomes tools + runtime only
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Rebuild plan approved, ready to implement
+**Progress:** Phase 1 COMPLETE - runtime package built, config files created
 
 ---
 
@@ -40,12 +40,49 @@ Summary:
 - All intelligence moves to `config/prompts/*.md`
 - All config stays in JSON files (agents.json, tools.json, models.json, etc.)
 
+## What's Done (Phase 1)
+
+### New runtime/ package (~1,150 lines)
+- `config.go` - Load JSON config files (system, agents, tools, destinations)
+- `events.go` - EventWatcher interface + PollingWatcher implementation
+- `parallel.go` - AgentPool with per-module limits, SessionManager
+- `session.go` - LLM session with tool calling loop
+- `tools.go` - Tool registry with security validation, tool call parsing
+
+### New db/rpc.go (~130 lines)
+- Generic `CallRPC(name, params)` with allowlist security
+- `CallRPCInto` for typed results
+- Default allowlist with common RPCs
+
+### New config files
+- `config/system.json` - Database, vault, git, runtime, courier settings
+- `config/tools.json` - Tool definitions with parameters, security levels, allowed agents
+
+### Line count progress
+```
+runtime/       ~1,150 lines (NEW)
+gitree/          252 lines (KEPT)
+vault/           253 lines (KEPT)
+maintenance/     746 lines (KEPT)
+security/        130 lines (KEPT)
+db/rpc.go        130 lines (NEW)
+-------------------------------
+Total:        ~2,660 lines (close to 2,500 target!)
+```
+
+## What's Next (Phase 2-5)
+
+1. **Phase 2:** Wire up tool implementations (git, db, vault, maintenance)
+2. **Phase 3:** Create destination runners (CLI, API, Courier)
+3. **Phase 4:** Delete old agent modules (orchestrator, dispatcher, council, planner, etc.)
+4. **Phase 5:** Update main.go to use new runtime, verify dashboard works
+
 ## Key Decisions Made
 
 1. **Tool security:** 2-3 tools per agent, validated at runtime
 2. **RPC:** Generic `CallRPC(name, params)` with allowlist
-3. **Events:** Abstraction layer (Supabase real-time today, swappable tomorrow)
-4. **Parallel:** Goroutines with config limits (8 per module)
+3. **Events:** Abstraction layer (PollingWatcher today, can add Realtime later)
+4. **Parallel:** Goroutines with config limits (8 per module, 160 total)
 5. **Everything swappable:** Models, platforms, database, git host, language
 
 ## What NOT To Do
@@ -57,8 +94,8 @@ Summary:
 
 ## What TO Do
 
-- Read the rebuild plan
-- Implement Phase 1-5 as documented
+- Read the rebuild plan (`docs/GOVERNOR_REBUILD_PLAN.md`)
+- Implement remaining phases
 - Keep prompts in markdown files
 - Keep config in JSON files
 - Go = tools + runtime only
