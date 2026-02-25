@@ -12,8 +12,8 @@ import (
 	"github.com/vibepilot/governor/internal/courier"
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/dispatcher"
+	"github.com/vibepilot/governor/internal/gitree"
 	"github.com/vibepilot/governor/internal/janitor"
-	"github.com/vibepilot/governor/internal/maintenance"
 	"github.com/vibepilot/governor/internal/orchestrator"
 	"github.com/vibepilot/governor/internal/researcher"
 	"github.com/vibepilot/governor/internal/security"
@@ -61,12 +61,12 @@ func main() {
 		repoPath = "."
 	}
 
-	maint := maintenance.New(&maintenance.Config{RepoPath: repoPath})
+	git := gitree.New(&gitree.Config{RepoPath: repoPath})
 	sup := supervisor.New()
 	test := tester.New(&tester.Config{RepoPath: repoPath})
 	visTest := visual.New(&visual.Config{RepoPath: repoPath})
 	res := researcher.New(database)
-	orch := orchestrator.New(database, maint, sup, test, visTest, res)
+	orch := orchestrator.New(database, git, sup, test, visTest, res)
 
 	sup.SetRuleProvider(&supervisorRuleAdapter{db: database})
 	test.SetRuleProvider(&testerRuleAdapter{db: database})
@@ -76,7 +76,7 @@ func main() {
 
 	d := dispatcher.New(database, cfg, leakDetector)
 	d.SetOrchestrator(orch)
-	d.SetMaintenance(maint)
+	d.SetGitree(git)
 	d.SetFinalizer(s)
 
 	if cfg.Courier.Enabled && cfg.GitHub.Token != "" {
