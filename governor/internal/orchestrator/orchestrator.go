@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/vibepilot/governor/internal/db"
-	"github.com/vibepilot/governor/internal/maintenance"
+	"github.com/vibepilot/governor/internal/gitree"
 	"github.com/vibepilot/governor/internal/researcher"
 	"github.com/vibepilot/governor/internal/supervisor"
 	"github.com/vibepilot/governor/internal/tester"
@@ -19,7 +19,7 @@ import (
 
 type Orchestrator struct {
 	db           *db.DB
-	maintenance  *maintenance.Maintenance
+	gitree       *gitree.Gitree
 	supervisor   *supervisor.Supervisor
 	tester       *tester.Tester
 	visualTester *visual.VisualTester
@@ -29,10 +29,10 @@ type Orchestrator struct {
 	ctx          context.Context
 }
 
-func New(database *db.DB, maint *maintenance.Maintenance, sup *supervisor.Supervisor, test *tester.Tester, visTest *visual.VisualTester, res *researcher.Researcher) *Orchestrator {
+func New(database *db.DB, git *gitree.Gitree, sup *supervisor.Supervisor, test *tester.Tester, visTest *visual.VisualTester, res *researcher.Researcher) *Orchestrator {
 	return &Orchestrator{
 		db:           database,
-		maintenance:  maint,
+		gitree:       git,
 		supervisor:   sup,
 		tester:       test,
 		visualTester: visTest,
@@ -67,18 +67,12 @@ func (o *Orchestrator) OnTaskComplete(ctx context.Context, taskID string, result
 	o.db.LogOrchestratorEvent(ctx, "task_complete", taskID, "", "", "", task.AssignedTo, "Task execution completed", nil)
 
 	if task.BranchName == "" {
-		branchName := o.generateBranchName(task)
-		if err := o.maintenance.CreateBranch(ctx, branchName); err != nil {
-			log.Printf("Orchestrator: failed to create branch for %s: %v", taskID[:8], err)
-			o.db.LogOrchestratorEvent(ctx, "branch_failed", taskID, "", "", "", "", "Branch creation failed", map[string]interface{}{"error": err.Error()})
-			return
-		}
-		task.BranchName = branchName
-		o.db.UpdateTaskBranch(ctx, taskID, branchName)
-		o.db.LogOrchestratorEvent(ctx, "branch_created", taskID, "", "", "", "", "Branch created", map[string]interface{}{"branch": branchName})
+		log.Printf("Orchestrator: task %s has no branch - branch should be created at assignment", taskID[:8])
+		o.handleRejection(ctx, task, "Task has no branch assigned")
+		return
 	}
 
-	if err := o.maintenance.CommitOutput(ctx, task.BranchName, result); err != nil {
+	if err := o.gitree.CommitOutput(ctx, task.BranchName, result); err != nil {
 		log.Printf("Orchestrator: commit failed for %s: %v", taskID[:8], err)
 		o.db.LogOrchestratorEvent(ctx, "commit_failed", taskID, "", "", "", "", "Commit failed", map[string]interface{}{"error": err.Error()})
 		o.handleRejection(ctx, task, fmt.Sprintf("Commit failed: %v", err))
@@ -97,7 +91,7 @@ func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *type
 		return
 	}
 
-	output, err := o.maintenance.ReadBranchOutput(ctx, task.BranchName)
+	output, err := o.gitree.ReadBranchOutput(ctx, task.BranchName, "")
 	if err != nil {
 		log.Printf("Orchestrator: failed to read branch output %s: %v", taskID[:8], err)
 		return
@@ -119,16 +113,11 @@ func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *type
 		o.db.LogOrchestratorEvent(ctx, "supervisor_approve", taskID, "", "", "", "", "Supervisor approved", nil)
 		o.db.UpdateTaskStatus(ctx, taskID, types.StatusApproval, nil)
 
-		mergeTaskID := generateID()
-		if err := o.db.CreateMergeTask(ctx, mergeTaskID, taskID, task.SliceID, task.BranchName, task.Title); err != nil {
-			log.Printf("Orchestrator: failed to create merge task for %s: %v", taskID[:8], err)
-		} else {
-			log.Printf("Orchestrator: %s approved, created merge task %s", taskID[:8], mergeTaskID[:8])
-		}
-
 		if task.Type != "test" && task.Type != "docs" {
 			o.db.UpdateTaskStatus(ctx, taskID, types.StatusTesting, result)
 			o.queueTest(taskID)
+		} else {
+			o.mergeTaskToModule(ctx, task)
 		}
 
 	case supervisor.ActionReject:
@@ -185,18 +174,96 @@ func (o *Orchestrator) processTest(ctx context.Context, taskID string) {
 	result := o.tester.RunTestsWithType(ctx, task.BranchName, task.Type)
 
 	if result.Passed {
-		log.Printf("Orchestrator: %s tests passed, creating merge task", taskID[:8])
-		o.db.UpdateTaskStatus(ctx, taskID, types.StatusApproval, nil)
-
-		mergeTaskID := generateID()
-		if err := o.db.CreateMergeTask(ctx, mergeTaskID, taskID, task.SliceID, task.BranchName, task.Title); err != nil {
-			log.Printf("Orchestrator: failed to create merge task for %s: %v", taskID[:8], err)
-		}
+		log.Printf("Orchestrator: %s tests passed, merging to module", taskID[:8])
+		o.mergeTaskToModule(ctx, task)
 	} else {
 		log.Printf("Orchestrator: %s tests failed: %v", taskID[:8], result.Failures)
 		notes := "Tests failed: " + strings.Join(result.Failures, "; ")
 		o.handleRejection(ctx, task, notes)
 	}
+}
+
+func (o *Orchestrator) mergeTaskToModule(ctx context.Context, task *types.Task) {
+	taskID := task.ID
+
+	if task.BranchName == "" {
+		log.Printf("Orchestrator: %s has no branch, cannot merge", taskID[:8])
+		return
+	}
+
+	if task.SliceID == "" {
+		log.Printf("Orchestrator: %s has no slice_id, merging directly to main", taskID[:8])
+		if err := o.gitree.MergeBranch(ctx, task.BranchName, "main"); err != nil {
+			log.Printf("Orchestrator: failed to merge %s to main: %v", taskID[:8], err)
+			return
+		}
+		o.gitree.DeleteBranch(ctx, task.BranchName)
+		o.db.UpdateTaskStatus(ctx, taskID, types.StatusMerged, nil)
+		o.db.LogOrchestratorEvent(ctx, "merged_to_main", taskID, "", "", "", "", "Merged to main", nil)
+		return
+	}
+
+	moduleBranch := "module/" + task.SliceID
+	if err := o.gitree.CreateModuleBranch(ctx, task.SliceID); err != nil {
+		log.Printf("Orchestrator: failed to create module branch %s: %v", moduleBranch, err)
+	}
+
+	if err := o.gitree.MergeBranch(ctx, task.BranchName, moduleBranch); err != nil {
+		log.Printf("Orchestrator: failed to merge %s to module %s: %v", taskID[:8], moduleBranch, err)
+		return
+	}
+
+	o.gitree.DeleteBranch(ctx, task.BranchName)
+	o.db.UpdateTaskStatus(ctx, taskID, types.StatusMerged, nil)
+	o.db.LogOrchestratorEvent(ctx, "merged_to_module", taskID, "", "", "", "", "Merged to module", map[string]interface{}{
+		"module_branch": moduleBranch,
+	})
+
+	log.Printf("Orchestrator: %s merged to %s", taskID[:8], moduleBranch)
+
+	o.checkModuleCompletion(ctx, task.SliceID)
+}
+
+func (o *Orchestrator) checkModuleCompletion(ctx context.Context, sliceID string) {
+	tasks, err := o.db.GetTasksBySlice(ctx, sliceID)
+	if err != nil {
+		log.Printf("Orchestrator: failed to get tasks for slice %s: %v", sliceID[:8], err)
+		return
+	}
+
+	allMerged := true
+	for _, t := range tasks {
+		if t.Status != types.StatusMerged && t.Type != "merge" {
+			allMerged = false
+			break
+		}
+	}
+
+	if !allMerged {
+		log.Printf("Orchestrator: slice %s has pending tasks, waiting", sliceID[:8])
+		return
+	}
+
+	moduleBranch := "module/" + sliceID
+	log.Printf("Orchestrator: slice %s complete, merging module to main", sliceID[:8])
+
+	if err := o.gitree.MergeBranch(ctx, moduleBranch, "main"); err != nil {
+		log.Printf("Orchestrator: failed to merge module %s to main: %v", sliceID[:8], err)
+		o.db.LogOrchestratorEvent(ctx, "module_merge_failed", "", "", "", "", "", "Module merge failed", map[string]interface{}{
+			"slice_id":      sliceID,
+			"module_branch": moduleBranch,
+			"error":         err.Error(),
+		})
+		return
+	}
+
+	o.gitree.DeleteBranch(ctx, moduleBranch)
+	o.db.LogOrchestratorEvent(ctx, "module_merged", "", "", "", "", "", "Module merged to main", map[string]interface{}{
+		"slice_id":      sliceID,
+		"module_branch": moduleBranch,
+	})
+
+	log.Printf("Orchestrator: module %s merged to main", sliceID[:8])
 }
 
 func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, notes string) {
@@ -231,6 +298,13 @@ func (o *Orchestrator) handleRejection(ctx context.Context, task *types.Task, no
 			go o.handleEscalation(o.ctx, taskID, notes)
 		}
 	} else {
+		if currentTask.BranchName != "" && o.gitree != nil {
+			if err := o.gitree.ClearBranch(ctx, currentTask.BranchName, ""); err != nil {
+				log.Printf("Orchestrator: failed to clear branch %s: %v", currentTask.BranchName, err)
+			} else {
+				log.Printf("Orchestrator: cleared branch %s for retry", currentTask.BranchName)
+			}
+		}
 		o.db.ResetTask(ctx, taskID, false)
 		o.db.UpdateTaskStatus(ctx, taskID, types.StatusAvailable, map[string]interface{}{
 			"attempts":      newAttempts,

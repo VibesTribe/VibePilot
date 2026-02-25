@@ -110,13 +110,13 @@ vibepilot/
 | supervisor | Quality gate | gemini-2.0-flash | Yes |
 
 ### Execution Agents (produce output)
-| Agent | Role | Model | Can Execute | Git Write |
-|-------|------|-------|-------------|-----------|
-| courier | Web execution | browser-use-gemini | Yes | No |
-| internal_cli | CLI execution | kimi-cli/opencode | Yes | No |
-| internal_api | API execution | gemini-api | Yes | No |
-| tester_code | Code testing | opencode | Yes | No |
-| **maintenance** | Git operator | opencode | Yes | **Yes (ONLY)** |
+| Agent | Role | Model | Can Execute |
+|-------|------|-------|-------------|
+| courier | Web execution | browser-use-gemini | Yes |
+| internal_cli | CLI execution | kimi-cli/opencode | Yes |
+| internal_api | API execution | gemini-api | Yes |
+| tester_code | Code testing | opencode | Yes |
+| maintenance | System updates | opencode | Yes |
 
 ### Support Agents (no decision, no execution)
 | Agent | Role | Model |
@@ -126,10 +126,19 @@ vibepilot/
 | consultant | PRD generation | gemini-2.0-flash |
 | planner | Task planning | kimi-cli |
 
+### Git Operations (Infrastructure)
+Git operations are handled by `gitree.go` - a utility library used by the orchestrator:
+- Branch creation at task assignment
+- Commits after task completion
+- Merges (task→module, module→main)
+- Branch deletion after merge
+
+This is NOT an agent. It's infrastructure.
+
 ### Critical Rules
-- **ONLY `maintenance` agent has git write access**
-- Other agents command maintenance via `maintenance_commands` table
-- Courier has NO codebase access, NO git access
+- **Git operations are infrastructure**, not an agent
+- Maintenance agent handles VibePilot system updates
+- Courier has NO codebase access
 
 ---
 

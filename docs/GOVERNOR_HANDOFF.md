@@ -876,4 +876,95 @@ Implemented:
 
 ---
 
-**END OF HANDOFF - Session 30**
+**END OF HANDOFF - Session 31**
+
+# SESSION 31 (2026-02-25)
+
+## What Was Done: Gitree Refactor + Branch Flow Fix
+
+### 1. Renamed maintenance → gitree
+- `internal/maintenance/` → `internal/gitree/`
+- `Maintenance` struct → `Gitree` struct
+- Updated all imports (orchestrator, dispatcher, main)
+- Clear naming: gitree = git tree operations (infrastructure, not agent)
+
+### 2. Fixed Branch Creation Timing
+**Before:** Branch created at task completion (wrong)
+**After:** Branch created at task assignment (correct)
+
+- Dispatcher creates branch right after `ClaimTask()`
+- Both internal and courier tasks get branches
+- Branch cleared on rejection for clean retry
+
+### 3. Implemented Proper Merge Flow
+**Before:** Created "merge tasks" as separate tasks (confusing)
+**After:** Direct merge in orchestrator
+
+Flow:
+```
+Task assigned → Create branch task/{id}
+Task executes → Output to branch
+Supervisor approves → Tests run
+Tests pass → Merge task/{id} → module/{slice_id}
+              Delete task branch
+All tasks in module done → Merge module/{slice_id} → main
+                           Delete module branch
+```
+
+### 4. Updated Maintenance Agent Prompt
+- Removed "Git Operator" role
+- Focus on VibePilot system updates
+- Git operations are infrastructure, not agent work
+
+### 5. Updated Documentation
+- `SYSTEM_REFERENCE.md`: Clarified gitree is infrastructure
+- `GOVERNOR_HANDOFF.md`: This update
+
+## Files Changed
+
+```
+vibepilot/
+├── governor/
+│   ├── cmd/governor/main.go              - Updated imports
+│   └── internal/
+│       ├── gitree/gitree.go              - NEW (renamed from maintenance)
+│       ├── dispatcher/dispatcher.go      - Branch creation at assignment
+│       ├── orchestrator/orchestrator.go  - Merge flow, no more merge tasks
+│       └── db/supabase.go                - Added GetTasksBySlice
+├── config/prompts/maintenance.md         - Removed git operator language
+└── docs/
+    ├── SYSTEM_REFERENCE.md               - Clarified gitree infrastructure
+    └── GOVERNOR_HANDOFF.md               - This update
+```
+
+## New Methods in gitree.go
+
+| Method | Purpose |
+|--------|---------|
+| `CreateBranch()` | Create task branch |
+| `CreateModuleBranch()` | Create module/{slice_id} branch |
+| `ClearBranch()` | Reset branch for retry |
+| `MergeBranch()` | Merge source → target |
+| `DeleteBranch()` | Delete local + remote |
+| `CommitOutput()` | Write files, commit, push |
+| `ReadBranchOutput()` | Get changed files |
+
+## What's Still NOT Done
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Visual testing | Stub | `TestVisual()` passes by default |
+| Vibes agent | ⚠️ Needs review | Created without discussion |
+
+## Code Stats
+
+```
+Total Go files: 28
+Total lines:   ~6,500
+Build:         ✅ Clean
+Vet:           ✅ No issues
+```
+
+---
+
+**END OF HANDOFF - Session 31**

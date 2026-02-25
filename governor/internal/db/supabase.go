@@ -282,6 +282,22 @@ func (d *DB) GetMergePendingTasks(ctx context.Context, sliceID string) ([]types.
 	return tasks, nil
 }
 
+func (d *DB) GetTasksBySlice(ctx context.Context, sliceID string) ([]types.Task, error) {
+	path := "tasks?slice_id=eq." + sliceID + "&select=*"
+
+	data, err := d.rest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var tasks []types.Task
+	if err := json.Unmarshal(data, &tasks); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
+}
+
 func (d *DB) UnlockDependents(ctx context.Context, taskID string) error {
 	_, err := d.rpc(ctx, "unlock_dependent_tasks", map[string]interface{}{
 		"p_completed_task_id": taskID,

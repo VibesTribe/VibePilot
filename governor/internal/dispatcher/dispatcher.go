@@ -37,11 +37,16 @@ type Dispatcher struct {
 	courier      *courier.Dispatcher
 	completer    TaskCompleter
 	finalizer    TaskFinalizer
-	maintenance  MaintenanceExecutor
+	gitree       Gitree
 	vault        *vault.Vault
 }
 
-type MaintenanceExecutor interface {
+type Gitree interface {
+	CreateBranch(ctx context.Context, branchName string) error
+	ClearBranch(ctx context.Context, branchName string, baseBranch string) error
+}
+
+type GitreeExecutor interface {
 	ExecuteMerge(ctx context.Context, taskID, branchName string) error
 }
 
@@ -67,12 +72,45 @@ func (d *Dispatcher) SetFinalizer(f TaskFinalizer) {
 	d.finalizer = f
 }
 
-func (d *Dispatcher) SetMaintenance(m MaintenanceExecutor) {
-	d.maintenance = m
+func (d *Dispatcher) SetGitree(g Gitree) {
+	d.gitree = g
 }
 
 func (d *Dispatcher) SetVault(v *vault.Vault) {
 	d.vault = v
+}
+
+func (d *Dispatcher) ensureTaskBranch(ctx context.Context, task *types.Task) string {
+	if task.BranchName != "" {
+		return task.BranchName
+	}
+
+	branchName := d.generateBranchName(task)
+
+	if d.gitree != nil {
+		if err := d.gitree.CreateBranch(ctx, branchName); err != nil {
+			log.Printf("Dispatcher: failed to create branch for %s: %v", task.ID[:8], err)
+			d.db.LogOrchestratorEvent(ctx, "branch_failed", task.ID, "", "", "", "", "Branch creation failed", map[string]interface{}{"error": err.Error()})
+			return ""
+		}
+	}
+
+	if err := d.db.UpdateTaskBranch(ctx, task.ID, branchName); err != nil {
+		log.Printf("Dispatcher: failed to update task branch for %s: %v", task.ID[:8], err)
+	}
+
+	task.BranchName = branchName
+	d.db.LogOrchestratorEvent(ctx, "branch_created", task.ID, "", "", "", "", "Branch created", map[string]interface{}{"branch": branchName})
+
+	return branchName
+}
+
+func (d *Dispatcher) generateBranchName(task *types.Task) string {
+	taskNum := task.TaskNumber
+	if taskNum == "" {
+		taskNum = task.ID[:8]
+	}
+	return fmt.Sprintf("task/%s", taskNum)
 }
 
 func (d *Dispatcher) Run(ctx context.Context, dispatchCh <-chan types.Task) {
@@ -157,6 +195,8 @@ func (d *Dispatcher) execute(ctx context.Context, task types.Task) {
 		d.finalize(task.ID, task.SliceID)
 		return
 	}
+
+	d.ensureTaskBranch(ctx, &task)
 
 	packet, err := d.db.GetTaskPacket(ctx, task.ID)
 	if err != nil || packet == nil {
@@ -471,6 +511,8 @@ func (d *Dispatcher) dispatchToCourier(ctx context.Context, task types.Task) {
 		d.finalize(task.ID, task.SliceID)
 		return
 	}
+
+	d.ensureTaskBranch(ctx, &task)
 
 	d.courier.Enqueue(task)
 }
