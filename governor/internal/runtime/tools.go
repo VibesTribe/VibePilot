@@ -15,7 +15,7 @@ type ToolResult struct {
 }
 
 type ToolExecutor interface {
-	Execute(ctx context.Context, name string, args map[string]any) (json.RawMessage, error)
+	Execute(ctx context.Context, args map[string]any) (json.RawMessage, error)
 }
 
 type ToolRegistry struct {
@@ -65,7 +65,7 @@ func (r *ToolRegistry) Execute(ctx context.Context, agentID, toolName string, ar
 		}
 	}
 
-	result, err := executor.Execute(ctx, toolName, args)
+	result, err := executor.Execute(ctx, args)
 	if err != nil {
 		return ToolResult{
 			Success: false,

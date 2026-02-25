@@ -8,8 +8,6 @@ import (
 	"io"
 	"net/http"
 	"time"
-
-	"github.com/vibepilot/governor/pkg/types"
 )
 
 type DB struct {
@@ -35,7 +33,7 @@ func (d *DB) Close() error {
 	return nil
 }
 
-func (d *DB) rest(ctx context.Context, method, path string, body interface{}) ([]byte, error) {
+func (d *DB) REST(ctx context.Context, method, path string, body interface{}) ([]byte, error) {
 	var reqBody io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -68,1213 +66,118 @@ func (d *DB) rest(ctx context.Context, method, path string, body interface{}) ([
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("supabase %d: %s", resp.StatusCode, sanitizeErrorBody(data))
+		errBody := string(data)
+		if len(errBody) > 200 {
+			errBody = errBody[:200] + "...(truncated)"
+		}
+		return nil, fmt.Errorf("supabase %d: %s", resp.StatusCode, errBody)
 	}
 
 	return data, nil
 }
 
-func sanitizeErrorBody(data []byte) string {
-	s := string(data)
-	if len(s) > 200 {
-		s = s[:200] + "...(truncated)"
-	}
-	return s
-}
-
 func (d *DB) rpc(ctx context.Context, name string, params interface{}) ([]byte, error) {
-	return d.rest(ctx, "POST", "rpc/"+name, params)
+	return d.REST(ctx, "POST", "rpc/"+name, params)
 }
 
-func (d *DB) GetAvailableTasks(ctx context.Context, limit int) ([]types.Task, error) {
-	path := fmt.Sprintf("tasks?status=eq.available&order=priority.asc,created_at.asc&limit=%d", limit)
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
+func (d *DB) RPC(ctx context.Context, name string, params map[string]interface{}) ([]byte, error) {
+	if !d.rpcAllowlist.Allowed(name) {
+		return nil, fmt.Errorf("RPC %s not in allowlist", name)
 	}
-
-	var tasks []types.Task
-	if err := json.Unmarshal(data, &tasks); err != nil {
-		return nil, fmt.Errorf("unmarshal tasks: %w", err)
-	}
-	return tasks, nil
-}
-
-func (d *DB) GetTaskByID(ctx context.Context, taskID string) (*types.Task, error) {
-	data, err := d.rest(ctx, "GET", "tasks?id=eq."+taskID, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var tasks []types.Task
-	if err := json.Unmarshal(data, &tasks); err != nil {
-		return nil, fmt.Errorf("unmarshal task: %w", err)
-	}
-	if len(tasks) == 0 {
-		return nil, fmt.Errorf("task %s not found", taskID)
-	}
-	return &tasks[0], nil
-}
-
-func (d *DB) CreateTask(ctx context.Context, task *types.Task) error {
-	body := map[string]interface{}{
-		"id":             task.ID,
-		"title":          task.Title,
-		"type":           task.Type,
-		"priority":       task.Priority,
-		"status":         string(task.Status),
-		"routing_flag":   string(task.RoutingFlag),
-		"slice_id":       task.SliceID,
-		"parent_task_id": task.ParentTaskID,
-		"branch_name":    task.BranchName,
-		"max_attempts":   task.MaxAttempts,
-		"created_at":     task.CreatedAt.Format(time.RFC3339),
-		"updated_at":     task.UpdatedAt.Format(time.RFC3339),
-	}
-
-	if task.PromptPacket != nil {
-		packetJSON, err := json.Marshal(task.PromptPacket)
-		if err != nil {
-			return fmt.Errorf("marshal prompt packet: %w", err)
-		}
-		body["prompt_packet"] = string(packetJSON)
-	}
-
-	_, err := d.rest(ctx, "POST", "tasks", body)
-	return err
-}
-
-type taskPacketRow struct {
-	TaskID  string `json:"task_id"`
-	Prompt  string `json:"prompt"`
-	Version int    `json:"version"`
-}
-
-func (d *DB) GetTaskPacket(ctx context.Context, taskID string) (*types.PromptPacket, error) {
-	path := fmt.Sprintf("task_packets?task_id=eq.%s&order=version.desc&limit=1", taskID)
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var rows []taskPacketRow
-	if err := json.Unmarshal(data, &rows); err != nil {
-		return nil, fmt.Errorf("unmarshal packet rows: %w", err)
-	}
-	if len(rows) == 0 {
-		return nil, nil
-	}
-
-	var packet types.PromptPacket
-	if err := json.Unmarshal([]byte(rows[0].Prompt), &packet); err != nil {
-		return nil, fmt.Errorf("unmarshal prompt JSON: %w", err)
-	}
-	return &packet, nil
-}
-
-func (d *DB) ClaimTask(ctx context.Context, taskID, modelID string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"status":      "in_progress",
-		"assigned_to": modelID,
-		"started_at":  now,
-		"updated_at":  now,
-	}
-
-	data, err := d.rest(ctx, "PATCH", "tasks?id=eq."+taskID+"&status=eq.available", body)
-	if err != nil {
-		return err
-	}
-
-	var result []map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return fmt.Errorf("unmarshal claim result: %w", err)
-	}
-	if len(result) == 0 {
-		return fmt.Errorf("task %s not available", taskID)
-	}
-	return nil
-}
-
-type TaskRunInput struct {
-	TaskID    string
-	ModelID   string
-	Courier   string
-	Platform  string
-	Status    string
-	Result    interface{}
-	TokensIn  int
-	TokensOut int
-}
-
-func (d *DB) RecordTaskRun(ctx context.Context, input *TaskRunInput) (string, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"task_id":     input.TaskID,
-		"model_id":    input.ModelID,
-		"courier":     input.Courier,
-		"platform":    input.Platform,
-		"status":      input.Status,
-		"result":      input.Result,
-		"tokens_in":   input.TokensIn,
-		"tokens_out":  input.TokensOut,
-		"tokens_used": input.TokensIn + input.TokensOut,
-		"started_at":  now,
-	}
-
-	data, err := d.rest(ctx, "POST", "task_runs", body)
-	if err != nil {
-		return "", err
-	}
-
-	var result []struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return "", fmt.Errorf("unmarshal run result: %w", err)
-	}
-	if len(result) == 0 {
-		return "", fmt.Errorf("no run ID returned")
-	}
-	return result[0].ID, nil
-}
-
-func (d *DB) CallROIRPC(ctx context.Context, runID string) error {
-	_, err := d.rpc(ctx, "calculate_enhanced_task_roi", map[string]interface{}{
-		"p_run_id": runID,
-	})
-	return err
-}
-
-func (d *DB) UpdateTaskStatus(ctx context.Context, taskID string, status types.TaskStatus, result interface{}) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"status":     string(status),
-		"updated_at": now,
-	}
-	if result != nil {
-		body["result"] = result
-	}
-
-	_, err := d.rest(ctx, "PATCH", "tasks?id=eq."+taskID, body)
-	return err
-}
-
-func (d *DB) UpdateTaskBranch(ctx context.Context, taskID string, branchName string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"branch_name": branchName,
-		"updated_at":  now,
-	}
-
-	_, err := d.rest(ctx, "PATCH", "tasks?id=eq."+taskID, body)
-	return err
-}
-
-func (d *DB) GetTasksBySlice(ctx context.Context, sliceID string) ([]types.Task, error) {
-	path := "tasks?slice_id=eq." + sliceID + "&select=*"
-
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var tasks []types.Task
-	if err := json.Unmarshal(data, &tasks); err != nil {
-		return nil, err
-	}
-
-	return tasks, nil
-}
-
-func (d *DB) UnlockDependents(ctx context.Context, taskID string) error {
-	_, err := d.rpc(ctx, "unlock_dependent_tasks", map[string]interface{}{
-		"p_completed_task_id": taskID,
-	})
-	return err
-}
-
-func (d *DB) ResetTask(ctx context.Context, taskID string, escalate bool) error {
-	task, err := d.GetTaskByID(ctx, taskID)
-	if err != nil {
-		return err
-	}
-
-	status := "available"
-	if escalate {
-		status = "escalated"
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"status":      status,
-		"attempts":    task.Attempts + 1,
-		"assigned_to": nil,
-		"started_at":  nil,
-		"updated_at":  now,
-	}
-
-	_, err = d.rest(ctx, "PATCH", "tasks?id=eq."+taskID, body)
-	return err
-}
-
-func (d *DB) GetStuckTasks(ctx context.Context, timeout time.Duration) ([]types.Task, error) {
-	cutoff := time.Now().Add(-timeout).UTC().Format(time.RFC3339)
-	path := fmt.Sprintf("tasks?status=eq.in_progress&updated_at=lt.%s", cutoff)
-
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var tasks []types.Task
-	if err := json.Unmarshal(data, &tasks); err != nil {
-		return nil, fmt.Errorf("unmarshal stuck tasks: %w", err)
-	}
-	return tasks, nil
-}
-
-type Runner struct {
-	ID              string     `json:"id"`
-	ModelID         string     `json:"model_id"`
-	ToolID          string     `json:"tool_id"`
-	CostPriority    int        `json:"cost_priority"`
-	DailyUsed       int        `json:"daily_used"`
-	DailyLimit      int        `json:"daily_limit"`
-	CooldownExpires *time.Time `json:"cooldown_expires_at"`
-	RateLimitReset  *time.Time `json:"rate_limit_reset_at"`
-}
-
-type Destination struct {
-	ID              string                 `json:"id"`
-	Name            string                 `json:"name"`
-	Type            string                 `json:"type"`
-	Status          string                 `json:"status"`
-	Command         string                 `json:"command"`
-	Endpoint        string                 `json:"endpoint"`
-	APIKeyRef       string                 `json:"api_key_ref"`
-	URL             string                 `json:"url"`
-	NewChatURL      string                 `json:"new_chat_url"`
-	CostCategory    string                 `json:"cost_category"`
-	RateLimits      map[string]interface{} `json:"rate_limits"`
-	Throttle        map[string]interface{} `json:"throttle"`
-	ModelsAvailable []string               `json:"models_available"`
-	Config          map[string]interface{} `json:"config"`
-}
-
-func (d *DB) GetDestination(ctx context.Context, destID string) (*Destination, error) {
-	data, err := d.rpc(ctx, "get_destination", map[string]interface{}{
-		"p_id": destID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var dest Destination
-	if err := json.Unmarshal(data, &dest); err != nil {
-		return nil, fmt.Errorf("unmarshal destination: %w", err)
-	}
-	if dest.ID == "" {
-		return nil, fmt.Errorf("destination %s not found or inactive", destID)
-	}
-	return &dest, nil
-}
-
-func (d *DB) GetBestRunner(ctx context.Context, routing string, taskType string) (*Runner, error) {
-	data, err := d.rpc(ctx, "get_best_runner", map[string]interface{}{
-		"p_routing":   routing,
-		"p_task_type": taskType,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var runners []Runner
-	if err := json.Unmarshal(data, &runners); err != nil {
-		return nil, fmt.Errorf("unmarshal runner: %w", err)
-	}
-	if len(runners) == 0 {
-		return nil, nil
-	}
-	return &runners[0], nil
-}
-
-func (d *DB) RecordRunnerResult(ctx context.Context, runnerID string, taskType string, success bool, tokens int) error {
-	_, err := d.rpc(ctx, "record_runner_result", map[string]interface{}{
-		"p_runner_id":   runnerID,
-		"p_task_type":   taskType,
-		"p_success":     success,
-		"p_tokens_used": tokens,
-	})
-	return err
-}
-
-func (d *DB) RefreshLimits(ctx context.Context) error {
-	_, err := d.rpc(ctx, "refresh_limits", nil)
-	return err
-}
-
-func (d *DB) SetRunnerCooldown(ctx context.Context, runnerID string, expiresAt time.Time) error {
-	_, err := d.rpc(ctx, "set_runner_cooldown", map[string]interface{}{
-		"p_runner_id":  runnerID,
-		"p_expires_at": expiresAt.Format(time.RFC3339),
-	})
-	return err
-}
-
-func (d *DB) SetRunnerRateLimited(ctx context.Context, runnerID string, resetAt time.Time) error {
-	_, err := d.rpc(ctx, "set_runner_rate_limited", map[string]interface{}{
-		"p_runner_id": runnerID,
-		"p_reset_at":  resetAt.Format(time.RFC3339),
-	})
-	return err
-}
-
-func (d *DB) GetRunners(ctx context.Context) ([]Runner, error) {
-	data, err := d.rest(ctx, "GET", "runners?select=id,model_id,tool_id,cost_priority,status,daily_used,daily_limit&status=eq.active", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var runners []Runner
-	if err := json.Unmarshal(data, &runners); err != nil {
-		return nil, fmt.Errorf("unmarshal runners: %w", err)
-	}
-	return runners, nil
-}
-
-func (d *DB) GetTasksByStatus(ctx context.Context, status string, limit int) ([]types.Task, error) {
-	path := fmt.Sprintf("tasks?status=eq.%s&order=priority.asc,created_at.asc&limit=%d", status, limit)
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var tasks []types.Task
-	if err := json.Unmarshal(data, &tasks); err != nil {
-		return nil, fmt.Errorf("unmarshal tasks: %w", err)
-	}
-	return tasks, nil
-}
-
-type ROISummary struct {
-	TotalRuns       int     `json:"total_runs"`
-	TotalTokensIn   int     `json:"total_tokens_in"`
-	TotalTokensOut  int     `json:"total_tokens_out"`
-	TheoreticalCost float64 `json:"theoretical_cost"`
-	ActualCost      float64 `json:"actual_cost"`
-	Savings         float64 `json:"savings"`
-}
-
-func (d *DB) GetROISummary(ctx context.Context) (*ROISummary, error) {
-	data, err := d.rest(ctx, "GET", "task_runs?select=tokens_in,tokens_out,platform_theoretical_cost_usd,total_actual_cost_usd,total_savings_usd", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var rows []struct {
-		TokensIn                   int     `json:"tokens_in"`
-		TokensOut                  int     `json:"tokens_out"`
-		PlatformTheoreticalCostUsd float64 `json:"platform_theoretical_cost_usd"`
-		TotalActualCostUsd         float64 `json:"total_actual_cost_usd"`
-		TotalSavingsUsd            float64 `json:"total_savings_usd"`
-	}
-
-	if err := json.Unmarshal(data, &rows); err != nil {
-		return nil, fmt.Errorf("unmarshal roi rows: %w", err)
-	}
-
-	summary := &ROISummary{}
-	for _, row := range rows {
-		summary.TotalRuns++
-		summary.TotalTokensIn += row.TokensIn
-		summary.TotalTokensOut += row.TokensOut
-		summary.TheoreticalCost += row.PlatformTheoreticalCostUsd
-		summary.ActualCost += row.TotalActualCostUsd
-		summary.Savings += row.TotalSavingsUsd
-	}
-
-	return summary, nil
-}
-
-type CouncilReviewInput struct {
-	PlanID             string
-	Round              int
-	ModelID            string
-	Lens               string
-	Vote               string
-	Confidence         float64
-	Approach           string
-	UserIntentCheck    string
-	TechDriftCheck     string
-	DependenciesCheck  string
-	PreventativeIssues []string
-	Concerns           []string
-	Suggestions        []string
-}
-
-type CouncilReview struct {
-	ID                 string   `json:"id"`
-	PlanID             string   `json:"plan_id"`
-	Round              int      `json:"round"`
-	ModelID            string   `json:"model_id"`
-	Lens               string   `json:"lens"`
-	Vote               string   `json:"vote"`
-	Confidence         float64  `json:"confidence"`
-	Approach           string   `json:"approach"`
-	UserIntentCheck    string   `json:"user_intent_check"`
-	TechDriftCheck     string   `json:"tech_drift_check"`
-	DependenciesCheck  string   `json:"dependencies_check"`
-	PreventativeIssues []string `json:"preventative_issues"`
-	Concerns           []string `json:"concerns"`
-	Suggestions        []string `json:"suggestions"`
-}
-
-type CouncilSummary struct {
-	PlanID         string          `json:"plan_id"`
-	Round          int             `json:"round"`
-	Reviews        []CouncilReview `json:"reviews"`
-	Consensus      string          `json:"consensus"`
-	AllApproved    bool            `json:"all_approved"`
-	AnyBlocked     bool            `json:"any_blocked"`
-	CommonConcerns []string        `json:"common_concerns"`
-	AllSuggestions []string        `json:"all_suggestions"`
-}
-
-func (d *DB) SubmitCouncilReview(ctx context.Context, input *CouncilReviewInput) (string, error) {
-	data, err := d.rpc(ctx, "submit_council_review", map[string]interface{}{
-		"p_plan_id":             input.PlanID,
-		"p_round":               input.Round,
-		"p_model_id":            input.ModelID,
-		"p_lens":                input.Lens,
-		"p_vote":                input.Vote,
-		"p_confidence":          input.Confidence,
-		"p_approach":            input.Approach,
-		"p_user_intent_check":   input.UserIntentCheck,
-		"p_tech_drift_check":    input.TechDriftCheck,
-		"p_dependencies_check":  input.DependenciesCheck,
-		"p_preventative_issues": input.PreventativeIssues,
-		"p_concerns":            input.Concerns,
-		"p_suggestions":         input.Suggestions,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	var result string
-	if err := json.Unmarshal(data, &result); err != nil {
-		return "", fmt.Errorf("unmarshal council review id: %w", err)
-	}
-	return result, nil
-}
-
-func (d *DB) GetCouncilSummary(ctx context.Context, planID string, round int) (*CouncilSummary, error) {
-	data, err := d.rpc(ctx, "get_council_summary", map[string]interface{}{
-		"p_plan_id": planID,
-		"p_round":   round,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var summary CouncilSummary
-	if err := json.Unmarshal(data, &summary); err != nil {
-		return nil, fmt.Errorf("unmarshal council summary: %w", err)
-	}
-	return &summary, nil
-}
-
-func (d *DB) GetAvailableModels(ctx context.Context, limit int) ([]Runner, error) {
-	path := fmt.Sprintf("runners?status=eq.active&order=cost_priority.asc&limit=%d", limit)
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var runners []Runner
-	if err := json.Unmarshal(data, &runners); err != nil {
-		return nil, fmt.Errorf("unmarshal runners: %w", err)
-	}
-	return runners, nil
-}
-
-func (d *DB) GetTaskRuns(ctx context.Context, taskID string) ([]types.TaskRun, error) {
-	path := fmt.Sprintf("task_runs?task_id=eq.%s&order=created_at.desc", taskID)
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var runs []types.TaskRun
-	if err := json.Unmarshal(data, &runs); err != nil {
-		return nil, fmt.Errorf("unmarshal task runs: %w", err)
-	}
-	return runs, nil
-}
-
-func (d *DB) CreateResearchSuggestion(ctx context.Context, payload map[string]interface{}) (string, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"task_id":     payload["task_id"],
-		"category":    payload["category"],
-		"root_cause":  payload["root_cause"],
-		"suggestions": payload["suggestions"],
-		"auto_retry":  payload["auto_retry"],
-		"new_model":   payload["new_model"],
-		"analyzed_at": payload["analyzed_at"],
-		"created_at":  now,
-	}
-
-	data, err := d.rest(ctx, "POST", "research_suggestions?select=id", body)
-	if err != nil {
-		return "", err
-	}
-
-	var result []struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return "", fmt.Errorf("unmarshal research suggestion: %w", err)
-	}
-	if len(result) == 0 {
-		return "", fmt.Errorf("no ID returned from research suggestion creation")
-	}
-	return result[0].ID, nil
-}
-
-func (d *DB) GetResearchSuggestion(ctx context.Context, taskID string) (map[string]interface{}, error) {
-	path := fmt.Sprintf("research_suggestions?task_id=eq.%s&order=created_at.desc&limit=1", taskID)
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var results []map[string]interface{}
-	if err := json.Unmarshal(data, &results); err != nil {
-		return nil, fmt.Errorf("unmarshal research suggestion: %w", err)
-	}
-	if len(results) == 0 {
-		return nil, fmt.Errorf("no research suggestion found for task %s", taskID)
-	}
-	return results[0], nil
-}
-
-func (d *DB) REST(ctx context.Context, method, path string, body interface{}) ([]byte, error) {
-	return d.rest(ctx, method, path, body)
-}
-
-func (d *DB) RPC(ctx context.Context, name string, params interface{}) ([]byte, error) {
 	return d.rpc(ctx, name, params)
 }
 
-func (d *DB) LogOrchestratorEvent(ctx context.Context, eventType, taskID, runnerID, fromRunnerID, toRunnerID, modelID, reason string, details map[string]interface{}) error {
-	params := map[string]interface{}{
-		"p_event_type":     eventType,
-		"p_task_id":        nil,
-		"p_runner_id":      nil,
-		"p_from_runner_id": nil,
-		"p_to_runner_id":   nil,
-		"p_model_id":       nil,
-		"p_reason":         nil,
-		"p_details":        nil,
-	}
-	if taskID != "" {
-		params["p_task_id"] = taskID
-	}
-	if runnerID != "" {
-		params["p_runner_id"] = runnerID
-	}
-	if fromRunnerID != "" {
-		params["p_from_runner_id"] = fromRunnerID
-	}
-	if toRunnerID != "" {
-		params["p_to_runner_id"] = toRunnerID
-	}
-	if modelID != "" {
-		params["p_model_id"] = modelID
-	}
-	if reason != "" {
-		params["p_reason"] = reason
-	}
-	if details != nil {
-		params["p_details"] = details
-	}
-	_, err := d.rpc(ctx, "log_orchestrator_event", params)
-	return err
-}
+func (d *DB) Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error) {
+	path := table + "?select=*"
 
-func (d *DB) AppendRoutingHistory(ctx context.Context, taskID, fromModel, toModel, reason string) error {
-	_, err := d.rpc(ctx, "append_routing_history", map[string]interface{}{
-		"p_task_id":    taskID,
-		"p_from_model": fromModel,
-		"p_to_model":   toModel,
-		"p_reason":     reason,
-	})
-	return err
-}
-
-func (d *DB) IncrementInFlight(ctx context.Context, runnerID string) (bool, error) {
-	data, err := d.rpc(ctx, "increment_in_flight", map[string]interface{}{
-		"p_runner_id": runnerID,
-	})
-	if err != nil {
-		return false, err
+	for key, val := range filters {
+		if key == "limit" {
+			path = path + "&limit=" + fmt.Sprintf("%v", val)
+		} else if key == "order" {
+			path = path + "&order=" + fmt.Sprintf("%v", val)
+		} else {
+			path = path + "&" + key + "=eq." + fmt.Sprintf("%v", val)
+		}
 	}
 
-	var result bool
-	if err := json.Unmarshal(data, &result); err != nil {
-		return false, fmt.Errorf("unmarshal increment_in_flight: %w", err)
-	}
-	return result, nil
-}
-
-func (d *DB) DecrementInFlight(ctx context.Context, runnerID string) error {
-	_, err := d.rpc(ctx, "decrement_in_flight", map[string]interface{}{
-		"p_runner_id": runnerID,
-	})
-	return err
-}
-
-type FailureRecord struct {
-	TaskID          string                 `json:"task_id,omitempty"`
-	TaskRunID       string                 `json:"task_run_id,omitempty"`
-	FailureType     string                 `json:"failure_type"`
-	FailureCategory string                 `json:"failure_category"`
-	Details         map[string]interface{} `json:"failure_details,omitempty"`
-	ModelID         string                 `json:"model_id,omitempty"`
-	Platform        string                 `json:"platform,omitempty"`
-	RunnerID        string                 `json:"runner_id,omitempty"`
-	TaskType        string                 `json:"task_type,omitempty"`
-	TokensUsed      int                    `json:"tokens_used,omitempty"`
-	DurationSec     int                    `json:"duration_sec,omitempty"`
-}
-
-func (d *DB) RecordFailure(ctx context.Context, record *FailureRecord) (string, error) {
-	params := map[string]interface{}{
-		"p_failure_type":     record.FailureType,
-		"p_failure_category": record.FailureCategory,
-	}
-	if record.TaskID != "" {
-		params["p_task_id"] = record.TaskID
-	}
-	if record.TaskRunID != "" {
-		params["p_task_run_id"] = record.TaskRunID
-	}
-	if record.Details != nil {
-		params["p_failure_details"] = record.Details
-	}
-	if record.ModelID != "" {
-		params["p_model_id"] = record.ModelID
-	}
-	if record.Platform != "" {
-		params["p_platform"] = record.Platform
-	}
-	if record.RunnerID != "" {
-		params["p_runner_id"] = record.RunnerID
-	}
-	if record.TaskType != "" {
-		params["p_task_type"] = record.TaskType
-	}
-	if record.TokensUsed > 0 {
-		params["p_tokens_used"] = record.TokensUsed
-	}
-	if record.DurationSec > 0 {
-		params["p_duration_sec"] = record.DurationSec
-	}
-
-	data, err := d.rpc(ctx, "record_failure", params)
-	if err != nil {
-		return "", err
-	}
-
-	var id string
-	if err := json.Unmarshal(data, &id); err != nil {
-		return "", fmt.Errorf("unmarshal failure id: %w", err)
-	}
-	return id, nil
-}
-
-type Heuristic struct {
-	ID             string                 `json:"id"`
-	TaskType       string                 `json:"task_type,omitempty"`
-	Condition      map[string]interface{} `json:"condition,omitempty"`
-	PreferredModel string                 `json:"preferred_model"`
-	Action         map[string]interface{} `json:"action,omitempty"`
-	Confidence     float64                `json:"confidence"`
-}
-
-func (d *DB) GetHeuristic(ctx context.Context, taskType string, condition map[string]interface{}) (*Heuristic, error) {
-	params := map[string]interface{}{}
-	if taskType != "" {
-		params["p_task_type"] = taskType
-	}
-	if condition != nil {
-		params["p_condition"] = condition
-	}
-
-	data, err := d.rpc(ctx, "get_heuristic", params)
+	data, err := d.REST(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var heuristics []Heuristic
-	if err := json.Unmarshal(data, &heuristics); err != nil {
-		return nil, fmt.Errorf("unmarshal heuristic: %w", err)
-	}
-	if len(heuristics) == 0 {
-		return nil, nil
-	}
-	return &heuristics[0], nil
+	return json.RawMessage(data), nil
 }
 
-func (d *DB) RecordHeuristicResult(ctx context.Context, heuristicID string, success bool) error {
-	_, err := d.rpc(ctx, "record_heuristic_result", map[string]interface{}{
-		"p_heuristic_id": heuristicID,
-		"p_success":      success,
-	})
+func (d *DB) Insert(ctx context.Context, table string, data map[string]any) (json.RawMessage, error) {
+	result, err := d.REST(ctx, "POST", table, data)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(result), nil
+}
+
+func (d *DB) Update(ctx context.Context, table, id string, data map[string]any) (json.RawMessage, error) {
+	path := table + "?id=eq." + id
+	result, err := d.REST(ctx, "PATCH", path, data)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(result), nil
+}
+
+func (d *DB) Delete(ctx context.Context, table, id string) error {
+	path := table + "?id=eq." + id
+	_, err := d.REST(ctx, "DELETE", path, nil)
 	return err
 }
 
-type ProblemSolution struct {
-	ID              string                 `json:"id"`
-	SolutionType    string                 `json:"solution_type"`
-	SolutionModel   string                 `json:"solution_model,omitempty"`
-	SolutionDetails map[string]interface{} `json:"solution_details,omitempty"`
-	SuccessRate     float64                `json:"success_rate"`
+type Destination struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	Status    string `json:"status"`
+	Command   string `json:"command,omitempty"`
+	Endpoint  string `json:"endpoint,omitempty"`
+	APIKeyRef string `json:"api_key_ref,omitempty"`
 }
 
-func (d *DB) RecordSolutionResult(ctx context.Context, solutionID string, success bool) error {
-	_, err := d.rpc(ctx, "record_solution_result", map[string]interface{}{
-		"p_solution_id": solutionID,
-		"p_success":     success,
-	})
-	return err
-}
-
-type RecentFailure struct {
-	ModelID      string `json:"model_id"`
-	Platform     string `json:"platform,omitempty"`
-	FailureType  string `json:"failure_type"`
-	FailureCount int    `json:"failure_count"`
-}
-
-func (d *DB) GetRecentFailures(ctx context.Context, taskType string, sinceMinutes int) ([]RecentFailure, error) {
-	params := map[string]interface{}{}
-	if taskType != "" {
-		params["p_task_type"] = taskType
-	}
-	if sinceMinutes > 0 {
-		params["p_since"] = fmt.Sprintf("NOW() - INTERVAL '%d minutes'", sinceMinutes)
-	}
-
-	data, err := d.rpc(ctx, "get_recent_failures", params)
+func (d *DB) GetDestination(ctx context.Context, id string) (*Destination, error) {
+	data, err := d.REST(ctx, "GET", "destinations?id=eq."+id+"&limit=1", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var failures []RecentFailure
-	if err := json.Unmarshal(data, &failures); err != nil {
-		return nil, fmt.Errorf("unmarshal recent failures: %w", err)
+	var dests []Destination
+	if err := json.Unmarshal(data, &dests); err != nil {
+		return nil, fmt.Errorf("unmarshal: %w", err)
 	}
-	return failures, nil
+
+	if len(dests) == 0 {
+		return nil, fmt.Errorf("destination %s not found", id)
+	}
+
+	return &dests[0], nil
 }
 
-func (d *DB) UpsertHeuristic(ctx context.Context, taskType string, condition map[string]interface{}, preferredModel string, action map[string]interface{}, confidence float64, source string) (string, error) {
-	params := map[string]interface{}{
-		"p_preferred_model": preferredModel,
-		"p_confidence":      confidence,
-	}
-	if taskType != "" {
-		params["p_task_type"] = taskType
-	}
-	if condition != nil {
-		params["p_condition"] = condition
-	}
-	if action != nil {
-		params["p_action"] = action
-	}
-	if source != "" {
-		params["p_source"] = source
-	}
-
-	data, err := d.rpc(ctx, "upsert_heuristic", params)
-	if err != nil {
-		return "", err
-	}
-
-	var id string
-	if err := json.Unmarshal(data, &id); err != nil {
-		return "", fmt.Errorf("unmarshal heuristic id: %w", err)
-	}
-	return id, nil
+type Runner struct {
+	ID           string  `json:"id"`
+	ModelID      string  `json:"model_id"`
+	ToolID       string  `json:"tool_id"`
+	Status       string  `json:"status"`
+	CostPriority int     `json:"cost_priority"`
+	Depreciation float64 `json:"depreciation_score"`
 }
 
-type RunnerToArchive struct {
-	ID                string     `json:"id"`
-	ModelID           string     `json:"model_id"`
-	DepreciationScore float64    `json:"depreciation_score"`
-	TotalAttempts     int        `json:"total_attempts"`
-	LastSuccessAt     *time.Time `json:"last_success_at"`
-}
-
-func (d *DB) GetRunnersToArchive(ctx context.Context, threshold float64, minAttempts, cooldownHours int) ([]RunnerToArchive, error) {
-	data, err := d.rpc(ctx, "get_runners_to_archive", map[string]interface{}{
-		"p_threshold":      threshold,
-		"p_min_attempts":   minAttempts,
-		"p_cooldown_hours": cooldownHours,
-	})
+func (d *DB) GetRunners(ctx context.Context) ([]Runner, error) {
+	data, err := d.REST(ctx, "GET", "runners?status=eq.active&select=id,model_id,tool_id,status,cost_priority,depreciation_score", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var runners []RunnerToArchive
+	var runners []Runner
 	if err := json.Unmarshal(data, &runners); err != nil {
-		return nil, fmt.Errorf("unmarshal runners to archive: %w", err)
+		return nil, fmt.Errorf("unmarshal: %w", err)
 	}
+
 	return runners, nil
-}
-
-func (d *DB) ArchiveRunner(ctx context.Context, runnerID, reason string) error {
-	_, err := d.rpc(ctx, "archive_runner", map[string]interface{}{
-		"p_runner_id": runnerID,
-		"p_reason":    reason,
-	})
-	return err
-}
-
-func (d *DB) BoostRunner(ctx context.Context, runnerID string) error {
-	_, err := d.rpc(ctx, "boost_runner", map[string]interface{}{
-		"p_runner_id": runnerID,
-	})
-	return err
-}
-
-func (d *DB) ReviveRunner(ctx context.Context, runnerID, reason string) error {
-	_, err := d.rpc(ctx, "revive_runner", map[string]interface{}{
-		"p_runner_id": runnerID,
-		"p_reason":    reason,
-	})
-	return err
-}
-
-type PlannerRule struct {
-	ID                  string                 `json:"id"`
-	AppliesTo           string                 `json:"applies_to"`
-	RuleType            string                 `json:"rule_type"`
-	RuleText            string                 `json:"rule_text"`
-	Details             map[string]interface{} `json:"details"`
-	Source              string                 `json:"source"`
-	Priority            int                    `json:"priority"`
-	TimesApplied        int                    `json:"times_applied"`
-	TimesPreventedIssue int                    `json:"times_prevented_issue"`
-	EffectivenessScore  float64                `json:"effectiveness_score"`
-}
-
-func (d *DB) GetPlannerRules(ctx context.Context, appliesTo string, limit int) ([]PlannerRule, error) {
-	params := map[string]interface{}{
-		"p_limit": limit,
-	}
-	if appliesTo != "" {
-		params["p_applies_to"] = appliesTo
-	}
-
-	data, err := d.rpc(ctx, "get_planner_rules", params)
-	if err != nil {
-		return nil, err
-	}
-
-	var rules []PlannerRule
-	if err := json.Unmarshal(data, &rules); err != nil {
-		return nil, fmt.Errorf("unmarshal planner rules: %w", err)
-	}
-	return rules, nil
-}
-
-func (d *DB) CreatePlannerRule(ctx context.Context, appliesTo, ruleType, ruleText, source string, details map[string]interface{}, sourceTaskID, sourceReviewType *string, priority int) (string, error) {
-	params := map[string]interface{}{
-		"p_applies_to": appliesTo,
-		"p_rule_type":  ruleType,
-		"p_rule_text":  ruleText,
-		"p_source":     source,
-		"p_details":    details,
-		"p_priority":   priority,
-	}
-	if sourceTaskID != nil {
-		params["p_source_task_id"] = *sourceTaskID
-	}
-	if sourceReviewType != nil {
-		params["p_source_review_type"] = *sourceReviewType
-	}
-
-	data, err := d.rpc(ctx, "create_planner_rule", params)
-	if err != nil {
-		return "", err
-	}
-
-	var ruleID string
-	if err := json.Unmarshal(data, &ruleID); err != nil {
-		return "", fmt.Errorf("unmarshal rule id: %w", err)
-	}
-	return ruleID, nil
-}
-
-func (d *DB) RecordPlannerRuleApplied(ctx context.Context, ruleID string) error {
-	_, err := d.rpc(ctx, "record_planner_rule_applied", map[string]interface{}{
-		"p_rule_id": ruleID,
-	})
-	return err
-}
-
-func (d *DB) RecordPlannerRulePreventedIssue(ctx context.Context, ruleID string) error {
-	_, err := d.rpc(ctx, "record_planner_rule_prevented_issue", map[string]interface{}{
-		"p_rule_id": ruleID,
-	})
-	return err
-}
-
-func (d *DB) DeactivatePlannerRule(ctx context.Context, ruleID, reason string) error {
-	_, err := d.rpc(ctx, "deactivate_planner_rule", map[string]interface{}{
-		"p_rule_id": ruleID,
-		"p_reason":  reason,
-	})
-	return err
-}
-
-func (d *DB) CreateRuleFromRejection(ctx context.Context, taskID, rejectionType, rejectionReason, appliesTo, source string) (string, error) {
-	data, err := d.rpc(ctx, "create_rule_from_rejection", map[string]interface{}{
-		"p_task_id":          taskID,
-		"p_rejection_type":   rejectionType,
-		"p_rejection_reason": rejectionReason,
-		"p_applies_to":       appliesTo,
-		"p_source":           source,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	var ruleID string
-	if err := json.Unmarshal(data, &ruleID); err != nil {
-		return "", fmt.Errorf("unmarshal rule id: %w", err)
-	}
-	return ruleID, nil
-}
-
-type TesterRule struct {
-	ID             string `json:"id"`
-	AppliesTo      string `json:"applies_to"`
-	TestType       string `json:"test_type"`
-	TestCommand    string `json:"test_command"`
-	TriggerPattern string `json:"trigger_pattern,omitempty"`
-	Priority       int    `json:"priority"`
-	CaughtBugs     int    `json:"caught_bugs"`
-	FalsePositives int    `json:"false_positives"`
-}
-
-func (d *DB) GetTesterRules(ctx context.Context, appliesTo string, limit int) ([]TesterRule, error) {
-	params := map[string]interface{}{
-		"p_limit": limit,
-	}
-	if appliesTo != "" {
-		params["p_applies_to"] = appliesTo
-	}
-
-	data, err := d.rpc(ctx, "get_tester_rules", params)
-	if err != nil {
-		return nil, err
-	}
-
-	var rules []TesterRule
-	if err := json.Unmarshal(data, &rules); err != nil {
-		return nil, fmt.Errorf("unmarshal tester rules: %w", err)
-	}
-	return rules, nil
-}
-
-func (d *DB) CreateTesterRule(ctx context.Context, appliesTo, testType, testCommand, source string, triggerPattern *string, priority int, sourceTaskID *string, sourceDetails map[string]interface{}) (string, error) {
-	params := map[string]interface{}{
-		"p_applies_to":   appliesTo,
-		"p_test_type":    testType,
-		"p_test_command": testCommand,
-		"p_source":       source,
-		"p_priority":     priority,
-	}
-	if triggerPattern != nil {
-		params["p_trigger_pattern"] = *triggerPattern
-	}
-	if sourceTaskID != nil {
-		params["p_source_task_id"] = *sourceTaskID
-	}
-	if sourceDetails != nil {
-		params["p_source_details"] = sourceDetails
-	}
-
-	data, err := d.rpc(ctx, "create_tester_rule", params)
-	if err != nil {
-		return "", err
-	}
-
-	var ruleID string
-	if err := json.Unmarshal(data, &ruleID); err != nil {
-		return "", fmt.Errorf("unmarshal tester rule id: %w", err)
-	}
-	return ruleID, nil
-}
-
-func (d *DB) RecordTesterRuleCaughtBug(ctx context.Context, ruleID string) error {
-	_, err := d.rpc(ctx, "record_tester_rule_caught_bug", map[string]interface{}{
-		"p_rule_id": ruleID,
-	})
-	return err
-}
-
-func (d *DB) RecordTesterRuleFalsePositive(ctx context.Context, ruleID string) error {
-	_, err := d.rpc(ctx, "record_tester_rule_false_positive", map[string]interface{}{
-		"p_rule_id": ruleID,
-	})
-	return err
-}
-
-type SupervisorRule struct {
-	ID               string                 `json:"id"`
-	TriggerPattern   string                 `json:"trigger_pattern"`
-	TriggerCondition map[string]interface{} `json:"trigger_condition,omitempty"`
-	Action           string                 `json:"action"`
-	Reason           string                 `json:"reason"`
-	TimesCaughtIssue int                    `json:"times_caught_issue"`
-}
-
-func (d *DB) GetSupervisorRules(ctx context.Context, taskType string, limit int) ([]SupervisorRule, error) {
-	params := map[string]interface{}{
-		"p_limit": limit,
-	}
-	if taskType != "" {
-		params["p_task_type"] = taskType
-	}
-
-	data, err := d.rpc(ctx, "get_supervisor_rules", params)
-	if err != nil {
-		return nil, err
-	}
-
-	var rules []SupervisorRule
-	if err := json.Unmarshal(data, &rules); err != nil {
-		return nil, fmt.Errorf("unmarshal supervisor rules: %w", err)
-	}
-	return rules, nil
-}
-
-func (d *DB) CreateSupervisorRule(ctx context.Context, triggerPattern, action, reason, source string, triggerCondition map[string]interface{}, sourceTaskID *string) (string, error) {
-	params := map[string]interface{}{
-		"p_trigger_pattern": triggerPattern,
-		"p_action":          action,
-		"p_reason":          reason,
-		"p_source":          source,
-	}
-	if triggerCondition != nil {
-		params["p_trigger_condition"] = triggerCondition
-	}
-	if sourceTaskID != nil {
-		params["p_source_task_id"] = *sourceTaskID
-	}
-
-	data, err := d.rpc(ctx, "create_supervisor_rule", params)
-	if err != nil {
-		return "", err
-	}
-
-	var ruleID string
-	if err := json.Unmarshal(data, &ruleID); err != nil {
-		return "", fmt.Errorf("unmarshal supervisor rule id: %w", err)
-	}
-	return ruleID, nil
-}
-
-func (d *DB) RecordSupervisorRuleTriggered(ctx context.Context, ruleID string, caughtIssue bool) error {
-	_, err := d.rpc(ctx, "record_supervisor_rule_triggered", map[string]interface{}{
-		"p_rule_id":      ruleID,
-		"p_caught_issue": caughtIssue,
-	})
-	return err
-}
-
-func (d *DB) CreateRuleFromSupervisorRejection(ctx context.Context, taskID, issuePattern, issueText string, taskType *string) (string, error) {
-	params := map[string]interface{}{
-		"p_task_id":       taskID,
-		"p_issue_pattern": issuePattern,
-		"p_issue_text":    issueText,
-	}
-	if taskType != nil {
-		params["p_task_type"] = *taskType
-	}
-
-	data, err := d.rpc(ctx, "create_rule_from_supervisor_rejection", params)
-	if err != nil {
-		return "", err
-	}
-
-	var ruleID string
-	if err := json.Unmarshal(data, &ruleID); err != nil {
-		return "", fmt.Errorf("unmarshal rule id: %w", err)
-	}
-	return ruleID, nil
-}
-
-func (d *DB) DeactivateTesterRule(ctx context.Context, ruleID, reason string) error {
-	_, err := d.rpc(ctx, "deactivate_tester_rule", map[string]interface{}{
-		"p_rule_id": ruleID,
-		"p_reason":  reason,
-	})
-	return err
-}
-
-func (d *DB) DeactivateSupervisorRule(ctx context.Context, ruleID, reason string) error {
-	_, err := d.rpc(ctx, "deactivate_supervisor_rule", map[string]interface{}{
-		"p_rule_id": ruleID,
-		"p_reason":  reason,
-	})
-	return err
-}
-
-type LearningStats struct {
-	TableName         string `json:"table_name"`
-	TotalRules        int    `json:"total_rules"`
-	ActiveRules       int    `json:"active_rules"`
-	TotalApplications int    `json:"total_applications"`
-	TotalIssuesCaught int    `json:"total_issues_caught"`
-}
-
-func (d *DB) GetLearningStats(ctx context.Context) ([]LearningStats, error) {
-	data, err := d.rpc(ctx, "get_learning_stats", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var stats []LearningStats
-	if err := json.Unmarshal(data, &stats); err != nil {
-		return nil, fmt.Errorf("unmarshal learning stats: %w", err)
-	}
-	return stats, nil
-}
-
-func (d *DB) GetChangeApprovals(ctx context.Context, changeID string) (map[string]bool, error) {
-	approvals := make(map[string]bool)
-
-	task, err := d.GetTaskByID(ctx, changeID)
-	if err != nil {
-		return approvals, nil
-	}
-
-	if task.Status == "approval" || task.Status == "merged" {
-		approvals["supervisor"] = true
-	}
-
-	if task.Status == "awaiting_human" || task.Status == "approval" || task.Status == "merged" {
-		approvals["council"] = true
-	}
-
-	if task.Status == "approval" || task.Status == "merged" {
-		approvals["human"] = true
-	}
-
-	return approvals, nil
 }

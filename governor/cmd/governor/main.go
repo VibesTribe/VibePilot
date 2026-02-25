@@ -2,114 +2,93 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	"github.com/vibepilot/governor/internal/analyst"
-	"github.com/vibepilot/governor/internal/config"
-	"github.com/vibepilot/governor/internal/courier"
 	"github.com/vibepilot/governor/internal/db"
-	"github.com/vibepilot/governor/internal/dispatcher"
+	"github.com/vibepilot/governor/internal/destinations"
 	"github.com/vibepilot/governor/internal/gitree"
-	"github.com/vibepilot/governor/internal/janitor"
-	"github.com/vibepilot/governor/internal/orchestrator"
-	"github.com/vibepilot/governor/internal/security"
-	"github.com/vibepilot/governor/internal/sentry"
-	"github.com/vibepilot/governor/internal/server"
-	"github.com/vibepilot/governor/internal/tester"
-	"github.com/vibepilot/governor/internal/throttle"
-	"github.com/vibepilot/governor/internal/visual"
-	"github.com/vibepilot/governor/pkg/types"
+	"github.com/vibepilot/governor/internal/runtime"
+	"github.com/vibepilot/governor/internal/tools"
+	"github.com/vibepilot/governor/internal/vault"
 )
 
 var (
-	version = "dev"
-	commit  = "none"
+	version = "2.0.0"
+	commit  = "dev"
 	date    = "unknown"
 )
 
 func main() {
-	cfg, err := config.Load("governor.yaml")
+	log.Printf("VibePilot Governor %s (commit: %s, built: %s)", version, commit, date)
+
+	cfg, err := runtime.LoadConfig("./config")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	log.Printf("VibePilot Governor %s starting...", version)
-	log.Printf("Poll interval: %v, Max concurrent: %d, Max per module: %d",
-		cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent, cfg.Governor.MaxPerModule)
+	dbURL := cfg.GetDatabaseURL()
+	dbKey := cfg.GetDatabaseKey()
+	if dbURL == "" || dbKey == "" {
+		log.Fatal("Database credentials required: set SUPABASE_URL and SUPABASE_KEY")
+	}
 
-	database := db.New(cfg.Supabase.URL, cfg.Supabase.ServiceKey)
+	database := db.New(dbURL, dbKey)
 	defer database.Close()
+	log.Println("Connected to database")
 
-	log.Println("Connected to Supabase")
-
-	leakDetector := security.NewLeakDetector()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	dispatchCh := make(chan types.Task, 10)
-
-	moduleLimiter := throttle.NewModuleLimiter(cfg.Governor.MaxPerModule)
-
-	repoPath := cfg.Governor.RepoPath
-	if repoPath == "" {
-		repoPath = "."
+	repoPath := "."
+	if p := os.Getenv("REPO_PATH"); p != "" {
+		repoPath = p
 	}
 
 	git := gitree.New(&gitree.Config{
 		RepoPath:          repoPath,
-		ProtectedBranches: cfg.Git.ProtectedBranches,
+		ProtectedBranches: []string{"main", "master"},
 	})
-	test := tester.New(&tester.Config{RepoPath: repoPath})
-	visTest := visual.New(&visual.Config{RepoPath: repoPath})
-	orch := orchestrator.New(database, git, test, visTest)
 
-	test.SetRuleProvider(&testerRuleAdapter{db: database})
+	v := vault.New(database)
 
-	s := sentry.New(database, cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent, dispatchCh, moduleLimiter)
-	go s.Run(ctx)
+	toolRegistry := runtime.NewToolRegistry(cfg)
+	tools.RegisterAll(toolRegistry, &tools.Dependencies{
+		DB:       database,
+		Git:      git,
+		Vault:    v,
+		RepoPath: repoPath,
+	})
 
-	d := dispatcher.New(database, cfg, leakDetector)
-	d.SetOrchestrator(orch)
-	d.SetGitree(git)
-	d.SetFinalizer(s)
+	sessionFactory := runtime.NewSessionFactory(cfg, toolRegistry)
 
-	if cfg.Courier.Enabled && cfg.GitHub.Token != "" {
-		courierDispatcher := courier.NewDispatcher(
-			cfg.GitHub.Token,
-			cfg.GitHub.Owner,
-			cfg.GitHub.Repo,
-			cfg.GitHub.Workflow,
-			cfg.Courier.CallbackURL,
-			cfg.Courier.MaxInFlight,
-		)
-		go courierDispatcher.Start(ctx)
-		d.SetCourier(courierDispatcher)
-		log.Println("Courier enabled: GitHub Actions dispatch active")
+	cliRunner := destinations.NewCLIRunner("opencode", cfg.System.Runtime.AgentTimeoutSeconds)
+	sessionFactory.RegisterDestination("opencode", cliRunner)
+	sessionFactory.RegisterDestination("kimi", destinations.NewCLIRunner("kimi", cfg.System.Runtime.AgentTimeoutSeconds))
+
+	pool := runtime.NewAgentPool(
+		cfg.System.Runtime.MaxConcurrentPerModule,
+		cfg.System.Runtime.MaxConcurrentTotal,
+	)
+
+	pollInterval := time.Duration(cfg.System.Runtime.EventPollIntervalMs) * time.Millisecond
+	watcher := runtime.NewPollingWatcher(&dbQuerierAdapter{db: database}, pollInterval)
+
+	router := runtime.NewEventRouter(watcher)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	setupEventHandlers(ctx, router, sessionFactory, pool, database)
+
+	if err := router.Start(ctx); err != nil {
+		log.Fatalf("Failed to start event router: %v", err)
 	}
 
-	go d.Run(ctx, dispatchCh)
-	go orch.Run(ctx)
-
-	j := janitor.New(database, cfg.Governor.StuckTimeout, cfg.Deprecation)
-	go j.Run(ctx)
-
-	analystSvc := analyst.New(database, cfg.Analyst, cfg.GitHub, repoPath)
-	go analystSvc.Run(ctx)
-
-	srv := server.New(&cfg.Server, &cfg.Governor, database)
-	srv.SetCourierCallback(d.OnCourierResult)
-	srv.SetModuleCountsGetter(s.ModuleCounts)
-	go func() {
-		if err := srv.Start(); err != nil {
-			log.Printf("Server error: %v", err)
-		}
-	}()
-
-	log.Println("Governor started. Press Ctrl+C to stop.")
+	log.Printf("Governor started (poll: %v, max/module: %d, max total: %d)",
+		pollInterval, cfg.System.Runtime.MaxConcurrentPerModule, cfg.System.Runtime.MaxConcurrentTotal)
+	log.Println("Press Ctrl+C to stop")
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -117,40 +96,283 @@ func main() {
 
 	log.Println("Shutting down...")
 	cancel()
-	srv.Shutdown()
+	watcher.Close()
+	pool.Wait()
 
-	log.Println("Governor stopped.")
+	log.Println("Governor stopped")
 }
 
-type testerRuleAdapter struct {
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB) {
+	router.On(runtime.EventTaskAvailable, func(event runtime.Event) {
+		var task map[string]any
+		if err := json.Unmarshal(event.Record, &task); err != nil {
+			log.Printf("[EventTaskAvailable] Failed to parse task: %v", err)
+			return
+		}
+
+		taskID, _ := task["id"].(string)
+		sliceID, _ := task["slice_id"].(string)
+		if sliceID == "" {
+			sliceID = "default"
+		}
+
+		session, err := factory.Create("orchestrator")
+		if err != nil {
+			log.Printf("[EventTaskAvailable] Failed to create orchestrator session: %v", err)
+			return
+		}
+
+		err = pool.Submit(ctx, sliceID, func() error {
+			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_available"})
+			if err != nil {
+				log.Printf("[EventTaskAvailable] Orchestrator session failed for %s: %v", taskID[:8], err)
+				return err
+			}
+			output := result.Output
+			if len(output) > 200 {
+				output = output[:200] + "..."
+			}
+			log.Printf("[EventTaskAvailable] Task %s routed: %s", taskID[:8], output)
+			return nil
+		})
+		if err != nil {
+			log.Printf("[EventTaskAvailable] Failed to submit to pool: %v", err)
+		}
+	})
+
+	router.On(runtime.EventTaskReview, func(event runtime.Event) {
+		var task map[string]any
+		if err := json.Unmarshal(event.Record, &task); err != nil {
+			return
+		}
+
+		taskID, _ := task["id"].(string)
+		sliceID, _ := task["slice_id"].(string)
+		if sliceID == "" {
+			sliceID = "review"
+		}
+
+		session, err := factory.Create("supervisor")
+		if err != nil {
+			log.Printf("[EventTaskReview] Failed to create supervisor session: %v", err)
+			return
+		}
+
+		err = pool.Submit(ctx, sliceID, func() error {
+			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_review"})
+			if err != nil {
+				return err
+			}
+			output := result.Output
+			if len(output) > 200 {
+				output = output[:200] + "..."
+			}
+			log.Printf("[EventTaskReview] Task %s reviewed: %s", taskID[:8], output)
+			return nil
+		})
+		if err != nil {
+			log.Printf("[EventTaskReview] Failed to submit to pool: %v", err)
+		}
+	})
+
+	router.On(runtime.EventTaskCompleted, func(event runtime.Event) {
+		var task map[string]any
+		if err := json.Unmarshal(event.Record, &task); err != nil {
+			return
+		}
+
+		taskID, _ := task["id"].(string)
+		sliceID, _ := task["slice_id"].(string)
+		if sliceID == "" {
+			sliceID = "complete"
+		}
+
+		session, err := factory.Create("supervisor")
+		if err != nil {
+			return
+		}
+
+		err = pool.Submit(ctx, sliceID, func() error {
+			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_completed"})
+			if err != nil {
+				return err
+			}
+			output := result.Output
+			if len(output) > 200 {
+				output = output[:200] + "..."
+			}
+			log.Printf("[EventTaskCompleted] Task %s completed: %s", taskID[:8], output)
+			return nil
+		})
+		if err != nil {
+			log.Printf("[EventTaskCompleted] Failed to submit to pool: %v", err)
+		}
+	})
+
+	router.On(runtime.EventPlanCreated, func(event runtime.Event) {
+		var plan map[string]any
+		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			return
+		}
+
+		planID, _ := plan["id"].(string)
+
+		session, err := factory.Create("supervisor")
+		if err != nil {
+			return
+		}
+
+		err = pool.Submit(ctx, "plans", func() error {
+			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "plan_created"})
+			if err != nil {
+				return err
+			}
+			output := result.Output
+			if len(output) > 200 {
+				output = output[:200] + "..."
+			}
+			log.Printf("[EventPlanCreated] Plan %s triaged: %s", planID[:8], output)
+			return nil
+		})
+		if err != nil {
+			log.Printf("[EventPlanCreated] Failed to submit to pool: %v", err)
+		}
+	})
+
+	router.On(runtime.EventCouncilDone, func(event runtime.Event) {
+		var plan map[string]any
+		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			return
+		}
+
+		planID, _ := plan["id"].(string)
+
+		session, err := factory.Create("supervisor")
+		if err != nil {
+			return
+		}
+
+		err = pool.Submit(ctx, "plans", func() error {
+			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "council_done"})
+			if err != nil {
+				return err
+			}
+			output := result.Output
+			if len(output) > 200 {
+				output = output[:200] + "..."
+			}
+			log.Printf("[EventCouncilDone] Council done for %s: %s", planID[:8], output)
+			return nil
+		})
+		if err != nil {
+			log.Printf("[EventCouncilDone] Failed to submit to pool: %v", err)
+		}
+	})
+
+	router.On(runtime.EventMaintenanceCmd, func(event runtime.Event) {
+		var cmd map[string]any
+		if err := json.Unmarshal(event.Record, &cmd); err != nil {
+			return
+		}
+
+		cmdID, _ := cmd["id"].(string)
+
+		session, err := factory.Create("maintenance")
+		if err != nil {
+			return
+		}
+
+		err = pool.Submit(ctx, "maintenance", func() error {
+			result, err := session.Run(ctx, map[string]any{"command": cmd, "event": "maintenance_command"})
+			if err != nil {
+				return err
+			}
+			output := result.Output
+			if len(output) > 200 {
+				output = output[:200] + "..."
+			}
+			log.Printf("[EventMaintenanceCmd] Command %s executed: %s", cmdID[:8], output)
+			return nil
+		})
+		if err != nil {
+			log.Printf("[EventMaintenanceCmd] Failed to submit to pool: %v", err)
+		}
+	})
+
+	router.On(runtime.EventResearchReady, func(event runtime.Event) {
+		session, err := factory.Create("supervisor")
+		if err != nil {
+			return
+		}
+
+		err = pool.Submit(ctx, "research", func() error {
+			result, err := session.Run(ctx, map[string]any{"event": "research_ready", "record": string(event.Record)})
+			if err != nil {
+				return err
+			}
+			log.Printf("[EventResearchReady] Research reviewed: %s", result.Output[:min(100, len(result.Output))])
+			return nil
+		})
+		if err != nil {
+			log.Printf("[EventResearchReady] Failed to submit to pool: %v", err)
+		}
+	})
+}
+
+type dbQuerierAdapter struct {
 	db *db.DB
 }
 
-func (a *testerRuleAdapter) GetTesterRules(ctx context.Context, appliesTo string, limit int) ([]tester.TesterRule, error) {
-	rules, err := a.db.GetTesterRules(ctx, appliesTo, limit)
-	if err != nil {
-		return nil, err
+func (q *dbQuerierAdapter) Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error) {
+	path := table
+
+	if columns, ok := filters["columns"].([]any); ok && len(columns) > 0 {
+		colStr := ""
+		for i, c := range columns {
+			if i > 0 {
+				colStr += ","
+			}
+			colStr += toString(c)
+		}
+		path = table + "?select=" + colStr
+	} else {
+		path = table + "?select=*"
 	}
-	result := make([]tester.TesterRule, len(rules))
-	for i, r := range rules {
-		result[i] = tester.TesterRule{
-			ID:             r.ID,
-			AppliesTo:      r.AppliesTo,
-			TestType:       r.TestType,
-			TestCommand:    r.TestCommand,
-			TriggerPattern: r.TriggerPattern,
-			Priority:       r.Priority,
-			CaughtBugs:     r.CaughtBugs,
-			FalsePositives: r.FalsePositives,
+
+	for key, val := range filters {
+		if key == "columns" || key == "select" {
+			continue
+		}
+		if orVal, ok := val.(string); ok && key == "or" {
+			path = path + "&or=(" + orVal + ")"
+		} else {
+			path = path + "&" + key + "=eq." + toString(val)
 		}
 	}
-	return result, nil
+
+	if limit, ok := filters["limit"].(float64); ok {
+		path = path + "&limit=" + toString(int(limit))
+	}
+
+	return q.db.REST(ctx, "GET", path, nil)
 }
 
-func (a *testerRuleAdapter) RecordTesterRuleCaughtBug(ctx context.Context, ruleID string) error {
-	return a.db.RecordTesterRuleCaughtBug(ctx, ruleID)
+func toString(v any) string {
+	switch val := v.(type) {
+	case string:
+		return val
+	case int:
+		return string(rune(val + '0'))
+	case float64:
+		return string(rune(int(val) + '0'))
+	default:
+		return ""
+	}
 }
 
-func (a *testerRuleAdapter) RecordTesterRuleFalsePositive(ctx context.Context, ruleID string) error {
-	return a.db.RecordTesterRuleFalsePositive(ctx, ruleID)
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
