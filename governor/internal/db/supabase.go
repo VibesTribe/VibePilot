@@ -241,47 +241,6 @@ func (d *DB) UpdateTaskBranch(ctx context.Context, taskID string, branchName str
 	return err
 }
 
-func (d *DB) CreateMergeTask(ctx context.Context, taskID, parentTaskID, sliceID, branchName, title string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	body := map[string]interface{}{
-		"id":             taskID,
-		"title":          "Merge: " + title,
-		"type":           "merge",
-		"status":         "available",
-		"priority":       1,
-		"routing_flag":   "internal",
-		"slice_id":       sliceID,
-		"parent_task_id": parentTaskID,
-		"branch_name":    branchName,
-		"max_attempts":   3,
-		"created_at":     now,
-		"updated_at":     now,
-	}
-
-	_, err := d.rest(ctx, "POST", "tasks", body)
-	return err
-}
-
-func (d *DB) GetMergePendingTasks(ctx context.Context, sliceID string) ([]types.Task, error) {
-	path := "tasks?type=eq.merge&status=neq.merged"
-	if sliceID != "" {
-		path += "&slice_id=eq." + sliceID
-	}
-
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var tasks []types.Task
-	if err := json.Unmarshal(data, &tasks); err != nil {
-		return nil, err
-	}
-
-	return tasks, nil
-}
-
 func (d *DB) GetTasksBySlice(ctx context.Context, sliceID string) ([]types.Task, error) {
 	path := "tasks?slice_id=eq." + sliceID + "&select=*"
 
@@ -595,107 +554,6 @@ func (d *DB) GetCouncilSummary(ctx context.Context, planID string, round int) (*
 	return &summary, nil
 }
 
-func (d *DB) NeedsNextRound(ctx context.Context, planID string, currentRound int) (bool, error) {
-	data, err := d.rpc(ctx, "needs_next_round", map[string]interface{}{
-		"p_plan_id":       planID,
-		"p_current_round": currentRound,
-	})
-	if err != nil {
-		return false, err
-	}
-
-	var result bool
-	if err := json.Unmarshal(data, &result); err != nil {
-		return false, fmt.Errorf("unmarshal needs_next_round: %w", err)
-	}
-	return result, nil
-}
-
-func (d *DB) GetRoundFeedback(ctx context.Context, planID string, round int) (map[string]interface{}, error) {
-	data, err := d.rpc(ctx, "get_round_feedback", map[string]interface{}{
-		"p_plan_id": planID,
-		"p_round":   round,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, fmt.Errorf("unmarshal round feedback: %w", err)
-	}
-	return result, nil
-}
-
-type MaintenanceCommand struct {
-	ID             string                 `json:"command_id"`
-	CommandType    string                 `json:"command_type"`
-	Payload        map[string]interface{} `json:"payload"`
-	Status         string                 `json:"status"`
-	IdempotencyKey string                 `json:"idempotency_key"`
-	ApprovedBy     string                 `json:"approved_by"`
-	ExecutedBy     string                 `json:"executed_by"`
-	Result         map[string]interface{} `json:"result"`
-	ErrorMessage   string                 `json:"error_message"`
-	RetryCount     int                    `json:"retry_count"`
-}
-
-func (d *DB) CreateMaintenanceCommand(ctx context.Context, commandType, idempotencyKey, approvedBy string, payload map[string]interface{}) (string, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"command_type":    commandType,
-		"payload":         payload,
-		"idempotency_key": idempotencyKey,
-		"approved_by":     approvedBy,
-		"created_at":      now,
-		"updated_at":      now,
-	}
-
-	data, err := d.rest(ctx, "POST", "maintenance_commands", body)
-	if err != nil {
-		return "", err
-	}
-
-	var result []struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return "", fmt.Errorf("unmarshal command result: %w", err)
-	}
-	if len(result) == 0 {
-		return "", fmt.Errorf("no command ID returned")
-	}
-	return result[0].ID, nil
-}
-
-func (d *DB) ClaimNextCommand(ctx context.Context, agentID string) (*MaintenanceCommand, error) {
-	data, err := d.rpc(ctx, "claim_next_command", map[string]interface{}{
-		"p_agent_id": agentID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var commands []MaintenanceCommand
-	if err := json.Unmarshal(data, &commands); err != nil {
-		return nil, fmt.Errorf("unmarshal command: %w", err)
-	}
-	if len(commands) == 0 {
-		return nil, nil
-	}
-	return &commands[0], nil
-}
-
-func (d *DB) CompleteCommand(ctx context.Context, commandID string, success bool, result map[string]interface{}, errorMessage string) error {
-	_, err := d.rpc(ctx, "complete_command", map[string]interface{}{
-		"p_command_id":    commandID,
-		"p_success":       success,
-		"p_result":        result,
-		"p_error_message": errorMessage,
-	})
-	return err
-}
-
 func (d *DB) GetAvailableModels(ctx context.Context, limit int) ([]Runner, error) {
 	path := fmt.Sprintf("runners?status=eq.active&order=cost_priority.asc&limit=%d", limit)
 	data, err := d.rest(ctx, "GET", path, nil)
@@ -847,19 +705,6 @@ func (d *DB) DecrementInFlight(ctx context.Context, runnerID string) error {
 	return err
 }
 
-func (d *DB) GetSystemState(ctx context.Context) (map[string]interface{}, error) {
-	data, err := d.rpc(ctx, "get_system_state", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, fmt.Errorf("unmarshal system state: %w", err)
-	}
-	return result, nil
-}
-
 type FailureRecord struct {
 	TaskID          string                 `json:"task_id,omitempty"`
 	TaskRunID       string                 `json:"task_run_id,omitempty"`
@@ -966,33 +811,6 @@ type ProblemSolution struct {
 	SolutionModel   string                 `json:"solution_model,omitempty"`
 	SolutionDetails map[string]interface{} `json:"solution_details,omitempty"`
 	SuccessRate     float64                `json:"success_rate"`
-}
-
-func (d *DB) GetProblemSolution(ctx context.Context, failureType, taskType string, keywords []string) (*ProblemSolution, error) {
-	params := map[string]interface{}{}
-	if failureType != "" {
-		params["p_failure_type"] = failureType
-	}
-	if taskType != "" {
-		params["p_task_type"] = taskType
-	}
-	if keywords != nil {
-		params["p_keywords"] = keywords
-	}
-
-	data, err := d.rpc(ctx, "get_problem_solution", params)
-	if err != nil {
-		return nil, err
-	}
-
-	var solutions []ProblemSolution
-	if err := json.Unmarshal(data, &solutions); err != nil {
-		return nil, fmt.Errorf("unmarshal problem solution: %w", err)
-	}
-	if len(solutions) == 0 {
-		return nil, nil
-	}
-	return &solutions[0], nil
 }
 
 func (d *DB) RecordSolutionResult(ctx context.Context, solutionID string, success bool) error {
