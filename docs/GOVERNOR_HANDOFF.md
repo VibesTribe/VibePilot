@@ -851,25 +851,25 @@ Vet:           ✅ No issues
 | Maintenance Agent | ❌ Wrong impl rolled back | Needs correct implementation |
 | Visual testing | Stub | `TestVisual()` passes by default |
 | Vibes agent | ⚠️ Needs review | Created without discussion |
-| Tester rule injection | Pending | Tester should use learned rules |
-| Supervisor rule injection | Pending | Supervisor should use learned rules |
+| ~~Tester rule injection~~ | ✅ DONE | Uses learned rules |
+| ~~Supervisor rule injection~~ | ✅ DONE | Uses learned rules |
 
 ## Integration Points Still Needed
 
-### Tester (`tester/tester.go`)
+### Tester (`tester/tester.go`) - ✅ DONE
 ```
-Current: RunTests() runs pytest + ruff
-Needed:
-  1. Get tester rules for task type
+Current: RunTests() runs pytest + ruff + learned rules
+Implemented:
+  1. Get tester rules for task type via RuleProvider
   2. Run learned tests in addition to standard tests
   3. Track which tests catch bugs
 ```
 
-### Supervisor (`supervisor/supervisor.go`)
+### Supervisor (`supervisor/supervisor.go`) - ✅ DONE
 ```
-Current: checkCodeQuality() has hardcoded patterns
-Needed:
-  1. Get supervisor rules for task type
+Current: checkCodeQuality() has hardcoded patterns + learned rules
+Implemented:
+  1. Get supervisor rules for task type via RuleProvider
   2. Run learned patterns in addition to hardcoded
   3. Track effectiveness
 ```
