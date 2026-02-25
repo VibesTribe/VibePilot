@@ -19,6 +19,11 @@ type Config struct {
 	Deprecation DeprecationConfig `yaml:"depreciation"`
 	Analyst     AnalystConfig     `yaml:"analyst"`
 	Agents      AgentsConfig      `yaml:"agents"`
+	Git         GitConfig         `yaml:"git"`
+}
+
+type GitConfig struct {
+	ProtectedBranches []string `yaml:"protected_branches"`
 }
 
 type AgentsConfig struct {
@@ -135,6 +140,9 @@ func Load(path string) (*Config, error) {
 			PromptsDir:     "./config/prompts",
 			ParallelMax:    50,
 			SequentialMode: false,
+		},
+		Git: GitConfig{
+			ProtectedBranches: []string{"main", "master"},
 		},
 	}
 

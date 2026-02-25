@@ -61,7 +61,10 @@ func main() {
 		repoPath = "."
 	}
 
-	git := gitree.New(&gitree.Config{RepoPath: repoPath})
+	git := gitree.New(&gitree.Config{
+		RepoPath:          repoPath,
+		ProtectedBranches: cfg.Git.ProtectedBranches,
+	})
 	sup := supervisor.New()
 	test := tester.New(&tester.Config{RepoPath: repoPath})
 	visTest := visual.New(&visual.Config{RepoPath: repoPath})
