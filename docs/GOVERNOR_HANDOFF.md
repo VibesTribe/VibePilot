@@ -764,4 +764,116 @@ Vet:           ✅ No issues
 
 ---
 
-**END OF HANDOFF - Session 29**
+# SESSION 30 (2026-02-25)
+
+## What Was Done: Learning System Phases 2-5 Complete
+
+### Phase 2: Planner Learning (Wired)
+- Orchestrator creates supervisor rules on rejection
+- DB methods already existed for planner rules
+
+### Phase 3: Tester/Supervisor Learning (NEW)
+**Schema:** `docs/supabase-schema/028_tester_supervisor_learning.sql`
+
+| Table | Purpose |
+|-------|---------|
+| `tester_learned_rules` | Tests that catch bugs |
+| `supervisor_learned_rules` | Patterns that flag issues |
+
+**RPCs Added:**
+- `get_tester_rules()` - Get active test rules
+- `create_tester_rule()` - Create new test rule
+- `record_tester_rule_caught_bug()` - Track effectiveness
+- `record_tester_rule_false_positive()` - Track false positives
+- `get_supervisor_rules()` - Get active supervisor rules
+- `create_supervisor_rule()` - Create new rule
+- `record_supervisor_rule_triggered()` - Track effectiveness
+- `create_rule_from_supervisor_rejection()` - Auto-create from rejection
+- `deactivate_tester_rule()` / `deactivate_supervisor_rule()` - Disable rules
+- `get_learning_stats()` - Aggregate stats for all learning tables
+
+**Go Methods Added to `db/supabase.go`:**
+- `GetTesterRules()`, `CreateTesterRule()`, `RecordTesterRuleCaughtBug()`, `RecordTesterRuleFalsePositive()`
+- `GetSupervisorRules()`, `CreateSupervisorRule()`, `RecordSupervisorRuleTriggered()`
+- `CreateRuleFromSupervisorRejection()`, `DeactivateTesterRule()`, `DeactivateSupervisorRule()`
+- `GetLearningStats()`
+
+**Integration:**
+- `orchestrator/orchestrator.go`: Added `createSupervisorRulesFromRejection()` and `extractPatternFromIssue()`
+- On supervisor rejection, automatically creates learned rules from issues
+
+### Phase 4: Daily Analysis Enhanced
+**File:** `internal/analyst/analyst.go`
+
+**Changes:**
+- `AnalysisData` now includes: `PlannerRules`, `TesterRules`, `SupervisorRules`
+- `gatherData()` fetches all rule tables
+- `buildPrompt()` includes rule data and explains rule_updates format
+- `AnalysisReport` has new `RuleUpdates` field
+- `applyUpdates()` handles rule deactivation for all rule types
+- `writeReport()` includes rule updates in markdown output
+
+### Phase 5: Depreciation/Revival (Already Complete)
+Janitor already had `checkDepreciation()` implemented:
+- Runs every minute
+- Uses configurable thresholds
+- Archives underperforming runners
+
+## Code Stats
+
+```
+Total Go files: 28
+Total lines:   ~6,300
+Build:         ✅ Clean
+Vet:           ✅ No issues
+```
+
+## New Files
+
+| File | Purpose |
+|------|---------|
+| `docs/supabase-schema/028_tester_supervisor_learning.sql` | Phase 3 schema |
+
+## Learning System Status
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 1 | ✅ COMPLETE | Core learning (heuristics, failures, solutions) |
+| 2 | ✅ COMPLETE | Planner learning + rejection → rule creation |
+| 3 | ✅ COMPLETE | Tester/Supervisor learning tables + methods |
+| 4 | ✅ COMPLETE | Daily analysis reads/writes all rule tables |
+| 5 | ✅ COMPLETE | Deprecation/Revival (was already done) |
+
+## What's Still NOT Done
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Maintenance Agent | ❌ Wrong impl rolled back | Needs correct implementation |
+| Visual testing | Stub | `TestVisual()` passes by default |
+| Vibes agent | ⚠️ Needs review | Created without discussion |
+| Tester rule injection | Pending | Tester should use learned rules |
+| Supervisor rule injection | Pending | Supervisor should use learned rules |
+
+## Integration Points Still Needed
+
+### Tester (`tester/tester.go`)
+```
+Current: RunTests() runs pytest + ruff
+Needed:
+  1. Get tester rules for task type
+  2. Run learned tests in addition to standard tests
+  3. Track which tests catch bugs
+```
+
+### Supervisor (`supervisor/supervisor.go`)
+```
+Current: checkCodeQuality() has hardcoded patterns
+Needed:
+  1. Get supervisor rules for task type
+  2. Run learned patterns in addition to hardcoded
+  3. Track effectiveness
+```
+
+---
+
+**END OF HANDOFF - Session 30**

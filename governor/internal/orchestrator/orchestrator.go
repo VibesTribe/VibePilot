@@ -134,6 +134,7 @@ func (o *Orchestrator) processSupervisorDecision(ctx context.Context, task *type
 	case supervisor.ActionReject:
 		log.Printf("Orchestrator: %s rejected: %s", taskID[:8], decision.Notes)
 		o.db.LogOrchestratorEvent(ctx, "supervisor_reject", taskID, "", "", "", "", "Supervisor rejected", map[string]interface{}{"notes": decision.Notes})
+		o.createSupervisorRulesFromRejection(ctx, taskID, task.Type, decision.Issues)
 		o.handleRejection(ctx, task, decision.Notes)
 
 	case supervisor.ActionHuman:
@@ -375,4 +376,57 @@ func classifyFailure(notes string) (failureType, failureCategory string) {
 	}
 
 	return "unknown", "task_issue"
+}
+
+func (o *Orchestrator) createSupervisorRulesFromRejection(ctx context.Context, taskID string, taskType string, issues []string) {
+	for _, issue := range issues {
+		pattern := o.extractPatternFromIssue(issue)
+		if pattern == "" {
+			continue
+		}
+
+		taskTypePtr := &taskType
+		if taskType == "" {
+			taskTypePtr = nil
+		}
+
+		ruleID, err := o.db.CreateRuleFromSupervisorRejection(ctx, taskID, pattern, issue, taskTypePtr)
+		if err != nil {
+			log.Printf("Orchestrator: failed to create supervisor rule from rejection: %v", err)
+			continue
+		}
+		log.Printf("Orchestrator: created supervisor rule %s from rejection (pattern: %s)", ruleID[:8], pattern)
+	}
+}
+
+func (o *Orchestrator) extractPatternFromIssue(issue string) string {
+	issueLower := strings.ToLower(issue)
+
+	if strings.Contains(issueLower, "secret") || strings.Contains(issueLower, "api_key") || strings.Contains(issueLower, "token") {
+		return "secret_pattern"
+	}
+	if strings.Contains(issueLower, "hardcoded") || strings.Contains(issueLower, "hard code") {
+		return "hardcoded_value"
+	}
+	if strings.Contains(issueLower, "todo") || strings.Contains(issueLower, "fixme") {
+		return "todo_comment"
+	}
+	if strings.Contains(issueLower, "print") {
+		return "print_statement"
+	}
+	if strings.Contains(issueLower, "deliverable") || strings.Contains(issueLower, "missing") {
+		return "missing_deliverable"
+	}
+	if strings.Contains(issueLower, "scope creep") || strings.Contains(issueLower, "extra file") {
+		return "scope_creep"
+	}
+
+	if len(issue) > 10 {
+		words := strings.Fields(issue)
+		if len(words) >= 2 {
+			return strings.ToLower(words[0] + "_" + words[1])
+		}
+	}
+
+	return ""
 }

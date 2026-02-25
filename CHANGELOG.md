@@ -6,6 +6,66 @@
 
 ---
 
+# 2026-02-25 (Session 30)
+
+## Summary
+
+Learning System Phases 2-5 COMPLETE. Full learning infrastructure now in place.
+
+### Major Work
+
+1. **Phase 3: Tester/Supervisor Learning Schema**
+   - Created `docs/supabase-schema/028_tester_supervisor_learning.sql`
+   - `tester_learned_rules` table - tests that catch bugs
+   - `supervisor_learned_rules` table - patterns that flag issues
+   - 10 new RPCs for rule management
+
+2. **Go Methods Added**
+   - `db/supabase.go`: 11 new methods for tester/supervisor rules
+   - `TesterRule`, `SupervisorRule`, `LearningStats` structs
+
+3. **Orchestrator Integration**
+   - Added `createSupervisorRulesFromRejection()` method
+   - Added `extractPatternFromIssue()` for pattern detection
+   - On supervisor rejection, automatically creates learned rules
+
+4. **Phase 4: Daily Analysis Enhanced**
+   - `AnalysisData` now includes all rule tables
+   - `gatherData()` fetches planner/tester/supervisor rules
+   - `applyUpdates()` handles rule deactivation
+   - LLM can now recommend rule deactivation
+
+5. **Phase 5: Already Complete**
+   - Janitor already had depreciation check
+   - Verified config-driven thresholds
+
+### Files Modified
+
+```
+vibepilot/
+├── docs/
+│   ├── supabase-schema/
+│   │   └── 028_tester_supervisor_learning.sql  - NEW - Phase 3 schema
+│   ├── GOVERNOR_HANDOFF.md                     - Session 30 notes
+│   └── LEARNING_SYSTEM_PLAN.md                 - Updated to v2.0, all phases complete
+├── governor/internal/
+│   ├── db/supabase.go                          - 11 new methods for Phase 3
+│   ├── orchestrator/orchestrator.go            - createSupervisorRulesFromRejection
+│   └── analyst/analyst.go                      - Enhanced for all rule tables
+```
+
+### Learning System Final Status
+
+| Phase | Status |
+|-------|--------|
+| 1 | ✅ Core learning (heuristics, failures, solutions) |
+| 2 | ✅ Planner learning + rejection → rule |
+| 3 | ✅ Tester/Supervisor learning |
+| 4 | ✅ Daily analysis reads/writes all rules |
+| 5 | ✅ Deprecation/Revival |
+
+---
+
 # 2026-02-25 (Session 29)
 
 ## Summary

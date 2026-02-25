@@ -26,6 +26,7 @@ type AnalysisReport struct {
 	Date             string            `json:"date"`
 	ModelUpdates     []ModelUpdate     `json:"model_updates,omitempty"`
 	HeuristicUpdates []HeuristicUpdate `json:"heuristic_updates,omitempty"`
+	RuleUpdates      []RuleUpdate      `json:"rule_updates,omitempty"`
 	Summary          string            `json:"summary"`
 	Recommendations  []string          `json:"recommendations,omitempty"`
 }
@@ -42,6 +43,13 @@ type HeuristicUpdate struct {
 	PreferredModel string                 `json:"preferred_model"`
 	Confidence     float64                `json:"confidence"`
 	Reason         string                 `json:"reason"`
+}
+
+type RuleUpdate struct {
+	RuleType string `json:"rule_type"` // "planner", "tester", "supervisor"
+	RuleID   string `json:"rule_id"`
+	Action   string `json:"action"` // "deactivate"
+	Reason   string `json:"reason"`
 }
 
 func New(database *db.DB, cfg config.AnalystConfig, ghCfg config.GitHubConfig, repoPath string) *Analyst {
@@ -154,10 +162,13 @@ func (a *Analyst) runAnalysis(ctx context.Context) error {
 }
 
 type AnalysisData struct {
-	TaskRuns       []map[string]interface{} `json:"task_runs"`
-	FailureRecords []map[string]interface{} `json:"failure_records"`
-	Heuristics     []map[string]interface{} `json:"heuristics"`
-	Runners        []map[string]interface{} `json:"runners"`
+	TaskRuns        []map[string]interface{} `json:"task_runs"`
+	FailureRecords  []map[string]interface{} `json:"failure_records"`
+	Heuristics      []map[string]interface{} `json:"heuristics"`
+	Runners         []map[string]interface{} `json:"runners"`
+	PlannerRules    []map[string]interface{} `json:"planner_rules"`
+	TesterRules     []map[string]interface{} `json:"tester_rules"`
+	SupervisorRules []map[string]interface{} `json:"supervisor_rules"`
 }
 
 func (a *Analyst) gatherData(ctx context.Context) (*AnalysisData, error) {
@@ -183,6 +194,21 @@ func (a *Analyst) gatherData(ctx context.Context) (*AnalysisData, error) {
 		json.Unmarshal(runnersData, &data.Runners)
 	}
 
+	plannerRulesData, err := a.db.REST(ctx, "GET", "planner_learned_rules?select=*&active=eq.true&limit=50", nil)
+	if err == nil {
+		json.Unmarshal(plannerRulesData, &data.PlannerRules)
+	}
+
+	testerRulesData, err := a.db.REST(ctx, "GET", "tester_learned_rules?select=*&active=eq.true&limit=50", nil)
+	if err == nil {
+		json.Unmarshal(testerRulesData, &data.TesterRules)
+	}
+
+	supervisorRulesData, err := a.db.REST(ctx, "GET", "supervisor_learned_rules?select=*&active=eq.true&limit=50", nil)
+	if err == nil {
+		json.Unmarshal(supervisorRulesData, &data.SupervisorRules)
+	}
+
 	return data, nil
 }
 
@@ -203,6 +229,9 @@ Analyze and respond in JSON format:
   "heuristic_updates": [
     {"task_type": "coding", "preferred_model": "xxx", "confidence": 0.8, "reason": "why"}
   ],
+  "rule_updates": [
+    {"rule_type": "planner|tester|supervisor", "rule_id": "xxx", "action": "deactivate", "reason": "why"}
+  ],
   "recommendations": ["recommendation 1", "recommendation 2"]
 }
 
@@ -210,6 +239,7 @@ Rules:
 - Only recommend actions you're confident about (success_rate patterns, consistent failures)
 - Confidence should be 0.5-1.0 based on data strength
 - Be conservative - wrong recommendations hurt the system
+- For rule_updates: deactivate rules with high false_positive rates or low effectiveness
 - If data is insufficient, just provide summary and skip recommendations
 
 Respond ONLY with valid JSON.`, string(dataJSON))
@@ -301,6 +331,29 @@ func (a *Analyst) applyUpdates(ctx context.Context, report *AnalysisReport) erro
 		}
 	}
 
+	for _, r := range report.RuleUpdates {
+		switch r.RuleType {
+		case "planner":
+			if err := a.db.DeactivatePlannerRule(ctx, r.RuleID, r.Reason); err != nil {
+				log.Printf("Analyst: failed to deactivate planner rule %s: %v", r.RuleID, err)
+			} else {
+				log.Printf("Analyst: deactivated planner rule %s - %s", r.RuleID, r.Reason)
+			}
+		case "tester":
+			if err := a.db.DeactivateTesterRule(ctx, r.RuleID, r.Reason); err != nil {
+				log.Printf("Analyst: failed to deactivate tester rule %s: %v", r.RuleID, err)
+			} else {
+				log.Printf("Analyst: deactivated tester rule %s - %s", r.RuleID, r.Reason)
+			}
+		case "supervisor":
+			if err := a.db.DeactivateSupervisorRule(ctx, r.RuleID, r.Reason); err != nil {
+				log.Printf("Analyst: failed to deactivate supervisor rule %s: %v", r.RuleID, err)
+			} else {
+				log.Printf("Analyst: deactivated supervisor rule %s - %s", r.RuleID, r.Reason)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -335,6 +388,14 @@ func (a *Analyst) writeReport(ctx context.Context, report *AnalysisReport) error
 		for _, h := range report.HeuristicUpdates {
 			sb.WriteString(fmt.Sprintf("- **%s**: prefer %s (confidence: %.2f) - %s\n",
 				h.TaskType, h.PreferredModel, h.Confidence, h.Reason))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(report.RuleUpdates) > 0 {
+		sb.WriteString("## Rule Updates\n\n")
+		for _, r := range report.RuleUpdates {
+			sb.WriteString(fmt.Sprintf("- **%s rule** %s: %s - %s\n", r.RuleType, r.RuleID[:8], r.Action, r.Reason))
 		}
 		sb.WriteString("\n")
 	}
