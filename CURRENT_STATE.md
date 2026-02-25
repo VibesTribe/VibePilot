@@ -3,7 +3,7 @@
 **Required reading: FIVE files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
 2. **`docs/SYSTEM_REFERENCE.md`** ← **WHAT WE HAVE AND HOW IT WORKS** (start here!)
-3. **`docs/GOVERNOR_HANDOFF.md`** ← **GO GOVERNOR STATUS** (what's done, what's next)
+3. **`docs/GOVERNOR_REBUILD_PLAN.md`** ← **REBUILD PLAN** (read this before touching Go code!)
 4. **`docs/core_philosophy.md`** - Strategic mindset and inviolable principles
 5. **`docs/prd_v1.4.md`** - Complete system specification
 
@@ -12,14 +12,60 @@
 ---
 
 **Last Updated:** 2026-02-25
-**Updated By:** GLM-5 - Session 29
-**Session Focus:** Config-driven destinations + Agent architecture cleanup
-**Direction:** Zero hardcoded tools, maintenance agent needs proper implementation
+**Updated By:** GLM-5 - Session 30
+**Session Focus:** GOVERNOR REBUILD - 8k → 2.5k lines
+**Direction:** Agent logic moves to prompts, Go becomes tools + runtime only
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Go Governor Phase 1-6 COMPLETE, Learning Phase 1-2 COMPLETE
+**Progress:** Rebuild plan approved, ready to implement
 
 ---
+
+# CRITICAL: GOVERNOR REBUILD IN PROGRESS
+
+## The Problem
+
+Current Go codebase: **8,287 lines**
+- 70% is "agent logic" that should be in LLM prompts
+- Hardcoded decisions prevent VibePilot from functioning as designed
+- Council, Planner, Supervisor, Orchestrator - all need LLMs to think, but Go tries to think for them
+
+## The Solution
+
+**Read `docs/GOVERNOR_REBUILD_PLAN.md` for full details.**
+
+Summary:
+- DELETE ~5,800 lines of "agent logic" modules
+- KEEP ~2,500 lines of tools (gitree, vault, maintenance, db, runtime)
+- All intelligence moves to `config/prompts/*.md`
+- All config stays in JSON files (agents.json, tools.json, models.json, etc.)
+
+## Key Decisions Made
+
+1. **Tool security:** 2-3 tools per agent, validated at runtime
+2. **RPC:** Generic `CallRPC(name, params)` with allowlist
+3. **Events:** Abstraction layer (Supabase real-time today, swappable tomorrow)
+4. **Parallel:** Goroutines with config limits (8 per module)
+5. **Everything swappable:** Models, platforms, database, git host, language
+
+## What NOT To Do
+
+- DO NOT add more "agent logic" to Go files
+- DO NOT build prompts in Go code
+- DO NOT make decisions in Go that LLMs should make
+- DO NOT hardcode anything
+
+## What TO Do
+
+- Read the rebuild plan
+- Implement Phase 1-5 as documented
+- Keep prompts in markdown files
+- Keep config in JSON files
+- Go = tools + runtime only
+
+---
+
+# PREVIOUS SESSIONS (Historical)
 
 # SESSION 29: CONFIG-DRIVEN DESTINATIONS (2026-02-25)
 
