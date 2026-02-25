@@ -68,6 +68,9 @@ func main() {
 	res := researcher.New(database)
 	orch := orchestrator.New(database, maint, sup, test, visTest, res)
 
+	sup.SetRuleProvider(&supervisorRuleAdapter{db: database})
+	test.SetRuleProvider(&testerRuleAdapter{db: database})
+
 	s := sentry.New(database, cfg.Governor.PollInterval, cfg.Governor.MaxConcurrent, dispatchCh, moduleLimiter)
 	go s.Run(ctx)
 
@@ -119,4 +122,64 @@ func main() {
 	srv.Shutdown()
 
 	log.Println("Governor stopped.")
+}
+
+type supervisorRuleAdapter struct {
+	db *db.DB
+}
+
+func (a *supervisorRuleAdapter) GetSupervisorRules(ctx context.Context, taskType string, limit int) ([]supervisor.SupervisorRule, error) {
+	rules, err := a.db.GetSupervisorRules(ctx, taskType, limit)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]supervisor.SupervisorRule, len(rules))
+	for i, r := range rules {
+		result[i] = supervisor.SupervisorRule{
+			ID:               r.ID,
+			TriggerPattern:   r.TriggerPattern,
+			TriggerCondition: r.TriggerCondition,
+			Action:           r.Action,
+			Reason:           r.Reason,
+			TimesCaughtIssue: r.TimesCaughtIssue,
+		}
+	}
+	return result, nil
+}
+
+func (a *supervisorRuleAdapter) RecordSupervisorRuleTriggered(ctx context.Context, ruleID string, caughtIssue bool) error {
+	return a.db.RecordSupervisorRuleTriggered(ctx, ruleID, caughtIssue)
+}
+
+type testerRuleAdapter struct {
+	db *db.DB
+}
+
+func (a *testerRuleAdapter) GetTesterRules(ctx context.Context, appliesTo string, limit int) ([]tester.TesterRule, error) {
+	rules, err := a.db.GetTesterRules(ctx, appliesTo, limit)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]tester.TesterRule, len(rules))
+	for i, r := range rules {
+		result[i] = tester.TesterRule{
+			ID:             r.ID,
+			AppliesTo:      r.AppliesTo,
+			TestType:       r.TestType,
+			TestCommand:    r.TestCommand,
+			TriggerPattern: r.TriggerPattern,
+			Priority:       r.Priority,
+			CaughtBugs:     r.CaughtBugs,
+			FalsePositives: r.FalsePositives,
+		}
+	}
+	return result, nil
+}
+
+func (a *testerRuleAdapter) RecordTesterRuleCaughtBug(ctx context.Context, ruleID string) error {
+	return a.db.RecordTesterRuleCaughtBug(ctx, ruleID)
+}
+
+func (a *testerRuleAdapter) RecordTesterRuleFalsePositive(ctx context.Context, ruleID string) error {
+	return a.db.RecordTesterRuleFalsePositive(ctx, ruleID)
 }

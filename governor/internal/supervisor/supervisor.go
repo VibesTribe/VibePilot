@@ -2,6 +2,8 @@ package supervisor
 
 import (
 	"context"
+	"log"
+	"regexp"
 	"strings"
 )
 
@@ -22,11 +24,12 @@ const (
 )
 
 type Decision struct {
-	Action   Action
-	Notes    string
-	Issues   []string
-	Warnings []string
-	Reason   string
+	Action        Action
+	Notes         string
+	Issues        []string
+	Warnings      []string
+	Reason        string
+	LearnedCaught []string
 }
 
 type PlanDecision struct {
@@ -76,25 +79,54 @@ type ResearchDecision struct {
 	CouncilFor string
 }
 
-type Supervisor struct{}
+type SupervisorRule struct {
+	ID               string
+	TriggerPattern   string
+	TriggerCondition map[string]interface{}
+	Action           string
+	Reason           string
+	TimesCaughtIssue int
+}
+
+type RuleProvider interface {
+	GetSupervisorRules(ctx context.Context, taskType string, limit int) ([]SupervisorRule, error)
+	RecordSupervisorRuleTriggered(ctx context.Context, ruleID string, caughtIssue bool) error
+}
+
+type Supervisor struct {
+	rules    RuleProvider
+	maxRules int
+}
 
 func New() *Supervisor {
-	return &Supervisor{}
+	return &Supervisor{maxRules: 20}
+}
+
+func (s *Supervisor) SetRuleProvider(provider RuleProvider) {
+	s.rules = provider
+}
+
+func (s *Supervisor) SetMaxRules(max int) {
+	if max > 0 {
+		s.maxRules = max
+	}
 }
 
 func (s *Supervisor) Review(ctx context.Context, input *ReviewInput) Decision {
 	var issues []string
 	var warnings []string
+	var learnedCaught []string
 
 	issues, warnings = s.checkDeliverables(input, issues, warnings)
 
-	issues = s.checkCodeQuality(input.OutputContent, issues, warnings)
+	issues, warnings, learnedCaught = s.checkCodeQuality(ctx, input, issues, warnings)
 
 	if len(issues) > 0 {
 		return Decision{
-			Action: ActionReject,
-			Notes:  s.formatNotes(issues),
-			Issues: issues,
+			Action:        ActionReject,
+			Notes:         s.formatNotes(issues),
+			Issues:        issues,
+			LearnedCaught: learnedCaught,
 		}
 	}
 
@@ -111,8 +143,9 @@ func (s *Supervisor) Review(ctx context.Context, input *ReviewInput) Decision {
 	}
 
 	return Decision{
-		Action:   ActionApprove,
-		Warnings: warnings,
+		Action:        ActionApprove,
+		Warnings:      warnings,
+		LearnedCaught: learnedCaught,
 	}
 }
 
@@ -154,7 +187,9 @@ func (s *Supervisor) checkDeliverables(input *ReviewInput, issues []string, warn
 	return issues, warnings
 }
 
-func (s *Supervisor) checkCodeQuality(content string, issues []string, warnings []string) []string {
+func (s *Supervisor) checkCodeQuality(ctx context.Context, input *ReviewInput, issues []string, warnings []string) ([]string, []string, []string) {
+	var learnedCaught []string
+	content := input.OutputContent
 	contentLower := strings.ToLower(content)
 
 	if strings.Contains(content, "TODO") || strings.Contains(content, "FIXME") {
@@ -165,7 +200,7 @@ func (s *Supervisor) checkCodeQuality(content string, issues []string, warnings 
 		warnings = append(warnings, "Code contains print statements - consider logging")
 	}
 
-	secretPatterns := []struct {
+	hardcodedSecrets := []struct {
 		name    string
 		pattern string
 	}{
@@ -176,7 +211,7 @@ func (s *Supervisor) checkCodeQuality(content string, issues []string, warnings 
 		{"password_literal_single", `password='`},
 	}
 
-	for _, p := range secretPatterns {
+	for _, p := range hardcodedSecrets {
 		if strings.Contains(contentLower, strings.ToLower(p.pattern)) {
 			issues = append(issues, "Potential secret detected: "+p.name)
 		}
@@ -186,7 +221,61 @@ func (s *Supervisor) checkCodeQuality(content string, issues []string, warnings 
 		warnings = append(warnings, "Output appears truncated (very short)")
 	}
 
-	return issues
+	if s.rules != nil {
+		learnedIssues, learnedWarnings, caught := s.applyLearnedRules(ctx, input.TaskType, content)
+		issues = append(issues, learnedIssues...)
+		warnings = append(warnings, learnedWarnings...)
+		learnedCaught = caught
+	}
+
+	return issues, warnings, learnedCaught
+}
+
+func (s *Supervisor) applyLearnedRules(ctx context.Context, taskType, content string) (issues []string, warnings []string, caught []string) {
+	rules, err := s.rules.GetSupervisorRules(ctx, taskType, s.maxRules)
+	if err != nil {
+		log.Printf("Supervisor: failed to get learned rules: %v", err)
+		return nil, nil, nil
+	}
+
+	for _, rule := range rules {
+		matched, err := regexp.MatchString("(?i)"+rule.TriggerPattern, content)
+		if err != nil {
+			if strings.Contains(strings.ToLower(content), strings.ToLower(rule.TriggerPattern)) {
+				matched = true
+			} else {
+				continue
+			}
+		}
+
+		if !matched {
+			continue
+		}
+
+		caught = append(caught, rule.ID)
+
+		issueText := rule.Reason
+		if issueText == "" {
+			issueText = "Learned rule triggered: " + rule.TriggerPattern
+		}
+
+		switch rule.Action {
+		case "reject":
+			issues = append(issues, issueText)
+			if err := s.rules.RecordSupervisorRuleTriggered(ctx, rule.ID, true); err != nil {
+				log.Printf("Supervisor: failed to record rule triggered: %v", err)
+			}
+		case "warn":
+			warnings = append(warnings, issueText)
+			if err := s.rules.RecordSupervisorRuleTriggered(ctx, rule.ID, false); err != nil {
+				log.Printf("Supervisor: failed to record rule triggered: %v", err)
+			}
+		case "human_review":
+			warnings = append(warnings, "Requires human review: "+issueText)
+		}
+	}
+
+	return issues, warnings, caught
 }
 
 func (s *Supervisor) formatNotes(issues []string) string {

@@ -182,7 +182,7 @@ func (o *Orchestrator) processTest(ctx context.Context, taskID string) {
 		return
 	}
 
-	result := o.tester.RunTests(ctx, task.BranchName)
+	result := o.tester.RunTestsWithType(ctx, task.BranchName, task.Type)
 
 	if result.Passed {
 		log.Printf("Orchestrator: %s tests passed, creating merge task", taskID[:8])
