@@ -29,7 +29,8 @@ func New(cfg *Config) *Gitree {
 
 func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
 	var out bytes.Buffer
-	cmd := g.gitCommand(ctx, "checkout", "-b", branchName)
+
+	cmd := g.gitCommand(ctx, "checkout", "--orphan", branchName)
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 
@@ -37,8 +38,11 @@ func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
 		if strings.Contains(out.String(), "already exists") {
 			return g.gitCommand(ctx, "checkout", branchName).Run()
 		}
-		return fmt.Errorf("create branch: %w - %s", err, out.String())
+		return fmt.Errorf("create orphan branch: %w - %s", err, out.String())
 	}
+
+	g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run()
+
 	return g.gitCommand(ctx, "push", "-u", "origin", branchName).Run()
 }
 
@@ -117,17 +121,17 @@ func (g *Gitree) CommitOutput(ctx context.Context, branchName string, output int
 	return g.gitCommand(ctx, "push").Run()
 }
 
-func (g *Gitree) ReadBranchOutput(ctx context.Context, branchName string, baseBranch string) ([]string, error) {
-	if baseBranch == "" {
-		baseBranch = "main"
+func (g *Gitree) ReadBranchOutput(ctx context.Context, branchName string) ([]string, error) {
+	if err := g.gitCommand(ctx, "checkout", branchName).Run(); err != nil {
+		return nil, fmt.Errorf("checkout branch: %w", err)
 	}
 
 	var files []string
-	cmd := g.gitCommand(ctx, "diff", "--name-only", baseBranch+"..."+branchName)
+	cmd := g.gitCommand(ctx, "ls-tree", "-r", "--name-only", "HEAD")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("git diff: %w", err)
+		return nil, fmt.Errorf("git ls-tree: %w", err)
 	}
 
 	for _, line := range strings.Split(out.String(), "\n") {
@@ -156,27 +160,24 @@ func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch str
 }
 
 func (g *Gitree) DeleteBranch(ctx context.Context, branchName string) error {
-	g.gitCommand(ctx, "branch", "-d", branchName).Run()
+	g.gitCommand(ctx, "branch", "-D", branchName).Run()
 	g.gitCommand(ctx, "push", "origin", "--delete", branchName).Run()
 	return nil
 }
 
-func (g *Gitree) ClearBranch(ctx context.Context, branchName string, baseBranch string) error {
-	if baseBranch == "" {
-		baseBranch = "main"
-	}
-
+func (g *Gitree) ClearBranch(ctx context.Context, branchName string) error {
 	if err := g.gitCommand(ctx, "checkout", branchName).Run(); err != nil {
 		return fmt.Errorf("checkout branch: %w", err)
 	}
 
+	g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run()
+	g.gitCommand(ctx, "clean", "-fd").Run()
+
 	var out bytes.Buffer
-	cmd := g.gitCommand(ctx, "reset", "--hard", baseBranch)
+	cmd := g.gitCommand(ctx, "commit", "--allow-empty", "-m", "clear for retry")
 	cmd.Stdout = &out
 	cmd.Stderr = &out
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("reset branch: %w - %s", err, out.String())
-	}
+	cmd.Run()
 
 	return g.gitCommand(ctx, "push", "-f").Run()
 }
@@ -184,7 +185,8 @@ func (g *Gitree) ClearBranch(ctx context.Context, branchName string, baseBranch 
 func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 	branchName := "module/" + sliceID
 	var out bytes.Buffer
-	cmd := g.gitCommand(ctx, "checkout", "-b", branchName)
+
+	cmd := g.gitCommand(ctx, "checkout", "--orphan", branchName)
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 
@@ -194,6 +196,9 @@ func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 		}
 		return fmt.Errorf("create module branch: %w - %s", err, out.String())
 	}
+
+	g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run()
+
 	return g.gitCommand(ctx, "push", "-u", "origin", branchName).Run()
 }
 
