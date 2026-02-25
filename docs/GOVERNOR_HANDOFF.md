@@ -968,3 +968,56 @@ Vet:           ✅ No issues
 ---
 
 **END OF HANDOFF - Session 31**
+
+# SESSION 32 (2026-02-25)
+
+## What Was Done: Code Audit + Dead Code Removal
+
+### Audit Findings
+
+| Category | Finding | Action |
+|----------|---------|--------|
+| Dead code | `vibes/` package (408 lines) - never imported | Removed |
+| Dead code | `CreateMergeTask`, `GetMergePendingTasks` - old merge flow | Removed |
+| Dead code | `MaintenanceCommand` + related functions - unused | Removed |
+| Dead code | `GetSystemState`, `GetRoundFeedback`, `NeedsNextRound` | Removed |
+| Dead code | `GetProblemSolution` - unused | Removed |
+| Not wired | `vault` in dispatcher - SetVault never called | Left (gracefully handles nil) |
+
+### Code Reduction
+
+```
+Before: 8,656 lines
+After:  8,066 lines
+Removed: 590 lines (6.8% reduction)
+```
+
+### Files Removed
+
+```
+governor/internal/vibes/vibes.go (entire package - 408 lines)
+```
+
+### Files Modified
+
+```
+governor/internal/db/supabase.go (removed ~182 lines of dead code)
+```
+
+### Remaining Items
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Visual testing | Stub | `TestVisual()` passes by default |
+| Vault wiring | Not wired | SetVault exists but never called in main |
+
+### Code Quality
+
+- ✅ No hardcoded thresholds/limits (all in config)
+- ✅ No TODO/FIXME comments (except content checking)
+- ✅ Build passes
+- ✅ Vet passes
+
+---
+
+**END OF HANDOFF - Session 32**
