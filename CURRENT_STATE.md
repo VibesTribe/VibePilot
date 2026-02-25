@@ -13,92 +13,101 @@
 
 **Last Updated:** 2026-02-25
 **Updated By:** GLM-5 - Session 30
-**Session Focus:** GOVERNOR REBUILD Phase 1 COMPLETE
-**Direction:** Agent logic moves to prompts, Go becomes tools + runtime only
+**Session Focus:** GOVERNOR REBUILD COMPLETE
+**Direction:** All agent logic in prompts, Go = tools + runtime only
 
 **Schema Location:** `docs/supabase-schema/` (all SQL files)
-**Progress:** Phase 1 COMPLETE - runtime package built, config files created
+**Progress:** REBUILD COMPLETE - 8,287 → 4,517 lines (45% reduction)
 
 ---
 
-# CRITICAL: GOVERNOR REBUILD IN PROGRESS
+# GOVERNOR REBUILD COMPLETE
 
-## The Problem
+## Before vs After
 
-Current Go codebase: **8,287 lines**
-- 70% is "agent logic" that should be in LLM prompts
-- Hardcoded decisions prevent VibePilot from functioning as designed
-- Council, Planner, Supervisor, Orchestrator - all need LLMs to think, but Go tries to think for them
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| Total lines | 8,287 | 4,517 | -45% |
+| Modules | 18 | 9 | -50% |
+| Agent logic in Go | ~5,800 lines | 0 lines | -100% |
 
-## The Solution
+## Final Structure
 
-**Read `docs/GOVERNOR_REBUILD_PLAN.md` for full details.**
-
-Summary:
-- DELETE ~5,800 lines of "agent logic" modules
-- KEEP ~2,500 lines of tools (gitree, vault, maintenance, db, runtime)
-- All intelligence moves to `config/prompts/*.md`
-- All config stays in JSON files (agents.json, tools.json, models.json, etc.)
-
-## What's Done (Phase 1)
-
-### New runtime/ package (~1,150 lines)
-- `config.go` - Load JSON config files (system, agents, tools, destinations)
-- `events.go` - EventWatcher interface + PollingWatcher implementation
-- `parallel.go` - AgentPool with per-module limits, SessionManager
-- `session.go` - LLM session with tool calling loop
-- `tools.go` - Tool registry with security validation, tool call parsing
-
-### New db/rpc.go (~130 lines)
-- Generic `CallRPC(name, params)` with allowlist security
-- `CallRPCInto` for typed results
-- Default allowlist with common RPCs
-
-### New config files
-- `config/system.json` - Database, vault, git, runtime, courier settings
-- `config/tools.json` - Tool definitions with parameters, security levels, allowed agents
-
-### Line count progress
 ```
-runtime/       ~1,150 lines (NEW)
-gitree/          252 lines (KEPT)
-vault/           253 lines (KEPT)
-maintenance/     746 lines (KEPT)
-security/        130 lines (KEPT)
-db/rpc.go        130 lines (NEW)
--------------------------------
-Total:        ~2,660 lines (close to 2,500 target!)
+governor/
+├── cmd/governor/main.go      (378 lines) - new event-driven main
+├── internal/
+│   ├── runtime/              (1,149 lines) - event loop, session, config
+│   │   ├── config.go         - Load JSON configs
+│   │   ├── events.go         - EventWatcher + PollingWatcher
+│   │   ├── session.go        - LLM session with tool calling
+│   │   ├── tools.go          - Tool registry + validation
+│   │   └── parallel.go       - AgentPool with limits
+│   ├── tools/                (956 lines) - all tool implementations
+│   │   ├── git_tools.go      - branch, commit, merge, delete
+│   │   ├── db_tools.go       - query, update, RPC
+│   │   ├── vault_tools.go    - secret retrieval
+│   │   ├── file_tools.go     - read, write, delete
+│   │   ├── sandbox_tools.go  - test execution
+│   │   ├── web_tools.go      - search, fetch
+│   │   └── registry.go       - RegisterAll function
+│   ├── maintenance/          (759 lines) - file ops, sandbox, backup
+│   ├── db/                   (313 lines) - generic query/RPC
+│   ├── vault/                (253 lines) - secret retrieval
+│   ├── gitree/               (252 lines) - git operations
+│   ├── destinations/         (170 lines) - CLI/API runners
+│   └── security/             (130 lines) - leak detection
+└── pkg/types/                (157 lines) - shared types
 ```
 
-## What's Next (Phase 2-5)
+## What Was Deleted
 
-1. **Phase 2:** Wire up tool implementations (git, db, vault, maintenance)
-2. **Phase 3:** Create destination runners (CLI, API, Courier)
-3. **Phase 4:** Delete old agent modules (orchestrator, dispatcher, council, planner, etc.)
-4. **Phase 5:** Update main.go to use new runtime, verify dashboard works
+- `orchestrator/` - logic moved to orchestrator.md
+- `dispatcher/` - replaced by runtime
+- `council/` - logic moved to council.md
+- `planner/` - logic moved to planner.md
+- `analyst/` - logic moved to researcher.md
+- `consultant/` - logic moved to consultant.md
+- `agent/` - replaced by runtime
+- `server/` - dashboard served by Vercel
+- `config/` - replaced by runtime/config.go
+- `pool/` - replaced by runtime/parallel.go
+- `tester/` - logic moved to prompts
+- `courier/` - using new destinations
+- `janitor/`, `sentry/`, `throttle/`, `visual/` - consolidated
 
-## Key Decisions Made
+## How It Works Now
 
-1. **Tool security:** 2-3 tools per agent, validated at runtime
-2. **RPC:** Generic `CallRPC(name, params)` with allowlist
-3. **Events:** Abstraction layer (PollingWatcher today, can add Realtime later)
-4. **Parallel:** Goroutines with config limits (8 per module, 160 total)
-5. **Everything swappable:** Models, platforms, database, git host, language
+1. **Event detection**: PollingWatcher checks DB for state changes
+2. **Event routing**: EventRouter dispatches to appropriate agent
+3. **Agent session**: SessionFactory loads prompt + tools + destination
+4. **LLM execution**: Session runs LLM with tool calling loop
+5. **Tool execution**: ToolRegistry validates and executes tools
+6. **Parallel control**: AgentPool limits concurrent sessions
 
-## What NOT To Do
+## Where Intelligence Lives
 
-- DO NOT add more "agent logic" to Go files
-- DO NOT build prompts in Go code
-- DO NOT make decisions in Go that LLMs should make
-- DO NOT hardcode anything
+| Component | Location |
+|-----------|----------|
+| Supervisor logic | `config/prompts/supervisor.md` |
+| Council logic | `config/prompts/council.md` |
+| Orchestrator logic | `config/prompts/orchestrator.md` |
+| Planner logic | `config/prompts/planner.md` |
+| Consultant logic | `config/prompts/consultant.md` |
+| Maintenance logic | `config/prompts/maintenance.md` |
+| Researcher logic | `config/prompts/researcher.md` |
+| Agent definitions | `config/agents.json` |
+| Tool definitions | `config/tools.json` |
+| System settings | `config/system.json` |
 
-## What TO Do
+## Key Principles Maintained
 
-- Read the rebuild plan (`docs/GOVERNOR_REBUILD_PLAN.md`)
-- Implement remaining phases
-- Keep prompts in markdown files
-- Keep config in JSON files
-- Go = tools + runtime only
+1. **Everything swappable** - models, platforms, database, git host
+2. **No hardcoded decisions** - LLM decides, Go executes
+3. **2-3 tools per agent** - enforced at runtime
+4. **Generic RPC** - CallRPC(name, params) with allowlist
+5. **Event-driven** - no polling loops in agent code
+6. **Parallel safe** - goroutines with per-module limits
 
 ---
 
