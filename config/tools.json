@@ -1,78 +1,176 @@
 {
-  "version": "1.0",
-  "description": "All available tools in VibePilot. Tools are primitives that skills use. Agents are scoped to specific tools.",
-  "tools": [
-    {
-      "id": "browser",
-      "name": "Web Browser",
-      "description": "Navigate websites, fill forms, click, extract content. Used by courier role.",
-      "type": "external",
-      "current_implementation": "browser-use",
-      "implementation_notes": {
-        "browser-use": "Model-driven. LLM sees page, decides actions via vision/reasoning. Flexible, model-agnostic.",
-        "playwright-cdp": "Deterministic. Snapshot returns refs, model picks ref, Playwright executes. More reliable but requires CDP setup. OpenClaw uses this approach."
+  "version": "2.0",
+  "description": "Tool definitions for VibePilot runtime. Parameters + security + implementation.",
+  "last_updated": "2026-02-25",
+  
+  "tools": {
+    "git_create_branch": {
+      "description": "Create a new git branch",
+      "parameters": {
+        "name": {"type": "string", "required": true, "description": "Branch name (e.g., task/T001-profile)"}
       },
-      "requires": ["browser-use"],
-      "swap_evaluated": "2026-02-17",
-      "swap_notes": "browser-use chosen for flexibility. Playwright+CDP (OpenClaw style) is viable alternative. Evaluate monthly as landscape evolves rapidly."
+      "security_level": "write",
+      "implementation": "gitree.CreateBranch",
+      "allowed_agents": ["maintenance"]
     },
-    {
-      "id": "file_read",
-      "name": "File Read",
-      "description": "Read files from filesystem. Used by internal runners for codebase access.",
-      "type": "internal"
+    
+    "git_read_branch": {
+      "description": "Read files from a git branch",
+      "parameters": {
+        "branch": {"type": "string", "required": true},
+        "path": {"type": "string", "required": false}
+      },
+      "security_level": "read",
+      "implementation": "gitree.ReadBranch",
+      "allowed_agents": ["supervisor", "planner", "council"]
     },
-    {
-      "id": "file_write",
-      "name": "File Write",
-      "description": "Write files to filesystem. Used by internal runners to create/modify code.",
-      "type": "internal"
+    
+    "git_commit": {
+      "description": "Commit changes to current branch",
+      "parameters": {
+        "message": {"type": "string", "required": true}
+      },
+      "security_level": "write",
+      "implementation": "gitree.Commit",
+      "allowed_agents": ["maintenance"]
     },
-    {
-      "id": "supabase_query",
-      "name": "Supabase Query",
-      "description": "Query Supabase database for state, metrics, task history. Used by Vibes agent.",
-      "type": "external",
-      "requires": ["supabase_client"]
+    
+    "git_merge": {
+      "description": "Merge source branch into target branch",
+      "parameters": {
+        "source": {"type": "string", "required": true},
+        "target": {"type": "string", "required": true}
+      },
+      "security_level": "write",
+      "implementation": "gitree.MergeBranch",
+      "allowed_agents": ["maintenance"]
     },
-    {
-      "id": "supabase_write",
-      "name": "Supabase Write",
-      "description": "Write to Supabase database. Used by orchestrator for state updates.",
-      "type": "external",
-      "requires": ["supabase_client"]
+    
+    "git_delete_branch": {
+      "description": "Delete a branch after merge",
+      "parameters": {
+        "name": {"type": "string", "required": true}
+      },
+      "security_level": "write",
+      "implementation": "gitree.DeleteBranch",
+      "allowed_agents": ["maintenance"]
     },
-    {
-      "id": "web_search",
-      "name": "Web Search",
-      "description": "Search the web for information. Used by research skill.",
-      "type": "external"
+    
+    "db_query": {
+      "description": "Query database table",
+      "parameters": {
+        "table": {"type": "string", "required": true},
+        "columns": {"type": "array", "required": false, "items": "string"},
+        "where": {"type": "object", "required": false},
+        "limit": {"type": "integer", "required": false}
+      },
+      "security_level": "read",
+      "implementation": "db.Query",
+      "allowed_agents": ["supervisor", "orchestrator", "council", "planner", "vibes"]
     },
-    {
-      "id": "git",
-      "name": "Git Operations",
-      "description": "Branch, commit, push, merge. Used by internal runners for code changes.",
-      "type": "internal"
+    
+    "db_update": {
+      "description": "Update database record",
+      "parameters": {
+        "table": {"type": "string", "required": true},
+        "id": {"type": "string", "required": true},
+        "data": {"type": "object", "required": true}
+      },
+      "security_level": "write",
+      "implementation": "db.Update",
+      "allowed_agents": ["supervisor", "orchestrator"]
     },
-    {
-      "id": "cli",
-      "name": "CLI Execution",
-      "description": "Execute shell commands. Used by internal CLI runner.",
-      "type": "internal"
+    
+    "db_rpc": {
+      "description": "Call database RPC function",
+      "parameters": {
+        "name": {"type": "string", "required": true, "description": "RPC function name"},
+        "params": {"type": "object", "required": false, "description": "RPC parameters"}
+      },
+      "security_level": "write",
+      "implementation": "db.CallRPC",
+      "allowed_agents": ["supervisor", "orchestrator", "maintenance"],
+      "notes": "RPC name validated against allowlist in db/rpc.go"
     },
-    {
-      "id": "voice_stt",
-      "name": "Speech to Text",
-      "description": "Convert speech to text. Used by Vibes for voice input.",
-      "type": "external",
-      "requires": ["deepgram"]
+    
+    "file_read": {
+      "description": "Read file from repository",
+      "parameters": {
+        "path": {"type": "string", "required": true}
+      },
+      "security_level": "read",
+      "implementation": "maintenance.ReadFile",
+      "allowed_agents": ["planner", "internal_cli", "tester_code", "vibes"]
     },
-    {
-      "id": "voice_tts",
-      "name": "Text to Speech",
-      "description": "Convert text to speech. Used by Vibes for voice output.",
-      "type": "external",
-      "requires": ["kokoro"]
+    
+    "file_write": {
+      "description": "Write file to repository (sandboxed)",
+      "parameters": {
+        "path": {"type": "string", "required": true},
+        "content": {"type": "string", "required": true}
+      },
+      "security_level": "write",
+      "implementation": "maintenance.WriteFile",
+      "allowed_agents": ["maintenance"]
+    },
+    
+    "sandbox_test": {
+      "description": "Run code in sandbox for testing",
+      "parameters": {
+        "files": {"type": "array", "required": true, "description": "Array of {path, content}"},
+        "test_command": {"type": "string", "required": false}
+      },
+      "security_level": "execute",
+      "implementation": "maintenance.SandboxTest",
+      "allowed_agents": ["maintenance", "tester_code"]
+    },
+    
+    "vault_get": {
+      "description": "Get secret from vault",
+      "parameters": {
+        "key": {"type": "string", "required": true, "description": "Secret key name"}
+      },
+      "security_level": "secret",
+      "implementation": "vault.GetSecret",
+      "allowed_agents": ["orchestrator"],
+      "notes": "Only orchestrator can fetch secrets to pass to runners"
+    },
+    
+    "web_search": {
+      "description": "Search the web",
+      "parameters": {
+        "query": {"type": "string", "required": true}
+      },
+      "security_level": "read",
+      "implementation": "web.Search",
+      "allowed_agents": ["consultant", "researcher", "council", "vibes"]
+    },
+    
+    "command_maintenance": {
+      "description": "Queue a command for maintenance agent",
+      "parameters": {
+        "command": {"type": "string", "required": true, "enum": ["merge", "create_branch", "delete_branch", "apply_change"]},
+        "params": {"type": "object", "required": false}
+      },
+      "security_level": "write",
+      "implementation": "db.QueueMaintenanceCommand",
+      "allowed_agents": ["supervisor"],
+      "notes": "Supervisor commands maintenance via queue, never direct execution"
     }
+  },
+  
+  "security_levels": {
+    "read": "Can read data, no modifications",
+    "write": "Can modify data/files",
+    "execute": "Can run code in sandbox",
+    "secret": "Can access encrypted secrets"
+  },
+  
+  "notes": [
+    "Tools are primitives that agents use",
+    "Each agent gets 2-3 tools maximum to prevent drift",
+    "Tool permissions enforced at runtime",
+    "Implementation maps to Go function in internal/ package",
+    "Add new tools: add definition here, implement in Go, register in runtime"
   ]
 }
