@@ -1,0 +1,160 @@
+package runtime
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"sync/atomic"
+	"time"
+)
+
+type AgentPool struct {
+	maxPerModule int
+	maxTotal     int
+	active       atomic.Int32
+	perModule    sync.Map // moduleID -> *int32
+	sem          chan struct{}
+	wg           sync.WaitGroup
+}
+
+func NewAgentPool(maxPerModule, maxTotal int) *AgentPool {
+	if maxTotal < maxPerModule {
+		maxTotal = maxPerModule
+	}
+	return &AgentPool{
+		maxPerModule: maxPerModule,
+		maxTotal:     maxTotal,
+		sem:          make(chan struct{}, maxTotal),
+	}
+}
+
+func (p *AgentPool) Submit(ctx context.Context, moduleID string, fn func() error) error {
+	if !p.acquire(moduleID) {
+		return fmt.Errorf("capacity exceeded for module %s or total limit reached", moduleID)
+	}
+
+	p.wg.Add(1)
+	go func() {
+		defer p.wg.Done()
+		defer p.release(moduleID)
+		fn()
+	}()
+
+	return nil
+}
+
+func (p *AgentPool) acquire(moduleID string) bool {
+	currentTotal := p.active.Load()
+	if int(currentTotal) >= p.maxTotal {
+		return false
+	}
+
+	moduleCountI, _ := p.perModule.LoadOrStore(moduleID, new(int32))
+	moduleCount := moduleCountI.(*int32)
+
+	if int(atomic.LoadInt32(moduleCount)) >= p.maxPerModule {
+		return false
+	}
+
+	select {
+	case p.sem <- struct{}{}:
+		p.active.Add(1)
+		atomic.AddInt32(moduleCount, 1)
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *AgentPool) release(moduleID string) {
+	moduleCountI, ok := p.perModule.Load(moduleID)
+	if ok {
+		atomic.AddInt32(moduleCountI.(*int32), -1)
+	}
+	p.active.Add(-1)
+	<-p.sem
+}
+
+func (p *AgentPool) Wait() {
+	p.wg.Wait()
+}
+
+func (p *AgentPool) ActiveCount() int {
+	return int(p.active.Load())
+}
+
+func (p *AgentPool) ModuleCount(moduleID string) int {
+	if countI, ok := p.perModule.Load(moduleID); ok {
+		return int(atomic.LoadInt32(countI.(*int32)))
+	}
+	return 0
+}
+
+func (p *AgentPool) Stats() map[string]interface{} {
+	moduleStats := make(map[string]int)
+	p.perModule.Range(func(key, value interface{}) bool {
+		moduleStats[key.(string)] = int(atomic.LoadInt32(value.(*int32)))
+		return true
+	})
+
+	return map[string]interface{}{
+		"active_total":   p.ActiveCount(),
+		"max_total":      p.maxTotal,
+		"max_per_module": p.maxPerModule,
+		"modules":        moduleStats,
+	}
+}
+
+type AgentSession struct {
+	ID          string
+	AgentID     string
+	ModuleID    string
+	TaskID      string
+	Destination string
+	Prompt      string
+	Tools       []string
+	Input       map[string]any
+	OnComplete  func(result map[string]any, err error)
+}
+
+type SessionManager struct {
+	pool     *AgentPool
+	sessions sync.Map // sessionID -> *AgentSession
+}
+
+func NewSessionManager(pool *AgentPool) *SessionManager {
+	return &SessionManager{pool: pool}
+}
+
+func (m *SessionManager) CreateSession(agentID, moduleID, taskID string) *AgentSession {
+	return &AgentSession{
+		ID:       fmt.Sprintf("%s-%s-%d", agentID, taskID[:8], time.Now().UnixNano()),
+		AgentID:  agentID,
+		ModuleID: moduleID,
+		TaskID:   taskID,
+	}
+}
+
+func (m *SessionManager) Register(session *AgentSession) {
+	m.sessions.Store(session.ID, session)
+}
+
+func (m *SessionManager) Unregister(sessionID string) {
+	m.sessions.Delete(sessionID)
+}
+
+func (m *SessionManager) Get(sessionID string) *AgentSession {
+	if v, ok := m.sessions.Load(sessionID); ok {
+		return v.(*AgentSession)
+	}
+	return nil
+}
+
+func (m *SessionManager) ListActive() []*AgentSession {
+	var sessions []*AgentSession
+	m.sessions.Range(func(key, value interface{}) bool {
+		sessions = append(sessions, value.(*AgentSession))
+		return true
+	})
+	return sessions
+}
