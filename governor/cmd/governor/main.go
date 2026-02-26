@@ -372,6 +372,35 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 	})
 
+	router.On(runtime.EventPlanReview, func(event runtime.Event) {
+		var plan map[string]any
+		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			log.Printf("[EventPlanReview] Failed to parse plan: %v", err)
+			return
+		}
+
+		planID, _ := plan["id"].(string)
+
+		session, err := factory.Create("supervisor")
+		if err != nil {
+			log.Printf("[EventPlanReview] Failed to create supervisor session: %v", err)
+			return
+		}
+
+		err = pool.Submit(ctx, "plans", func() error {
+			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "plan_review"})
+			if err != nil {
+				log.Printf("[EventPlanReview] Supervisor session failed for %s: %v", truncateID(planID), err)
+				return err
+			}
+			log.Printf("[EventPlanReview] Plan %s reviewed: %s", truncateID(planID), truncateOutput(result.Output))
+			return nil
+		})
+		if err != nil {
+			log.Printf("[EventPlanReview] Failed to submit to pool: %v", err)
+		}
+	})
+
 	router.On(runtime.EventTestResults, func(event runtime.Event) {
 		var testResult map[string]any
 		if err := json.Unmarshal(event.Record, &testResult); err != nil {

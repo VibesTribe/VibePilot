@@ -50,6 +50,7 @@ func RegisterAll(registry *runtime.ToolRegistry, deps *Dependencies) {
 	if deps.DB != nil {
 		registry.Register("db_query", NewDBQueryTool(deps.DB))
 		registry.Register("db_update", NewDBUpdateTool(deps.DB))
+		registry.Register("db_insert", NewDBInsertTool(deps.DB))
 		registry.Register("db_rpc", NewDBRPCTool(deps.DB))
 		registry.Register("command_maintenance", NewMaintenanceCommandTool(deps.DB))
 	}

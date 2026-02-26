@@ -5,7 +5,7 @@
       "id": "consultant",
       "name": "Consultant",
       "prompt": "consultant.md",
-      "tools": ["web_search", "web_fetch", "db_query"],
+      "tools": ["web_search", "web_fetch", "db_query", "file_read", "file_write"],
       "default_destination": "opencode",
       "description": "Human entry point - transforms ideas into zero-ambiguity PRDs"
     },
@@ -13,7 +13,7 @@
       "id": "planner",
       "name": "Planner",
       "prompt": "planner.md",
-      "tools": ["db_query", "db_rpc", "file_read"],
+      "tools": ["db_query", "db_update", "file_read", "file_write"],
       "default_destination": "opencode",
       "description": "Breaks PRD into atomic tasks with prompt packets"
     },
@@ -21,7 +21,7 @@
       "id": "supervisor",
       "name": "Supervisor",
       "prompt": "supervisor.md",
-      "tools": ["db_query", "db_update", "db_rpc"],
+      "tools": ["db_query", "db_update", "db_rpc", "file_read"],
       "default_destination": "opencode",
       "description": "Quality control - approves/rejects, decides simple vs complex"
     },

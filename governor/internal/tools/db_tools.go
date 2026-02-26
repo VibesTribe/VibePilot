@@ -10,7 +10,7 @@ import (
 	"github.com/vibepilot/governor/internal/db"
 )
 
-var invalidFilterChars = regexp.MustCompile(`[<>'"\\;--]`)
+var invalidFilterChars = regexp.MustCompile(`[<>'"\\;\-]`)
 
 func sanitizeFilterValue(val interface{}) string {
 	s := fmt.Sprintf("%v", val)
@@ -131,6 +131,44 @@ func (t *DBUpdateTool) Execute(ctx context.Context, args map[string]any) (json.R
 	return json.Marshal(map[string]any{
 		"success": true,
 		"id":      id,
+		"result":  json.RawMessage(result),
+	})
+}
+
+type DBInsertTool struct {
+	db *db.DB
+}
+
+func NewDBInsertTool(database *db.DB) *DBInsertTool {
+	return &DBInsertTool{db: database}
+}
+
+func (t *DBInsertTool) Execute(ctx context.Context, args map[string]any) (json.RawMessage, error) {
+	table, ok := args["table"].(string)
+	if !ok {
+		return nil, fmt.Errorf("table parameter required")
+	}
+	table = sanitizeColumnName(table)
+	if table == "" {
+		return nil, fmt.Errorf("invalid table name")
+	}
+
+	data, ok := args["data"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("data parameter required")
+	}
+
+	result, err := t.db.REST(ctx, "POST", table, data)
+	if err != nil {
+		return json.Marshal(map[string]any{
+			"success": false,
+			"error":   err.Error(),
+		})
+	}
+
+	return json.Marshal(map[string]any{
+		"success": true,
+		"table":   table,
 		"result":  json.RawMessage(result),
 	})
 }

@@ -1,6 +1,7 @@
 package destinations
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -62,19 +63,49 @@ func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 
 	output := stdout.String()
 
-	var result struct {
-		Content      string `json:"content"`
-		InputTokens  int    `json:"input_tokens"`
-		OutputTokens int    `json:"output_tokens"`
+	var content strings.Builder
+	var tokensIn, tokensOut int
+
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+
+		var entry map[string]interface{}
+		if err := json.Unmarshal(line, &entry); err != nil {
+			continue
+		}
+
+		entryType, _ := entry["type"].(string)
+		switch entryType {
+		case "text":
+			if part, ok := entry["part"].(map[string]interface{}); ok {
+				if text, ok := part["text"].(string); ok {
+					content.WriteString(text)
+				}
+			}
+		case "step_finish":
+			if part, ok := entry["part"].(map[string]interface{}); ok {
+				if tokens, ok := part["tokens"].(map[string]interface{}); ok {
+					if in, ok := tokens["input"].(float64); ok {
+						tokensIn = int(in)
+					}
+					if out, ok := tokens["output"].(float64); ok {
+						tokensOut = int(out)
+					}
+				}
+			}
+		}
 	}
 
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		estimatedIn := len(prompt) / 4
-		estimatedOut := len(output) / 4
-		return output, estimatedIn, estimatedOut, nil
+	result := content.String()
+	if result == "" {
+		return output, len(prompt) / 4, len(output) / 4, nil
 	}
 
-	return result.Content, result.InputTokens, result.OutputTokens, nil
+	return result, tokensIn, tokensOut, nil
 }
 
 func (r *CLIRunner) RunWithSystemPrompt(ctx context.Context, systemPrompt, userPrompt string, timeout int) (string, int, int, error) {

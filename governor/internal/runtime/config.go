@@ -56,6 +56,7 @@ type EventsConfig struct {
 	TaskStatusesReview       []string `json:"task_statuses_review"`
 	TaskStatusesCompleted    []string `json:"task_statuses_completed"`
 	PlanStatusesDraft        []string `json:"plan_statuses_draft"`
+	PlanStatusesReview       []string `json:"plan_statuses_review"`
 	PlanStatusesCouncil      []string `json:"plan_statuses_council"`
 	PlanStatusesPendingHuman []string `json:"plan_statuses_pending_human"`
 	PlanStatusesApproved     []string `json:"plan_statuses_approved"`
