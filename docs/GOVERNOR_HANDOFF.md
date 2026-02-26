@@ -1,8 +1,8 @@
 # Governor Implementation Handoff Document
 
-**Session:** 2026-02-26 (Session 31)
-**Purpose:** Full audit, security fixes, plans table, approval flow
-**Status:** PRODUCTION READY - Clean, lean, optimized, fully swappable
+**Session:** 2026-02-26 (Session 32)
+**Purpose:** Fixed PRD → Plan → Review flow, added review status, fixed agent tools
+**Status:** READY FOR TESTING
 
 ---
 
@@ -205,17 +205,17 @@ governor/ (5,179 lines)
 
 ## 9 AGENTS
 
-| Agent | Prompt | When Called |
-|-------|--------|-------------|
-| consultant | consultant.md | Human has new idea |
-| planner | planner.md | PRD ready (draft status) |
-| supervisor | supervisor.md | Review, test results, research |
-| council | council.md | Complex decisions |
-| orchestrator | orchestrator.md | Task available, routing, Vibes |
-| maintenance | maintenance.md | Code changes |
-| researcher | system_researcher.md | Daily research |
-| tester | testers.md | Code validation |
-| watcher | watcher.md | Failure monitoring |
+| Agent | Prompt | Tools | When Called |
+|-------|--------|-------|-------------|
+| consultant | consultant.md | web_search, web_fetch, db_query, file_read, file_write | Human has new idea |
+| planner | planner.md | db_query, db_update, file_read, file_write | PRD ready (draft status) |
+| supervisor | supervisor.md | db_query, db_update, db_rpc, file_read | Plan review, task review, test results |
+| council | council.md | db_query, file_read, web_search | Complex decisions |
+| orchestrator | orchestrator.md | db_query, db_update, db_rpc | Task available, routing, Vibes |
+| maintenance | maintenance.md | git_*, file_*, sandbox_test, run_lint, run_typecheck | Code changes |
+| researcher | system_researcher.md | web_search, web_fetch, db_query | Daily research |
+| tester | testers.md | file_read, sandbox_test, run_lint, run_typecheck | Code validation |
+| watcher | watcher.md | db_query, db_update, db_rpc | Failure monitoring |
 
 ---
 
@@ -271,14 +271,24 @@ governor/ (5,179 lines)
 ## EVENT FLOW
 
 ```
-PRD created (draft)    → EventPRDReady    → Planner creates tasks
+PRD created (draft)    → EventPRDReady    → Planner creates plan, saves to GitHub, sets status=review
+Plan ready (review)    → EventPlanReview  → Supervisor reads PRD+plan, decides simple/complex
+Plan needs council     → EventPlanCreated → Council reviews
+Council done           → EventCouncilDone → Supervisor approves, tasks created
 Tasks available        → EventTaskAvailable → Orchestrator routes
 Task needs review      → EventTaskReview   → Supervisor validates
 Tests completed        → EventTestResults  → Supervisor processes
-Plan needs council     → EventPlanCreated  → Supervisor triages
-Council done           → EventCouncilDone  → Supervisor approves
 Research ready         → EventResearchReady → Supervisor reviews
 Maintenance command    → EventMaintenanceCmd → Maintenance executes
+```
+
+### Plan Status Flow
+
+```
+draft → (Planner saves plan) → review → (Supervisor decides)
+                                         ↓
+                              Simple → approved → tasks created
+                              Complex → council_review → approved → tasks created
 ```
 
 ---
@@ -321,6 +331,13 @@ grep -rn "TODO\|FIXME\|STUB" --include="*.go"
 
 | Date | Session | Change |
 |------|---------|--------|
+| 2026-02-26 | 32 | Fixed PRD → Plan → Review flow: added review status, EventPlanReview |
+| 2026-02-26 | 32 | Fixed agent tools: planner (file_write, db_update), supervisor (file_read) |
+| 2026-02-26 | 32 | Updated planner prompt: save plan to GitHub, not db_insert tasks |
+| 2026-02-26 | 32 | Updated supervisor prompt: added Scenario 0 (initial plan review) |
+| 2026-02-26 | 32 | Fixed CLIRunner: NDJSON parsing for opencode output |
+| 2026-02-26 | 32 | Added courier runner implementation |
+| 2026-02-26 | 32 | Added db_insert tool (for future use after approval) |
 | 2026-02-26 | 31 | Full audit: security fixes, all hardcoded → constants |
 | 2026-02-26 | 31 | Killed orphaned Python processes |
 | 2026-02-26 | 31 | Added event types: PRDReady, TestResults, HumanQuery |

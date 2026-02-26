@@ -11,67 +11,99 @@
 ---
 
 **Last Updated:** 2026-02-26
-**Updated By:** GLM-5 - Session 31
-**Branch:** `go-governor` (all changes ready)
-**Status:** PRODUCTION READY
+**Updated By:** GLM-5 - Session 32
+**Branch:** `go-governor` (all changes pushed)
+**Status:** READY FOR TESTING
 
 ---
 
-# SESSION 31: COMPLETE
+# SESSION 32: PRD → PLAN → REVIEW FLOW COMPLETE
 
 ## What Changed This Session
 
-### 1. Plans Table & Approval Flow
-- Created `docs/supabase-schema/029_plans_table.sql`
-- Plans track PRD → Plan → Approval before tasks reach orchestrator
-- SQL function `update_plan_status` auto-flips tasks to `available` when approved
-- Council reviews stored as JSONB (3 lenses)
+### 1. Fixed the PRD → Plan → Review Flow
 
-### 2. Protected Branches
-- Added `research-considerations` to protected branches
-- Now: `main`, `master`, `research-considerations`
+The core flow now works correctly:
 
-### 3. New RPCs
-- `add_council_review` - Add a lens vote to a plan
-- `set_council_consensus` - Set council consensus after review
+```
+PRD in GitHub (docs/prds/*.md)
+        ↓
+    Plan created (status=draft)
+        ↓
+    Governor detects draft → EventPRDReady → Planner runs
+        ↓
+    Planner reads PRD → creates plan → saves to GitHub → status=review
+        ↓
+    Governor detects review → EventPlanReview → Supervisor runs
+        ↓
+    Supervisor reads PRD + plan → decides simple/complex
+        ├── Simple → status=approved
+        └── Complex → status=council_review → Council → approved
+        ↓
+    Approved → Tasks created from plan → Orchestrator assigns
+```
 
-### 4. Config Updates
-- Removed `plan_statuses_planned`
-- Added `plan_statuses_pending_human`
-- Updated EventsConfig struct
+### 2. Files Changed
 
-## Final Metrics
+| File | Change |
+|------|--------|
+| `docs/supabase-schema/030_add_review_status.sql` | NEW - adds `review` status |
+| `governor/config/system.json` | Added `plan_statuses_review: ["review"]` |
+| `governor/config/agents.json` | Fixed tools for consultant, planner, supervisor |
+| `prompts/planner.md` | Changed: save plan to GitHub, set status=review |
+| `prompts/supervisor.md` | Added: Scenario 0 (initial plan review) |
+| `governor/internal/runtime/config.go` | Added `PlanStatusesReview` field |
+| `governor/internal/runtime/events.go` | Added `EventPlanReview`, `detectPlanReview()` |
+| `governor/cmd/governor/main.go` | Added handler for `EventPlanReview` |
+| `governor/internal/tools/db_tools.go` | Added `DBInsertTool` |
+| `governor/internal/tools/registry.go` | Registered `db_insert` tool |
+| `governor/config/tools.json` | Added `db_insert` tool definition |
+| `governor/internal/destinations/runners.go` | Fixed NDJSON parsing for opencode |
+| `governor/internal/destinations/courier.go` | NEW - courier runner implementation |
 
-| Metric | Value |
-|--------|-------|
-| Go files | 23 |
-| Total lines | ~5,200 |
-| Binary size | ~9.6MB |
-| Python remnants | 0 |
-| Stubs | 0 |
-| Hardcoded values | 0 |
-| RPCs in allowlist | 42 |
-| Protected branches | 3 |
+### 3. Agent Tools Fixed
+
+| Agent | Tools |
+|-------|-------|
+| **Consultant** | `web_search`, `web_fetch`, `db_query`, `file_read`, `file_write` |
+| **Planner** | `db_query`, `db_update`, `file_read`, `file_write` |
+| **Supervisor** | `db_query`, `db_update`, `db_rpc`, `file_read` |
+
+### 4. SQL Migrations Applied
+
+| Migration | Status |
+|-----------|--------|
+| 029_plans_table.sql | ✅ Applied (Session 31) |
+| 030_add_review_status.sql | ✅ Applied (Session 32) |
 
 ---
 
-## Approval Flow Summary
+## Plan Status Flow
 
-```
-Researcher Suggestion (GitHub)
-        ↓
-Simple → Supervisor → Planner → Tasks (pending)
-                                ↓
-                        Supervisor approves plan
-                                ↓
-                        Tasks become AVAILABLE
-                                ↓
-                        Governor routes to execution
+| Status | Meaning | Next Step |
+|--------|---------|-----------|
+| `draft` | Planner is working | Planner saves plan, sets to `review` |
+| `review` | Ready for Supervisor | Supervisor decides simple/complex |
+| `council_review` | Complex, needs Council | Council reviews, reaches consensus |
+| `revision_needed` | Council wants changes | Planner updates plan |
+| `pending_human` | Awaiting human decision | Human approves/rejects |
+| `approved` | Plan approved | Tasks created, Orchestrator assigns |
+| `archived` | Plan archived | No action |
 
-Complex → Council (3 lenses) → Human review → Approved → Tasks
-```
+---
 
-**Key Insight:** Tasks NEVER reach orchestrator until plan is approved.
+## Task Status Flow
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Created, waiting for plan approval |
+| `pending_dependency` | Waiting on another task |
+| `active` | Ready for assignment (was `available`) |
+| `in_progress` | Assigned to agent |
+| `review` | Done, awaiting supervisor review |
+| `testing` | Tests running |
+| `approval` | Tests passed, awaiting merge |
+| `merged` | Complete |
 
 ---
 
@@ -80,11 +112,14 @@ Complex → Council (3 lenses) → Human review → Approved → Tasks
 | Component | Status |
 |-----------|--------|
 | Governor builds | ✅ |
-| Vault security (JIT keys) | ✅ |
+| Event detection (polling) | ✅ |
+| PRD → Planner trigger | ✅ |
+| Plan → Supervisor trigger | ✅ |
+| Plan saved to GitHub | ✅ (prompt updated) |
+| Supervisor initial review | ✅ (prompt updated) |
+| Vault security | ✅ |
 | Dashboard live data | ✅ |
-| Adapter pattern for swappable data | ✅ |
-| Plans table | ✅ Created, needs to be applied to Supabase |
-| Council RPCs | ✅ In allowlist |
+| Courier runner | ✅ Implemented |
 
 ---
 
@@ -92,11 +127,10 @@ Complex → Council (3 lenses) → Human review → Approved → Tasks
 
 | Item | Priority | Notes |
 |------|----------|-------|
-| Apply SQL migration to Supabase | High | `029_plans_table.sql` |
-| Populate vault with API keys | High | Keys exist, need to add to vault |
-| Test end-to-end flow | High | Create PRD → Plan → Tasks → Execute |
-| Wire dashboard Review Now button | Medium | Links to GitHub/Vercel/etc. |
-| Council review docs in GitHub | Medium | Template + process |
+| Test end-to-end flow | HIGH | Create PRD → Plan → Review → Tasks |
+| Council implementation | Medium | Council review for complex plans |
+| Task creation from approved plan | Medium | Extract tasks from plan file |
+| Wire dashboard Review Now button | Low | Links to GitHub/Vercel |
 
 ---
 
@@ -105,10 +139,11 @@ Complex → Council (3 lenses) → Human review → Approved → Tasks
 | Command | Action |
 |---------|--------|
 | `cd ~/vibepilot/governor && go build -o governor ./cmd/governor` | Build |
-| `cd ~/vibepilot/governor && go vet ./...` | Static analysis |
 | `cd ~/vibepilot/governor && ./governor` | Run |
 | `cat governor/config/system.json` | View settings |
 | `ls ~/vibepilot/prompts/` | View prompts |
+| `ls ~/vibepilot/docs/prds/` | View PRDs |
+| `ls ~/vibepilot/docs/plans/` | View plans |
 
 ---
 
@@ -116,11 +151,11 @@ Complex → Council (3 lenses) → Human review → Approved → Tasks
 
 **Read first:**
 1. `CURRENT_STATE.md` (this file)
-2. `docs/GOVERNOR_HANDOFF.md` (all constants, security fixes, approval flow)
+2. `docs/GOVERNOR_HANDOFF.md` (all implementation details)
 3. `docs/core_philosophy.md` (strategic mindset)
 
 **What to do:**
-1. Apply `029_plans_table.sql` to Supabase
-2. Test the approval flow
-3. Wire dashboard Review Now button
-4. Create council review doc template
+1. Test the full PRD → Plan → Review flow
+2. Verify planner saves plan to GitHub correctly
+3. Verify supervisor reads plan and makes decision
+4. Implement task creation from approved plan
