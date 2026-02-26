@@ -14,6 +14,7 @@ const (
 	EventTaskAvailable  EventType = "task_available"
 	EventTaskCompleted  EventType = "task_completed"
 	EventTaskReview     EventType = "task_review"
+	EventPlanReview     EventType = "plan_review"
 	EventPlanCreated    EventType = "plan_created"
 	EventCouncilDone    EventType = "council_done"
 	EventResearchReady  EventType = "research_ready"
@@ -102,6 +103,7 @@ func (w *PollingWatcher) poll(ctx context.Context) {
 
 func (w *PollingWatcher) checkForEvents(ctx context.Context, lastSeen map[string]time.Time) {
 	w.detectTaskEvents(ctx, lastSeen)
+	w.detectPlanReview(ctx, lastSeen)
 	w.detectPlanEvents(ctx, lastSeen)
 	w.detectPRDReady(ctx, lastSeen)
 	w.detectMaintenanceEvents(ctx, lastSeen)
@@ -119,6 +121,7 @@ func (w *PollingWatcher) getEventsConfig() *EventsConfig {
 		TaskStatusesReview:       []string{"review"},
 		TaskStatusesCompleted:    []string{"testing", "approval"},
 		PlanStatusesDraft:        []string{"draft"},
+		PlanStatusesReview:       []string{"review"},
 		PlanStatusesCouncil:      []string{"council_review", "revision_needed"},
 		PlanStatusesPendingHuman: []string{"pending_human"},
 		PlanStatusesApproved:     []string{"approved"},
@@ -179,6 +182,50 @@ func (w *PollingWatcher) detectTaskEvents(ctx context.Context, lastSeen map[stri
 					Timestamp: time.Now(),
 				})
 			}
+		}
+	}
+}
+
+func (w *PollingWatcher) detectPlanReview(ctx context.Context, lastSeen map[string]time.Time) {
+	eventsCfg := w.getEventsConfig()
+
+	if len(eventsCfg.PlanStatusesReview) == 0 {
+		return
+	}
+
+	orFilter := buildOrFilter(eventsCfg.PlanStatusesReview, "status")
+
+	plans, err := w.db.Query(ctx, "plans", map[string]any{
+		"or":    orFilter,
+		"limit": 10,
+	})
+	if err != nil {
+		return
+	}
+
+	var planList []map[string]any
+	if err := json.Unmarshal(plans, &planList); err != nil {
+		return
+	}
+
+	for _, plan := range planList {
+		id, _ := plan["id"].(string)
+		updatedAt, _ := plan["updated_at"].(string)
+
+		key := fmt.Sprintf("plan_review:%s", id)
+		ts, _ := time.Parse(time.RFC3339, updatedAt)
+
+		if lastSeen[key].Before(ts) {
+			lastSeen[key] = ts
+
+			record, _ := json.Marshal(plan)
+			w.emit(Event{
+				Type:      EventPlanReview,
+				ID:        id,
+				Table:     "plans",
+				Record:    record,
+				Timestamp: time.Now(),
+			})
 		}
 	}
 }

@@ -71,6 +71,15 @@
       "security_level": "write",
       "implementation": "db"
     },
+    "db_insert": {
+      "description": "Insert new record into database table",
+      "parameters": {
+        "table": {"type": "string", "required": true},
+        "data": {"type": "object", "required": true}
+      },
+      "security_level": "write",
+      "implementation": "db"
+    },
     "db_rpc": {
       "description": "Call database RPC function",
       "parameters": {

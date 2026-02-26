@@ -40,6 +40,7 @@
     "task_statuses_review": ["review"],
     "task_statuses_completed": ["testing", "approval"],
     "plan_statuses_draft": ["draft"],
+    "plan_statuses_review": ["review"],
     "plan_statuses_council": ["council_review", "revision_needed"],
     "plan_statuses_pending_human": ["pending_human"],
     "plan_statuses_approved": ["approved"],
