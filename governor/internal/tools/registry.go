@@ -1,8 +1,8 @@
 package tools
 
 import (
-	"context"
-	"encoding/json"
+	"net/http"
+	"time"
 
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/gitree"
@@ -10,11 +10,31 @@ import (
 	"github.com/vibepilot/governor/internal/vault"
 )
 
+const (
+	DefaultHTTPTimeoutSecs     = 30
+	DefaultMaxIdleConns        = 10
+	DefaultIdleConnTimeoutSecs = 30
+)
+
 type Dependencies struct {
 	DB       *db.DB
 	Git      *gitree.Gitree
 	Vault    *vault.Vault
 	RepoPath string
+	Config   *runtime.Config
+}
+
+var sharedHTTPClient *http.Client
+
+func init() {
+	sharedHTTPClient = &http.Client{
+		Timeout: DefaultHTTPTimeoutSecs * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:       DefaultMaxIdleConns,
+			IdleConnTimeout:    DefaultIdleConnTimeoutSecs * time.Second,
+			DisableCompression: false,
+		},
+	}
 }
 
 func RegisterAll(registry *runtime.ToolRegistry, deps *Dependencies) {
@@ -38,23 +58,24 @@ func RegisterAll(registry *runtime.ToolRegistry, deps *Dependencies) {
 		registry.Register("vault_get", NewVaultGetTool(deps.Vault))
 	}
 
+	sandboxTimeout := DefaultSandboxTimeoutSecs
+	if deps.Config != nil && deps.Config.GetSandboxConfig().TimeoutSeconds > 0 {
+		sandboxTimeout = deps.Config.GetSandboxConfig().TimeoutSeconds
+	}
+
 	if deps.RepoPath != "" {
 		registry.Register("file_read", NewFileReadTool(deps.RepoPath))
 		registry.Register("file_write", NewFileWriteTool(deps.RepoPath))
 		registry.Register("file_delete", NewFileDeleteTool(deps.RepoPath))
-		registry.Register("sandbox_test", NewSandboxTestTool(deps.RepoPath, 60))
+		registry.Register("sandbox_test", NewSandboxTestTool(deps.RepoPath, sandboxTimeout))
 		registry.Register("run_lint", NewRunLintTool(deps.RepoPath))
 		registry.Register("run_typecheck", NewRunTypecheckTool(deps.RepoPath))
 	}
 
-	registry.Register("web_search", NewWebSearchTool())
-	registry.Register("web_fetch", NewWebFetchTool())
-}
-
-type toolAdapter struct {
-	execute func(ctx context.Context, args map[string]any) (json.RawMessage, error)
-}
-
-func (a *toolAdapter) Execute(ctx context.Context, args map[string]any) (json.RawMessage, error) {
-	return a.execute(ctx, args)
+	var allowlist []string
+	if deps.Config != nil {
+		allowlist = deps.Config.GetHTTPAllowlist()
+	}
+	registry.Register("web_search", NewWebSearchTool(allowlist))
+	registry.Register("web_fetch", NewWebFetchTool(allowlist))
 }

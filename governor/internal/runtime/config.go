@@ -9,10 +9,14 @@ import (
 )
 
 type SystemConfig struct {
-	Database DatabaseConfig `json:"database"`
-	Vault    VaultConfig    `json:"vault"`
-	Git      GitConfig      `json:"git"`
-	Runtime  RuntimeConfig  `json:"runtime"`
+	Database   DatabaseConfig `json:"database"`
+	Vault      VaultConfig    `json:"vault"`
+	Git        GitConfig      `json:"git"`
+	Runtime    RuntimeConfig  `json:"runtime"`
+	Security   SecurityConfig `json:"security"`
+	Events     EventsConfig   `json:"events"`
+	Sandbox    SandboxConfig  `json:"sandbox"`
+	PromptsDir string         `json:"prompts_dir"`
 }
 
 type DatabaseConfig struct {
@@ -22,14 +26,16 @@ type DatabaseConfig struct {
 }
 
 type VaultConfig struct {
-	KeyEnv string `json:"key_env"`
-	Table  string `json:"table"`
+	KeyEnv          string `json:"key_env"`
+	Table           string `json:"table"`
+	CacheTTLSeconds int    `json:"cache_ttl_seconds"`
 }
 
 type GitConfig struct {
-	Host     string `json:"host"`
-	RepoEnv  string `json:"repo_env"`
-	TokenEnv string `json:"token_env"`
+	Host              string   `json:"host"`
+	RepoEnv           string   `json:"repo_env"`
+	TokenEnv          string   `json:"token_env"`
+	ProtectedBranches []string `json:"protected_branches"`
 }
 
 type RuntimeConfig struct {
@@ -37,6 +43,30 @@ type RuntimeConfig struct {
 	MaxConcurrentTotal     int `json:"max_concurrent_total"`
 	EventPollIntervalMs    int `json:"event_poll_interval_ms"`
 	AgentTimeoutSeconds    int `json:"agent_timeout_seconds"`
+	MaxToolTurns           int `json:"max_tool_turns"`
+}
+
+type SecurityConfig struct {
+	LeakDetectionEnabled bool     `json:"leak_detection_enabled"`
+	HTTPAllowlist        []string `json:"http_allowlist"`
+}
+
+type EventsConfig struct {
+	TaskStatusesAvailable    []string `json:"task_statuses_available"`
+	TaskStatusesReview       []string `json:"task_statuses_review"`
+	TaskStatusesCompleted    []string `json:"task_statuses_completed"`
+	PlanStatusesDraft        []string `json:"plan_statuses_draft"`
+	PlanStatusesCouncil      []string `json:"plan_statuses_council"`
+	PlanStatusesPendingHuman []string `json:"plan_statuses_pending_human"`
+	PlanStatusesApproved     []string `json:"plan_statuses_approved"`
+	MaintenanceStatus        string   `json:"maintenance_status"`
+	TestResultsStatus        string   `json:"test_results_status"`
+}
+
+type SandboxConfig struct {
+	DefaultTestCommand string `json:"default_test_command"`
+	TimeoutSeconds     int    `json:"timeout_seconds"`
+	TempDir            string `json:"temp_dir"`
 }
 
 type AgentConfig struct {
@@ -52,7 +82,7 @@ type AgentConfig struct {
 
 type AgentsFile struct {
 	Version string        `json:"version"`
-	Agents  []AgentConfig `json:"agents"` // Array format from existing config
+	Agents  []AgentConfig `json:"agents"`
 }
 
 func (a *AgentsFile) GetAgent(id string) *AgentConfig {
@@ -81,15 +111,16 @@ type ToolsFile struct {
 }
 
 type DestinationConfig struct {
-	ID        string                 `json:"id"`
-	Name      string                 `json:"name"`
-	Type      string                 `json:"type"`
-	Status    string                 `json:"status"`
-	Command   string                 `json:"command,omitempty"`
-	Endpoint  string                 `json:"endpoint,omitempty"`
-	APIKeyRef string                 `json:"api_key_ref,omitempty"`
-	Models    []string               `json:"models_available,omitempty"`
-	Extra     map[string]interface{} `json:"-"` // Capture unknown fields
+	ID             string                 `json:"id"`
+	Name           string                 `json:"name"`
+	Type           string                 `json:"type"`
+	Status         string                 `json:"status"`
+	Command        string                 `json:"command,omitempty"`
+	Endpoint       string                 `json:"endpoint,omitempty"`
+	APIKeyRef      string                 `json:"api_key_ref,omitempty"`
+	Models         []string               `json:"models_available,omitempty"`
+	TimeoutSeconds int                    `json:"timeout_seconds,omitempty"`
+	Extra          map[string]interface{} `json:"-"`
 }
 
 type DestinationsFile struct {
@@ -104,6 +135,7 @@ type ModelConfig struct {
 	Capabilities []string `json:"capabilities"`
 	AccessVia    []string `json:"access_via"`
 	APIKeyRef    string   `json:"api_key_ref,omitempty"`
+	Status       string   `json:"status"`
 }
 
 type ModelsFile struct {
@@ -183,17 +215,35 @@ func (c *Config) Reload() error {
 			Database: DatabaseConfig{
 				Type:   "supabase",
 				URLEnv: "SUPABASE_URL",
-				KeyEnv: "SUPABASE_KEY",
+				KeyEnv: "SUPABASE_SERVICE_KEY",
 			},
 			Vault: VaultConfig{
-				KeyEnv: "VAULT_KEY",
-				Table:  "secrets_vault",
+				KeyEnv:          "VAULT_KEY",
+				Table:           "secrets_vault",
+				CacheTTLSeconds: 300,
+			},
+			Git: GitConfig{
+				Host:              "github",
+				ProtectedBranches: []string{"main", "master"},
 			},
 			Runtime: RuntimeConfig{
 				MaxConcurrentPerModule: 8,
 				MaxConcurrentTotal:     160,
 				EventPollIntervalMs:    1000,
 				AgentTimeoutSeconds:    300,
+				MaxToolTurns:           10,
+			},
+			Events: EventsConfig{
+				TaskStatusesAvailable: []string{"available"},
+				TaskStatusesReview:    []string{"review"},
+				TaskStatusesCompleted: []string{"testing", "approval"},
+				PlanStatusesCouncil:   []string{"council_review"},
+				PlanStatusesApproved:  []string{"approved"},
+				MaintenanceStatus:     "pending",
+			},
+			Sandbox: SandboxConfig{
+				DefaultTestCommand: "npm test",
+				TimeoutSeconds:     60,
 			},
 		}
 	}
@@ -270,7 +320,11 @@ func (c *Config) GetModel(id string) *ModelConfig {
 
 func (c *Config) LoadPrompt(promptPath string) (string, error) {
 	c.mu.RLock()
-	fullPath := filepath.Join(c.promptsDir, filepath.Base(promptPath))
+	promptsDir := c.promptsDir
+	if c.System != nil && c.System.PromptsDir != "" {
+		promptsDir = c.System.PromptsDir
+	}
+	fullPath := filepath.Join(promptsDir, filepath.Base(promptPath))
 	c.mu.RUnlock()
 
 	data, err := os.ReadFile(fullPath)
@@ -303,6 +357,51 @@ func (c *Config) GetDatabaseKey() string {
 
 func (c *Config) GetVaultKey() string {
 	return os.Getenv(c.System.Vault.KeyEnv)
+}
+
+func (c *Config) GetProtectedBranches() []string {
+	if c.System == nil || c.System.Git.ProtectedBranches == nil {
+		return []string{"main", "master"}
+	}
+	return c.System.Git.ProtectedBranches
+}
+
+func (c *Config) GetHTTPAllowlist() []string {
+	if c.System == nil || c.System.Security.HTTPAllowlist == nil {
+		return []string{
+			"api.supabase.co",
+			"api.github.com",
+			"github.com",
+		}
+	}
+	return c.System.Security.HTTPAllowlist
+}
+
+func (c *Config) GetEventsConfig() *EventsConfig {
+	if c.System == nil {
+		return &EventsConfig{
+			TaskStatusesAvailable:    []string{"available"},
+			TaskStatusesReview:       []string{"review"},
+			TaskStatusesCompleted:    []string{"testing", "approval"},
+			PlanStatusesDraft:        []string{"draft"},
+			PlanStatusesCouncil:      []string{"council_review", "revision_needed"},
+			PlanStatusesPendingHuman: []string{"pending_human"},
+			PlanStatusesApproved:     []string{"approved"},
+			MaintenanceStatus:        "pending",
+			TestResultsStatus:        "pending_review",
+		}
+	}
+	return &c.System.Events
+}
+
+func (c *Config) GetSandboxConfig() *SandboxConfig {
+	if c.System == nil {
+		return &SandboxConfig{
+			DefaultTestCommand: "npm test",
+			TimeoutSeconds:     60,
+		}
+	}
+	return &c.System.Sandbox
 }
 
 func loadJSON[T any](path string) (*T, error) {

@@ -4,9 +4,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/vibepilot/governor/internal/db"
 )
+
+var invalidFilterChars = regexp.MustCompile(`[<>'"\\;--]`)
+
+func sanitizeFilterValue(val interface{}) string {
+	s := fmt.Sprintf("%v", val)
+	s = invalidFilterChars.ReplaceAllString(s, "")
+	return s
+}
+
+func sanitizeColumnName(name string) string {
+	validName := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+	if !validName.MatchString(name) {
+		return ""
+	}
+	return name
+}
 
 type DBQueryTool struct {
 	db *db.DB
@@ -21,27 +39,40 @@ func (t *DBQueryTool) Execute(ctx context.Context, args map[string]any) (json.Ra
 	if !ok {
 		return nil, fmt.Errorf("table parameter required")
 	}
+	table = sanitizeColumnName(table)
+	if table == "" {
+		return nil, fmt.Errorf("invalid table name")
+	}
 
 	path := table
 
 	if columns, ok := args["columns"].([]any); ok && len(columns) > 0 {
-		colStr := ""
-		for i, c := range columns {
-			if i > 0 {
-				colStr += ","
+		var validCols []string
+		for _, c := range columns {
+			col := sanitizeColumnName(fmt.Sprintf("%v", c))
+			if col != "" {
+				validCols = append(validCols, col)
 			}
-			colStr += fmt.Sprintf("%v", c)
 		}
-		path = fmt.Sprintf("%s?select=%s", table, colStr)
+		if len(validCols) > 0 {
+			path = fmt.Sprintf("%s?select=%s", table, strings.Join(validCols, ","))
+		}
+	} else {
+		path = table + "?select=*"
 	}
 
 	if where, ok := args["where"].(map[string]any); ok {
 		for key, val := range where {
-			path = fmt.Sprintf("%s&%s=eq.%v", path, key, val)
+			col := sanitizeColumnName(key)
+			if col == "" {
+				continue
+			}
+			safeVal := sanitizeFilterValue(val)
+			path = fmt.Sprintf("%s&%s=eq.%s", path, col, safeVal)
 		}
 	}
 
-	if limit, ok := args["limit"].(float64); ok {
+	if limit, ok := args["limit"].(float64); ok && limit > 0 && limit <= 1000 {
 		path = fmt.Sprintf("%s&limit=%d", path, int(limit))
 	}
 
@@ -72,10 +103,17 @@ func (t *DBUpdateTool) Execute(ctx context.Context, args map[string]any) (json.R
 	if !ok {
 		return nil, fmt.Errorf("table parameter required")
 	}
+	table = sanitizeColumnName(table)
+	if table == "" {
+		return nil, fmt.Errorf("invalid table name")
+	}
+
 	id, ok := args["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("id parameter required")
 	}
+	id = sanitizeFilterValue(id)
+
 	data, ok := args["data"].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("data parameter required")
@@ -109,6 +147,11 @@ func (t *DBRPCTool) Execute(ctx context.Context, args map[string]any) (json.RawM
 	name, ok := args["name"].(string)
 	if !ok {
 		return nil, fmt.Errorf("name parameter required")
+	}
+
+	validRPC := regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
+	if !validRPC.MatchString(name) {
+		return nil, fmt.Errorf("invalid RPC name format")
 	}
 
 	params, _ := args["params"].(map[string]any)
@@ -145,6 +188,7 @@ func (t *MaintenanceCommandTool) Execute(ctx context.Context, args map[string]an
 	if !ok {
 		return nil, fmt.Errorf("command parameter required")
 	}
+	command = sanitizeFilterValue(command)
 
 	params, _ := args["params"].(map[string]any)
 	if params == nil {

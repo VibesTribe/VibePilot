@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -26,7 +28,8 @@ var (
 func main() {
 	log.Printf("VibePilot Governor %s (commit: %s, built: %s)", version, commit, date)
 
-	cfg, err := runtime.LoadConfig("./config")
+	configDir := getConfigDir()
+	cfg, err := runtime.LoadConfig(configDir)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -34,21 +37,19 @@ func main() {
 	dbURL := cfg.GetDatabaseURL()
 	dbKey := cfg.GetDatabaseKey()
 	if dbURL == "" || dbKey == "" {
-		log.Fatal("Database credentials required: set SUPABASE_URL and SUPABASE_KEY")
+		log.Fatal("Database credentials required: set SUPABASE_URL and SUPABASE_SERVICE_KEY")
 	}
 
 	database := db.New(dbURL, dbKey)
 	defer database.Close()
 	log.Println("Connected to database")
 
-	repoPath := "."
-	if p := os.Getenv("REPO_PATH"); p != "" {
-		repoPath = p
-	}
+	repoPath := getEnvOrDefault("REPO_PATH", ".")
+	protectedBranches := cfg.GetProtectedBranches()
 
 	git := gitree.New(&gitree.Config{
 		RepoPath:          repoPath,
-		ProtectedBranches: []string{"main", "master"},
+		ProtectedBranches: protectedBranches,
 	})
 
 	v := vault.New(database)
@@ -59,13 +60,11 @@ func main() {
 		Git:      git,
 		Vault:    v,
 		RepoPath: repoPath,
+		Config:   cfg,
 	})
 
 	sessionFactory := runtime.NewSessionFactory(cfg, toolRegistry)
-
-	cliRunner := destinations.NewCLIRunner("opencode", cfg.System.Runtime.AgentTimeoutSeconds)
-	sessionFactory.RegisterDestination("opencode", cliRunner)
-	sessionFactory.RegisterDestination("kimi", destinations.NewCLIRunner("kimi", cfg.System.Runtime.AgentTimeoutSeconds))
+	registerDestinations(sessionFactory, cfg, v)
 
 	pool := runtime.NewAgentPool(
 		cfg.System.Runtime.MaxConcurrentPerModule,
@@ -73,14 +72,14 @@ func main() {
 	)
 
 	pollInterval := time.Duration(cfg.System.Runtime.EventPollIntervalMs) * time.Millisecond
-	watcher := runtime.NewPollingWatcher(&dbQuerierAdapter{db: database}, pollInterval)
+	watcher := runtime.NewPollingWatcher(&dbQuerierAdapter{db: database, cfg: cfg}, pollInterval)
 
 	router := runtime.NewEventRouter(watcher)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	setupEventHandlers(ctx, router, sessionFactory, pool, database)
+	setupEventHandlers(ctx, router, sessionFactory, pool, database, cfg)
 
 	if err := router.Start(ctx); err != nil {
 		log.Fatalf("Failed to start event router: %v", err)
@@ -102,7 +101,57 @@ func main() {
 	log.Println("Governor stopped")
 }
 
-func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB) {
+func getConfigDir() string {
+	if dir := os.Getenv("GOVERNOR_CONFIG_DIR"); dir != "" {
+		return dir
+	}
+	return "./config"
+}
+
+func getEnvOrDefault(key, defaultVal string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return defaultVal
+}
+
+func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault) {
+	destinationsCfg := cfg.Destinations
+	if destinationsCfg == nil {
+		log.Println("Warning: no destinations configured")
+		return
+	}
+
+	secretProvider := destinations.NewVaultAdapter(v)
+
+	for _, dest := range destinationsCfg.Destinations {
+		if dest.Status != "active" {
+			log.Printf("Skipping inactive destination: %s", dest.ID)
+			continue
+		}
+
+		switch dest.Type {
+		case "cli":
+			timeout := destinations.DefaultTimeoutSecs
+			if dest.TimeoutSeconds > 0 {
+				timeout = dest.TimeoutSeconds
+			}
+			runner := destinations.NewCLIRunner(dest.Command, timeout)
+			factory.RegisterDestination(dest.ID, runner)
+			log.Printf("Registered CLI destination: %s (%s)", dest.ID, dest.Command)
+		case "api":
+			runner := destinations.NewAPIRunnerFromConfig(dest, secretProvider)
+			factory.RegisterDestination(dest.ID, runner)
+			log.Printf("Registered API destination: %s (%s)", dest.ID, dest.Endpoint)
+		default:
+			log.Printf("Unknown destination type: %s for %s", dest.Type, dest.ID)
+		}
+	}
+}
+
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config) {
+	eventsCfg := cfg.System.Events
+
 	router.On(runtime.EventTaskAvailable, func(event runtime.Event) {
 		var task map[string]any
 		if err := json.Unmarshal(event.Record, &task); err != nil {
@@ -125,14 +174,10 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		err = pool.Submit(ctx, sliceID, func() error {
 			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_available"})
 			if err != nil {
-				log.Printf("[EventTaskAvailable] Orchestrator session failed for %s: %v", taskID[:8], err)
+				log.Printf("[EventTaskAvailable] Orchestrator session failed for %s: %v", truncateID(taskID), err)
 				return err
 			}
-			output := result.Output
-			if len(output) > 200 {
-				output = output[:200] + "..."
-			}
-			log.Printf("[EventTaskAvailable] Task %s routed: %s", taskID[:8], output)
+			log.Printf("[EventTaskAvailable] Task %s routed: %s", truncateID(taskID), truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -163,11 +208,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			if err != nil {
 				return err
 			}
-			output := result.Output
-			if len(output) > 200 {
-				output = output[:200] + "..."
-			}
-			log.Printf("[EventTaskReview] Task %s reviewed: %s", taskID[:8], output)
+			log.Printf("[EventTaskReview] Task %s reviewed: %s", truncateID(taskID), truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -197,11 +238,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			if err != nil {
 				return err
 			}
-			output := result.Output
-			if len(output) > 200 {
-				output = output[:200] + "..."
-			}
-			log.Printf("[EventTaskCompleted] Task %s completed: %s", taskID[:8], output)
+			log.Printf("[EventTaskCompleted] Task %s completed: %s", truncateID(taskID), truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -227,11 +264,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			if err != nil {
 				return err
 			}
-			output := result.Output
-			if len(output) > 200 {
-				output = output[:200] + "..."
-			}
-			log.Printf("[EventPlanCreated] Plan %s triaged: %s", planID[:8], output)
+			log.Printf("[EventPlanCreated] Plan %s triaged: %s", truncateID(planID), truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -257,11 +290,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			if err != nil {
 				return err
 			}
-			output := result.Output
-			if len(output) > 200 {
-				output = output[:200] + "..."
-			}
-			log.Printf("[EventCouncilDone] Council done for %s: %s", planID[:8], output)
+			log.Printf("[EventCouncilDone] Council done for %s: %s", truncateID(planID), truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -287,11 +316,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			if err != nil {
 				return err
 			}
-			output := result.Output
-			if len(output) > 200 {
-				output = output[:200] + "..."
-			}
-			log.Printf("[EventMaintenanceCmd] Command %s executed: %s", cmdID[:8], output)
+			log.Printf("[EventMaintenanceCmd] Command %s executed: %s", truncateID(cmdID), truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -310,17 +335,75 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			if err != nil {
 				return err
 			}
-			log.Printf("[EventResearchReady] Research reviewed: %s", result.Output[:min(100, len(result.Output))])
+			log.Printf("[EventResearchReady] Research reviewed: %s", truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
 			log.Printf("[EventResearchReady] Failed to submit to pool: %v", err)
 		}
 	})
+
+	router.On(runtime.EventPRDReady, func(event runtime.Event) {
+		var plan map[string]any
+		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			log.Printf("[EventPRDReady] Failed to parse plan: %v", err)
+			return
+		}
+
+		planID, _ := plan["id"].(string)
+
+		session, err := factory.Create("planner")
+		if err != nil {
+			log.Printf("[EventPRDReady] Failed to create planner session: %v", err)
+			return
+		}
+
+		err = pool.Submit(ctx, "planning", func() error {
+			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "prd_ready"})
+			if err != nil {
+				log.Printf("[EventPRDReady] Planner session failed for %s: %v", truncateID(planID), err)
+				return err
+			}
+			log.Printf("[EventPRDReady] Plan %s planned: %s", truncateID(planID), truncateOutput(result.Output))
+			return nil
+		})
+		if err != nil {
+			log.Printf("[EventPRDReady] Failed to submit to pool: %v", err)
+		}
+	})
+
+	router.On(runtime.EventTestResults, func(event runtime.Event) {
+		var testResult map[string]any
+		if err := json.Unmarshal(event.Record, &testResult); err != nil {
+			return
+		}
+
+		taskID, _ := testResult["task_id"].(string)
+
+		session, err := factory.Create("supervisor")
+		if err != nil {
+			return
+		}
+
+		err = pool.Submit(ctx, "testing", func() error {
+			result, err := session.Run(ctx, map[string]any{"test_result": testResult, "event": "test_results"})
+			if err != nil {
+				return err
+			}
+			log.Printf("[EventTestResults] Task %s tests processed: %s", truncateID(taskID), truncateOutput(result.Output))
+			return nil
+		})
+		if err != nil {
+			log.Printf("[EventTestResults] Failed to submit to pool: %v", err)
+		}
+	})
+
+	_ = eventsCfg
 }
 
 type dbQuerierAdapter struct {
-	db *db.DB
+	db  *db.DB
+	cfg *runtime.Config
 }
 
 func (q *dbQuerierAdapter) Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error) {
@@ -362,17 +445,28 @@ func toString(v any) string {
 	case string:
 		return val
 	case int:
-		return string(rune(val + '0'))
+		return strconv.Itoa(val)
+	case int64:
+		return strconv.FormatInt(val, 10)
 	case float64:
-		return string(rune(int(val) + '0'))
+		return strconv.FormatFloat(val, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(val)
 	default:
-		return ""
+		return fmt.Sprintf("%v", val)
 	}
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+func truncateID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
 	}
-	return b
+	return id
+}
+
+func truncateOutput(output string) string {
+	if len(output) > 200 {
+		return output[:200] + "..."
+	}
+	return output
 }

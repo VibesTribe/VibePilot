@@ -10,20 +10,48 @@ import (
 	"time"
 )
 
+const (
+	DefaultHTTPTimeoutSecs  = 30
+	DefaultErrorTruncateLen = 200
+)
+
+type DBConfig struct {
+	HTTPTimeoutSecs  int
+	ErrorTruncateLen int
+}
+
 type DB struct {
 	url          string
 	key          string
 	client       *http.Client
 	rpcAllowlist *RPCAllowlist
+	config       *DBConfig
 }
 
 func New(url, key string) *DB {
+	return NewWithConfig(url, key, nil)
+}
+
+func NewWithConfig(url, key string, cfg *DBConfig) *DB {
+	if cfg == nil {
+		cfg = &DBConfig{
+			HTTPTimeoutSecs:  DefaultHTTPTimeoutSecs,
+			ErrorTruncateLen: DefaultErrorTruncateLen,
+		}
+	}
+
+	timeout := DefaultHTTPTimeoutSecs
+	if cfg.HTTPTimeoutSecs > 0 {
+		timeout = cfg.HTTPTimeoutSecs
+	}
+
 	return &DB{
 		url:          url,
 		key:          key,
 		rpcAllowlist: NewRPCAllowlist(),
+		config:       cfg,
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: time.Duration(timeout) * time.Second,
 		},
 	}
 }
@@ -66,9 +94,13 @@ func (d *DB) REST(ctx context.Context, method, path string, body interface{}) ([
 	}
 
 	if resp.StatusCode >= 400 {
+		truncateLen := d.config.ErrorTruncateLen
+		if truncateLen <= 0 {
+			truncateLen = DefaultErrorTruncateLen
+		}
 		errBody := string(data)
-		if len(errBody) > 200 {
-			errBody = errBody[:200] + "...(truncated)"
+		if len(errBody) > truncateLen {
+			errBody = errBody[:truncateLen] + "...(truncated)"
 		}
 		return nil, fmt.Errorf("supabase %d: %s", resp.StatusCode, errBody)
 	}
@@ -132,13 +164,15 @@ func (d *DB) Delete(ctx context.Context, table, id string) error {
 }
 
 type Destination struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Type      string `json:"type"`
-	Status    string `json:"status"`
-	Command   string `json:"command,omitempty"`
-	Endpoint  string `json:"endpoint,omitempty"`
-	APIKeyRef string `json:"api_key_ref,omitempty"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Type           string   `json:"type"`
+	Status         string   `json:"status"`
+	Command        string   `json:"command,omitempty"`
+	Endpoint       string   `json:"endpoint,omitempty"`
+	APIKeyRef      string   `json:"api_key_ref,omitempty"`
+	Models         []string `json:"models_available,omitempty"`
+	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
 }
 
 func (d *DB) GetDestination(ctx context.Context, id string) (*Destination, error) {

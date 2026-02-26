@@ -1,0 +1,54 @@
+{
+  "prompts_dir": "/home/mjlockboxsocial/vibepilot/prompts",
+  "database": {
+    "type": "supabase",
+    "url_env": "SUPABASE_URL",
+    "key_env": "SUPABASE_SERVICE_KEY"
+  },
+  "vault": {
+    "key_env": "VAULT_KEY",
+    "table": "secrets_vault",
+    "cache_ttl_seconds": 300
+  },
+  "git": {
+    "host": "github",
+    "repo_env": "GITHUB_REPO",
+    "token_env": "GITHUB_TOKEN",
+    "protected_branches": ["main", "master", "research-considerations"]
+  },
+  "runtime": {
+    "max_concurrent_per_module": 8,
+    "max_concurrent_total": 160,
+    "event_poll_interval_ms": 1000,
+    "agent_timeout_seconds": 300,
+    "max_tool_turns": 10
+  },
+  "security": {
+    "leak_detection_enabled": true,
+    "http_allowlist": [
+      "api.supabase.co",
+      "api.github.com",
+      "github.com",
+      "api.anthropic.com",
+      "api.openai.com",
+      "generativelanguage.googleapis.com",
+      "api.deepseek.com"
+    ]
+  },
+  "events": {
+    "task_statuses_available": ["available"],
+    "task_statuses_review": ["review"],
+    "task_statuses_completed": ["testing", "approval"],
+    "plan_statuses_draft": ["draft"],
+    "plan_statuses_council": ["council_review", "revision_needed"],
+    "plan_statuses_pending_human": ["pending_human"],
+    "plan_statuses_approved": ["approved"],
+    "maintenance_status": "pending",
+    "test_results_status": "pending_review"
+  },
+  "sandbox": {
+    "default_test_command": "npm test",
+    "timeout_seconds": 60,
+    "temp_dir": ""
+  }
+}
