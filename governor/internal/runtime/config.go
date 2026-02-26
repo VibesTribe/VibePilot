@@ -9,14 +9,15 @@ import (
 )
 
 type SystemConfig struct {
-	Database   DatabaseConfig `json:"database"`
-	Vault      VaultConfig    `json:"vault"`
-	Git        GitConfig      `json:"git"`
-	Runtime    RuntimeConfig  `json:"runtime"`
-	Security   SecurityConfig `json:"security"`
-	Events     EventsConfig   `json:"events"`
-	Sandbox    SandboxConfig  `json:"sandbox"`
-	PromptsDir string         `json:"prompts_dir"`
+	Database    DatabaseConfig    `json:"database"`
+	Vault       VaultConfig       `json:"vault"`
+	Git         GitConfig         `json:"git"`
+	Runtime     RuntimeConfig     `json:"runtime"`
+	Concurrency ConcurrencyConfig `json:"concurrency"`
+	Security    SecurityConfig    `json:"security"`
+	Events      EventsConfig      `json:"events"`
+	Sandbox     SandboxConfig     `json:"sandbox"`
+	PromptsDir  string            `json:"prompts_dir"`
 }
 
 type DatabaseConfig struct {
@@ -44,6 +45,21 @@ type RuntimeConfig struct {
 	EventPollIntervalMs    int `json:"event_poll_interval_ms"`
 	AgentTimeoutSeconds    int `json:"agent_timeout_seconds"`
 	MaxToolTurns           int `json:"max_tool_turns"`
+}
+
+type ConcurrencyConfig struct {
+	Limits       map[string]int `json:"limits"`
+	DefaultLimit int            `json:"default_limit"`
+}
+
+func (c *ConcurrencyConfig) GetLimit(destination string) int {
+	if limit, ok := c.Limits[destination]; ok {
+		return limit
+	}
+	if c.DefaultLimit > 0 {
+		return c.DefaultLimit
+	}
+	return 3
 }
 
 type SecurityConfig struct {

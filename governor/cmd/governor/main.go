@@ -66,9 +66,10 @@ func main() {
 	sessionFactory := runtime.NewSessionFactory(cfg, toolRegistry)
 	registerDestinations(sessionFactory, cfg, v)
 
-	pool := runtime.NewAgentPool(
+	pool := runtime.NewAgentPoolWithConcurrency(
 		cfg.System.Runtime.MaxConcurrentPerModule,
 		cfg.System.Runtime.MaxConcurrentTotal,
+		&cfg.System.Concurrency,
 	)
 
 	pollInterval := time.Duration(cfg.System.Runtime.EventPollIntervalMs) * time.Millisecond
@@ -85,8 +86,8 @@ func main() {
 		log.Fatalf("Failed to start event router: %v", err)
 	}
 
-	log.Printf("Governor started (poll: %v, max/module: %d, max total: %d)",
-		pollInterval, cfg.System.Runtime.MaxConcurrentPerModule, cfg.System.Runtime.MaxConcurrentTotal)
+	log.Printf("Governor started (poll: %v, max/module: %d, max total: %d, opencode limit: %d)",
+		pollInterval, cfg.System.Runtime.MaxConcurrentPerModule, cfg.System.Runtime.MaxConcurrentTotal, cfg.System.Concurrency.GetLimit("opencode"))
 	log.Println("Press Ctrl+C to stop")
 
 	sigCh := make(chan os.Signal, 1)
@@ -171,7 +172,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.Submit(ctx, sliceID, func() error {
+		err = pool.SubmitWithDestination(ctx, sliceID, "opencode", func() error {
 			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_available"})
 			if err != nil {
 				log.Printf("[EventTaskAvailable] Orchestrator session failed for %s: %v", truncateID(taskID), err)
@@ -203,7 +204,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.Submit(ctx, sliceID, func() error {
+		err = pool.SubmitWithDestination(ctx, sliceID, "opencode", func() error {
 			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_review"})
 			if err != nil {
 				return err
@@ -233,7 +234,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.Submit(ctx, sliceID, func() error {
+		err = pool.SubmitWithDestination(ctx, sliceID, "opencode", func() error {
 			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_completed"})
 			if err != nil {
 				return err
@@ -259,7 +260,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.Submit(ctx, "plans", func() error {
+		err = pool.SubmitWithDestination(ctx, "plans", "opencode", func() error {
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "plan_created"})
 			if err != nil {
 				return err
@@ -285,7 +286,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.Submit(ctx, "plans", func() error {
+		err = pool.SubmitWithDestination(ctx, "plans", "opencode", func() error {
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "council_done"})
 			if err != nil {
 				return err
@@ -311,7 +312,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.Submit(ctx, "maintenance", func() error {
+		err = pool.SubmitWithDestination(ctx, "maintenance", "opencode", func() error {
 			result, err := session.Run(ctx, map[string]any{"command": cmd, "event": "maintenance_command"})
 			if err != nil {
 				return err
@@ -330,7 +331,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.Submit(ctx, "research", func() error {
+		err = pool.SubmitWithDestination(ctx, "research", "opencode", func() error {
 			result, err := session.Run(ctx, map[string]any{"event": "research_ready", "record": string(event.Record)})
 			if err != nil {
 				return err
@@ -358,7 +359,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.Submit(ctx, "planning", func() error {
+		err = pool.SubmitWithDestination(ctx, "planning", "opencode", func() error {
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "prd_ready"})
 			if err != nil {
 				log.Printf("[EventPRDReady] Planner session failed for %s: %v", truncateID(planID), err)
@@ -387,7 +388,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.Submit(ctx, "plans", func() error {
+		err = pool.SubmitWithDestination(ctx, "plans", "opencode", func() error {
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "plan_review"})
 			if err != nil {
 				log.Printf("[EventPlanReview] Supervisor session failed for %s: %v", truncateID(planID), err)
@@ -414,7 +415,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.Submit(ctx, "testing", func() error {
+		err = pool.SubmitWithDestination(ctx, "testing", "opencode", func() error {
 			result, err := session.Run(ctx, map[string]any{"test_result": testResult, "event": "test_results"})
 			if err != nil {
 				return err
