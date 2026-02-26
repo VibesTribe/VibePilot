@@ -12,20 +12,58 @@ import (
 	"time"
 )
 
+const (
+	DefaultSandboxTimeoutSecs   = 60
+	DefaultLintTimeoutSecs      = 60
+	DefaultTypecheckTimeoutSecs = 120
+)
+
 type SandboxTestTool struct {
-	repoPath    string
-	sandboxDir  string
-	timeoutSecs int
+	repoPath       string
+	sandboxDir     string
+	timeoutSecs    int
+	defaultTestCmd string
+}
+
+type SandboxConfig struct {
+	RepoPath       string
+	SandboxDir     string
+	TimeoutSecs    int
+	DefaultTestCmd string
 }
 
 func NewSandboxTestTool(repoPath string, timeoutSecs int) *SandboxTestTool {
-	if timeoutSecs == 0 {
-		timeoutSecs = 60
+	return NewSandboxTestToolWithConfig(&SandboxConfig{
+		RepoPath:    repoPath,
+		TimeoutSecs: timeoutSecs,
+	})
+}
+
+func NewSandboxTestToolWithConfig(cfg *SandboxConfig) *SandboxTestTool {
+	if cfg == nil {
+		cfg = &SandboxConfig{}
 	}
+
+	timeout := cfg.TimeoutSecs
+	if timeout <= 0 {
+		timeout = DefaultSandboxTimeoutSecs
+	}
+
+	sandboxDir := cfg.SandboxDir
+	if sandboxDir == "" {
+		sandboxDir = filepath.Join(os.TempDir(), "vibepilot-sandbox")
+	}
+
+	defaultCmd := cfg.DefaultTestCmd
+	if defaultCmd == "" {
+		defaultCmd = "npm test"
+	}
+
 	return &SandboxTestTool{
-		repoPath:    repoPath,
-		sandboxDir:  filepath.Join(os.TempDir(), "vibepilot-sandbox"),
-		timeoutSecs: timeoutSecs,
+		repoPath:       cfg.RepoPath,
+		sandboxDir:     sandboxDir,
+		timeoutSecs:    timeout,
+		defaultTestCmd: defaultCmd,
 	}
 }
 
@@ -37,7 +75,7 @@ func (t *SandboxTestTool) Execute(ctx context.Context, args map[string]any) (jso
 
 	testCommand, _ := args["test_command"].(string)
 	if testCommand == "" {
-		testCommand = "npm test"
+		testCommand = t.defaultTestCmd
 	}
 
 	runID := fmt.Sprintf("%d", time.Now().UnixNano())
@@ -114,21 +152,29 @@ func (t *SandboxTestTool) Execute(ctx context.Context, args map[string]any) (jso
 	})
 }
 
-type RunLINTTool struct {
-	repoPath string
+type RunLintTool struct {
+	repoPath    string
+	timeoutSecs int
 }
 
-func NewRunLintTool(repoPath string) *RunLINTTool {
-	return &RunLINTTool{repoPath: repoPath}
+func NewRunLintTool(repoPath string) *RunLintTool {
+	return &RunLintTool{repoPath: repoPath, timeoutSecs: DefaultLintTimeoutSecs}
 }
 
-func (t *RunLINTTool) Execute(ctx context.Context, args map[string]any) (json.RawMessage, error) {
+func NewRunLintToolWithTimeout(repoPath string, timeoutSecs int) *RunLintTool {
+	if timeoutSecs <= 0 {
+		timeoutSecs = DefaultLintTimeoutSecs
+	}
+	return &RunLintTool{repoPath: repoPath, timeoutSecs: timeoutSecs}
+}
+
+func (t *RunLintTool) Execute(ctx context.Context, args map[string]any) (json.RawMessage, error) {
 	path, _ := args["path"].(string)
 	if path == "" {
 		path = "."
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(t.timeoutSecs)*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "npm", "run", "lint")
@@ -153,11 +199,19 @@ func (t *RunLINTTool) Execute(ctx context.Context, args map[string]any) (json.Ra
 }
 
 type RunTypecheckTool struct {
-	repoPath string
+	repoPath    string
+	timeoutSecs int
 }
 
 func NewRunTypecheckTool(repoPath string) *RunTypecheckTool {
-	return &RunTypecheckTool{repoPath: repoPath}
+	return &RunTypecheckTool{repoPath: repoPath, timeoutSecs: DefaultTypecheckTimeoutSecs}
+}
+
+func NewRunTypecheckToolWithTimeout(repoPath string, timeoutSecs int) *RunTypecheckTool {
+	if timeoutSecs <= 0 {
+		timeoutSecs = DefaultTypecheckTimeoutSecs
+	}
+	return &RunTypecheckTool{repoPath: repoPath, timeoutSecs: timeoutSecs}
 }
 
 func (t *RunTypecheckTool) Execute(ctx context.Context, args map[string]any) (json.RawMessage, error) {
@@ -166,7 +220,7 @@ func (t *RunTypecheckTool) Execute(ctx context.Context, args map[string]any) (js
 		path = "."
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(t.timeoutSecs)*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "npm", "run", "typecheck")

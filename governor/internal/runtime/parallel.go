@@ -3,18 +3,19 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 type AgentPool struct {
 	maxPerModule int
 	maxTotal     int
 	active       atomic.Int32
-	perModule    sync.Map // moduleID -> *int32
+	perModule    sync.Map
 	sem          chan struct{}
 	wg           sync.WaitGroup
+	errorCh      chan error
 }
 
 func NewAgentPool(maxPerModule, maxTotal int) *AgentPool {
@@ -25,6 +26,7 @@ func NewAgentPool(maxPerModule, maxTotal int) *AgentPool {
 		maxPerModule: maxPerModule,
 		maxTotal:     maxTotal,
 		sem:          make(chan struct{}, maxTotal),
+		errorCh:      make(chan error, maxTotal),
 	}
 }
 
@@ -37,7 +39,23 @@ func (p *AgentPool) Submit(ctx context.Context, moduleID string, fn func() error
 	go func() {
 		defer p.wg.Done()
 		defer p.release(moduleID)
-		fn()
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[AgentPool] panic recovered in module %s: %v", moduleID, r)
+				select {
+				case p.errorCh <- fmt.Errorf("panic in %s: %v", moduleID, r):
+				default:
+				}
+			}
+		}()
+
+		if err := fn(); err != nil {
+			select {
+			case p.errorCh <- err:
+			default:
+				log.Printf("[AgentPool] error channel full, dropping error: %v", err)
+			}
+		}
 	}()
 
 	return nil
@@ -79,6 +97,22 @@ func (p *AgentPool) Wait() {
 	p.wg.Wait()
 }
 
+func (p *AgentPool) Errors() <-chan error {
+	return p.errorCh
+}
+
+func (p *AgentPool) DrainErrors() []error {
+	var errors []error
+	for {
+		select {
+		case err := <-p.errorCh:
+			errors = append(errors, err)
+		default:
+			return errors
+		}
+	}
+}
+
 func (p *AgentPool) ActiveCount() int {
 	return int(p.active.Load())
 }
@@ -103,58 +137,4 @@ func (p *AgentPool) Stats() map[string]interface{} {
 		"max_per_module": p.maxPerModule,
 		"modules":        moduleStats,
 	}
-}
-
-type AgentSession struct {
-	ID          string
-	AgentID     string
-	ModuleID    string
-	TaskID      string
-	Destination string
-	Prompt      string
-	Tools       []string
-	Input       map[string]any
-	OnComplete  func(result map[string]any, err error)
-}
-
-type SessionManager struct {
-	pool     *AgentPool
-	sessions sync.Map // sessionID -> *AgentSession
-}
-
-func NewSessionManager(pool *AgentPool) *SessionManager {
-	return &SessionManager{pool: pool}
-}
-
-func (m *SessionManager) CreateSession(agentID, moduleID, taskID string) *AgentSession {
-	return &AgentSession{
-		ID:       fmt.Sprintf("%s-%s-%d", agentID, taskID[:8], time.Now().UnixNano()),
-		AgentID:  agentID,
-		ModuleID: moduleID,
-		TaskID:   taskID,
-	}
-}
-
-func (m *SessionManager) Register(session *AgentSession) {
-	m.sessions.Store(session.ID, session)
-}
-
-func (m *SessionManager) Unregister(sessionID string) {
-	m.sessions.Delete(sessionID)
-}
-
-func (m *SessionManager) Get(sessionID string) *AgentSession {
-	if v, ok := m.sessions.Load(sessionID); ok {
-		return v.(*AgentSession)
-	}
-	return nil
-}
-
-func (m *SessionManager) ListActive() []*AgentSession {
-	var sessions []*AgentSession
-	m.sessions.Range(func(key, value interface{}) bool {
-		sessions = append(sessions, value.(*AgentSession))
-		return true
-	})
-	return sessions
 }

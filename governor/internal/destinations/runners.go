@@ -5,10 +5,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/vibepilot/governor/internal/runtime"
+	"github.com/vibepilot/governor/internal/vault"
 )
+
+const (
+	DefaultTimeoutSecs = 300
+)
+
+type SecretProvider interface {
+	GetSecret(ctx context.Context, keyName string) (string, error)
+}
 
 type CLIRunner struct {
 	command string
@@ -16,8 +29,8 @@ type CLIRunner struct {
 }
 
 func NewCLIRunner(command string, timeoutSecs int) *CLIRunner {
-	if timeoutSecs == 0 {
-		timeoutSecs = 300
+	if timeoutSecs <= 0 {
+		timeoutSecs = DefaultTimeoutSecs
 	}
 	return &CLIRunner{
 		command: command,
@@ -56,7 +69,9 @@ func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 	}
 
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		return output, len(prompt) / 4, len(output) / 4, nil
+		estimatedIn := len(prompt) / 4
+		estimatedOut := len(output) / 4
+		return output, estimatedIn, estimatedOut, nil
 	}
 
 	return result.Content, result.InputTokens, result.OutputTokens, nil
@@ -68,45 +83,201 @@ func (r *CLIRunner) RunWithSystemPrompt(ctx context.Context, systemPrompt, userP
 }
 
 type APIRunner struct {
-	endpoint   string
-	apiKey     string
-	model      string
-	httpClient interface {
-		Do(req interface{}) (interface{}, error)
-	}
-	timeout time.Duration
+	endpoint       string
+	apiKeyRef      string
+	model          string
+	provider       string
+	httpClient     *http.Client
+	timeout        time.Duration
+	secretProvider SecretProvider
 }
 
 type APIRunnerConfig struct {
-	Endpoint   string
-	APIKey     string
-	Model      string
-	TimeoutSec int
+	Endpoint       string
+	APIKeyRef      string
+	Model          string
+	Provider       string
+	TimeoutSeconds int
+	SecretProvider SecretProvider
 }
 
 func NewAPIRunner(cfg *APIRunnerConfig) *APIRunner {
-	timeout := 300 * time.Second
-	if cfg.TimeoutSec > 0 {
-		timeout = time.Duration(cfg.TimeoutSec) * time.Second
+	timeoutSecs := DefaultTimeoutSecs
+	if cfg.TimeoutSeconds > 0 {
+		timeoutSecs = cfg.TimeoutSeconds
 	}
+	timeout := time.Duration(timeoutSecs) * time.Second
 	return &APIRunner{
-		endpoint: cfg.Endpoint,
-		apiKey:   cfg.APIKey,
-		model:    cfg.Model,
-		timeout:  timeout,
+		endpoint:       cfg.Endpoint,
+		apiKeyRef:      cfg.APIKeyRef,
+		model:          cfg.Model,
+		provider:       cfg.Provider,
+		httpClient:     &http.Client{Timeout: timeout},
+		timeout:        timeout,
+		secretProvider: cfg.SecretProvider,
 	}
+}
+
+func NewAPIRunnerFromConfig(dest runtime.DestinationConfig, secrets SecretProvider) *APIRunner {
+	model := ""
+	if len(dest.Models) > 0 {
+		model = dest.Models[0]
+	}
+
+	provider := detectProvider(dest.Endpoint)
+
+	timeoutSecs := DefaultTimeoutSecs
+	if dest.TimeoutSeconds > 0 {
+		timeoutSecs = dest.TimeoutSeconds
+	}
+
+	return NewAPIRunner(&APIRunnerConfig{
+		Endpoint:       dest.Endpoint,
+		APIKeyRef:      dest.APIKeyRef,
+		Model:          model,
+		Provider:       provider,
+		TimeoutSeconds: timeoutSecs,
+		SecretProvider: secrets,
+	})
+}
+
+func detectProvider(endpoint string) string {
+	if strings.Contains(endpoint, "generativelanguage.googleapis.com") {
+		return "google"
+	}
+	if strings.Contains(endpoint, "api.deepseek.com") {
+		return "deepseek"
+	}
+	if strings.Contains(endpoint, "api.openai.com") {
+		return "openai"
+	}
+	if strings.Contains(endpoint, "api.anthropic.com") {
+		return "anthropic"
+	}
+	return "unknown"
+}
+
+func (r *APIRunner) getAPIKey(ctx context.Context) (string, error) {
+	if r.secretProvider == nil || r.apiKeyRef == "" {
+		return "", fmt.Errorf("API key not configured for %s", r.endpoint)
+	}
+	return r.secretProvider.GetSecret(ctx, r.apiKeyRef)
 }
 
 func (r *APIRunner) Run(ctx context.Context, prompt string, timeout int) (string, int, int, error) {
-	return "", 0, 0, fmt.Errorf("API runner not yet implemented - use CLI runner")
+	apiKey, err := r.getAPIKey(ctx)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("retrieve API key: %w", err)
+	}
+
+	switch r.provider {
+	case "google":
+		return r.callGemini(ctx, prompt, apiKey)
+	case "deepseek":
+		url := r.endpoint
+		if !strings.Contains(url, "/chat/completions") {
+			url = strings.TrimSuffix(r.endpoint, "/") + "/v1/chat/completions"
+		}
+		return r.callOpenAICompatible(ctx, prompt, url, apiKey)
+	case "openai":
+		url := strings.TrimSuffix(r.endpoint, "/") + "/chat/completions"
+		return r.callOpenAICompatible(ctx, prompt, url, apiKey)
+	default:
+		return "", 0, 0, fmt.Errorf("unsupported provider: %s", r.provider)
+	}
 }
 
-func (r *APIRunner) callGemini(ctx context.Context, prompt string) (string, int, int, error) {
-	return "", 0, 0, nil
+func (r *APIRunner) callGemini(ctx context.Context, prompt, apiKey string) (string, int, int, error) {
+	url := fmt.Sprintf("%s/%s:generateContent", r.endpoint, r.model)
+
+	reqBody := map[string]interface{}{
+		"contents": []map[string]interface{}{
+			{
+				"parts": []map[string]string{
+					{"text": prompt},
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", apiKey)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return "", 0, 0, fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	content, tokensIn, tokensOut := parseGeminiResponse(respBody)
+	if content == "" {
+		return "", 0, 0, fmt.Errorf("empty response from Gemini")
+	}
+
+	return content, tokensIn, tokensOut, nil
 }
 
-func (r *APIRunner) callDeepSeek(ctx context.Context, prompt string) (string, int, int, error) {
-	return "", 0, 0, nil
+func (r *APIRunner) callOpenAICompatible(ctx context.Context, prompt, url, apiKey string) (string, int, int, error) {
+	reqBody := map[string]interface{}{
+		"model": r.model,
+		"messages": []map[string]string{
+			{"role": "user", "content": prompt},
+		},
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return "", 0, 0, fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	content, tokensIn, tokensOut := parseOpenAIResponse(respBody)
+	if content == "" {
+		return "", 0, 0, fmt.Errorf("empty response from API")
+	}
+
+	return content, tokensIn, tokensOut, nil
 }
 
 func parseGeminiResponse(body []byte) (string, int, int) {
@@ -163,8 +334,14 @@ func parseOpenAIResponse(body []byte) (string, int, int) {
 		result.Usage.CompletionTokens
 }
 
-func isJSON(s string) bool {
-	s = strings.TrimSpace(s)
-	return (strings.HasPrefix(s, "{") && strings.HasSuffix(s, "}")) ||
-		(strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]"))
+type VaultAdapter struct {
+	v *vault.Vault
+}
+
+func NewVaultAdapter(v *vault.Vault) *VaultAdapter {
+	return &VaultAdapter{v: v}
+}
+
+func (a *VaultAdapter) GetSecret(ctx context.Context, keyName string) (string, error) {
+	return a.v.GetSecret(ctx, keyName)
 }

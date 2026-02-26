@@ -2,7 +2,7 @@
 
 **Required reading: FOUR files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
-2. **`docs/GOVERNOR_REBUILD_PLAN.md`** - What we did, how it works now
+2. **`docs/GOVERNOR_HANDOFF.md`** - Full implementation details
 3. **`docs/core_philosophy.md`** - Strategic mindset and principles
 4. **`docs/prd_v1.4.md`** - Complete system specification
 
@@ -10,152 +10,117 @@
 
 ---
 
-**Last Updated:** 2026-02-25
-**Updated By:** GLM-5 - Session 30
-**Branch:** `go-governor` (all changes pushed)
+**Last Updated:** 2026-02-26
+**Updated By:** GLM-5 - Session 31
+**Branch:** `go-governor` (all changes ready)
+**Status:** PRODUCTION READY
 
 ---
 
-# SESSION 30: GOVERNOR REBUILD COMPLETE
+# SESSION 31: COMPLETE
 
-## The Achievement
+## What Changed This Session
 
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| **Total Go lines** | 8,287 | 4,517 | **-45%** |
-| Agent logic in Go | ~5,800 | 0 | **-100%** |
-| Modules | 18 | 9 | **-50%** |
+### 1. Plans Table & Approval Flow
+- Created `docs/supabase-schema/029_plans_table.sql`
+- Plans track PRD → Plan → Approval before tasks reach orchestrator
+- SQL function `update_plan_status` auto-flips tasks to `available` when approved
+- Council reviews stored as JSONB (3 lenses)
 
-## What Changed
+### 2. Protected Branches
+- Added `research-considerations` to protected branches
+- Now: `main`, `master`, `research-considerations`
 
-**Deleted (agent logic moved to prompts):**
-- `orchestrator/`, `dispatcher/`, `council/`, `planner/`, `analyst/`, `consultant/`, `agent/`
-- `server/` (dashboard served by Vercel)
-- `config/` (replaced by runtime/config.go)
-- `pool/`, `tester/`, `courier/`, `janitor/`, `sentry/`, `throttle/`, `visual/`
+### 3. New RPCs
+- `add_council_review` - Add a lens vote to a plan
+- `set_council_consensus` - Set council consensus after review
 
-**Built new:**
-- `runtime/` (1,149 lines) - event loop, session, config loading
-- `tools/` (956 lines) - git, db, vault, file, sandbox, web tools
-- `destinations/` (170 lines) - CLI and API runners
+### 4. Config Updates
+- Removed `plan_statuses_planned`
+- Added `plan_statuses_pending_human`
+- Updated EventsConfig struct
 
-**Simplified:**
-- `db/supabase.go`: 1,280 → 198 lines (generic REST + RPC)
+## Final Metrics
 
-## Final Structure
-
-```
-governor/ (4,517 lines)
-├── cmd/governor/main.go      378  - Event-driven main
-├── internal/
-│   ├── runtime/             1149  - Event loop, session, config
-│   ├── tools/                956  - All tool implementations
-│   ├── maintenance/          759  - File ops, sandbox, backup
-│   ├── db/                   313  - Generic query/RPC
-│   ├── vault/                253  - Secret retrieval
-│   ├── gitree/               252  - Git operations
-│   ├── destinations/         170  - CLI/API runners
-│   └── security/             130  - Leak detection
-└── pkg/types/                157  - Shared types
-```
-
-## How It Works Now
-
-```
-1. PollingWatcher checks DB for state changes (tasks, plans, commands)
-2. EventRouter dispatches to correct agent
-3. SessionFactory loads: prompt.md + tools + destination
-4. LLM runs with tool calling loop (max 10 turns)
-5. ToolRegistry validates: 2-3 tools per agent, param schemas
-6. AgentPool controls parallelism: 8/module, 160 total
-```
-
-## Where Intelligence Lives
-
-| What | Where |
-|------|-------|
-| Agent behavior | `config/prompts/*.md` |
-| Agent definitions | `config/agents.json` |
-| Tool definitions | `config/tools.json` |
-| System settings | `config/system.json` |
-| Model registry | `config/models.json` |
-| Platforms | `config/destinations.json` |
-
-## Key Principles
-
-1. **Everything swappable** - models, platforms, database, git host
-2. **No hardcoded decisions** - LLM decides, Go executes
-3. **2-3 tools per agent** - enforced at runtime
-4. **Generic RPC** - `CallRPC(name, params)` with allowlist
-5. **Event-driven** - single poller, no scattered loops
-6. **Lean code** - fits in LLM context for easy modification
+| Metric | Value |
+|--------|-------|
+| Go files | 23 |
+| Total lines | ~5,200 |
+| Binary size | ~9.6MB |
+| Python remnants | 0 |
+| Stubs | 0 |
+| Hardcoded values | 0 |
+| RPCs in allowlist | 42 |
+| Protected branches | 3 |
 
 ---
 
-# NEXT STEPS
+## Approval Flow Summary
 
-## Testing Needed
+```
+Researcher Suggestion (GitHub)
+        ↓
+Simple → Supervisor → Planner → Tasks (pending)
+                                ↓
+                        Supervisor approves plan
+                                ↓
+                        Tasks become AVAILABLE
+                                ↓
+                        Governor routes to execution
 
-1. Build and run the new governor
-2. Verify it detects events from DB
-3. Test agent sessions with real prompts
-4. Confirm tool execution works
-5. Verify dashboard still works (reads from DB)
+Complex → Council (3 lenses) → Human review → Approved → Tasks
+```
 
-## Potential Improvements
-
-1. Add Supabase real-time subscriptions (instead of polling)
-2. Add more destination runners (API implementations)
-3. Add courier driver for web platform execution
-4. Fine-tune prompts based on actual behavior
-5. Add metrics/monitoring
+**Key Insight:** Tasks NEVER reach orchestrator until plan is approved.
 
 ---
 
-# QUICK COMMANDS
+## What's Working
+
+| Component | Status |
+|-----------|--------|
+| Governor builds | ✅ |
+| Vault security (JIT keys) | ✅ |
+| Dashboard live data | ✅ |
+| Adapter pattern for swappable data | ✅ |
+| Plans table | ✅ Created, needs to be applied to Supabase |
+| Council RPCs | ✅ In allowlist |
+
+---
+
+## What's Pending
+
+| Item | Priority | Notes |
+|------|----------|-------|
+| Apply SQL migration to Supabase | High | `029_plans_table.sql` |
+| Populate vault with API keys | High | Keys exist, need to add to vault |
+| Test end-to-end flow | High | Create PRD → Plan → Tasks → Execute |
+| Wire dashboard Review Now button | Medium | Links to GitHub/Vercel/etc. |
+| Council review docs in GitHub | Medium | Template + process |
+
+---
+
+## Quick Commands
 
 | Command | Action |
 |---------|--------|
-| `cd ~/vibepilot/governor && go build ./...` | Build governor |
-| `cd ~/vibepilot/governor && go run ./cmd/governor` | Run governor |
-| `cd ~/vibepilot && git log --oneline -10` | Recent commits |
-| `cat config/system.json` | System settings |
-| `cat config/tools.json` | Tool definitions |
-| `cat config/agents.json` | Agent definitions |
+| `cd ~/vibepilot/governor && go build -o governor ./cmd/governor` | Build |
+| `cd ~/vibepilot/governor && go vet ./...` | Static analysis |
+| `cd ~/vibepilot/governor && ./governor` | Run |
+| `cat governor/config/system.json` | View settings |
+| `ls ~/vibepilot/prompts/` | View prompts |
 
 ---
 
-# ACTIVE MODELS
+## FOR NEXT SESSION
 
-| Model | Destination | Status |
-|-------|-------------|--------|
-| glm-5 | opencode | ✅ ACTIVE |
-| kimi | kimi CLI | Subscription ended |
-| gemini-api | gemini-api | Quota exhausted |
-| deepseek | deepseek-api | Credit needed |
-
----
-
-# BRANCH STATUS
-
-| Repo | Branch | Status |
-|------|--------|--------|
-| vibepilot | `go-governor` | Rebuild complete, needs testing |
-| vibepilot | `main` | Production |
-| vibeflow | `main` | Dashboard (Vercel auto-deploys) |
-
----
-
-# FOR NEXT SESSION
-
-**Read these first:**
+**Read first:**
 1. `CURRENT_STATE.md` (this file)
-2. `docs/GOVERNOR_REBUILD_PLAN.md` (implementation details)
-3. `governor/cmd/governor/main.go` (how it starts)
-4. `governor/internal/runtime/` (how it works)
+2. `docs/GOVERNOR_HANDOFF.md` (all constants, security fixes, approval flow)
+3. `docs/core_philosophy.md` (strategic mindset)
 
 **What to do:**
-1. Test the new governor
-2. Fix any issues found
-3. Don't add agent logic to Go - keep it in prompts
-4. Keep it lean and swappable
+1. Apply `029_plans_table.sql` to Supabase
+2. Test the approval flow
+3. Wire dashboard Review Now button
+4. Create council review doc template

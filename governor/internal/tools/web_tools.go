@@ -8,15 +8,20 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
+)
+
+const (
+	WebSearchURL   = "https://api.duckduckgo.com/"
+	WebFetchMaxLen = 10000
+	UserAgent      = "Mozilla/5.0 (compatible; VibePilot/2.0)"
 )
 
 type WebSearchTool struct {
-	timeout time.Duration
+	allowlist []string
 }
 
-func NewWebSearchTool() *WebSearchTool {
-	return &WebSearchTool{timeout: 30 * time.Second}
+func NewWebSearchTool(allowlist []string) *WebSearchTool {
+	return &WebSearchTool{allowlist: allowlist}
 }
 
 func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (json.RawMessage, error) {
@@ -25,11 +30,8 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (json.
 		return nil, fmt.Errorf("query parameter required")
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, t.timeout)
-	defer cancel()
-
 	escapedQuery := url.QueryEscape(query)
-	searchURL := fmt.Sprintf("https://api.duckduckgo.com/?q=%s&format=json&no_html=1", escapedQuery)
+	searchURL := fmt.Sprintf("%s?q=%s&format=json&no_html=1", WebSearchURL, escapedQuery)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
 	if err != nil {
@@ -40,8 +42,9 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (json.
 		})
 	}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	req.Header.Set("User-Agent", UserAgent)
+
+	resp, err := sharedHTTPClient.Do(req)
 	if err != nil {
 		return json.Marshal(map[string]any{
 			"success": false,
@@ -76,8 +79,8 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (json.
 
 	relatedTopics, _ := result["RelatedTopics"].([]any)
 	var topics []map[string]string
-	for _, t := range relatedTopics {
-		if topic, ok := t.(map[string]any); ok {
+	for _, tp := range relatedTopics {
+		if topic, ok := tp.(map[string]any); ok {
 			text, _ := topic["Text"].(string)
 			firstURL, _ := topic["FirstURL"].(string)
 			if text != "" {
@@ -106,11 +109,30 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (json.
 }
 
 type WebFetchTool struct {
-	timeout time.Duration
+	allowlist []string
 }
 
-func NewWebFetchTool() *WebFetchTool {
-	return &WebFetchTool{timeout: 30 * time.Second}
+func NewWebFetchTool(allowlist []string) *WebFetchTool {
+	return &WebFetchTool{allowlist: allowlist}
+}
+
+func (t *WebFetchTool) isAllowed(urlStr string) bool {
+	if len(t.allowlist) == 0 {
+		return true
+	}
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return false
+	}
+
+	host := parsedURL.Hostname()
+	for _, allowed := range t.allowlist {
+		if host == allowed || strings.HasSuffix(host, "."+allowed) {
+			return true
+		}
+	}
+	return false
 }
 
 func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (json.RawMessage, error) {
@@ -119,12 +141,24 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (json.R
 		return nil, fmt.Errorf("url parameter required")
 	}
 
-	if !strings.HasPrefix(urlStr, "http://") && !strings.HasPrefix(urlStr, "https://") {
+	if !strings.HasPrefix(urlStr, "https://") {
+		if strings.HasPrefix(urlStr, "http://") {
+			return json.Marshal(map[string]any{
+				"success": false,
+				"error":   "only HTTPS URLs are allowed",
+				"url":     urlStr,
+			})
+		}
 		urlStr = "https://" + urlStr
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, t.timeout)
-	defer cancel()
+	if !t.isAllowed(urlStr) {
+		return json.Marshal(map[string]any{
+			"success": false,
+			"error":   "URL host not in allowlist",
+			"url":     urlStr,
+		})
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
@@ -135,10 +169,9 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (json.R
 		})
 	}
 
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; VibePilot/1.0)")
+	req.Header.Set("User-Agent", UserAgent)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := sharedHTTPClient.Do(req)
 	if err != nil {
 		return json.Marshal(map[string]any{
 			"success": false,
@@ -158,14 +191,9 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (json.R
 	}
 
 	contentType := resp.Header.Get("Content-Type")
-	var content string
-	if strings.Contains(contentType, "application/json") {
-		content = string(body)
-	} else {
-		content = string(body)
-		if len(content) > 10000 {
-			content = content[:10000] + "\n... (truncated)"
-		}
+	content := string(body)
+	if len(content) > WebFetchMaxLen {
+		content = content[:WebFetchMaxLen] + "\n... (truncated)"
 	}
 
 	return json.Marshal(map[string]any{

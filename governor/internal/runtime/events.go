@@ -18,6 +18,9 @@ const (
 	EventCouncilDone    EventType = "council_done"
 	EventResearchReady  EventType = "research_ready"
 	EventMaintenanceCmd EventType = "maintenance_command"
+	EventPRDReady       EventType = "prd_ready"
+	EventTestResults    EventType = "test_results"
+	EventHumanQuery     EventType = "human_query"
 )
 
 type Event struct {
@@ -36,17 +39,18 @@ type EventWatcher interface {
 	Close() error
 }
 
+type Querier interface {
+	Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error)
+}
+
 type PollingWatcher struct {
 	db       Querier
+	cfg      *Config
 	interval time.Duration
 	handlers []EventHandler
 	mu       sync.RWMutex
 	stop     chan struct{}
 	stopped  bool
-}
-
-type Querier interface {
-	Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error)
 }
 
 func NewPollingWatcher(db Querier, interval time.Duration) *PollingWatcher {
@@ -58,6 +62,12 @@ func NewPollingWatcher(db Querier, interval time.Duration) *PollingWatcher {
 		interval: interval,
 		stop:     make(chan struct{}),
 	}
+}
+
+func (w *PollingWatcher) SetConfig(cfg *Config) {
+	w.mu.Lock()
+	w.cfg = cfg
+	w.mu.Unlock()
 }
 
 func (w *PollingWatcher) Subscribe(ctx context.Context, handler EventHandler) error {
@@ -93,12 +103,42 @@ func (w *PollingWatcher) poll(ctx context.Context) {
 func (w *PollingWatcher) checkForEvents(ctx context.Context, lastSeen map[string]time.Time) {
 	w.detectTaskEvents(ctx, lastSeen)
 	w.detectPlanEvents(ctx, lastSeen)
+	w.detectPRDReady(ctx, lastSeen)
 	w.detectMaintenanceEvents(ctx, lastSeen)
+	w.detectTestResults(ctx, lastSeen)
+}
+
+func (w *PollingWatcher) getEventsConfig() *EventsConfig {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.cfg != nil {
+		return w.cfg.GetEventsConfig()
+	}
+	return &EventsConfig{
+		TaskStatusesAvailable:    []string{"available"},
+		TaskStatusesReview:       []string{"review"},
+		TaskStatusesCompleted:    []string{"testing", "approval"},
+		PlanStatusesDraft:        []string{"draft"},
+		PlanStatusesCouncil:      []string{"council_review", "revision_needed"},
+		PlanStatusesPendingHuman: []string{"pending_human"},
+		PlanStatusesApproved:     []string{"approved"},
+		MaintenanceStatus:        "pending",
+		TestResultsStatus:        "pending_review",
+	}
 }
 
 func (w *PollingWatcher) detectTaskEvents(ctx context.Context, lastSeen map[string]time.Time) {
+	eventsCfg := w.getEventsConfig()
+
+	allStatuses := make([]string, 0)
+	allStatuses = append(allStatuses, eventsCfg.TaskStatusesAvailable...)
+	allStatuses = append(allStatuses, eventsCfg.TaskStatusesReview...)
+	allStatuses = append(allStatuses, eventsCfg.TaskStatusesCompleted...)
+
+	orFilter := buildOrFilter(allStatuses, "status")
+
 	tasks, err := w.db.Query(ctx, "tasks", map[string]any{
-		"or": "(status.eq.available,status.eq.review,status.eq.testing)",
+		"or": orFilter,
 	})
 	if err != nil {
 		return
@@ -121,12 +161,11 @@ func (w *PollingWatcher) detectTaskEvents(ctx context.Context, lastSeen map[stri
 			lastSeen[key] = ts
 
 			var eventType EventType
-			switch status {
-			case "available":
+			if contains(eventsCfg.TaskStatusesAvailable, status) {
 				eventType = EventTaskAvailable
-			case "review":
+			} else if contains(eventsCfg.TaskStatusesReview, status) {
 				eventType = EventTaskReview
-			case "testing", "approval":
+			} else if contains(eventsCfg.TaskStatusesCompleted, status) {
 				eventType = EventTaskCompleted
 			}
 
@@ -145,8 +184,16 @@ func (w *PollingWatcher) detectTaskEvents(ctx context.Context, lastSeen map[stri
 }
 
 func (w *PollingWatcher) detectPlanEvents(ctx context.Context, lastSeen map[string]time.Time) {
+	eventsCfg := w.getEventsConfig()
+
+	allStatuses := make([]string, 0)
+	allStatuses = append(allStatuses, eventsCfg.PlanStatusesApproved...)
+	allStatuses = append(allStatuses, eventsCfg.PlanStatusesCouncil...)
+
+	orFilter := buildOrFilter(allStatuses, "status")
+
 	plans, err := w.db.Query(ctx, "plans", map[string]any{
-		"or": "(status.eq.approved,status.eq.council_review)",
+		"or": orFilter,
 	})
 	if err != nil {
 		return
@@ -169,10 +216,9 @@ func (w *PollingWatcher) detectPlanEvents(ctx context.Context, lastSeen map[stri
 			lastSeen[key] = ts
 
 			var eventType EventType
-			switch status {
-			case "council_review":
+			if contains(eventsCfg.PlanStatusesCouncil, status) {
 				eventType = EventPlanCreated
-			case "approved":
+			} else if contains(eventsCfg.PlanStatusesApproved, status) {
 				eventType = EventCouncilDone
 			}
 
@@ -191,8 +237,10 @@ func (w *PollingWatcher) detectPlanEvents(ctx context.Context, lastSeen map[stri
 }
 
 func (w *PollingWatcher) detectMaintenanceEvents(ctx context.Context, lastSeen map[string]time.Time) {
+	eventsCfg := w.getEventsConfig()
+
 	cmds, err := w.db.Query(ctx, "maintenance_commands", map[string]any{
-		"status": "pending",
+		"status": eventsCfg.MaintenanceStatus,
 	})
 	if err != nil {
 		return
@@ -225,6 +273,115 @@ func (w *PollingWatcher) detectMaintenanceEvents(ctx context.Context, lastSeen m
 	}
 }
 
+func (w *PollingWatcher) detectPRDReady(ctx context.Context, lastSeen map[string]time.Time) {
+	eventsCfg := w.getEventsConfig()
+
+	if len(eventsCfg.PlanStatusesDraft) == 0 {
+		return
+	}
+
+	orFilter := buildOrFilter(eventsCfg.PlanStatusesDraft, "status")
+
+	plans, err := w.db.Query(ctx, "plans", map[string]any{
+		"or":    orFilter,
+		"limit": 10,
+	})
+	if err != nil {
+		return
+	}
+
+	var planList []map[string]any
+	if err := json.Unmarshal(plans, &planList); err != nil {
+		return
+	}
+
+	for _, plan := range planList {
+		id, _ := plan["id"].(string)
+		updatedAt, _ := plan["updated_at"].(string)
+
+		key := fmt.Sprintf("prd_ready:%s", id)
+		ts, _ := time.Parse(time.RFC3339, updatedAt)
+
+		if lastSeen[key].Before(ts) {
+			lastSeen[key] = ts
+
+			record, _ := json.Marshal(plan)
+			w.emit(Event{
+				Type:      EventPRDReady,
+				ID:        id,
+				Table:     "plans",
+				Record:    record,
+				Timestamp: time.Now(),
+			})
+		}
+	}
+}
+
+func (w *PollingWatcher) detectTestResults(ctx context.Context, lastSeen map[string]time.Time) {
+	eventsCfg := w.getEventsConfig()
+
+	if eventsCfg.TestResultsStatus == "" {
+		return
+	}
+
+	results, err := w.db.Query(ctx, "test_results", map[string]any{
+		"status": eventsCfg.TestResultsStatus,
+		"limit":  10,
+	})
+	if err != nil {
+		return
+	}
+
+	var resultList []map[string]any
+	if err := json.Unmarshal(results, &resultList); err != nil {
+		return
+	}
+
+	for _, result := range resultList {
+		id, _ := result["id"].(string)
+		createdAt, _ := result["created_at"].(string)
+
+		key := fmt.Sprintf("test_result:%s", id)
+		ts, _ := time.Parse(time.RFC3339, createdAt)
+
+		if lastSeen[key].Before(ts) {
+			lastSeen[key] = ts
+
+			record, _ := json.Marshal(result)
+			w.emit(Event{
+				Type:      EventTestResults,
+				ID:        id,
+				Table:     "test_results",
+				Record:    record,
+				Timestamp: time.Now(),
+			})
+		}
+	}
+}
+
+func buildOrFilter(values []string, field string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	if len(values) == 1 {
+		return field + ".eq." + values[0]
+	}
+	result := field + ".eq." + values[0]
+	for i := 1; i < len(values); i++ {
+		result += "," + field + ".eq." + values[i]
+	}
+	return result
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 func (w *PollingWatcher) emit(event Event) {
 	w.mu.RLock()
 	handlers := make([]EventHandler, len(w.handlers))
@@ -245,10 +402,9 @@ func (w *PollingWatcher) Close() error {
 }
 
 type EventRouter struct {
-	watcher   EventWatcher
-	routes    map[EventType][]EventHandler
-	mu        sync.RWMutex
-	agentPool *AgentPool
+	watcher EventWatcher
+	routes  map[EventType][]EventHandler
+	mu      sync.RWMutex
 }
 
 func NewEventRouter(watcher EventWatcher) *EventRouter {
@@ -274,10 +430,4 @@ func (r *EventRouter) Start(ctx context.Context) error {
 			go h(event)
 		}
 	})
-}
-
-func (r *EventRouter) SetAgentPool(pool *AgentPool) {
-	r.mu.Lock()
-	r.agentPool = pool
-	r.mu.Unlock()
 }

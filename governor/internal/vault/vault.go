@@ -4,16 +4,29 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/pbkdf2"
+
 	"github.com/vibepilot/governor/internal/db"
+)
+
+const (
+	defaultCacheTTL  = 5 * time.Minute
+	pbkdf2Iterations = 100000
+	saltSize         = 16
+	nonceSize        = 12
+	keySize          = 32
+	tableName        = "secrets_vault"
 )
 
 type Vault struct {
@@ -46,8 +59,6 @@ type SecretRecord struct {
 	CreatedAt      string `json:"created_at"`
 }
 
-const defaultCacheTTL = 5 * time.Minute
-
 func New(database *db.DB) *Vault {
 	v := &Vault{
 		db:       database,
@@ -74,7 +85,13 @@ func (v *Vault) loadVaultKey() []byte {
 		log.Printf("Vault: WARNING - VAULT_KEY not set, decryption will fail")
 		return nil
 	}
-	return deriveKey(key)
+	return deriveKey(key, getMachineSalt())
+}
+
+func getMachineSalt() []byte {
+	hostname, _ := os.Hostname()
+	salt := sha256.Sum256([]byte("vibepilot-vault-" + hostname))
+	return salt[:saltSize]
 }
 
 func (v *Vault) GetSecret(ctx context.Context, keyName string) (string, error) {
@@ -130,7 +147,7 @@ func (v *Vault) GetSecretNoCache(ctx context.Context, keyName string) (string, e
 }
 
 func (v *Vault) fetchFromDB(ctx context.Context, keyName string) (*SecretRecord, error) {
-	path := fmt.Sprintf("secrets_vault?key_name=eq.%s&limit=1", keyName)
+	path := fmt.Sprintf("%s?key_name=eq.%s&limit=1", tableName, keyName)
 	data, err := v.db.REST(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("db query: %w", err)
@@ -153,33 +170,72 @@ func (v *Vault) decrypt(encrypted string) (string, error) {
 		return "", fmt.Errorf("VAULT_KEY not configured")
 	}
 
-	block, err := aes.NewCipher(v.vaultKey)
-	if err != nil {
-		return "", fmt.Errorf("create cipher: %w", err)
-	}
-
 	ciphertext, err := base64.StdEncoding.DecodeString(encrypted)
 	if err != nil {
 		return "", fmt.Errorf("base64 decode: %w", err)
 	}
 
-	if len(ciphertext) < aes.BlockSize {
+	if len(ciphertext) < saltSize+nonceSize+1 {
 		return "", fmt.Errorf("ciphertext too short")
 	}
 
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
+	salt := ciphertext[:saltSize]
+	nonce := ciphertext[saltSize : saltSize+nonceSize]
+	actualCiphertext := ciphertext[saltSize+nonceSize:]
 
-	stream := cipher.NewCFBDecrypter(block, iv)
-	plaintext := make([]byte, len(ciphertext))
-	stream.XORKeyStream(plaintext, ciphertext)
+	key := deriveKey(string(v.vaultKey), salt)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", fmt.Errorf("create cipher: %w", err)
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("create GCM: %w", err)
+	}
+
+	plaintext, err := aesgcm.Open(nil, nonce, actualCiphertext, nil)
+	if err != nil {
+		return "", fmt.Errorf("decrypt: %w", err)
+	}
 
 	return string(plaintext), nil
 }
 
-func deriveKey(key string) []byte {
-	hash := sha256.Sum256([]byte(key))
-	return hash[:]
+func Encrypt(plaintext, masterKey string) (string, error) {
+	salt := make([]byte, saltSize)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return "", fmt.Errorf("generate salt: %w", err)
+	}
+
+	nonce := make([]byte, nonceSize)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", fmt.Errorf("generate nonce: %w", err)
+	}
+
+	key := deriveKey(masterKey, salt)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", fmt.Errorf("create cipher: %w", err)
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("create GCM: %w", err)
+	}
+
+	ciphertext := aesgcm.Seal(nil, nonce, []byte(plaintext), nil)
+
+	result := append(salt, nonce...)
+	result = append(result, ciphertext...)
+
+	return base64.StdEncoding.EncodeToString(result), nil
+}
+
+func deriveKey(password string, salt []byte) []byte {
+	return pbkdf2.Key([]byte(password), salt, pbkdf2Iterations, keySize, sha256.New)
 }
 
 func (v *Vault) logAudit(ctx context.Context, operation, keyName string, allowed bool, reason string) {

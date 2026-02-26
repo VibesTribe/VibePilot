@@ -1,6 +1,6 @@
 module github.com/vibepilot/governor
 
-go 1.23
+go 1.24.0
 
 require (
 	github.com/google/go-github/v62 v62.0.0
@@ -10,5 +10,6 @@ require (
 
 require (
 	github.com/google/go-querystring v1.1.0 // indirect
-	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/net v0.49.0 // indirect
 )

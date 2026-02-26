@@ -1,0 +1,38 @@
+{
+  "destinations": [
+    {
+      "id": "opencode",
+      "name": "OpenCode CLI",
+      "type": "cli",
+      "status": "active",
+      "command": "opencode",
+      "timeout_seconds": 300
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi CLI",
+      "type": "cli",
+      "status": "inactive",
+      "command": "kimi",
+      "timeout_seconds": 300
+    },
+    {
+      "id": "gemini-api",
+      "name": "Gemini API",
+      "type": "api",
+      "status": "inactive",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+      "api_key_ref": "GEMINI_API_KEY",
+      "models_available": ["gemini-2.0-flash", "gemini-1.5-pro"]
+    },
+    {
+      "id": "deepseek-api",
+      "name": "DeepSeek API",
+      "type": "api",
+      "status": "inactive",
+      "endpoint": "https://api.deepseek.com/v1",
+      "api_key_ref": "DEEPSEEK_API_KEY",
+      "models_available": ["deepseek-chat", "deepseek-reasoner"]
+    }
+  ]
+}

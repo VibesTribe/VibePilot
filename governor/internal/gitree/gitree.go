@@ -9,16 +9,21 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+const DefaultGitTimeout = 60 * time.Second
 
 type Gitree struct {
 	repoPath          string
 	protectedBranches map[string]bool
+	timeout           time.Duration
 }
 
 type Config struct {
 	RepoPath          string
 	ProtectedBranches []string
+	Timeout           time.Duration
 }
 
 func New(cfg *Config) *Gitree {
@@ -32,6 +37,11 @@ func New(cfg *Config) *Gitree {
 		repoPath = cwd
 	}
 
+	timeout := cfg.Timeout
+	if timeout <= 0 {
+		timeout = DefaultGitTimeout
+	}
+
 	protected := make(map[string]bool)
 	for _, branch := range cfg.ProtectedBranches {
 		protected[strings.TrimSpace(branch)] = true
@@ -40,6 +50,7 @@ func New(cfg *Config) *Gitree {
 	return &Gitree{
 		repoPath:          repoPath,
 		protectedBranches: protected,
+		timeout:           timeout,
 	}
 }
 
@@ -55,6 +66,9 @@ func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
 	if g.isProtected(branchName) {
 		return fmt.Errorf("cannot create branch: '%s' is protected", branchName)
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
 
 	var out bytes.Buffer
 
@@ -75,6 +89,9 @@ func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
 }
 
 func (g *Gitree) CommitOutput(ctx context.Context, branchName string, output interface{}) error {
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
+
 	if err := g.gitCommand(ctx, "checkout", branchName).Run(); err != nil {
 		return fmt.Errorf("checkout branch: %w", err)
 	}
@@ -150,6 +167,9 @@ func (g *Gitree) CommitOutput(ctx context.Context, branchName string, output int
 }
 
 func (g *Gitree) ReadBranchOutput(ctx context.Context, branchName string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
+
 	if err := g.gitCommand(ctx, "checkout", branchName).Run(); err != nil {
 		return nil, fmt.Errorf("checkout branch: %w", err)
 	}
@@ -172,6 +192,9 @@ func (g *Gitree) ReadBranchOutput(ctx context.Context, branchName string) ([]str
 }
 
 func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch string) error {
+	ctx, cancel := context.WithTimeout(ctx, g.timeout*2)
+	defer cancel()
+
 	if g.isProtected(targetBranch) && !g.isTaskOrModuleBranch(sourceBranch) {
 		return fmt.Errorf("cannot merge '%s' to protected branch '%s': only module/* branches can merge to protected branches", sourceBranch, targetBranch)
 	}
@@ -192,6 +215,9 @@ func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch str
 }
 
 func (g *Gitree) DeleteBranch(ctx context.Context, branchName string) error {
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
+
 	if g.isProtected(branchName) {
 		return fmt.Errorf("cannot delete protected branch: %s", branchName)
 	}
@@ -202,6 +228,9 @@ func (g *Gitree) DeleteBranch(ctx context.Context, branchName string) error {
 }
 
 func (g *Gitree) ClearBranch(ctx context.Context, branchName string) error {
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
+
 	if g.isProtected(branchName) {
 		return fmt.Errorf("cannot clear protected branch: %s", branchName)
 	}
@@ -226,6 +255,9 @@ func (g *Gitree) ClearBranch(ctx context.Context, branchName string) error {
 }
 
 func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
+
 	branchName := "module/" + sliceID
 	var out bytes.Buffer
 

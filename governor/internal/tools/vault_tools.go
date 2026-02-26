@@ -22,18 +22,20 @@ func (t *VaultGetTool) Execute(ctx context.Context, args map[string]any) (json.R
 		return nil, fmt.Errorf("key parameter required")
 	}
 
-	value, err := t.vault.GetSecret(ctx, key)
+	_, err := t.vault.GetSecret(ctx, key)
 	if err != nil {
 		return json.Marshal(map[string]any{
 			"success": false,
 			"error":   err.Error(),
 			"key":     key,
+			"exists":  false,
 		})
 	}
 
 	return json.Marshal(map[string]any{
 		"success": true,
 		"key":     key,
-		"exists":  value != "",
+		"exists":  true,
+		"message": "Secret exists but value is not exposed for security",
 	})
 }

@@ -120,38 +120,3 @@ type DispatchResult struct {
 	ChatURL    string `json:"chat_url,omitempty"`
 	BranchName string `json:"branch_name,omitempty"`
 }
-
-type Provider interface {
-	Chat(req *ChatRequest) (*ChatResponse, error)
-	SupportsNativeTools() bool
-}
-
-type ChatRequest struct {
-	Model     string           `json:"model"`
-	Messages  []ChatMessage    `json:"messages"`
-	Tools     []ToolDefinition `json:"tools,omitempty"`
-	MaxTokens int              `json:"max_tokens,omitempty"`
-}
-
-type ChatMessage struct {
-	Role    string      `json:"role"`
-	Content interface{} `json:"content"`
-}
-
-type ChatResponse struct {
-	ID      string      `json:"id"`
-	Content string      `json:"content"`
-	Usage   *TokenUsage `json:"usage"`
-}
-
-type TokenUsage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
-
-type ToolDefinition struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	InputSchema map[string]interface{} `json:"input_schema"`
-}
