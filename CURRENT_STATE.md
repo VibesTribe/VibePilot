@@ -10,44 +10,51 @@
 
 ---
 
-**Last Updated:** 2026-02-26
-**Updated By:** GLM-5 - Session 32
+**Last Updated:** 2026-02-27
+**Updated By:** GLM-5 - Session 33
 **Branch:** `go-governor` (all changes pushed)
-**Status:** FIXING - Session cleanup issue identified
+**Status:** READY - Security bootstrap fixed
 
 ---
 
-# SESSION 32: PRD → PLAN → REVIEW FLOW (IN PROGRESS)
+# SESSION 33: SECURITY BOOTSTRAP FIX
 
-## Current Issue
+## What Was Fixed
 
-**Opencode sessions not being deleted** - Each `opencode run` creates a new session. Governor creates sessions but never deletes them. 43+ orphaned sessions exist.
+**Governor was using wrong env var for database key.**
 
-### Root Cause Found
-- `opencode run` creates a NEW session every call
-- Go CLIRunner never calls `opencode session delete <id>`
-- Sessions pile up → eventually causes issues
+### The Problem
+- Go governor expected `SUPABASE_SERVICE_KEY` 
+- Python used `SUPABASE_KEY` (anon key)
+- `.env` only had `SUPABASE_KEY`
+- Systemd service used `EnvironmentFile=` (keys readable from files)
 
 ### The Fix
-1. Extract sessionID from NDJSON output (it's in every response)
-2. Call `opencode session delete <sessionID>` after each Run
-3. Same pattern as task branches: delete when done
+1. Changed Go to use `SUPABASE_KEY` (matches Python, works with RLS)
+2. Removed `EnvironmentFile` from systemd service
+3. Added `docs/SECURITY_BOOTSTRAP.md` documenting the architecture
 
-### What's Working
-- Event detection (polling) ✅
-- EventPRDReady trigger ✅
-- EventPlanReview trigger ✅
-- Plan status transitions (draft → review) ✅
-- Plan file saved to GitHub ✅
-- Concurrency limits per destination ✅ (opencode: 5)
+### Files Changed
 
-### Next Steps
-1. Add session cleanup to CLIRunner
-2. Re-test flow
+| File | Change |
+|------|--------|
+| `governor/config/system.json` | `key_env: SUPABASE_KEY` |
+| `governor/internal/runtime/config.go` | Default `KeyEnv: SUPABASE_KEY` |
+| `governor/cmd/governor/main.go` | Error message updated |
+| `scripts/governor.service` | Removed `EnvironmentFile` |
+| `docs/SECURITY_BOOTSTRAP.md` | NEW - architecture documentation |
+
+### Bootstrap Keys (from process environment, NEVER files)
+
+| Key | Purpose |
+|-----|---------|
+| `SUPABASE_URL` | Database endpoint |
+| `SUPABASE_KEY` | Anon key - reads from vault via RLS |
+| `VAULT_KEY` | Decrypts secrets |
 
 ---
 
-# SESSION 32: PRD → PLAN → REVIEW FLOW COMPLETE
+## SESSION 32: PRD → PLAN → REVIEW FLOW (IN PROGRESS)
 
 ## What Changed This Session
 
