@@ -65,6 +65,7 @@ func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 
 	var content strings.Builder
 	var tokensIn, tokensOut int
+	var sessionID string
 
 	scanner := bufio.NewScanner(strings.NewReader(output))
 	for scanner.Scan() {
@@ -76,6 +77,10 @@ func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 		var entry map[string]interface{}
 		if err := json.Unmarshal(line, &entry); err != nil {
 			continue
+		}
+
+		if sid, ok := entry["sessionID"].(string); ok && sid != "" {
+			sessionID = sid
 		}
 
 		entryType, _ := entry["type"].(string)
@@ -100,12 +105,24 @@ func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 		}
 	}
 
+	if sessionID != "" {
+		r.deleteSession(sessionID)
+	}
+
 	result := content.String()
 	if result == "" {
 		return output, len(prompt) / 4, len(output) / 4, nil
 	}
 
 	return result, tokensIn, tokensOut, nil
+}
+
+func (r *CLIRunner) deleteSession(sessionID string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, r.command, "session", "delete", sessionID)
+	cmd.Run()
 }
 
 func (r *CLIRunner) RunWithSystemPrompt(ctx context.Context, systemPrompt, userPrompt string, timeout int) (string, int, int, error) {

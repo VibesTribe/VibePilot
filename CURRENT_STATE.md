@@ -13,7 +13,7 @@
 **Last Updated:** 2026-02-26
 **Updated By:** GLM-5 - Session 32
 **Branch:** `go-governor` (all changes pushed)
-**Status:** TESTING - Session handling issue discovered
+**Status:** FIXING - Session cleanup issue identified
 
 ---
 
@@ -21,24 +21,29 @@
 
 ## Current Issue
 
-**Opencode sessions not closing properly** - GLM-5 subscription has 5 concurrent session limit. Governor is opening sessions but may not be closing them, causing "Unauthorized" errors.
+**Opencode sessions not being deleted** - Each `opencode run` creates a new session. Governor creates sessions but never deletes them. 43+ orphaned sessions exist.
+
+### Root Cause Found
+- `opencode run` creates a NEW session every call
+- Go CLIRunner never calls `opencode session delete <id>`
+- Sessions pile up → eventually causes issues
+
+### The Fix
+1. Extract sessionID from NDJSON output (it's in every response)
+2. Call `opencode session delete <sessionID>` after each Run
+3. Same pattern as task branches: delete when done
 
 ### What's Working
 - Event detection (polling) ✅
 - EventPRDReady trigger ✅
 - EventPlanReview trigger ✅
 - Plan status transitions (draft → review) ✅
-- Plan file saved to GitHub ✅ (manually verified)
-
-### What's Broken
-- Opencode sessions failing with "Unauthorized" after a few calls
-- Likely: sessions not closing, hitting 5 concurrent limit
+- Plan file saved to GitHub ✅
+- Concurrency limits per destination ✅ (opencode: 5)
 
 ### Next Steps
-1. Check Python orchestrator session handling
-2. Compare with Go CLIRunner session handling
-3. Ensure sessions close after task completion
-4. Re-test flow
+1. Add session cleanup to CLIRunner
+2. Re-test flow
 
 ---
 
