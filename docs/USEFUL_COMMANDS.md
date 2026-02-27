@@ -4,29 +4,65 @@ Copy-paste commands for common operations.
 
 ---
 
-## Orchestrator Service
+## MIGRATING TO NEW HOST
+
+If you need to move VibePilot to a new server:
+
+```bash
+# 1. On new server - install Go
+sudo apt update && sudo apt install -y golang-go
+
+# 2. Clone the repo
+git clone https://github.com/VibesTribe/VibePilot.git ~/vibepilot
+cd ~/vibepilot
+
+# 3. Build the governor
+cd governor && go build -o governor ./cmd/governor
+
+# 4. Set up bootstrap keys (you'll need the 3 keys from GitHub Secrets)
+sudo scripts/setup-bootstrap.sh
+# Enter when prompted:
+#   - SUPABASE_URL
+#   - SUPABASE_KEY
+#   - VAULT_KEY
+
+# 5. Deploy the service
+sudo scripts/deploy-governor.sh
+
+# 6. Verify it's running
+systemctl status vibepilot-governor
+```
+
+**That's it.** Everything else (tasks, plans, vault secrets) is in Supabase and GitHub.
+
+---
+
+## Governor Service (Go - Current)
 
 ```bash
 # Check if running
-systemctl status vibepilot-orchestrator
+systemctl status vibepilot-governor
 
 # View live logs (Ctrl+C to exit)
-journalctl -u vibepilot-orchestrator -f
+journalctl -u vibepilot-governor -f
 
 # View recent logs (last 50 lines)
-journalctl -u vibepilot-orchestrator -n 50
+journalctl -u vibepilot-governor -n 50
 
 # View logs from last hour
-journalctl -u vibepilot-orchestrator --since "1 hour ago"
+journalctl -u vibepilot-governor --since "1 hour ago"
 
 # Restart the service
-sudo systemctl restart vibepilot-orchestrator
+sudo systemctl restart vibepilot-governor
 
 # Stop the service
-sudo systemctl stop vibepilot-orchestrator
+sudo systemctl stop vibepilot-governor
 
 # Start the service
-sudo systemctl start vibepilot-orchestrator
+sudo systemctl start vibepilot-governor
+
+# Rebuild and restart (after code changes)
+cd ~/vibepilot/governor && go build -o governor ./cmd/governor && sudo systemctl restart vibepilot-governor
 ```
 
 ---
@@ -49,8 +85,8 @@ git pull
 # Switch to main branch
 git checkout main
 
-# Switch to research branch
-git checkout research-considerations
+# Switch to go-governor branch (current development)
+git checkout go-governor
 ```
 
 ---
@@ -58,21 +94,16 @@ git checkout research-considerations
 ## Database (Supabase)
 
 ```bash
-# Connect to Supabase via psql (if installed)
-psql $SUPABASE_URL
+# Quick query - see current plans
+source ~/.env 2>/dev/null || true
+curl -s "$SUPABASE_URL/rest/v1/plans?select=id,status,title" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" | python3 -m json.tool
 
-# View tasks table (via orchestrator venv)
-source ~/vibepilot/venv/bin/activate
-python3 -c "
-from supabase import create_client
-import os
-from dotenv import load_dotenv
-load_dotenv('/home/mjlockboxsocial/vibepilot/.env')
-db = create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_KEY'])
-tasks = db.table('tasks').select('id,status,title').limit(10).execute()
-for t in tasks.data:
-    print(f\"{t['id'][:8]}... | {t['status']:15} | {t.get('title','')[:40]}\")
-"
+# Quick query - see pending tasks
+curl -s "$SUPABASE_URL/rest/v1/tasks?select=id,status,title&status=eq.pending" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" | python3 -m json.tool
 ```
 
 ---
@@ -111,7 +142,7 @@ ls -la
 find ~ -name "filename" 2>/dev/null
 
 # Search inside files
-grep -r "search term" ~/vibepilot --include="*.py"
+grep -r "search term" ~/vibepilot --include="*.go"
 
 # View a file
 cat filename
@@ -120,7 +151,7 @@ less filename  # (q to exit)
 
 ---
 
-## Dashboard (Vibeflow)
+## Dashboard & Links
 
 ```bash
 # Dashboard URL
@@ -141,14 +172,17 @@ https://github.com/VibesTribe/vibeflow
 # Kill a stuck process (replace PID with actual number)
 kill -9 12345
 
-# Restart everything
-sudo systemctl restart vibepilot-orchestrator
+# Restart the governor
+sudo systemctl restart vibepilot-governor
 
 # Check if port is in use
 lsof -i :8000
 
 # Free up memory (clear cache)
 sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
+
+# If governor won't start - check logs
+journalctl -u vibepilot-governor -n 100
 ```
 
 ---
@@ -164,5 +198,32 @@ echo "=== DISK ===" && df -h / && \
 echo "" && \
 echo "=== MEMORY ===" && free -h && \
 echo "" && \
-echo "=== ORCHESTRATOR ===" && systemctl is-active vibepilot-orchestrator
+echo "=== GOVERNOR ===" && systemctl is-active vibepilot-governor
 ```
+
+---
+
+## OpenCode Sessions (Cleanup)
+
+```bash
+# List all sessions
+opencode session list
+
+# Delete a specific session
+opencode session delete <session-id>
+
+# Count sessions
+opencode session list | wc -l
+```
+
+---
+
+## Key Files to Know
+
+| File | Purpose |
+|------|---------|
+| `CURRENT_STATE.md` | What's happening now |
+| `docs/SECURITY_BOOTSTRAP.md` | How credentials work |
+| `docs/GOVERNOR_HANDOFF.md` | Governor implementation details |
+| `governor/config/system.json` | Governor configuration |
+| `prompts/*.md` | Agent behavior definitions |

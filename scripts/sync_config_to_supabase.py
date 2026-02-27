@@ -209,6 +209,49 @@ def import_prompts(db):
     return synced
 
 
+def import_destinations(db):
+    """Import destinations.json to Supabase."""
+    print("Importing destinations.json → Supabase...")
+
+    config = load_json_config("destinations.json")
+    destinations = config.get("destinations", [])
+
+    synced = 0
+    for dest in destinations:
+        dest_id = dest.get("id")
+        dest_type = dest.get("type") or dest.get("destination_type", "unknown")
+
+        row = {
+            "id": dest_id,
+            "name": dest.get("name", dest_id),
+            "type": dest_type,
+            "status": dest.get("status", "active"),
+            "command": dest.get("command") if dest_type == "cli" else None,
+            "endpoint": dest.get("endpoint")
+            if dest_type in ["api", "api_free", "api_credit"]
+            else None,
+            "api_key_ref": dest.get("api_key_ref"),
+            "url": dest.get("url") if dest_type == "web" else None,
+            "new_chat_url": dest.get("new_chat_url"),
+            "cost_category": dest.get("cost_category"),
+            "rate_limits": dest.get("rate_limits")
+            or dest.get("free_tier", {}).get("rate_limits")
+            or {},
+            "throttle": dest.get("throttle") or {},
+            "models_available": dest.get("models_available", []),
+            "config": dest,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+
+        result = db.table("destinations").upsert(row).execute()
+        if result.data:
+            synced += 1
+            print(f"  ✓ {dest_id}")
+
+    print(f"Imported {synced}/{len(destinations)} destinations")
+    return synced
+
+
 def export_models(db):
     """Export Supabase models to models.json."""
     print("Exporting Supabase → models.json...")
@@ -365,7 +408,11 @@ def do_import(db):
     import_models(db)
     import_platforms(db)
 
-    # Try to import skills/tools/prompts if tables exist
+    try:
+        import_destinations(db)
+    except Exception as e:
+        print(f"  Destinations skipped: {e}")
+
     try:
         import_skills(db)
     except Exception as e:
