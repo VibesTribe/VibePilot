@@ -88,6 +88,17 @@ cd ~/vibepilot
 
 ## Vault (API Keys)
 
+**Where credentials live:**
+
+| Secret Type | Location | Notes |
+|-------------|----------|-------|
+| `SUPABASE_URL` | GitHub Secrets | Bootstrap credential |
+| `SUPABASE_SERVICE_KEY` | GitHub Secrets | Service role for admin ops |
+| `VAULT_KEY` | GitHub Secrets | Decrypts Supabase vault |
+| **All other API keys** | Supabase Vault | Encrypted, retrieved at runtime |
+
+**Never hardcode secrets.** Use `vault_manager.py` to retrieve at runtime.
+
 ```python
 # Location: vault_manager.py
 from vault_manager import get_api_key, VaultManager
@@ -104,11 +115,6 @@ vault.ingest_secret('GEMINI_API_KEY', 'your-key-here')
 - DEEPSEEK_API_KEY ✓
 - GITHUB_TOKEN ✓
 - GEMINI_API_KEY - NOT YET ADDED
-
-**Bootstrap keys (in .env, not vault):**
-- SUPABASE_URL
-- SUPABASE_KEY
-- VAULT_KEY
 
 ---
 

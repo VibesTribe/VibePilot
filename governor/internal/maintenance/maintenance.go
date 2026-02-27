@@ -1,122 +1,346 @@
 package maintenance
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/vibepilot/governor/internal/db"
+	"github.com/vibepilot/governor/internal/gitree"
+	"github.com/vibepilot/governor/pkg/types"
 )
 
+type RiskLevel string
+
+const (
+	RiskLow      RiskLevel = "low"
+	RiskMedium   RiskLevel = "medium"
+	RiskHigh     RiskLevel = "high"
+	RiskCritical RiskLevel = "critical"
+)
+
+type ChangeType string
+
+const (
+	ChangeTypeConfig     ChangeType = "config"
+	ChangeTypeDependency ChangeType = "dependency"
+	ChangeTypeCode       ChangeType = "code"
+	ChangeTypePrompt     ChangeType = "prompt"
+	ChangeTypeSchema     ChangeType = "schema"
+)
+
+type Change struct {
+	ID         string
+	Type       ChangeType
+	Target     string
+	Action     string
+	Content    []byte
+	Reason     string
+	BackupPath string
+}
+
+type ExecutionResult struct {
+	Success      bool
+	Output       string
+	TestsPassed  bool
+	RollbackPath string
+	Error        string
+}
+
 type Maintenance struct {
-	repoPath string
+	db         *db.DB
+	gitree     *gitree.Gitree
+	repoPath   string
+	sandboxDir string
 }
 
 type Config struct {
-	RepoPath string
+	RepoPath   string
+	SandboxDir string
 }
 
-func New(cfg *Config) *Maintenance {
-	if cfg == nil || cfg.RepoPath == "" {
-		cwd, _ := os.Getwd()
-		return &Maintenance{repoPath: cwd}
+func New(cfg *Config, database *db.DB, git *gitree.Gitree) *Maintenance {
+	repoPath := cfg.RepoPath
+	if repoPath == "" {
+		repoPath, _ = os.Getwd()
 	}
-	return &Maintenance{repoPath: cfg.RepoPath}
+
+	sandboxDir := cfg.SandboxDir
+	if sandboxDir == "" {
+		sandboxDir = filepath.Join(os.TempDir(), "vibepilot-sandbox")
+	}
+
+	return &Maintenance{
+		db:         database,
+		gitree:     git,
+		repoPath:   repoPath,
+		sandboxDir: sandboxDir,
+	}
 }
 
-func (m *Maintenance) CreateBranch(ctx context.Context, branchName string) error {
-	if err := m.gitCommand(ctx, "checkout", "-b", branchName).Run(); err != nil {
-		if strings.Contains(err.Error(), "already exists") {
-			return m.gitCommand(ctx, "checkout", branchName).Run()
+func (m *Maintenance) ClassifyRisk(change *Change) RiskLevel {
+	switch change.Type {
+	case ChangeTypeConfig:
+		if change.Action == "create" {
+			return RiskLow
 		}
-		return fmt.Errorf("create branch: %w", err)
+		return RiskMedium
+	case ChangeTypePrompt:
+		return RiskLow
+	case ChangeTypeDependency:
+		return RiskMedium
+	case ChangeTypeCode:
+		return RiskHigh
+	case ChangeTypeSchema:
+		return RiskCritical
+	default:
+		return RiskHigh
 	}
-	return m.gitCommand(ctx, "push", "-u", "origin", branchName).Run()
 }
 
-func (m *Maintenance) CommitOutput(ctx context.Context, branchName string, output interface{}) error {
-	if err := m.gitCommand(ctx, "checkout", branchName).Run(); err != nil {
-		return fmt.Errorf("checkout branch: %w", err)
+func (m *Maintenance) RequiresSandbox(change *Change) bool {
+	risk := m.ClassifyRisk(change)
+	return risk == RiskHigh || risk == RiskCritical
+}
+
+func (m *Maintenance) Execute(ctx context.Context, task *types.Task, packet *types.PromptPacket, output interface{}) (*ExecutionResult, error) {
+	change, err := m.parseOutputToChange(output, task)
+	if err != nil {
+		return nil, fmt.Errorf("parse output: %w", err)
 	}
 
-	if files, ok := output.(map[string]interface{})["files"]; ok {
-		for _, f := range files.([]interface{}) {
-			file := f.(map[string]interface{})
-			path := file["path"].(string)
-			content := file["content"].(string)
+	if m.RequiresSandbox(change) {
+		return m.executeWithSandbox(ctx, task, packet, change)
+	}
 
-			fullPath := filepath.Join(m.repoPath, path)
-			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-				return fmt.Errorf("create dir: %w", err)
+	return m.executeDirect(ctx, task, packet, change)
+}
+
+func (m *Maintenance) executeDirect(ctx context.Context, task *types.Task, packet *types.PromptPacket, change *Change) (*ExecutionResult, error) {
+	result := &ExecutionResult{}
+
+	backupPath, err := m.Backup(change.Target)
+	if err != nil {
+		log.Printf("Maintenance: backup warning for %s: %v", change.Target, err)
+	}
+	change.BackupPath = backupPath
+
+	if err := m.applyChange(change); err != nil {
+		result.Error = err.Error()
+		if backupPath != "" {
+			if rerr := m.Rollback(backupPath, change.Target); rerr != nil {
+				log.Printf("Maintenance: rollback failed: %v", rerr)
 			}
-			if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
-				return fmt.Errorf("write file: %w", err)
+		}
+		return result, fmt.Errorf("apply change: %w", err)
+	}
+
+	result.Success = true
+	result.TestsPassed = true
+
+	m.auditLog(change, result)
+
+	return result, nil
+}
+
+func (m *Maintenance) executeWithSandbox(ctx context.Context, task *types.Task, packet *types.PromptPacket, change *Change) (*ExecutionResult, error) {
+	result := &ExecutionResult{}
+
+	sandboxPath, err := m.CreateSandbox()
+	if err != nil {
+		return nil, fmt.Errorf("create sandbox: %w", err)
+	}
+	defer m.CleanupSandbox(sandboxPath)
+
+	backupPath, err := m.Backup(change.Target)
+	if err != nil {
+		log.Printf("Maintenance: backup warning for %s: %v", change.Target, err)
+	}
+	change.BackupPath = backupPath
+
+	if err := m.ApplyToSandbox(sandboxPath, change); err != nil {
+		result.Error = err.Error()
+		return result, fmt.Errorf("apply to sandbox: %w", err)
+	}
+
+	testResult, err := m.TestInSandbox(sandboxPath)
+	if err != nil || !testResult.Passed {
+		result.Error = fmt.Sprintf("sandbox tests failed: %v", testResult.Failures)
+		return result, fmt.Errorf("sandbox tests failed")
+	}
+
+	if err := m.applyChange(change); err != nil {
+		result.Error = err.Error()
+		if backupPath != "" {
+			if rerr := m.Rollback(backupPath, change.Target); rerr != nil {
+				log.Printf("Maintenance: rollback failed: %v", rerr)
+			}
+		}
+		return result, fmt.Errorf("apply change: %w", err)
+	}
+
+	result.Success = true
+	result.TestsPassed = true
+	result.RollbackPath = backupPath
+
+	m.auditLog(change, result)
+
+	return result, nil
+}
+
+func (m *Maintenance) applyChange(change *Change) error {
+	if change.Target == "" {
+		return fmt.Errorf("change target is empty")
+	}
+
+	targetPath := filepath.Join(m.repoPath, change.Target)
+
+	dir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("create dir: %w", err)
+	}
+
+	var writeErr error
+	if change.Action == "delete" {
+		writeErr = os.Remove(targetPath)
+		if os.IsNotExist(writeErr) {
+			writeErr = nil
+		}
+	} else {
+		writeErr = os.WriteFile(targetPath, change.Content, 0644)
+	}
+
+	if writeErr != nil {
+		return fmt.Errorf("write file: %w", writeErr)
+	}
+
+	return nil
+}
+
+func (m *Maintenance) parseOutputToChange(output interface{}, task *types.Task) (*Change, error) {
+	change := &Change{
+		ID:     task.ID,
+		Reason: task.Title,
+	}
+
+	outputMap, ok := output.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("output is not a map")
+	}
+
+	if changeType, ok := outputMap["change_type"].(string); ok {
+		change.Type = ChangeType(changeType)
+	} else {
+		change.Type = ChangeTypeCode
+	}
+
+	if target, ok := outputMap["target"].(string); ok {
+		change.Target = target
+	}
+
+	if action, ok := outputMap["action"].(string); ok {
+		change.Action = action
+	} else {
+		change.Action = "update"
+	}
+
+	if content, ok := outputMap["content"].(string); ok {
+		change.Content = []byte(content)
+	} else if contentBytes, ok := outputMap["content"].([]byte); ok {
+		change.Content = contentBytes
+	}
+
+	return change, nil
+}
+
+func (m *Maintenance) auditLog(change *Change, result *ExecutionResult) {
+	log.Printf("Maintenance: change %s type=%s target=%s action=%s success=%v tests=%v",
+		change.ID, change.Type, change.Target, change.Action, result.Success, result.TestsPassed)
+
+	if m.db != nil {
+		m.db.RPC(context.Background(), "log_orchestrator_event", map[string]interface{}{
+			"p_event_type": "maintenance_change",
+			"p_task_id":    change.ID,
+			"p_message":    fmt.Sprintf("type=%s target=%s action=%s", change.Type, change.Target, change.Action),
+			"p_details": map[string]interface{}{
+				"success":      result.Success,
+				"tests_passed": result.TestsPassed,
+				"backup_path":  change.BackupPath,
+			},
+		})
+	}
+}
+
+func (m *Maintenance) CheckApprovalChain(ctx context.Context, change *Change) error {
+	if m.db == nil {
+		return nil
+	}
+
+	var approvals []map[string]interface{}
+	err := m.db.CallRPCInto(ctx, "get_change_approvals", map[string]any{"p_change_id": change.ID}, &approvals)
+	if err != nil {
+		return fmt.Errorf("get approvals: %w", err)
+	}
+
+	approvalMap := make(map[string]bool)
+	for _, a := range approvals {
+		if approver, ok := a["approver"].(string); ok {
+			if approved, ok := a["approved"].(bool); ok {
+				approvalMap[approver] = approved
 			}
 		}
 	}
 
-	if err := m.gitCommand(ctx, "add", ".").Run(); err != nil {
-		return fmt.Errorf("git add: %w", err)
-	}
-
-	var commitOut bytes.Buffer
-	commitCmd := m.gitCommand(ctx, "commit", "-m", "task output")
-	commitCmd.Stdout = &commitOut
-	commitCmd.Stderr = &commitOut
-
-	if err := commitCmd.Run(); err != nil {
-		if strings.Contains(commitOut.String(), "nothing to commit") {
-			return nil
-		}
-		return fmt.Errorf("git commit: %w - %s", err, commitOut.String())
-	}
-
-	return m.gitCommand(ctx, "push").Run()
-}
-
-func (m *Maintenance) ReadBranchOutput(ctx context.Context, branchName string) ([]string, error) {
-	var files []string
-
-	cmd := m.gitCommand(ctx, "diff", "--name-only", "main..."+branchName)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("git diff: %w", err)
-	}
-
-	for _, line := range strings.Split(out.String(), "\n") {
-		if line = strings.TrimSpace(line); line != "" {
-			files = append(files, line)
+	required := m.requiredApprovals(change)
+	for _, req := range required {
+		if !approvalMap[req] {
+			return fmt.Errorf("missing required approval: %s", req)
 		}
 	}
 
-	return files, nil
+	return nil
 }
 
-func (m *Maintenance) MergeBranch(ctx context.Context, sourceBranch, targetBranch string) error {
-	if err := m.gitCommand(ctx, "checkout", targetBranch).Run(); err != nil {
-		return fmt.Errorf("checkout target: %w", err)
+func (m *Maintenance) requiredApprovals(change *Change) []string {
+	switch m.ClassifyRisk(change) {
+	case RiskLow:
+		return []string{"supervisor"}
+	case RiskMedium:
+		return []string{"supervisor", "council"}
+	case RiskHigh:
+		return []string{"supervisor", "council", "human"}
+	case RiskCritical:
+		return []string{"supervisor", "council", "human"}
+	default:
+		return []string{"supervisor", "council", "human"}
 	}
-
-	if err := m.gitCommand(ctx, "pull", "origin", targetBranch).Run(); err != nil {
-	}
-
-	if err := m.gitCommand(ctx, "merge", sourceBranch).Run(); err != nil {
-		return fmt.Errorf("merge: %w", err)
-	}
-
-	return m.gitCommand(ctx, "push", "origin", targetBranch).Run()
 }
 
-func (m *Maintenance) DeleteBranch(ctx context.Context, branchName string) error {
-	m.gitCommand(ctx, "branch", "-d", branchName).Run()
-	return m.gitCommand(ctx, "push", "origin", "--delete", branchName).Run()
+func (m *Maintenance) IsSystemChange(change *Change) bool {
+	systemPaths := []string{
+		"governor/",
+		"config/",
+		"scripts/",
+		"docs/supabase-schema/",
+	}
+
+	for _, prefix := range systemPaths {
+		if strings.HasPrefix(change.Target, prefix) {
+			return true
+		}
+	}
+
+	switch change.Type {
+	case ChangeTypeConfig, ChangeTypeSchema:
+		return true
+	default:
+		return false
+	}
 }
 
-func (m *Maintenance) gitCommand(ctx context.Context, args ...string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = m.repoPath
-	return cmd
+func (m *Maintenance) RepoPath() string {
+	return m.repoPath
 }

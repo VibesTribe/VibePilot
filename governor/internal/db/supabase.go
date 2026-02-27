@@ -8,22 +8,50 @@ import (
 	"io"
 	"net/http"
 	"time"
-
-	"github.com/vibepilot/governor/pkg/types"
 )
 
+const (
+	DefaultHTTPTimeoutSecs  = 30
+	DefaultErrorTruncateLen = 200
+)
+
+type DBConfig struct {
+	HTTPTimeoutSecs  int
+	ErrorTruncateLen int
+}
+
 type DB struct {
-	url    string
-	key    string
-	client *http.Client
+	url          string
+	key          string
+	client       *http.Client
+	rpcAllowlist *RPCAllowlist
+	config       *DBConfig
 }
 
 func New(url, key string) *DB {
+	return NewWithConfig(url, key, nil)
+}
+
+func NewWithConfig(url, key string, cfg *DBConfig) *DB {
+	if cfg == nil {
+		cfg = &DBConfig{
+			HTTPTimeoutSecs:  DefaultHTTPTimeoutSecs,
+			ErrorTruncateLen: DefaultErrorTruncateLen,
+		}
+	}
+
+	timeout := DefaultHTTPTimeoutSecs
+	if cfg.HTTPTimeoutSecs > 0 {
+		timeout = cfg.HTTPTimeoutSecs
+	}
+
 	return &DB{
-		url: url,
-		key: key,
+		url:          url,
+		key:          key,
+		rpcAllowlist: NewRPCAllowlist(),
+		config:       cfg,
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: time.Duration(timeout) * time.Second,
 		},
 	}
 }
@@ -33,7 +61,7 @@ func (d *DB) Close() error {
 	return nil
 }
 
-func (d *DB) rest(ctx context.Context, method, path string, body interface{}) ([]byte, error) {
+func (d *DB) REST(ctx context.Context, method, path string, body interface{}) ([]byte, error) {
 	var reqBody io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -66,347 +94,124 @@ func (d *DB) rest(ctx context.Context, method, path string, body interface{}) ([
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("supabase %d: %s", resp.StatusCode, string(data))
+		truncateLen := d.config.ErrorTruncateLen
+		if truncateLen <= 0 {
+			truncateLen = DefaultErrorTruncateLen
+		}
+		errBody := string(data)
+		if len(errBody) > truncateLen {
+			errBody = errBody[:truncateLen] + "...(truncated)"
+		}
+		return nil, fmt.Errorf("supabase %d: %s", resp.StatusCode, errBody)
 	}
 
 	return data, nil
 }
 
 func (d *DB) rpc(ctx context.Context, name string, params interface{}) ([]byte, error) {
-	return d.rest(ctx, "POST", "rpc/"+name, params)
+	return d.REST(ctx, "POST", "rpc/"+name, params)
 }
 
-func (d *DB) GetAvailableTasks(ctx context.Context, limit int) ([]types.Task, error) {
-	path := fmt.Sprintf("tasks?status=eq.available&order=priority.asc,created_at.asc&limit=%d", limit)
-	data, err := d.rest(ctx, "GET", path, nil)
+func (d *DB) RPC(ctx context.Context, name string, params map[string]interface{}) ([]byte, error) {
+	if !d.rpcAllowlist.Allowed(name) {
+		return nil, fmt.Errorf("RPC %s not in allowlist", name)
+	}
+	return d.rpc(ctx, name, params)
+}
+
+func (d *DB) Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error) {
+	path := table + "?select=*"
+
+	for key, val := range filters {
+		if key == "limit" {
+			path = path + "&limit=" + fmt.Sprintf("%v", val)
+		} else if key == "order" {
+			path = path + "&order=" + fmt.Sprintf("%v", val)
+		} else {
+			path = path + "&" + key + "=eq." + fmt.Sprintf("%v", val)
+		}
+	}
+
+	data, err := d.REST(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var tasks []types.Task
-	if err := json.Unmarshal(data, &tasks); err != nil {
-		return nil, fmt.Errorf("unmarshal tasks: %w", err)
-	}
-	return tasks, nil
+	return json.RawMessage(data), nil
 }
 
-func (d *DB) GetTaskByID(ctx context.Context, taskID string) (*types.Task, error) {
-	data, err := d.rest(ctx, "GET", "tasks?id=eq."+taskID, nil)
+func (d *DB) Insert(ctx context.Context, table string, data map[string]any) (json.RawMessage, error) {
+	result, err := d.REST(ctx, "POST", table, data)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(result), nil
+}
+
+func (d *DB) Update(ctx context.Context, table, id string, data map[string]any) (json.RawMessage, error) {
+	path := table + "?id=eq." + id
+	result, err := d.REST(ctx, "PATCH", path, data)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(result), nil
+}
+
+func (d *DB) Delete(ctx context.Context, table, id string) error {
+	path := table + "?id=eq." + id
+	_, err := d.REST(ctx, "DELETE", path, nil)
+	return err
+}
+
+type Destination struct {
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Type           string   `json:"type"`
+	Status         string   `json:"status"`
+	Command        string   `json:"command,omitempty"`
+	Endpoint       string   `json:"endpoint,omitempty"`
+	APIKeyRef      string   `json:"api_key_ref,omitempty"`
+	Models         []string `json:"models_available,omitempty"`
+	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
+}
+
+func (d *DB) GetDestination(ctx context.Context, id string) (*Destination, error) {
+	data, err := d.REST(ctx, "GET", "destinations?id=eq."+id+"&limit=1", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var tasks []types.Task
-	if err := json.Unmarshal(data, &tasks); err != nil {
-		return nil, fmt.Errorf("unmarshal task: %w", err)
-	}
-	if len(tasks) == 0 {
-		return nil, nil
-	}
-	return &tasks[0], nil
-}
-
-type taskPacketRow struct {
-	TaskID  string `json:"task_id"`
-	Prompt  string `json:"prompt"`
-	Version int    `json:"version"`
-}
-
-func (d *DB) GetTaskPacket(ctx context.Context, taskID string) (*types.PromptPacket, error) {
-	path := fmt.Sprintf("task_packets?task_id=eq.%s&order=version.desc&limit=1", taskID)
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
+	var dests []Destination
+	if err := json.Unmarshal(data, &dests); err != nil {
+		return nil, fmt.Errorf("unmarshal: %w", err)
 	}
 
-	var rows []taskPacketRow
-	if err := json.Unmarshal(data, &rows); err != nil {
-		return nil, fmt.Errorf("unmarshal packet rows: %w", err)
-	}
-	if len(rows) == 0 {
-		return nil, nil
+	if len(dests) == 0 {
+		return nil, fmt.Errorf("destination %s not found", id)
 	}
 
-	var packet types.PromptPacket
-	if err := json.Unmarshal([]byte(rows[0].Prompt), &packet); err != nil {
-		return nil, fmt.Errorf("unmarshal prompt JSON: %w", err)
-	}
-	return &packet, nil
-}
-
-func (d *DB) ClaimTask(ctx context.Context, taskID, modelID string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"status":      "in_progress",
-		"assigned_to": modelID,
-		"started_at":  now,
-		"updated_at":  now,
-	}
-
-	data, err := d.rest(ctx, "PATCH", "tasks?id=eq."+taskID+"&status=eq.available", body)
-	if err != nil {
-		return err
-	}
-
-	var result []map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return fmt.Errorf("unmarshal claim result: %w", err)
-	}
-	if len(result) == 0 {
-		return fmt.Errorf("task %s not available", taskID)
-	}
-	return nil
-}
-
-type TaskRunInput struct {
-	TaskID    string
-	ModelID   string
-	Courier   string
-	Platform  string
-	Status    string
-	Result    interface{}
-	TokensIn  int
-	TokensOut int
-}
-
-func (d *DB) RecordTaskRun(ctx context.Context, input *TaskRunInput) (string, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"task_id":     input.TaskID,
-		"model_id":    input.ModelID,
-		"courier":     input.Courier,
-		"platform":    input.Platform,
-		"status":      input.Status,
-		"result":      input.Result,
-		"tokens_in":   input.TokensIn,
-		"tokens_out":  input.TokensOut,
-		"tokens_used": input.TokensIn + input.TokensOut,
-		"started_at":  now,
-	}
-
-	data, err := d.rest(ctx, "POST", "task_runs", body)
-	if err != nil {
-		return "", err
-	}
-
-	var result []struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return "", fmt.Errorf("unmarshal run result: %w", err)
-	}
-	if len(result) == 0 {
-		return "", fmt.Errorf("no run ID returned")
-	}
-	return result[0].ID, nil
-}
-
-func (d *DB) CallROIRPC(ctx context.Context, runID string) error {
-	_, err := d.rpc(ctx, "calculate_enhanced_task_roi", map[string]interface{}{
-		"p_run_id": runID,
-	})
-	return err
-}
-
-func (d *DB) UpdateTaskStatus(ctx context.Context, taskID string, status types.TaskStatus, result interface{}) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"status":     string(status),
-		"updated_at": now,
-	}
-	if result != nil {
-		body["result"] = result
-	}
-
-	_, err := d.rest(ctx, "PATCH", "tasks?id=eq."+taskID, body)
-	return err
-}
-
-func (d *DB) UpdateTaskBranch(ctx context.Context, taskID string, branchName string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"branch_name": branchName,
-		"updated_at":  now,
-	}
-
-	_, err := d.rest(ctx, "PATCH", "tasks?id=eq."+taskID, body)
-	return err
-}
-
-func (d *DB) UnlockDependents(ctx context.Context, taskID string) error {
-	_, err := d.rpc(ctx, "unlock_dependent_tasks", map[string]interface{}{
-		"p_completed_task_id": taskID,
-	})
-	return err
-}
-
-func (d *DB) ResetTask(ctx context.Context, taskID string, escalate bool) error {
-	task, err := d.GetTaskByID(ctx, taskID)
-	if err != nil {
-		return err
-	}
-	if task == nil {
-		return fmt.Errorf("task %s not found", taskID)
-	}
-
-	status := "available"
-	if escalate {
-		status = "escalated"
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	body := map[string]interface{}{
-		"status":      status,
-		"attempts":    task.Attempts + 1,
-		"assigned_to": nil,
-		"started_at":  nil,
-		"updated_at":  now,
-	}
-
-	_, err = d.rest(ctx, "PATCH", "tasks?id=eq."+taskID, body)
-	return err
-}
-
-func (d *DB) GetStuckTasks(ctx context.Context, timeout time.Duration) ([]types.Task, error) {
-	cutoff := time.Now().Add(-timeout).UTC().Format(time.RFC3339)
-	path := fmt.Sprintf("tasks?status=eq.in_progress&updated_at=lt.%s", cutoff)
-
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var tasks []types.Task
-	if err := json.Unmarshal(data, &tasks); err != nil {
-		return nil, fmt.Errorf("unmarshal stuck tasks: %w", err)
-	}
-	return tasks, nil
+	return &dests[0], nil
 }
 
 type Runner struct {
-	ID              string     `json:"id"`
-	ModelID         string     `json:"model_id"`
-	ToolID          string     `json:"tool_id"`
-	CostPriority    int        `json:"cost_priority"`
-	DailyUsed       int        `json:"daily_used"`
-	DailyLimit      int        `json:"daily_limit"`
-	CooldownExpires *time.Time `json:"cooldown_expires_at"`
-	RateLimitReset  *time.Time `json:"rate_limit_reset_at"`
-}
-
-func (d *DB) GetBestRunner(ctx context.Context, routing string, taskType string) (*Runner, error) {
-	data, err := d.rpc(ctx, "get_best_runner", map[string]interface{}{
-		"p_routing":   routing,
-		"p_task_type": taskType,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var runners []Runner
-	if err := json.Unmarshal(data, &runners); err != nil {
-		return nil, fmt.Errorf("unmarshal runner: %w", err)
-	}
-	if len(runners) == 0 {
-		return nil, nil
-	}
-	return &runners[0], nil
-}
-
-func (d *DB) RecordRunnerResult(ctx context.Context, runnerID string, taskType string, success bool, tokens int) error {
-	_, err := d.rpc(ctx, "record_runner_result", map[string]interface{}{
-		"p_runner_id":   runnerID,
-		"p_task_type":   taskType,
-		"p_success":     success,
-		"p_tokens_used": tokens,
-	})
-	return err
-}
-
-func (d *DB) RefreshLimits(ctx context.Context) error {
-	_, err := d.rpc(ctx, "refresh_limits", nil)
-	return err
-}
-
-func (d *DB) SetRunnerCooldown(ctx context.Context, runnerID string, expiresAt time.Time) error {
-	_, err := d.rpc(ctx, "set_runner_cooldown", map[string]interface{}{
-		"p_runner_id":  runnerID,
-		"p_expires_at": expiresAt.Format(time.RFC3339),
-	})
-	return err
-}
-
-func (d *DB) SetRunnerRateLimited(ctx context.Context, runnerID string, resetAt time.Time) error {
-	_, err := d.rpc(ctx, "set_runner_rate_limited", map[string]interface{}{
-		"p_runner_id": runnerID,
-		"p_reset_at":  resetAt.Format(time.RFC3339),
-	})
-	return err
+	ID           string  `json:"id"`
+	ModelID      string  `json:"model_id"`
+	ToolID       string  `json:"tool_id"`
+	Status       string  `json:"status"`
+	CostPriority int     `json:"cost_priority"`
+	Depreciation float64 `json:"depreciation_score"`
 }
 
 func (d *DB) GetRunners(ctx context.Context) ([]Runner, error) {
-	data, err := d.rest(ctx, "GET", "runners?select=id,model_id,tool_id,cost_priority,status,daily_used,daily_limit&status=eq.active", nil)
+	data, err := d.REST(ctx, "GET", "runners?status=eq.active&select=id,model_id,tool_id,status,cost_priority,depreciation_score", nil)
 	if err != nil {
 		return nil, err
 	}
 
 	var runners []Runner
 	if err := json.Unmarshal(data, &runners); err != nil {
-		return nil, fmt.Errorf("unmarshal runners: %w", err)
+		return nil, fmt.Errorf("unmarshal: %w", err)
 	}
+
 	return runners, nil
-}
-
-func (d *DB) GetTasksByStatus(ctx context.Context, status string, limit int) ([]types.Task, error) {
-	path := fmt.Sprintf("tasks?status=eq.%s&order=priority.asc,created_at.asc&limit=%d", status, limit)
-	data, err := d.rest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var tasks []types.Task
-	if err := json.Unmarshal(data, &tasks); err != nil {
-		return nil, fmt.Errorf("unmarshal tasks: %w", err)
-	}
-	return tasks, nil
-}
-
-type ROISummary struct {
-	TotalRuns       int     `json:"total_runs"`
-	TotalTokensIn   int     `json:"total_tokens_in"`
-	TotalTokensOut  int     `json:"total_tokens_out"`
-	TheoreticalCost float64 `json:"theoretical_cost"`
-	ActualCost      float64 `json:"actual_cost"`
-	Savings         float64 `json:"savings"`
-}
-
-func (d *DB) GetROISummary(ctx context.Context) (*ROISummary, error) {
-	data, err := d.rest(ctx, "GET", "task_runs?select=tokens_in,tokens_out,platform_theoretical_cost_usd,total_actual_cost_usd,total_savings_usd", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var rows []struct {
-		TokensIn                   int     `json:"tokens_in"`
-		TokensOut                  int     `json:"tokens_out"`
-		PlatformTheoreticalCostUsd float64 `json:"platform_theoretical_cost_usd"`
-		TotalActualCostUsd         float64 `json:"total_actual_cost_usd"`
-		TotalSavingsUsd            float64 `json:"total_savings_usd"`
-	}
-
-	if err := json.Unmarshal(data, &rows); err != nil {
-		return nil, fmt.Errorf("unmarshal roi rows: %w", err)
-	}
-
-	summary := &ROISummary{}
-	for _, row := range rows {
-		summary.TotalRuns++
-		summary.TotalTokensIn += row.TokensIn
-		summary.TotalTokensOut += row.TokensOut
-		summary.TheoreticalCost += row.PlatformTheoreticalCostUsd
-		summary.ActualCost += row.TotalActualCostUsd
-		summary.Savings += row.TotalSavingsUsd
-	}
-
-	return summary, nil
 }

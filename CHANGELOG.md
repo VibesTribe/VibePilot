@@ -6,6 +6,148 @@
 
 ---
 
+# 2026-02-25 (Session 30)
+
+## Summary
+
+Learning System Phases 2-5 COMPLETE. Full learning infrastructure now in place.
+
+### Major Work
+
+1. **Phase 3: Tester/Supervisor Learning Schema**
+   - Created `docs/supabase-schema/028_tester_supervisor_learning.sql`
+   - `tester_learned_rules` table - tests that catch bugs
+   - `supervisor_learned_rules` table - patterns that flag issues
+   - 10 new RPCs for rule management
+
+2. **Go Methods Added**
+   - `db/supabase.go`: 11 new methods for tester/supervisor rules
+   - `TesterRule`, `SupervisorRule`, `LearningStats` structs
+
+3. **Orchestrator Integration**
+   - Added `createSupervisorRulesFromRejection()` method
+   - Added `extractPatternFromIssue()` for pattern detection
+   - On supervisor rejection, automatically creates learned rules
+
+4. **Phase 4: Daily Analysis Enhanced**
+   - `AnalysisData` now includes all rule tables
+   - `gatherData()` fetches planner/tester/supervisor rules
+   - `applyUpdates()` handles rule deactivation
+   - LLM can now recommend rule deactivation
+
+5. **Phase 5: Already Complete**
+   - Janitor already had depreciation check
+   - Verified config-driven thresholds
+
+### Files Modified
+
+```
+vibepilot/
+├── docs/
+│   ├── supabase-schema/
+│   │   └── 028_tester_supervisor_learning.sql  - NEW - Phase 3 schema
+│   ├── GOVERNOR_HANDOFF.md                     - Session 30 notes
+│   └── LEARNING_SYSTEM_PLAN.md                 - Updated to v2.0, all phases complete
+├── governor/internal/
+│   ├── db/supabase.go                          - 11 new methods for Phase 3
+│   ├── orchestrator/orchestrator.go            - createSupervisorRulesFromRejection
+│   └── analyst/analyst.go                      - Enhanced for all rule tables
+```
+
+### Learning System Final Status
+
+| Phase | Status |
+|-------|--------|
+| 1 | ✅ Core learning (heuristics, failures, solutions) |
+| 2 | ✅ Planner learning + rejection → rule |
+| 3 | ✅ Tester/Supervisor learning |
+| 4 | ✅ Daily analysis reads/writes all rules |
+| 5 | ✅ Deprecation/Revival |
+
+---
+
+# 2026-02-25 (Session 29)
+
+## Summary
+
+Config-driven destinations (zero hardcoded tools), planner learning schema, agents created (consultant, planner, council, vibes), maintenance rollback.
+
+### Major Work
+
+1. **Config-Driven Destinations**
+   - Removed hardcoded `resolveToolCommand()` switch from dispatcher
+   - Created `destinations` table + sync to supabase
+   - Dispatcher now reads from DB: `GetDestination()` → `executeCLI()` / `executeAPI()`
+   - To swap/add/remove destinations: edit JSON, run sync, done
+
+2. **Planner Learning Schema (Phase 2)**
+   - `docs/supabase-schema/025_planner_learning.sql`
+   - `planner_learned_rules` table + 6 RPCs
+   - Go methods added to db/supabase.go
+
+3. **Agents Created**
+   - consultant (351 lines) - PRD generation
+   - planner (537 lines) - Task breakdown
+   - council (565 lines) - Multi-lens review
+   - vibes (408 lines) - Human interface
+
+4. **Maintenance Rollback**
+   - WRONG: Built polling loop, bypassed agent architecture
+   - ROLLED BACK: Removed polling, removed merge special case
+   - CORRECT: maintenance.go = git utilities only
+
+### Files Modified
+
+```
+vibepilot/
+├── docs/supabase-schema/
+│   ├── 025_planner_learning.sql      - NEW - Planner learning schema
+│   └── 026_destinations.sql          - NEW - Destinations table
+├── governor/internal/
+│   ├── db/supabase.go                - Destination methods, planner learning
+│   ├── dispatcher/dispatcher.go      - Config-driven execution
+│   ├── agent/executor.go             - Config-driven execution
+│   ├── analyst/analyst.go            - Config-driven execution
+│   ├── consultant/consultant.go      - NEW
+│   ├── planner/planner.go            - NEW
+│   ├── council/council.go            - EXISTS (verified)
+│   └── vibes/vibes.go                - NEW
+├── scripts/
+│   └── sync_config_to_supabase.py    - Added import_destinations()
+├── docs/
+│   ├── GOVERNOR_HANDOFF.md           - Updated for Session 29
+│   └── CURRENT_STATE.md              - Updated for Session 29
+└── CHANGELOG.md                      - This file
+```
+
+### Commits
+
+```
+90b22984 fix: revert maintenance polling, route merge through agent flow
+f6cc19b9 feat: add maintenance polling loop (ROLLED BACK)
+8f3c2529 fix: remove remaining hardcoded tool references
+85c63da9 feat: config-driven destinations (zero hardcoded tools)
+690bbf9c feat: add planner learning (Phase 2) schema and RPCs
+b82d18dd feat: add Vibes agent for human interface
+```
+
+### Key Understanding
+
+**Every agent = role + skills + tools + brain (assigned at runtime)**
+
+Maintenance is NOT special - it follows same pattern as all other agents. Was wrongly implemented as polling loop, rolled back.
+
+### Next Session Priority
+
+1. Fix branch creation timing (at assignment, not completion)
+2. Add target_branch to merge tasks
+3. Implement task→module merge
+4. Implement module completion detection
+5. Implement module→main merge
+6. Update maintenance.md prompt
+
+---
+
 # 2026-02-20 (Session 18)
 
 ## Summary

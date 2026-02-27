@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "description": "System configuration - database, vault, git, runtime settings. All swappable.",
+  
+  "database": {
+    "type": "supabase",
+    "url_env": "SUPABASE_URL",
+    "key_env": "SUPABASE_KEY",
+    "notes": "Swap type and env vars to change database. Add new driver to db/ package."
+  },
+  
+  "vault": {
+    "key_env": "VAULT_KEY",
+    "table": "secrets_vault",
+    "notes": "Vault stores encrypted secrets. Key is bootstrap credential, never in DB."
+  },
+  
+  "git": {
+    "host": "github",
+    "repo_env": "GITHUB_REPO",
+    "token_env": "GITHUB_TOKEN",
+    "protected_branches": ["main", "master"],
+    "notes": "Swap host to gitlab/bitbucket. Add driver to gitree/ package."
+  },
+  
+  "runtime": {
+    "max_concurrent_per_module": 8,
+    "max_concurrent_total": 160,
+    "event_poll_interval_ms": 1000,
+    "agent_timeout_seconds": 300,
+    "max_tool_turns": 10,
+    "notes": "Tune for performance. 8/module matches Kimi's parallel agent limit."
+  },
+  
+  "courier": {
+    "driver": "github_actions",
+    "max_concurrent": 3,
+    "timeout_seconds": 300,
+    "github_actions": {
+      "workflow": "browser-use.yml",
+      "notes": "Uses GitHub's free 7GB runners. Swap driver for local/external."
+    }
+  },
+  
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "audit_table": "orchestrator_events"
+  }
+}
