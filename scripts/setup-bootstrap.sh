@@ -11,7 +11,7 @@ echo ""
 echo "This script stores the three bootstrap keys securely."
 echo "These keys come from GitHub Secrets:"
 echo "  - SUPABASE_URL"
-echo "  - SUPABASE_KEY"
+echo "  - SUPABASE_SERVICE_KEY (service role, not anon)"
 echo "  - VAULT_KEY"
 echo ""
 
@@ -34,8 +34,8 @@ echo "Enter SUPABASE_URL:"
 read -r SUPABASE_URL
 
 echo ""
-echo "Enter SUPABASE_KEY (anon key):"
-read -rs SUPABASE_KEY
+echo "Enter SUPABASE_SERVICE_KEY (service role key - starts with eyJ...):"
+read -rs SUPABASE_SERVICE_KEY
 echo "(hidden)"
 
 echo ""
@@ -50,7 +50,7 @@ sudo tee "$CREDENTIALS_FILE" > /dev/null << EOF
 # Generated: $(date -Iseconds)
 
 SUPABASE_URL=$SUPABASE_URL
-SUPABASE_KEY=$SUPABASE_KEY
+SUPABASE_SERVICE_KEY=$SUPABASE_SERVICE_KEY
 VAULT_KEY=$VAULT_KEY
 EOF
 

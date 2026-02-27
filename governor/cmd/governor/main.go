@@ -37,7 +37,7 @@ func main() {
 	dbURL := cfg.GetDatabaseURL()
 	dbKey := cfg.GetDatabaseKey()
 	if dbURL == "" || dbKey == "" {
-		log.Fatal("Database credentials required: set SUPABASE_URL and SUPABASE_KEY")
+		log.Fatal("Database credentials required: set SUPABASE_URL and SUPABASE_SERVICE_KEY")
 	}
 
 	database := db.New(dbURL, dbKey)

@@ -21,8 +21,9 @@ fi
 source "$CREDENTIALS_FILE"
 
 # Verify all keys present
-if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ] || [ -z "$VAULT_KEY" ]; then
+if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ] || [ -z "$VAULT_KEY" ]; then
     echo "ERROR: Missing bootstrap keys in $CREDENTIALS_FILE"
+    echo "Required: SUPABASE_URL, SUPABASE_SERVICE_KEY, VAULT_KEY"
     echo "Run: sudo scripts/setup-bootstrap.sh"
     exit 1
 fi
@@ -45,7 +46,7 @@ mkdir -p /etc/systemd/system/$SERVICE_NAME.service.d
 cat > /etc/systemd/system/$SERVICE_NAME.service.d/override.conf << EOF
 [Service]
 Environment="SUPABASE_URL=$SUPABASE_URL"
-Environment="SUPABASE_KEY=$SUPABASE_KEY"
+Environment="SUPABASE_SERVICE_KEY=$SUPABASE_SERVICE_KEY"
 Environment="VAULT_KEY=$VAULT_KEY"
 EOF
 chmod 600 /etc/systemd/system/$SERVICE_NAME.service.d/override.conf

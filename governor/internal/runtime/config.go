@@ -20,6 +20,12 @@ type SystemConfig struct {
 	PromptsDir  string            `json:"prompts_dir"`
 }
 
+// DatabaseConfig specifies how to connect to Supabase.
+// KeyEnv MUST be SUPABASE_SERVICE_KEY (not anon key) because:
+//   - Vault table requires service role to bypass RLS
+//   - Anon key cannot read/write secrets_vault
+//
+// See governor/internal/vault/vault.go for full architecture docs.
 type DatabaseConfig struct {
 	Type   string `json:"type"`
 	URLEnv string `json:"url_env"`
@@ -232,7 +238,7 @@ func (c *Config) Reload() error {
 			Database: DatabaseConfig{
 				Type:   "supabase",
 				URLEnv: "SUPABASE_URL",
-				KeyEnv: "SUPABASE_KEY",
+				KeyEnv: "SUPABASE_SERVICE_KEY",
 			},
 			Vault: VaultConfig{
 				KeyEnv:          "VAULT_KEY",

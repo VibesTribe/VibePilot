@@ -1,3 +1,26 @@
+// Package vault provides encrypted secret storage and retrieval.
+//
+// ARCHITECTURE (read this before modifying):
+//
+// Bootstrap keys come from process environment (injected by systemd from GitHub Secrets):
+//   - SUPABASE_URL: Database endpoint
+//   - SUPABASE_SERVICE_KEY: Service role key (bypasses RLS, can read/write vault)
+//   - VAULT_KEY: Master key for AES-GCM decryption
+//
+// All other secrets (GITHUB_TOKEN, API keys, etc.) are stored encrypted in the
+// secrets_vault table and retrieved at runtime. They never touch the environment.
+//
+// WHY SERVICE_KEY (not anon key):
+//   - The secrets_vault table has RLS enabled
+//   - Only service_role can read/write (anon is blocked)
+//   - This is intentional: prevents any compromised agent from dumping the vault
+//   - SERVICE_KEY is only in root-only systemd override, not accessible to agents
+//
+// DO NOT:
+//   - Change key_env to SUPABASE_KEY (anon) - it won't work with RLS
+//   - Add RLS policy for anon - defeats the security model
+//   - Put keys in .env files - agents can read them
+//   - Hardcode keys anywhere
 package vault
 
 import (
