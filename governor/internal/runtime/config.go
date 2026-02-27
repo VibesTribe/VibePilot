@@ -232,7 +232,7 @@ func (c *Config) Reload() error {
 			Database: DatabaseConfig{
 				Type:   "supabase",
 				URLEnv: "SUPABASE_URL",
-				KeyEnv: "SUPABASE_SERVICE_KEY",
+				KeyEnv: "SUPABASE_KEY",
 			},
 			Vault: VaultConfig{
 				KeyEnv:          "VAULT_KEY",
