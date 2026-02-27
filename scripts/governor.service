@@ -9,7 +9,10 @@ Type=simple
 User=mjlockboxsocial
 Group=mjlockboxsocial
 WorkingDirectory=/home/mjlockboxsocial/vibepilot/governor
-EnvironmentFile=/home/mjlockboxsocial/vibepilot/.env
+
+# Bootstrap keys injected from GitHub Secrets via deploy script
+# NEVER use EnvironmentFile - keys must not be readable from files
+# Required: SUPABASE_URL, SUPABASE_KEY, VAULT_KEY
 
 ExecStart=/home/mjlockboxsocial/vibepilot/governor/governor
 
