@@ -64,7 +64,6 @@ func (l *ModelLoader) Load(ctx context.Context) error {
 func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) error {
 	rateLimitsJSON, _ := json.Marshal(profile.RateLimits)
 	recoveryJSON, _ := json.Marshal(profile.Recovery)
-	learnedJSON, _ := json.Marshal(profile.Learned)
 	apiPricingJSON, _ := json.Marshal(profile.APIPricing)
 	capabilitiesJSON, _ := json.Marshal(profile.Capabilities)
 	strengthsJSON, _ := json.Marshal(profile.Strengths)
@@ -82,31 +81,24 @@ func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) 
 		"notes":               profile.Notes,
 	}
 
-	upsertData := map[string]interface{}{
-		"id":            profile.ID,
+	updateData := map[string]interface{}{
 		"name":          profile.Name,
 		"vendor":        profile.Provider,
-		"access_type":   profile.AccessType,
 		"context_limit": profile.ContextLimit,
-		"status":        profile.Status,
 		"rate_limits":   json.RawMessage(rateLimitsJSON),
 		"config":        configMap,
-		"learned":       json.RawMessage(learnedJSON),
 	}
 
 	if profile.APIPricing.InputPer1MUsd > 0 {
-		upsertData["cost_input_per_1k_usd"] = profile.APIPricing.InputPer1MUsd / 1000.0
+		updateData["cost_input_per_1k_usd"] = profile.APIPricing.InputPer1MUsd / 1000.0
 	}
 	if profile.APIPricing.OutputPer1MUsd > 0 {
-		upsertData["cost_output_per_1k_usd"] = profile.APIPricing.OutputPer1MUsd / 1000.0
+		updateData["cost_output_per_1k_usd"] = profile.APIPricing.OutputPer1MUsd / 1000.0
 	}
 
-	_, err := l.db.Update(ctx, "models", profile.ID, upsertData)
+	_, err := l.db.Update(ctx, "models", profile.ID, updateData)
 	if err != nil {
-		_, insertErr := l.db.Insert(ctx, "models", upsertData)
-		if insertErr != nil {
-			return fmt.Errorf("update failed: %v, insert failed: %v", err, insertErr)
-		}
+		return fmt.Errorf("update model %s: %w", profile.ID, err)
 	}
 
 	return nil

@@ -9,16 +9,18 @@ import (
 )
 
 type SystemConfig struct {
-	Database    DatabaseConfig    `json:"database"`
-	Vault       VaultConfig       `json:"vault"`
-	Git         GitConfig         `json:"git"`
-	Runtime     RuntimeConfig     `json:"runtime"`
-	Concurrency ConcurrencyConfig `json:"concurrency"`
-	Security    SecurityConfig    `json:"security"`
-	Events      EventsConfig      `json:"events"`
-	Sandbox     SandboxConfig     `json:"sandbox"`
-	WebTools    WebToolsConfig    `json:"web_tools"`
-	PromptsDir  string            `json:"prompts_dir"`
+	Database    DatabaseConfig         `json:"database"`
+	Vault       VaultConfig            `json:"vault"`
+	Git         GitConfig              `json:"git"`
+	Runtime     RuntimeConfig          `json:"runtime"`
+	Concurrency ConcurrencyConfig      `json:"concurrency"`
+	Security    SecurityConfig         `json:"security"`
+	Events      EventsConfig           `json:"events"`
+	Sandbox     SandboxConfig          `json:"sandbox"`
+	WebTools    WebToolsConfig         `json:"web_tools"`
+	Recovery    map[string]interface{} `json:"recovery"`
+	Defaults    map[string]interface{} `json:"defaults"`
+	PromptsDir  string                 `json:"prompts_dir"`
 }
 
 // DatabaseConfig specifies how to connect to Supabase.

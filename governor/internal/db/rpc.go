@@ -50,6 +50,13 @@ var defaultRPCAllowlist = map[string]bool{
 	"set_council_consensus":       true,
 	"create_tasks":                true,
 	"unlock_dependent_tasks":      true,
+	"find_orphaned_sessions":      true,
+	"recover_orphaned_session":    true,
+	"record_model_failure":        true,
+	"record_model_success":        true,
+	"check_model_availability":    true,
+	"get_event_checkpoint":        true,
+	"update_event_checkpoint":     true,
 }
 
 type RPCAllowlist struct {
