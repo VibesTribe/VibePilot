@@ -155,7 +155,10 @@ func NewAPIRunnerFromConfig(dest runtime.DestinationConfig, secrets SecretProvid
 		model = dest.Models[0]
 	}
 
-	provider := detectProvider(dest.Endpoint)
+	provider := dest.Provider
+	if provider == "" {
+		provider = detectProvider(dest.Endpoint)
+	}
 
 	timeoutSecs := DefaultTimeoutSecs
 	if dest.TimeoutSeconds > 0 {

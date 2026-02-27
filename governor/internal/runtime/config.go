@@ -17,6 +17,7 @@ type SystemConfig struct {
 	Security    SecurityConfig    `json:"security"`
 	Events      EventsConfig      `json:"events"`
 	Sandbox     SandboxConfig     `json:"sandbox"`
+	WebTools    WebToolsConfig    `json:"web_tools"`
 	PromptsDir  string            `json:"prompts_dir"`
 }
 
@@ -92,6 +93,14 @@ type SandboxConfig struct {
 	TempDir            string `json:"temp_dir"`
 }
 
+type WebToolsConfig struct {
+	SearchURL        string `json:"search_url"`
+	UserAgent        string `json:"user_agent"`
+	MaxFetchLength   int    `json:"max_fetch_length"`
+	MaxRelatedTopics int    `json:"max_related_topics"`
+	TimeoutSeconds   int    `json:"timeout_seconds"`
+}
+
 type AgentConfig struct {
 	ID                 string          `json:"id"`
 	Name               string          `json:"name,omitempty"`
@@ -138,6 +147,7 @@ type DestinationConfig struct {
 	Name           string                 `json:"name"`
 	Type           string                 `json:"type"`
 	Status         string                 `json:"status"`
+	Provider       string                 `json:"provider,omitempty"`
 	Command        string                 `json:"command,omitempty"`
 	Endpoint       string                 `json:"endpoint,omitempty"`
 	APIKeyRef      string                 `json:"api_key_ref,omitempty"`
@@ -425,6 +435,19 @@ func (c *Config) GetSandboxConfig() *SandboxConfig {
 		}
 	}
 	return &c.System.Sandbox
+}
+
+func (c *Config) GetWebToolsConfig() *WebToolsConfig {
+	if c.System == nil || c.System.WebTools.SearchURL == "" {
+		return &WebToolsConfig{
+			SearchURL:        "https://api.duckduckgo.com/",
+			UserAgent:        "Mozilla/5.0 (compatible; VibePilot/2.0)",
+			MaxFetchLength:   10000,
+			MaxRelatedTopics: 5,
+			TimeoutSeconds:   30,
+		}
+	}
+	return &c.System.WebTools
 }
 
 func loadJSON[T any](path string) (*T, error) {

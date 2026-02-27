@@ -74,9 +74,11 @@ func RegisterAll(registry *runtime.ToolRegistry, deps *Dependencies) {
 	}
 
 	var allowlist []string
+	var webConfig *runtime.WebToolsConfig
 	if deps.Config != nil {
 		allowlist = deps.Config.GetHTTPAllowlist()
+		webConfig = deps.Config.GetWebToolsConfig()
 	}
-	registry.Register("web_search", NewWebSearchTool(allowlist))
-	registry.Register("web_fetch", NewWebFetchTool(allowlist))
+	registry.Register("web_search", NewWebSearchTool(allowlist, webConfig))
+	registry.Register("web_fetch", NewWebFetchTool(allowlist, webConfig))
 }

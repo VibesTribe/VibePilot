@@ -16,11 +16,17 @@
 //   - This is intentional: prevents any compromised agent from dumping the vault
 //   - SERVICE_KEY is only in root-only systemd override, not accessible to agents
 //
+// HOST PORTABILITY:
+//   - The encryption salt is FIXED (not hostname-based)
+//   - Same VAULT_KEY = same decryption on any host
+//   - Pack up, move to new server, same secrets work
+//
 // DO NOT:
 //   - Change key_env to SUPABASE_KEY (anon) - it won't work with RLS
 //   - Add RLS policy for anon - defeats the security model
 //   - Put keys in .env files - agents can read them
 //   - Hardcode keys anywhere
+//   - Change the salt - it will break all existing encrypted secrets
 package vault
 
 import (
@@ -112,8 +118,7 @@ func (v *Vault) loadVaultKey() []byte {
 }
 
 func getMachineSalt() []byte {
-	hostname, _ := os.Hostname()
-	salt := sha256.Sum256([]byte("vibepilot-vault-" + hostname))
+	salt := sha256.Sum256([]byte("vibepilot-vault-portable-salt-v1"))
 	return salt[:saltSize]
 }
 

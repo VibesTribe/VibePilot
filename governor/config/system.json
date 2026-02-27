@@ -61,5 +61,12 @@
     "default_test_command": "npm test",
     "timeout_seconds": 60,
     "temp_dir": ""
+  },
+  "web_tools": {
+    "search_url": "https://api.duckduckgo.com/",
+    "user_agent": "Mozilla/5.0 (compatible; VibePilot/2.0)",
+    "max_fetch_length": 10000,
+    "max_related_topics": 5,
+    "timeout_seconds": 30
   }
 }

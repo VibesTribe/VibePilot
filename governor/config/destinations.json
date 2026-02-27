@@ -21,6 +21,7 @@
       "name": "Gemini API",
       "type": "api",
       "status": "inactive",
+      "provider": "google",
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
       "api_key_ref": "GEMINI_API_KEY",
       "models_available": ["gemini-2.0-flash", "gemini-1.5-pro"]
@@ -30,6 +31,7 @@
       "name": "DeepSeek API",
       "type": "api",
       "status": "inactive",
+      "provider": "deepseek",
       "endpoint": "https://api.deepseek.com/v1",
       "api_key_ref": "DEEPSEEK_API_KEY",
       "models_available": ["deepseek-chat", "deepseek-reasoner"]
