@@ -84,16 +84,43 @@ This allows `SUPABASE_KEY` (anon) to read from vault, but only `SUPABASE_SERVICE
 
 ---
 
-## Deployment
+## Deployment Options
 
-Keys are injected from GitHub Secrets at deploy time:
+### Option 1: GitHub Actions (Recommended for automation)
 
+1. Set up a self-hosted GitHub Actions runner on the server (one-time)
+2. Add bootstrap keys to GitHub Secrets (SUPABASE_URL, SUPABASE_KEY, VAULT_KEY)
+3. Push to main or manually trigger workflow
+4. Workflow deploys with secrets injected
+
+Files:
+- `.github/workflows/deploy-governor.yml`
+
+### Option 2: Manual Deploy Scripts
+
+**First-time setup (requires human with sudo):**
 ```bash
-# Deploy script (run by human or CI/CD)
-export SUPABASE_URL="${FROM_GITHUB_SECRET}"
-export SUPABASE_KEY="${FROM_GITHUB_SECRET}"
-export VAULT_KEY="${FROM_GITHUB_SECRET}"
-systemctl restart vibepilot-governor
+sudo scripts/setup-bootstrap.sh
+# Prompts for the three bootstrap keys
+# Stores in /etc/vibepilot/bootstrap.conf (root-only)
+```
+
+**Deploy anytime:**
+```bash
+sudo scripts/deploy-governor.sh
+# Reads from /etc/vibepilot/bootstrap.conf
+# Builds, installs, and starts the service
+```
+
+Files:
+- `scripts/setup-bootstrap.sh` - one-time setup
+- `scripts/deploy-governor.sh` - deploy script
+
+### Option 3: AI Deploy
+
+If the AI has the bootstrap keys in context:
+```bash
+sudo SUPABASE_URL="..." SUPABASE_KEY="..." VAULT_KEY="..." scripts/deploy-governor.sh
 ```
 
 ---
