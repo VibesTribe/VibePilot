@@ -7,7 +7,7 @@
       "id": "glm-5",
       "name": "GLM-5",
       "provider": "zhipu",
-      "access_type": "subscription",
+      "access_type": "cli_subscription",
       "context_limit": 128000,
       "capabilities": ["code", "reasoning", "tools"],
       "access_via": ["opencode"],

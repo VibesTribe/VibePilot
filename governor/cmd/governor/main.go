@@ -72,13 +72,25 @@ func main() {
 		&cfg.System.Concurrency,
 	)
 
+	usageTracker := runtime.NewUsageTracker(database)
+
+	_, err = runtime.LoadModelsFromConfig(configDir, database, usageTracker)
+	if err != nil {
+		log.Printf("Warning: Failed to load model profiles: %v", err)
+	}
+
 	pollInterval := time.Duration(cfg.System.Runtime.EventPollIntervalMs) * time.Millisecond
 	watcher := runtime.NewPollingWatcher(&dbQuerierAdapter{db: database, cfg: cfg}, pollInterval)
 
-	router := runtime.NewEventRouter(watcher)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	recoveryCfg := getRecoveryConfig(cfg)
+	runStartupRecovery(ctx, database, recoveryCfg)
+
+	watcher.SetConfig(cfg)
+
+	router := runtime.NewEventRouter(watcher)
 
 	setupEventHandlers(ctx, router, sessionFactory, pool, database, cfg)
 
@@ -499,4 +511,91 @@ func truncateOutput(output string) string {
 		return output[:200] + "..."
 	}
 	return output
+}
+
+type RecoveryConfig struct {
+	OrphanThresholdSeconds int
+	MaxTaskAttempts        int
+	ModelFailureThreshold  int
+}
+
+func getRecoveryConfig(cfg *runtime.Config) RecoveryConfig {
+	recovery := RecoveryConfig{
+		OrphanThresholdSeconds: 300,
+		MaxTaskAttempts:        3,
+		ModelFailureThreshold:  3,
+	}
+
+	if cfg.System != nil && cfg.System.Recovery != nil {
+		if v := cfg.System.Recovery["orphan_threshold_seconds"]; v != nil {
+			switch val := v.(type) {
+			case float64:
+				recovery.OrphanThresholdSeconds = int(val)
+			case int:
+				recovery.OrphanThresholdSeconds = val
+			}
+		}
+		if v := cfg.System.Recovery["max_task_attempts"]; v != nil {
+			switch val := v.(type) {
+			case float64:
+				recovery.MaxTaskAttempts = int(val)
+			case int:
+				recovery.MaxTaskAttempts = val
+			}
+		}
+		if v := cfg.System.Recovery["model_failure_threshold"]; v != nil {
+			switch val := v.(type) {
+			case float64:
+				recovery.ModelFailureThreshold = int(val)
+			case int:
+				recovery.ModelFailureThreshold = val
+			}
+		}
+	}
+
+	return recovery
+}
+
+func runStartupRecovery(ctx context.Context, database *db.DB, cfg RecoveryConfig) {
+	log.Println("Running startup recovery...")
+
+	orphans, err := database.RPC(ctx, "find_orphaned_sessions", map[string]interface{}{
+		"p_orphan_threshold_seconds": cfg.OrphanThresholdSeconds,
+	})
+	if err != nil {
+		log.Printf("[Recovery] Warning: Could not check for orphans: %v", err)
+		return
+	}
+
+	var orphanList []map[string]interface{}
+	if err := json.Unmarshal(orphans, &orphanList); err != nil {
+		log.Printf("[Recovery] Warning: Could not parse orphan list: %v", err)
+		return
+	}
+
+	if len(orphanList) == 0 {
+		log.Println("[Recovery] No orphaned sessions found")
+		return
+	}
+
+	log.Printf("[Recovery] Found %d orphaned session(s)", len(orphanList))
+
+	for _, orphan := range orphanList {
+		sessionID, _ := orphan["id"].(string)
+		taskID, _ := orphan["task_id"].(string)
+		secondsSince, _ := orphan["seconds_since_heartbeat"].(float64)
+
+		log.Printf("[Recovery] Recovering orphan session %s (task %s, %d seconds since heartbeat)",
+			truncateID(sessionID), truncateID(taskID), int(secondsSince))
+
+		_, err := database.RPC(ctx, "recover_orphaned_session", map[string]interface{}{
+			"p_session_id": sessionID,
+			"p_reason":     "startup_recovery",
+		})
+		if err != nil {
+			log.Printf("[Recovery] Failed to recover session %s: %v", truncateID(sessionID), err)
+		}
+	}
+
+	log.Printf("[Recovery] Recovery complete - %d session(s) recovered", len(orphanList))
 }
