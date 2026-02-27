@@ -21,7 +21,25 @@
     "max_concurrent_total": 160,
     "event_poll_interval_ms": 1000,
     "agent_timeout_seconds": 300,
-    "max_tool_turns": 10
+    "max_tool_turns": 10,
+    "event_query_limit": 10
+  },
+  "recovery": {
+    "heartbeat_interval_seconds": 30,
+    "orphan_threshold_seconds": 300,
+    "stuck_dependency_threshold_hours": 2,
+    "human_approval_timeout_days": 3,
+    "max_task_attempts": 3,
+    "model_failure_threshold": 3,
+    "usage_threshold_pct": 80,
+    "auto_bench_on_failures": true,
+    "auto_restore_after_cooldown": true
+  },
+  "defaults": {
+    "throttle_behavior": "slow_down",
+    "buffer_pct": 80,
+    "spacing_min_seconds": 1,
+    "cooldown_minutes": 30
   },
   "concurrency": {
     "limits": {

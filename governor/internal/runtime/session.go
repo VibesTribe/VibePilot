@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+const (
+	DefaultSessionTimeoutSecs = 300
+	DefaultSessionMaxTurns    = 10
+)
+
 type LLMClient interface {
 	Call(ctx context.Context, prompt string, tools []string) (string, error)
 }
@@ -45,8 +50,8 @@ func NewSession(id, agentID string, dest DestinationRunner, prompt string, tools
 		prompt:       prompt,
 		tools:        tools,
 		toolRegistry: registry,
-		timeout:      5 * time.Minute,
-		maxTurns:     10,
+		timeout:      time.Duration(DefaultSessionTimeoutSecs) * time.Second,
+		maxTurns:     DefaultSessionMaxTurns,
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -195,5 +200,11 @@ func (f *SessionFactory) Create(agentID string, opts ...SessionOption) (*Session
 
 	sessionID := fmt.Sprintf("%s-%d", agentID, time.Now().UnixNano())
 
-	return NewSession(sessionID, agentID, dest, prompt, agent.Tools, f.registry, opts...), nil
+	cfgOpts := []SessionOption{
+		WithTimeout(time.Duration(f.config.GetRuntimeConfig().AgentTimeoutSeconds) * time.Second),
+		WithMaxTurns(f.config.GetRuntimeConfig().MaxToolTurns),
+	}
+	cfgOpts = append(cfgOpts, opts...)
+
+	return NewSession(sessionID, agentID, dest, prompt, agent.Tools, f.registry, cfgOpts...), nil
 }
