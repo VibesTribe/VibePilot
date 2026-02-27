@@ -6,6 +6,100 @@
 
 ---
 
+# 2026-02-27 (Session 34)
+
+## Summary
+
+Event persistence, usage tracking, startup recovery, and model profiles. Major infrastructure for scale.
+
+### Major Work
+
+1. **Bug Fix: "signal: terminated"**
+   - Root cause: `cleanup_zombies.sh` killed governor children
+   - Fix: Check cgroup membership before killing
+   - Verified: Planner runs successfully now
+
+2. **Event Persistence (Schema 032)**
+   - `event_checkpoints` - survive restarts
+   - `runner_sessions` - orphan detection
+   - `event_queue` - replay capability
+   - `system_config` - fallback defaults
+   - 8 new RPCs for recovery operations
+
+3. **Usage Tracking System**
+   - Multi-window tracking: minute/hour/day/week
+   - 80% buffer enforcement (configurable)
+   - Auto-calculated request spacing from rate limits
+   - Cooldown countdown per model
+   - `usage_tracker.go` - 450 lines
+
+4. **Model Profiles**
+   - Full rate limit profiles in `models.json`
+   - API pricing for theoretical cost
+   - Per-model recovery config
+   - Learned data schema (not yet wired)
+   - `model_loader.go` - syncs to DB
+
+5. **Config Improvements**
+   - session.go: uses config for timeout/maxTurns
+   - events.go: configurable query limits
+   - runners.go: CLI args configurable
+   - system.json: recovery + defaults sections
+
+6. **GCE Cleanup**
+   - Removed: OpenClaw, Docker, Playwright, Python caches
+   - Saved: ~3GB disk, ~330MB RAM
+   - Verified: No orphaned terminals
+
+### Files Modified
+
+```
+vibepilot/
+├── scripts/
+│   └── cleanup_zombies.sh              - Check cgroup before killing
+├── governor/
+│   ├── cmd/governor/
+│   │   └── main.go                     - Startup recovery, model loading
+│   ├── config/
+│   │   ├── models.json                 - Full model profiles (437 lines)
+│   │   ├── system.json                 - Recovery + defaults sections
+│   │   └── destinations.json           - cli_args field
+│   └── internal/
+│       ├── db/
+│       │   └── rpc.go                  - 7 new RPCs in allowlist
+│       ├── runtime/
+│       │   ├── config.go               - Recovery, Defaults, GetRuntimeConfig
+│       │   ├── events.go               - Configurable query limits
+│       │   ├── session.go              - Use config for timeout/maxTurns
+│       │   ├── usage_tracker.go        - NEW - Multi-window tracking
+│       │   └── model_loader.go         - NEW - Sync models.json to DB
+│       └── destinations/
+│           └── runners.go              - Configurable CLI args
+├── docs/
+│   ├── supabase-schema/
+│   │   └── 032_event_persistence.sql   - NEW - Event tables + RPCs
+│   ├── SESSION_34_HANDOFF.md           - NEW - Session details
+│   └── CURRENT_STATE.md                - Updated
+└── legacy/python/venv/                 - DELETED - Moved earlier
+```
+
+### Commits
+
+1. `bc041826` - feat: Config improvements and cleanup fix
+2. `1f5a4be6` - feat: Event persistence, usage tracking, and model profiles
+3. `783d4518` - feat: Startup recovery and orphan detection
+
+### Remaining Gaps
+
+| Gap | Priority | Description |
+|-----|----------|-------------|
+| Tool protocol | CRITICAL | OpenCode ignores TOOL: format |
+| Learning loop | HIGH | RPCs exist, nothing calls them |
+| Queue system | MEDIUM | For 50+ concurrent agents |
+| Multi-host | LOW | Single point of failure |
+
+---
+
 # 2026-02-25 (Session 30)
 
 ## Summary

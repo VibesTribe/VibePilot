@@ -2,7 +2,7 @@
 
 **Required reading: FIVE files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
-2. **`docs/SESSION_33_HANDOFF.md`** - Latest session details and blockers
+2. **`docs/SESSION_34_HANDOFF.md`** - Latest session details and next priorities
 3. **`docs/SECURITY_BOOTSTRAP.md`** - How credentials work (READ THIS FIRST)
 4. **`docs/GOVERNOR_HANDOFF.md`** - Full implementation details
 5. **`docs/core_philosophy.md`** - Strategic mindset and principles
@@ -13,8 +13,8 @@
 
 **Last Updated:** 2026-02-27
 **Updated By:** GLM-5 - Session 34
-**Branch:** `main` (go-governor merged)
-**Status:** FIXED - "signal: terminated" bug resolved (cleanup script fixed)
+**Branch:** `main`
+**Status:** ACTIVE - Event persistence, usage tracking, startup recovery implemented
 
 ---
 
@@ -27,7 +27,9 @@ vibepilot-governor.service (Go binary)
 ├── Polls Supabase every 1s
 ├── Max 8 concurrent per module, 160 total
 ├── OpenCode limit: 5 concurrent
-└── Reads secrets from vault at runtime
+├── Reads secrets from vault at runtime
+├── Startup recovery: finds and recovers orphaned sessions
+└── Usage tracking: multi-window rate limit enforcement
 ```
 
 **Status:** `systemctl status vibepilot-governor`
@@ -37,11 +39,11 @@ vibepilot-governor.service (Go binary)
 ```
 vibepilot/
 ├── governor/              # ACTIVE - Go binary (everything)
-│   ├── cmd/governor/      # Main entry point
+│   ├── cmd/governor/      # Main entry point + startup recovery
 │   ├── internal/
-│   │   ├── db/            # Supabase client
+│   │   ├── db/            # Supabase client + RPC allowlist
 │   │   ├── vault/         # Secret decryption
-│   │   ├── runtime/       # Event detection, agent sessions
+│   │   ├── runtime/       # Events, sessions, usage_tracker, model_loader
 │   │   ├── destinations/  # CLI runners (opencode)
 │   │   └── tools/         # Agent tools
 │   └── config/            # JSON configs
@@ -91,96 +93,109 @@ vibepilot/
 
 ---
 
-## Migrating to New Host
-
-```bash
-# 1. Clone repo
-git clone https://github.com/VibesTribe/VibePilot.git ~/vibepilot
-
-# 2. Build governor
-cd ~/vibepilot/governor && go build -o governor ./cmd/governor
-
-# 3. Set up bootstrap keys (from GitHub Secrets)
-sudo scripts/setup-bootstrap.sh
-
-# 4. Deploy
-sudo scripts/deploy-governor.sh
-```
-
-See `docs/USEFUL_COMMANDS.md` for full guide.
-
----
-
-## Session 33 Changes
-
-### Security Fix
-- Governor uses `SUPABASE_SERVICE_KEY` (bypasses RLS for vault)
-- Keys removed from `.env`, stored in systemd override (root-only)
-- Old Python orchestrator service disabled
-
-### Branch Merge
-- Merged `go-governor` into `main` (single clean branch)
-- Deleted OLD architecture (YAML config with hardcoded keys)
-- Codebase: 5,695 lines Go, 24 files
-
-### Python Removed
-- All `.py` files → `legacy/python/`
-- `venv/` → `legacy/python/venv/`
-- `runners/`, `core/` → `legacy/python/`
-- `requirements.txt` deleted
-
-### Audit Fixes
-- Vault: Fixed machine salt (portable across hosts)
-- Web tools: Made configurable via system.json
-- Provider detection: Config-driven, not hardcoded
-
-### New Files
-- `docs/SECURITY_BOOTSTRAP.md` - Credential architecture
-- `docs/SESSION_33_HANDOFF.md` - Session details and blockers
-- `scripts/setup-bootstrap.sh` - One-time key setup
-- `scripts/deploy-governor.sh` - Deploy script
-- `.github/workflows/deploy-governor.yml` - CI/CD option
-
----
-
 ## Session 34 Changes (Current)
 
-### Bug Fix: "signal: terminated" Root Cause Found
+### 1. Bug Fix: "signal: terminated" 
+- **Root cause:** `cleanup_zombies.sh` killed governor children
+- **Fix:** Script now checks cgroup membership before killing
+- **File:** `scripts/cleanup_zombies.sh`
 
-**Problem:** Governor-spawned opencode processes were killed by `cleanup_zombies.sh` hourly cron job.
+### 2. Event Persistence & Recovery
+- **New tables:** `event_checkpoints`, `runner_sessions`, `event_queue`, `system_config`
+- **Schema:** `docs/supabase-schema/032_event_persistence.sql`
+- **Startup recovery:** Governor finds and recovers orphaned sessions
+- **RPCs added:** 8 new functions for recovery operations
 
-**Root Cause:** The cleanup script couldn't distinguish:
-- Governor children (should be protected) from
-- True zombie orphans (should be killed)
+### 3. Usage Tracking System
+- **Multi-window tracking:** minute/hour/day/week
+- **Buffer percentage:** 80% default (configurable per model)
+- **Auto-calculated spacing:** Based on rate limits
+- **Cooldown countdown:** Per-model configurable
+- **Files:** `governor/internal/runtime/usage_tracker.go`
 
-**Solution:** Updated `scripts/cleanup_zombies.sh` to check cgroup membership:
-- Processes in `vibepilot-governor.service` cgroup → PROTECTED
-- Orphans (PPID=1) NOT in governor cgroup → KILLED
-- User sessions with terminal → PROTECTED
+### 4. Model Profiles
+- **Full rate limit profiles:** Per-model in `models.json`
+- **API pricing:** For theoretical cost calculation
+- **Per-model recovery config:** Cooldown, timeout, thresholds
+- **Learned data:** best_for_task_types, failure_rates (schema ready)
+- **Files:** `governor/config/models.json`, `model_loader.go`
 
-**Verification:** Tested with systemd test services to confirm:
-- Children ARE in governor's cgroup
-- `KillMode=control-group` kills children when service stops
-- Orphaned children also get cleaned up by systemd
+### 5. Config Improvements
+- **session.go:** Reads timeout/maxTurns from config
+- **events.go:** Configurable query limits
+- **runners.go:** CLI args configurable via destinations.json
+- **system.json:** Added `recovery` and `defaults` sections
 
-### No Governor Code Changes Needed
-
-The governor's process management is already robust:
-- `KillMode=control-group` in systemd handles cleanup
-- Children stay in cgroup even with different PGID
-- Systemd kills entire cgroup on service stop
+### 6. GCE Cleanup
+- **Removed:** OpenClaw, Docker, Playwright, Python caches
+- **Saved:** ~3GB disk, ~330MB RAM
+- **Verified:** No orphaned terminals
 
 ---
 
-## Remaining Items
+## What's Configurable (No Hardcoded Values)
 
-**What to work on next:**
-1. Tool architecture: How should OpenCode do db operations?
-2. Event system: Add persistence/retry for 50 parallel agents
-3. Test the fix by triggering a planner event
+| Setting | Config File | Field |
+|---------|-------------|-------|
+| Orphan threshold | system.json | `recovery.orphan_threshold_seconds` |
+| Max task attempts | system.json | `recovery.max_task_attempts` |
+| Model failure threshold | system.json | `recovery.model_failure_threshold` |
+| Buffer percentage | models.json | Each model's `buffer_pct` |
+| Request spacing | models.json | Each model's `spacing_min_seconds` |
+| Cooldown duration | models.json | Each model's `recovery.cooldown_minutes` |
+| Rate limits | models.json | Each model's `rate_limits.*` |
+| Concurrency limits | system.json | `concurrency.limits.*` |
+| Event query limit | system.json | `runtime.event_query_limit` |
 
-**What NOT to do:**
+---
+
+## Remaining Gaps (Priority Order)
+
+### CRITICAL - Blocks Real Work
+
+| Gap | Description | Effort |
+|-----|-------------|--------|
+| **Tool protocol** | OpenCode ignores `TOOL:` format, can't do db operations reliably | High |
+
+### IMPORTANT - Learning Loop Not Connected
+
+| Gap | Description | Effort |
+|-----|-------------|--------|
+| **record_model_success/failure** | RPCs exist, nothing calls them after task completion | Medium |
+| **Orchestrator feedback** | No automatic feedback from completed tasks to routing decisions | Medium |
+
+### FUTURE - Scale Optimization
+
+| Gap | Description | Effort |
+|-----|-------------|--------|
+| Queue-based execution | Priority/weighting for 50+ concurrent | Medium |
+| Multi-host distribution | Single point of failure currently | High |
+| Observability | Prometheus/Grafana for metrics | Medium |
+
+---
+
+## For Next Session
+
+**Priority 1: Tool Protocol**
+- How should OpenCode do database operations?
+- Options: TOOL: format adapter, OpenCode tool server, different protocol
+
+**Priority 2: Wire Learning Loop**
+- After task completion → call `record_model_success` or `record_model_failure`
+- Supervisor or governor code needs to call these RPCs
+- Orchestrator reads `models.learned` for routing decisions
+
+**Priority 3: Test End-to-End**
+- Run a full task through the system
+- Verify recovery works on crash
+- Verify learning accumulates
+
+---
+
+## What NOT to Do
+
 - Don't look for keys in `.env` (it's empty)
 - Don't use Python code (it's in legacy/)
 - Don't hardcode keys anywhere
 - Don't modify cleanup script without understanding cgroup logic
+- Don't hardcode any defaults - everything in config files
