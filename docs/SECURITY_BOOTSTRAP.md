@@ -15,10 +15,16 @@
 | Key | Source | Purpose |
 |-----|--------|---------|
 | `SUPABASE_URL` | GitHub Secrets | Database endpoint |
-| `SUPABASE_KEY` | GitHub Secrets | Anon key - reads from vault via RLS policy |
+| `SUPABASE_SERVICE_KEY` | GitHub Secrets | Service role - bypasses RLS, reads/writes vault |
 | `VAULT_KEY` | GitHub Secrets | Decrypts secrets from vault |
 
 **These are the ONLY keys that exist before runtime.** Everything else is encrypted in the vault.
+
+**IMPORTANT:** We use `SUPABASE_SERVICE_KEY` (not anon key) because:
+- The vault table has RLS enabled
+- Only service_role can read/write the vault
+- Anon key is BLOCKED by RLS policy
+- This is intentional security - prevents compromised agents from dumping vault
 
 ---
 
@@ -29,17 +35,18 @@ GitHub Secrets (deploy time)
         │
         ▼
 ┌─────────────────────────────────────┐
-│  Process Environment (memory only)  │
+│  systemd override.conf (root-only)  │
 │  - SUPABASE_URL                     │
-│  - SUPABASE_KEY                     │
+│  - SUPABASE_SERVICE_KEY             │
 │  - VAULT_KEY                        │
 └─────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────┐
-│  Governor starts                    │
-│  - Connects to Supabase with KEY    │
-│  - Creates Vault with VAULT_KEY     │
+│  Governor process (memory only)     │
+│  - Reads from os.Getenv()           │
+│  - Uses SERVICE_KEY for DB access   │
+│  - Uses VAULT_KEY for decryption    │
 └─────────────────────────────────────┘
         │
         ▼
@@ -48,6 +55,7 @@ GitHub Secrets (deploy time)
 │  - GITHUB_TOKEN                     │
 │  - DEEPSEEK_API_KEY                 │
 │  - GEMINI_API_KEY                   │
+│  - RAINDROP_ACCESS_TOKEN            │
 │  - etc.                             │
 └─────────────────────────────────────┘
 ```
@@ -61,6 +69,7 @@ GitHub Secrets (deploy time)
 - ❌ NO hardcoded keys in code
 - ❌ NO keys in bash commands
 - ❌ NO keys in git commits
+- ❌ NO anon key for vault access (blocked by RLS)
 
 ---
 
@@ -69,67 +78,29 @@ GitHub Secrets (deploy time)
 The `secrets_vault` table uses Row Level Security:
 
 ```sql
--- Service role gets full access
+-- Service role gets full access (governor uses this)
 CREATE POLICY "vault_service_role_full" ON secrets_vault
   FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
--- Anon/authenticated can SELECT (read only)
-CREATE POLICY "vault_authenticated_read" ON secrets_vault
-  FOR SELECT TO authenticated
-  USING (true);
+-- Anon/authenticated are BLOCKED
+CREATE POLICY "vault_no_delete" ON secrets_vault
+  FOR DELETE TO authenticated USING (false);
+CREATE POLICY "vault_no_insert" ON secrets_vault
+  FOR INSERT TO authenticated WITH CHECK (false);
+CREATE POLICY "vault_no_update" ON secrets_vault
+  FOR UPDATE TO authenticated USING (false) WITH CHECK (false);
 ```
 
-This allows `SUPABASE_KEY` (anon) to read from vault, but only `SUPABASE_SERVICE_KEY` can write.
+**Why this matters:** Even if an agent somehow gets the anon key, it CANNOT read the vault. Only the service key (stored root-only in systemd override) can access it.
 
 ---
 
-## Deployment Options
-
-### Option 1: GitHub Actions (Recommended for automation)
-
-1. Set up a self-hosted GitHub Actions runner on the server (one-time)
-2. Add bootstrap keys to GitHub Secrets (SUPABASE_URL, SUPABASE_KEY, VAULT_KEY)
-3. Push to main or manually trigger workflow
-4. Workflow deploys with secrets injected
-
-Files:
-- `.github/workflows/deploy-governor.yml`
-
-### Option 2: Manual Deploy Scripts
-
-**First-time setup (requires human with sudo):**
-```bash
-sudo scripts/setup-bootstrap.sh
-# Prompts for the three bootstrap keys
-# Stores in /etc/vibepilot/bootstrap.conf (root-only)
-```
-
-**Deploy anytime:**
-```bash
-sudo scripts/deploy-governor.sh
-# Reads from /etc/vibepilot/bootstrap.conf
-# Builds, installs, and starts the service
-```
-
-Files:
-- `scripts/setup-bootstrap.sh` - one-time setup
-- `scripts/deploy-governor.sh` - deploy script
-
-### Option 3: AI Deploy
-
-If the AI has the bootstrap keys in context:
-```bash
-sudo SUPABASE_URL="..." SUPABASE_KEY="..." VAULT_KEY="..." scripts/deploy-governor.sh
-```
-
----
-
-## Where Keys Live Now
+## Where Keys Live
 
 | Location | What's There | Who Can Read |
 |----------|--------------|--------------|
-| `/etc/systemd/system/vibepilot-governor.service.d/override.conf` | All 3 bootstrap keys | root only |
+| `/etc/systemd/.../override.conf` | All 3 bootstrap keys | root only |
 | `.env` | NOTHING (empty) | Doesn't matter |
 | GitHub Secrets | Backup copy | GitHub only |
 
@@ -137,29 +108,22 @@ sudo SUPABASE_URL="..." SUPABASE_KEY="..." VAULT_KEY="..." scripts/deploy-govern
 
 ---
 
-## Current Deployment (Already Done)
+## Deployment
 
-The governor is already deployed and running:
+### Manual Deploy (one-time setup)
 
 ```bash
-# Check status
-systemctl status vibepilot-governor
+# 1. Get bootstrap keys from GitHub Secrets
+# 2. Run setup script (prompts for keys)
+sudo scripts/setup-bootstrap.sh
 
-# View logs
-journalctl -u vibepilot-governor -f
-
-# Restart
-sudo systemctl restart vibepilot-governor
+# 3. Deploy
+sudo scripts/deploy-governor.sh
 ```
 
----
+### GitHub Actions (automated)
 
-## Legacy Python Code
-
-Python scripts (`vault_manager.py`, `orchestrator.py`, etc.) are **no longer used**.
-- Go governor handles everything
-- Python code kept for reference only
-- Old `vibepilot-orchestrator.service` has been disabled
+See `.github/workflows/deploy-governor.yml`
 
 ---
 
@@ -167,21 +131,25 @@ Python scripts (`vault_manager.py`, `orchestrator.py`, etc.) are **no longer use
 
 Before touching any credentials:
 
-1. Read this file
-2. Keys are in `/etc/systemd/system/vibepilot-governor.service.d/override.conf` (root only - you CAN'T read it)
-3. Never look for `.env` files - they're empty
-4. Never hardcode keys anywhere
+1. **Read this file first**
+2. Keys are in systemd override (root-only - you CAN'T read it)
+3. Never look for `.env` files - they're empty by design
+4. Never change `key_env` from `SUPABASE_SERVICE_KEY` to `SUPABASE_KEY`
 5. If you need a secret, it's in the vault (use Go vault implementation)
+6. **DO NOT add RLS policy for anon** - it defeats the security model
 
 ---
 
 ## Files That Reference This
 
-- `governor/config/system.json` - defines which env vars to use
-- `scripts/governor.service` - systemd unit (NO EnvironmentFile)
-- `/etc/systemd/system/vibepilot-governor.service.d/override.conf` - where keys actually live
-- `governor/internal/vault/vault.go` - vault implementation
-- `governor/internal/db/supabase.go` - database connection
+| File | What It Does |
+|------|--------------|
+| `governor/config/system.json` | Defines `key_env: SUPABASE_SERVICE_KEY` |
+| `governor/internal/vault/vault.go` | Full architecture docs in comments |
+| `governor/internal/runtime/config.go` | DatabaseConfig with KeyEnv |
+| `scripts/governor.service` | Systemd unit (NO EnvironmentFile) |
+| `scripts/setup-bootstrap.sh` | Prompts for 3 bootstrap keys |
+| `scripts/deploy-governor.sh` | Injects keys to systemd override |
 
 ---
 
@@ -189,6 +157,6 @@ Before touching any credentials:
 
 | Date | Change |
 |------|--------|
+| 2026-02-27 | Fixed: SERVICE_KEY not anon key (correct architecture) |
 | 2026-02-27 | Keys removed from .env, stored only in systemd override |
 | 2026-02-27 | Old Python orchestrator disabled |
-| 2026-02-27 | Created after session wasted by hardcoded keys confusion |
