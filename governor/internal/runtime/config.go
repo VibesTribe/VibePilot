@@ -52,6 +52,7 @@ type RuntimeConfig struct {
 	EventPollIntervalMs    int `json:"event_poll_interval_ms"`
 	AgentTimeoutSeconds    int `json:"agent_timeout_seconds"`
 	MaxToolTurns           int `json:"max_tool_turns"`
+	EventQueryLimit        int `json:"event_query_limit"`
 }
 
 type ConcurrencyConfig struct {
@@ -149,6 +150,7 @@ type DestinationConfig struct {
 	Status         string                 `json:"status"`
 	Provider       string                 `json:"provider,omitempty"`
 	Command        string                 `json:"command,omitempty"`
+	CLIArgs        []string               `json:"cli_args,omitempty"`
 	Endpoint       string                 `json:"endpoint,omitempty"`
 	APIKeyRef      string                 `json:"api_key_ref,omitempty"`
 	Models         []string               `json:"models_available,omitempty"`
@@ -448,6 +450,20 @@ func (c *Config) GetWebToolsConfig() *WebToolsConfig {
 		}
 	}
 	return &c.System.WebTools
+}
+
+func (c *Config) GetRuntimeConfig() *RuntimeConfig {
+	if c.System == nil {
+		return &RuntimeConfig{
+			MaxConcurrentPerModule: 8,
+			MaxConcurrentTotal:     160,
+			EventPollIntervalMs:    1000,
+			AgentTimeoutSeconds:    300,
+			MaxToolTurns:           10,
+			EventQueryLimit:        10,
+		}
+	}
+	return &c.System.Runtime
 }
 
 func loadJSON[T any](path string) (*T, error) {

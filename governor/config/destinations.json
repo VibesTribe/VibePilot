@@ -6,6 +6,7 @@
       "type": "cli",
       "status": "active",
       "command": "opencode",
+      "cli_args": ["run", "--format", "json"],
       "timeout_seconds": 300
     },
     {
@@ -14,6 +15,7 @@
       "type": "cli",
       "status": "inactive",
       "command": "kimi",
+      "cli_args": ["run", "--format", "json"],
       "timeout_seconds": 300
     },
     {

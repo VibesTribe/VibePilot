@@ -130,6 +130,18 @@ func (w *PollingWatcher) getEventsConfig() *EventsConfig {
 	}
 }
 
+func (w *PollingWatcher) getQueryLimit() int {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.cfg != nil {
+		limit := w.cfg.GetRuntimeConfig().EventQueryLimit
+		if limit > 0 {
+			return limit
+		}
+	}
+	return 10
+}
+
 func (w *PollingWatcher) detectTaskEvents(ctx context.Context, lastSeen map[string]time.Time) {
 	eventsCfg := w.getEventsConfig()
 
@@ -197,7 +209,7 @@ func (w *PollingWatcher) detectPlanReview(ctx context.Context, lastSeen map[stri
 
 	plans, err := w.db.Query(ctx, "plans", map[string]any{
 		"or":    orFilter,
-		"limit": 10,
+		"limit": w.getQueryLimit(),
 	})
 	if err != nil {
 		return
@@ -331,7 +343,7 @@ func (w *PollingWatcher) detectPRDReady(ctx context.Context, lastSeen map[string
 
 	plans, err := w.db.Query(ctx, "plans", map[string]any{
 		"or":    orFilter,
-		"limit": 10,
+		"limit": w.getQueryLimit(),
 	})
 	if err != nil {
 		return
@@ -373,7 +385,7 @@ func (w *PollingWatcher) detectTestResults(ctx context.Context, lastSeen map[str
 
 	results, err := w.db.Query(ctx, "test_results", map[string]any{
 		"status": eventsCfg.TestResultsStatus,
-		"limit":  10,
+		"limit":  w.getQueryLimit(),
 	})
 	if err != nil {
 		return

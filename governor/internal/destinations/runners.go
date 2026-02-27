@@ -20,21 +20,32 @@ const (
 	DefaultTimeoutSecs = 300
 )
 
+var DefaultCLIArgs = []string{"run", "--format", "json"}
+
 type SecretProvider interface {
 	GetSecret(ctx context.Context, keyName string) (string, error)
 }
 
 type CLIRunner struct {
 	command string
+	cliArgs []string
 	timeout time.Duration
 }
 
 func NewCLIRunner(command string, timeoutSecs int) *CLIRunner {
+	return NewCLIRunnerWithArgs(command, nil, timeoutSecs)
+}
+
+func NewCLIRunnerWithArgs(command string, cliArgs []string, timeoutSecs int) *CLIRunner {
 	if timeoutSecs <= 0 {
 		timeoutSecs = DefaultTimeoutSecs
 	}
+	if len(cliArgs) == 0 {
+		cliArgs = DefaultCLIArgs
+	}
 	return &CLIRunner{
 		command: command,
+		cliArgs: cliArgs,
 		timeout: time.Duration(timeoutSecs) * time.Second,
 	}
 }
@@ -50,7 +61,8 @@ func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 		defer cancel()
 	}
 
-	cmd := exec.CommandContext(ctx, r.command, "run", "--format", "json", prompt)
+	args := append(r.cliArgs, prompt)
+	cmd := exec.CommandContext(ctx, r.command, args...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
