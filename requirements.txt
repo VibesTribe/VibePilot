@@ -1,9 +1,0 @@
-supabase
-python-dotenv
-cryptography
-litellm[proxy]
-zhipuai
-openai
-psycopg2-binary
-browser-use
-google-genai
