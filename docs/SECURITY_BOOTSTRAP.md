@@ -125,14 +125,53 @@ sudo SUPABASE_URL="..." SUPABASE_KEY="..." VAULT_KEY="..." scripts/deploy-govern
 
 ---
 
+## Where Keys Live Now
+
+| Location | What's There | Who Can Read |
+|----------|--------------|--------------|
+| `/etc/systemd/system/vibepilot-governor.service.d/override.conf` | All 3 bootstrap keys | root only |
+| `.env` | NOTHING (empty) | Doesn't matter |
+| GitHub Secrets | Backup copy | GitHub only |
+
+**The systemd override file is the ONLY place keys exist on the server.**
+
+---
+
+## Current Deployment (Already Done)
+
+The governor is already deployed and running:
+
+```bash
+# Check status
+systemctl status vibepilot-governor
+
+# View logs
+journalctl -u vibepilot-governor -f
+
+# Restart
+sudo systemctl restart vibepilot-governor
+```
+
+---
+
+## Legacy Python Code
+
+Python scripts (`vault_manager.py`, `orchestrator.py`, etc.) are **no longer used**.
+- Go governor handles everything
+- Python code kept for reference only
+- Old `vibepilot-orchestrator.service` has been disabled
+
+---
+
 ## For New Agents/Sessions
 
 Before touching any credentials:
 
 1. Read this file
-2. Understand: keys come from process environment → vault
-3. Never read from `.env` files
+2. Keys are in `/etc/systemd/system/vibepilot-governor.service.d/override.conf` (root only - you CAN'T read it)
+3. Never look for `.env` files - they're empty
 4. Never hardcode keys anywhere
+5. If you need a secret, it's in the vault (use Go vault implementation)
 
 ---
 
@@ -140,9 +179,9 @@ Before touching any credentials:
 
 - `governor/config/system.json` - defines which env vars to use
 - `scripts/governor.service` - systemd unit (NO EnvironmentFile)
+- `/etc/systemd/system/vibepilot-governor.service.d/override.conf` - where keys actually live
 - `governor/internal/vault/vault.go` - vault implementation
 - `governor/internal/db/supabase.go` - database connection
-- `vault_manager.py` - Python vault implementation
 
 ---
 
@@ -150,4 +189,6 @@ Before touching any credentials:
 
 | Date | Change |
 |------|--------|
+| 2026-02-27 | Keys removed from .env, stored only in systemd override |
+| 2026-02-27 | Old Python orchestrator disabled |
 | 2026-02-27 | Created after session wasted by hardcoded keys confusion |
