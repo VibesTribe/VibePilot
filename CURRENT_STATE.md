@@ -1,19 +1,20 @@
 # VibePilot Current State
 
-**Required reading: FOUR files**
+**Required reading: FIVE files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
-2. **`docs/SECURITY_BOOTSTRAP.md`** - How credentials work (READ THIS FIRST)
-3. **`docs/GOVERNOR_HANDOFF.md`** - Full implementation details
-4. **`docs/core_philosophy.md`** - Strategic mindset and principles
+2. **`docs/SESSION_33_HANDOFF.md`** - Latest session details and blockers
+3. **`docs/SECURITY_BOOTSTRAP.md`** - How credentials work (READ THIS FIRST)
+4. **`docs/GOVERNOR_HANDOFF.md`** - Full implementation details
+5. **`docs/core_philosophy.md`** - Strategic mindset and principles
 
-**Read all four → Know everything → Do anything**
+**Read all five → Know everything → Do anything**
 
 ---
 
 **Last Updated:** 2026-02-27
 **Updated By:** GLM-5 - Session 33
-**Branch:** `go-governor` (all changes pushed)
-**Status:** CLEAN - Python removed, security fixed, Go only
+**Branch:** `main` (go-governor merged)
+**Status:** BLOCKED - Debugging opencode "signal: terminated"
 
 ---
 
@@ -69,7 +70,7 @@ vibepilot/
 | Key | Where It Lives | Who Can Read |
 |-----|----------------|--------------|
 | `SUPABASE_URL` | `/etc/systemd/.../override.conf` | root only |
-| `SUPABASE_KEY` | `/etc/systemd/.../override.conf` | root only |
+| `SUPABASE_SERVICE_KEY` | `/etc/systemd/.../override.conf` | root only |
 | `VAULT_KEY` | `/etc/systemd/.../override.conf` | root only |
 
 **All other secrets** → Encrypted in Supabase `secrets_vault` table
@@ -113,9 +114,14 @@ See `docs/USEFUL_COMMANDS.md` for full guide.
 ## Session 33 Changes
 
 ### Security Fix
-- Governor now uses `SUPABASE_KEY` (not SERVICE_KEY)
+- Governor uses `SUPABASE_SERVICE_KEY` (bypasses RLS for vault)
 - Keys removed from `.env`, stored in systemd override (root-only)
 - Old Python orchestrator service disabled
+
+### Branch Merge
+- Merged `go-governor` into `main` (single clean branch)
+- Deleted OLD architecture (YAML config with hardcoded keys)
+- Codebase: 5,695 lines Go, 24 files
 
 ### Python Removed
 - All `.py` files → `legacy/python/`
@@ -123,25 +129,43 @@ See `docs/USEFUL_COMMANDS.md` for full guide.
 - `runners/`, `core/` → `legacy/python/`
 - `requirements.txt` deleted
 
+### Audit Fixes
+- Vault: Fixed machine salt (portable across hosts)
+- Web tools: Made configurable via system.json
+- Provider detection: Config-driven, not hardcoded
+
 ### New Files
 - `docs/SECURITY_BOOTSTRAP.md` - Credential architecture
+- `docs/SESSION_33_HANDOFF.md` - Session details and blockers
 - `scripts/setup-bootstrap.sh` - One-time key setup
 - `scripts/deploy-governor.sh` - Deploy script
 - `.github/workflows/deploy-governor.yml` - CI/CD option
 
 ---
 
+## Current Blocker
+
+**OpenCode "signal: terminated" when called from governor**
+
+- Planner agent fails immediately
+- Supervisor worked earlier
+- Direct opencode CLI calls work fine
+- Possible causes: concurrency, systemd environment, resources
+- See `docs/SESSION_33_HANDOFF.md` for full analysis
+
+---
+
 ## FOR NEXT SESSION
 
 **Read first:**
-1. `docs/SECURITY_BOOTSTRAP.md` - How credentials work
-2. `docs/GOVERNOR_HANDOFF.md` - Implementation details
-3. `docs/core_philosophy.md` - Strategic mindset
+1. `docs/SESSION_33_HANDOFF.md` - Current blocker and analysis
+2. `docs/SECURITY_BOOTSTRAP.md` - How credentials work
+3. `docs/GOVERNOR_HANDOFF.md` - Implementation details
 
-**What to do:**
-1. Test the full PRD → Plan → Review flow
-2. Verify supervisor reads plan and makes decision
-3. Implement task creation from approved plan
+**What to debug:**
+1. Why opencode is terminated (concurrency? environment?)
+2. Tool architecture: How should OpenCode do db operations?
+3. Event system: Add persistence/retry for 50 parallel agents
 
 **What NOT to do:**
 - Don't look for keys in `.env` (it's empty)
