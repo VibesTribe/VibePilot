@@ -8,20 +8,26 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-)
 
-const (
-	WebSearchURL   = "https://api.duckduckgo.com/"
-	WebFetchMaxLen = 10000
-	UserAgent      = "Mozilla/5.0 (compatible; VibePilot/2.0)"
+	"github.com/vibepilot/governor/internal/runtime"
 )
 
 type WebSearchTool struct {
 	allowlist []string
+	config    *runtime.WebToolsConfig
 }
 
-func NewWebSearchTool(allowlist []string) *WebSearchTool {
-	return &WebSearchTool{allowlist: allowlist}
+func NewWebSearchTool(allowlist []string, config *runtime.WebToolsConfig) *WebSearchTool {
+	if config == nil {
+		config = &runtime.WebToolsConfig{
+			SearchURL:        "https://api.duckduckgo.com/",
+			UserAgent:        "Mozilla/5.0 (compatible; VibePilot/2.0)",
+			MaxFetchLength:   10000,
+			MaxRelatedTopics: 5,
+			TimeoutSeconds:   30,
+		}
+	}
+	return &WebSearchTool{allowlist: allowlist, config: config}
 }
 
 func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (json.RawMessage, error) {
@@ -31,7 +37,7 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (json.
 	}
 
 	escapedQuery := url.QueryEscape(query)
-	searchURL := fmt.Sprintf("%s?q=%s&format=json&no_html=1", WebSearchURL, escapedQuery)
+	searchURL := fmt.Sprintf("%s?q=%s&format=json&no_html=1", t.config.SearchURL, escapedQuery)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
 	if err != nil {
@@ -42,7 +48,7 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (json.
 		})
 	}
 
-	req.Header.Set("User-Agent", UserAgent)
+	req.Header.Set("User-Agent", t.config.UserAgent)
 
 	resp, err := sharedHTTPClient.Do(req)
 	if err != nil {
@@ -79,6 +85,10 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (json.
 
 	relatedTopics, _ := result["RelatedTopics"].([]any)
 	var topics []map[string]string
+	maxTopics := t.config.MaxRelatedTopics
+	if maxTopics <= 0 {
+		maxTopics = 5
+	}
 	for _, tp := range relatedTopics {
 		if topic, ok := tp.(map[string]any); ok {
 			text, _ := topic["Text"].(string)
@@ -90,7 +100,7 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (json.
 				})
 			}
 		}
-		if len(topics) >= 5 {
+		if len(topics) >= maxTopics {
 			break
 		}
 	}
@@ -110,10 +120,20 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (json.
 
 type WebFetchTool struct {
 	allowlist []string
+	config    *runtime.WebToolsConfig
 }
 
-func NewWebFetchTool(allowlist []string) *WebFetchTool {
-	return &WebFetchTool{allowlist: allowlist}
+func NewWebFetchTool(allowlist []string, config *runtime.WebToolsConfig) *WebFetchTool {
+	if config == nil {
+		config = &runtime.WebToolsConfig{
+			SearchURL:        "https://api.duckduckgo.com/",
+			UserAgent:        "Mozilla/5.0 (compatible; VibePilot/2.0)",
+			MaxFetchLength:   10000,
+			MaxRelatedTopics: 5,
+			TimeoutSeconds:   30,
+		}
+	}
+	return &WebFetchTool{allowlist: allowlist, config: config}
 }
 
 func (t *WebFetchTool) isAllowed(urlStr string) bool {
@@ -169,7 +189,7 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (json.R
 		})
 	}
 
-	req.Header.Set("User-Agent", UserAgent)
+	req.Header.Set("User-Agent", t.config.UserAgent)
 
 	resp, err := sharedHTTPClient.Do(req)
 	if err != nil {
@@ -192,8 +212,12 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (json.R
 
 	contentType := resp.Header.Get("Content-Type")
 	content := string(body)
-	if len(content) > WebFetchMaxLen {
-		content = content[:WebFetchMaxLen] + "\n... (truncated)"
+	maxLen := t.config.MaxFetchLength
+	if maxLen <= 0 {
+		maxLen = 10000
+	}
+	if len(content) > maxLen {
+		content = content[:maxLen] + "\n... (truncated)"
 	}
 
 	return json.Marshal(map[string]any{
