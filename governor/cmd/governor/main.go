@@ -93,7 +93,7 @@ func main() {
 	destRouter := runtime.NewRouter(cfg, database)
 	eventRouter := runtime.NewEventRouter(watcher)
 
-	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, destRouter)
+	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, destRouter, git)
 
 	if err := eventRouter.Start(ctx); err != nil {
 		log.Fatalf("Failed to start event router: %v", err)
@@ -163,7 +163,7 @@ func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, 
 	}
 }
 
-func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, destRouter *runtime.Router) {
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, destRouter *runtime.Router, git *gitree.Gitree) {
 	eventsCfg := cfg.System.Events
 
 	selectDestination := func(agentID, taskID, taskType string) string {
@@ -192,6 +192,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 		taskID, _ := task["id"].(string)
 		taskType, _ := task["type"].(string)
+		taskNumber, _ := task["task_number"].(string)
 		sliceID, _ := task["slice_id"].(string)
 		if sliceID == "" {
 			sliceID = "default"
@@ -201,6 +202,17 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		if destID == "" {
 			log.Printf("[EventTaskAvailable] No destination available for task %s", truncateID(taskID))
 			return
+		}
+
+		branchName := fmt.Sprintf("task/%s", taskNumber)
+		if taskNumber == "" {
+			branchName = fmt.Sprintf("task/%s", truncateID(taskID))
+		}
+
+		if err := git.CreateBranch(ctx, branchName); err != nil {
+			log.Printf("[EventTaskAvailable] Failed to create branch %s: %v", branchName, err)
+		} else {
+			log.Printf("[EventTaskAvailable] Created branch %s for task %s", branchName, truncateID(taskID))
 		}
 
 		session, err := factory.Create("orchestrator")
