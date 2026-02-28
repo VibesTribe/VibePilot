@@ -93,6 +93,15 @@ func main() {
 	destRouter := runtime.NewRouter(cfg, database)
 	eventRouter := runtime.NewEventRouter(watcher)
 
+	prdWatcher := runtime.NewPRDWatcher(database, runtime.PRDWatcherConfig{
+		Enabled:   cfg.System.PRDWatcher.Enabled,
+		RepoPath:  cfg.System.PRDWatcher.RepoPath,
+		Branch:    cfg.System.PRDWatcher.Branch,
+		Directory: cfg.System.PRDWatcher.Directory,
+		Interval:  time.Duration(cfg.System.PRDWatcher.IntervalSeconds) * time.Second,
+	})
+	go prdWatcher.Start(ctx)
+
 	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, destRouter, git)
 
 	if err := eventRouter.Start(ctx); err != nil {
@@ -243,6 +252,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 		taskID, _ := task["id"].(string)
 		taskType, _ := task["type"].(string)
+		modelID, _ := task["model_id"].(string)
 		sliceID, _ := task["slice_id"].(string)
 		if sliceID == "" {
 			sliceID = "review"
@@ -265,7 +275,81 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			if err != nil {
 				return err
 			}
-			log.Printf("[EventTaskReview] Task %s reviewed via %s: %s", truncateID(taskID), destID, truncateOutput(result.Output))
+
+			decision, parseErr := runtime.ParseSupervisorDecision(result.Output)
+			if parseErr != nil {
+				log.Printf("[EventTaskReview] Failed to parse decision for %s: %v", truncateID(taskID), parseErr)
+				log.Printf("[EventTaskReview] Raw output: %s", truncateOutput(result.Output))
+				return nil
+			}
+
+			log.Printf("[EventTaskReview] Task %s decision: %s, next: %s", truncateID(taskID), decision.Decision, decision.NextAction)
+
+			switch decision.Decision {
+			case "pass":
+				_, err := database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "testing",
+				})
+				if err != nil {
+					log.Printf("[EventTaskReview] Failed to update task status to testing: %v", err)
+				}
+
+			case "fail":
+				for _, issue := range decision.Issues {
+					failureCategory := runtime.CategorizeFailure(issue.Type)
+					_, err := database.RPC(ctx, "record_failure", map[string]any{
+						"p_task_id":          taskID,
+						"p_failure_type":     issue.Type,
+						"p_failure_category": failureCategory,
+						"p_failure_details":  map[string]any{"description": issue.Description, "severity": issue.Severity},
+						"p_model_id":         modelID,
+						"p_task_type":        taskType,
+					})
+					if err != nil {
+						log.Printf("[EventTaskReview] Failed to record failure: %v", err)
+					}
+				}
+
+				switch decision.NextAction {
+				case "return_to_runner":
+					_, err := database.RPC(ctx, "update_task_status", map[string]any{
+						"p_task_id": taskID,
+						"p_status":  "available",
+					})
+					if err != nil {
+						log.Printf("[EventTaskReview] Failed to reset task to available: %v", err)
+					}
+
+				case "split_task", "escalate":
+					_, err := database.RPC(ctx, "update_task_status", map[string]any{
+						"p_task_id": taskID,
+						"p_status":  "escalated",
+					})
+					if err != nil {
+						log.Printf("[EventTaskReview] Failed to escalate task: %v", err)
+					}
+
+				default:
+					_, err := database.RPC(ctx, "update_task_status", map[string]any{
+						"p_task_id": taskID,
+						"p_status":  "available",
+					})
+					if err != nil {
+						log.Printf("[EventTaskReview] Failed to reset task: %v", err)
+					}
+				}
+
+			case "reroute":
+				_, err := database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "available",
+				})
+				if err != nil {
+					log.Printf("[EventTaskReview] Failed to reroute task: %v", err)
+				}
+			}
+
 			return nil
 		})
 		if err != nil {
@@ -464,7 +548,37 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 				log.Printf("[EventPRDReady] Planner session failed for %s: %v", truncateID(planID), err)
 				return err
 			}
-			log.Printf("[EventPRDReady] Plan %s planned via %s: %s", truncateID(planID), destID, truncateOutput(result.Output))
+
+			plannerOutput, parseErr := runtime.ParsePlannerOutput(result.Output)
+			if parseErr != nil {
+				log.Printf("[EventPRDReady] Failed to parse planner output: %v", parseErr)
+				log.Printf("[EventPRDReady] Raw output: %s", truncateOutput(result.Output))
+				return nil
+			}
+
+			log.Printf("[EventPRDReady] Plan %s created with %d tasks, status: %s", truncateID(planID), plannerOutput.TotalTasks, plannerOutput.Status)
+
+			if plannerOutput.PlanPath != "" && plannerOutput.PlanContent != "" {
+				branchName := "docs/plans"
+				output := map[string]any{
+					"files": []map[string]any{
+						{"path": plannerOutput.PlanPath, "content": plannerOutput.PlanContent},
+					},
+				}
+				if err := git.CommitOutput(ctx, branchName, output); err != nil {
+					log.Printf("[EventPRDReady] Failed to commit plan to GitHub: %v", err)
+				}
+			}
+
+			_, err = database.RPC(ctx, "update_plan_status", map[string]any{
+				"p_plan_id":      planID,
+				"p_status":       plannerOutput.Status,
+				"p_review_notes": map[string]any{"plan_path": plannerOutput.PlanPath, "total_tasks": plannerOutput.TotalTasks},
+			})
+			if err != nil {
+				log.Printf("[EventPRDReady] Failed to update plan status: %v", err)
+			}
+
 			return nil
 		})
 		if err != nil {
@@ -498,7 +612,40 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 				log.Printf("[EventPlanReview] Supervisor session failed for %s: %v", truncateID(planID), err)
 				return err
 			}
-			log.Printf("[EventPlanReview] Plan %s reviewed via %s: %s", truncateID(planID), destID, truncateOutput(result.Output))
+
+			review, parseErr := runtime.ParseInitialReview(result.Output)
+			if parseErr != nil {
+				log.Printf("[EventPlanReview] Failed to parse review: %v", parseErr)
+				log.Printf("[EventPlanReview] Raw output: %s", truncateOutput(result.Output))
+				return nil
+			}
+
+			log.Printf("[EventPlanReview] Plan %s review: decision=%s complexity=%s", truncateID(planID), review.Decision, review.Complexity)
+
+			var newStatus string
+			switch review.Decision {
+			case "approved":
+				newStatus = "approved"
+			case "council_review":
+				newStatus = "council_review"
+			default:
+				newStatus = "revision_needed"
+			}
+
+			_, err = database.RPC(ctx, "update_plan_status", map[string]any{
+				"p_plan_id": planID,
+				"p_status":  newStatus,
+				"p_review_notes": map[string]any{
+					"complexity": review.Complexity,
+					"reasoning":  review.Reasoning,
+					"concerns":   review.Concerns,
+					"task_count": review.TaskCount,
+				},
+			})
+			if err != nil {
+				log.Printf("[EventPlanReview] Failed to update plan status: %v", err)
+			}
+
 			return nil
 		})
 		if err != nil {
