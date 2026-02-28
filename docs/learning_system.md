@@ -87,19 +87,41 @@ Human clicks "Review Now" → Sees complete doc:
   - Alternative options (if any)
         ↓
 Human decides:
-  - Approve → Maintenance implements
+  - Approve → Planner creates task → Flows through task system
   - Ask Questions → Clarification added to doc
   - Reject → Closed with reason
 ```
+
+**IMPORTANT: Nothing is implemented directly.** All changes go through the task system:
+- Human approves → Planner creates task → Supervisor approves → Orchestrator assigns → Model executes
+
+---
+
+## ALL CHANGES GO THROUGH TASK SYSTEM
+
+**No direct implementation by anyone.**
+
+| Change Type | Flow |
+|-------------|------|
+| Simple (new model) | Supervisor approves → Planner creates task → Task system |
+| Complex (approved by human) | Human approves → Planner creates task → Task system |
+
+The model that executes the task wears the appropriate "hat" (uses the right agent prompt) based on what the task requires.
 
 ---
 
 ## MAINTENANCE DAILY TASK
 
-Runs daily at scheduled time:
+Runs daily at scheduled time. This is a TASK that flows through the task system:
 
 ```
-Maintenance agent:
+Daily trigger → Planner creates "Update agent learnings" task
+        ↓
+Supervisor approves task
+        ↓
+Orchestrator assigns to available model wearing "maintenance hat"
+        ↓
+Model executes:
   1. Query Supabase for new learnings (patterns detected today)
   2. For each agent prompt with new learnings:
      - Read current "What I've Learned" section
@@ -108,6 +130,19 @@ Maintenance agent:
   3. Commit to main: "learn: Update agent learnings YYYY-MM-DD"
   4. Report to Supervisor
 ```
+
+---
+
+## "HATS" CONCEPT
+
+Models don't have fixed roles. Any available model can wear any "hat" (use any agent prompt) based on what the task requires.
+
+**Orchestrator assigns based on:**
+- What models are available right now
+- What capabilities the task needs
+- Which "hat" is appropriate
+
+**Example:** A "maintenance" task can be executed by GLM-5, Kimi, or DeepSeek - whoever is available and scores best. The model wears the "maintenance hat" (uses maintenance prompt) for that task.
 
 ---
 

@@ -458,20 +458,74 @@ Visual Tester (for UI tasks):
 │          ↓                                                                   │
 │  Assessment:                                                                │
 │                                                                              │
-│  SIMPLE suggestion:                                                         │
+│  SIMPLE suggestion (new model, pricing update, config tweak):               │
 │    - Approve                                                                │
-│    - Send to Planner to implement                                           │
+│    - Send to Planner to create task                                         │
+│    - Task flows through normal task system                                  │
 │                                                                              │
-│  COMPLEX suggestion:                                                        │
+│  COMPLEX suggestion (architecture, new system component):                   │
 │    - Call Council with full suggestions                                     │
 │    - Council provides feedback                                              │
+│    - Create review doc with all feedback                                    │
 │    - Send for human review                                                  │
+│    - If approved → Send to Planner to create task                           │
 │                                                                              │
 │  PAID API OUT OF CREDIT:                                                    │
-│    - Send for human review                                                  │
+│    - Send for human review immediately                                      │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+          ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│              ALL CHANGES GO THROUGH TASK SYSTEM                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  NOTHING IS IMPLEMENTED DIRECTLY.                                            │
+│                                                                              │
+│  Simple suggestion approved:                                                │
+│    Supervisor → Planner (creates task) → Supervisor approves task           │
+│           → Orchestrator assigns to available model → Model executes        │
+│                                                                              │
+│  Complex suggestion approved:                                               │
+│    Council → Human → Planner (creates task) → Supervisor approves           │
+│           → Orchestrator assigns to available model → Model executes        │
+│                                                                              │
+│  The model that executes wears the appropriate "hat" for that task.         │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## "HATS" CONCEPT
+
+Models don't have fixed roles. Any available model can wear any "hat" (use any agent prompt) based on what the task requires.
+
+**Orchestrator assigns based on:**
+- What models are available right now
+- What capabilities the task needs
+- Which "hat" is appropriate (planner, supervisor, maintenance, etc.)
+
+**Example:**
+```
+Task: "Add new model Grok to registry"
+  - Needs: maintenance hat (config updates)
+  - Available: GLM-5, Kimi
+  - Orchestrator picks: GLM-5 (best score, available)
+  - GLM-5 wears "maintenance hat" for this task
+  - Uses maintenance prompt, executes task
+```
+
+**Another example:**
+```
+Task: "Review plan for user auth feature"
+  - Needs: supervisor hat (quality review)
+  - Available: DeepSeek, Kimi
+  - Orchestrator picks: Kimi (good at analysis)
+  - Kimi wears "supervisor hat" for this task
+  - Uses supervisor prompt, reviews plan
+```
+
+**Key insight:** Roles are defined by prompts (hats), not by which model. Orchestrator puts the best available model in the right hat for each task.
 
 ---
 
