@@ -53,20 +53,10 @@ Tests have run. You must process results and decide next action.
 ### Your Actions
 
 **Step 1: Read the PRD**
-```
-TOOL: file_read
-{
-  "path": "<plan.prd_path>"
-}
-```
+The PRD is located at the path specified in `plan.prd_path`. Read it to understand the requirements.
 
 **Step 2: Read the Plan**
-```
-TOOL: file_read
-{
-  "path": "<plan.plan_path>"
-}
-```
+The plan is located at the path specified in `plan.plan_path`. Read it to evaluate quality.
 
 **Step 3: Evaluate Complexity**
 
@@ -91,39 +81,14 @@ Review the plan against the PRD. Use your judgment - these are guidelines, not h
 - Ambiguity or concerns in the plan
 - Large scope (many tasks with interdependencies)
 
-### Decision Output
-
-**If SIMPLE - Approve directly:**
-```
-TOOL: db_update
-{
-  "table": "plans",
-  "id": "<plan.id>",
-  "data": {
-    "status": "approved",
-    "complexity": "simple"
-  }
-}
-```
-
-**If COMPLEX - Send to Council:**
-```
-TOOL: db_update
-{
-  "table": "plans",
-  "id": "<plan.id>",
-  "data": {
-    "status": "council_review",
-    "complexity": "complex"
-  }
-}
-```
-
 ### Output Format
+
+After evaluation, output your decision in this format:
+
 ```json
 {
   "action": "initial_review_complete",
-  "plan_id": "uuid",
+  "plan_id": "<plan.id>",
   "decision": "approved" | "council_review",
   "complexity": "simple" | "complex",
   "reasoning": "Brief explanation of why simple or complex",

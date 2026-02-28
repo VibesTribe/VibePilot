@@ -63,7 +63,7 @@ func main() {
 		Config:   cfg,
 	})
 
-	sessionFactory := runtime.NewSessionFactory(cfg, toolRegistry)
+	sessionFactory := runtime.NewSessionFactory(cfg)
 	registerDestinations(sessionFactory, cfg, v)
 
 	pool := runtime.NewAgentPoolWithConcurrency(
@@ -90,11 +90,12 @@ func main() {
 
 	watcher.SetConfig(cfg)
 
-	router := runtime.NewEventRouter(watcher)
+	destRouter := runtime.NewRouter(cfg, database)
+	eventRouter := runtime.NewEventRouter(watcher)
 
-	setupEventHandlers(ctx, router, sessionFactory, pool, database, cfg)
+	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, destRouter)
 
-	if err := router.Start(ctx); err != nil {
+	if err := eventRouter.Start(ctx); err != nil {
 		log.Fatalf("Failed to start event router: %v", err)
 	}
 
@@ -162,8 +163,25 @@ func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, 
 	}
 }
 
-func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config) {
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, destRouter *runtime.Router) {
 	eventsCfg := cfg.System.Events
+
+	selectDestination := func(agentID, taskID, taskType string) string {
+		result, err := destRouter.SelectDestination(ctx, runtime.RoutingRequest{
+			AgentID:  agentID,
+			TaskID:   taskID,
+			TaskType: taskType,
+		})
+		if err != nil || result == nil {
+			log.Printf("[Router] No destination available for agent %s, using fallback", agentID)
+			dests := destRouter.GetAvailableDestinations()
+			if len(dests) > 0 {
+				return dests[0]
+			}
+			return ""
+		}
+		return result.DestinationID
+	}
 
 	router.On(runtime.EventTaskAvailable, func(event runtime.Event) {
 		var task map[string]any
@@ -173,9 +191,16 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		taskID, _ := task["id"].(string)
+		taskType, _ := task["type"].(string)
 		sliceID, _ := task["slice_id"].(string)
 		if sliceID == "" {
 			sliceID = "default"
+		}
+
+		destID := selectDestination("orchestrator", taskID, taskType)
+		if destID == "" {
+			log.Printf("[EventTaskAvailable] No destination available for task %s", truncateID(taskID))
+			return
 		}
 
 		session, err := factory.Create("orchestrator")
@@ -184,13 +209,13 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.SubmitWithDestination(ctx, sliceID, "opencode", func() error {
+		err = pool.SubmitWithDestination(ctx, sliceID, destID, func() error {
 			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_available"})
 			if err != nil {
 				log.Printf("[EventTaskAvailable] Orchestrator session failed for %s: %v", truncateID(taskID), err)
 				return err
 			}
-			log.Printf("[EventTaskAvailable] Task %s routed: %s", truncateID(taskID), truncateOutput(result.Output))
+			log.Printf("[EventTaskAvailable] Task %s routed via %s: %s", truncateID(taskID), destID, truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -205,9 +230,16 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		taskID, _ := task["id"].(string)
+		taskType, _ := task["type"].(string)
 		sliceID, _ := task["slice_id"].(string)
 		if sliceID == "" {
 			sliceID = "review"
+		}
+
+		destID := selectDestination("supervisor", taskID, taskType)
+		if destID == "" {
+			log.Printf("[EventTaskReview] No destination available for task %s", truncateID(taskID))
+			return
 		}
 
 		session, err := factory.Create("supervisor")
@@ -216,12 +248,12 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.SubmitWithDestination(ctx, sliceID, "opencode", func() error {
+		err = pool.SubmitWithDestination(ctx, sliceID, destID, func() error {
 			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_review"})
 			if err != nil {
 				return err
 			}
-			log.Printf("[EventTaskReview] Task %s reviewed: %s", truncateID(taskID), truncateOutput(result.Output))
+			log.Printf("[EventTaskReview] Task %s reviewed via %s: %s", truncateID(taskID), destID, truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -236,22 +268,39 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		taskID, _ := task["id"].(string)
+		taskType, _ := task["type"].(string)
+		modelID, _ := task["model_id"].(string)
 		sliceID, _ := task["slice_id"].(string)
 		if sliceID == "" {
 			sliceID = "complete"
 		}
 
-		session, err := factory.Create("supervisor")
-		if err != nil {
+		destID := selectDestination("supervisor", taskID, taskType)
+		if destID == "" {
+			log.Printf("[EventTaskCompleted] No destination available for task %s", truncateID(taskID))
+			recordModelFailure(ctx, database, modelID, taskID, "no_destination")
 			return
 		}
 
-		err = pool.SubmitWithDestination(ctx, sliceID, "opencode", func() error {
-			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_completed"})
-			if err != nil {
-				return err
-			}
-			log.Printf("[EventTaskCompleted] Task %s completed: %s", truncateID(taskID), truncateOutput(result.Output))
+		session, err := factory.Create("supervisor")
+		if err != nil {
+			recordModelFailure(ctx, database, modelID, taskID, "session_create_failed")
+			return
+		}
+
+		start := time.Now()
+		result, sessionErr := session.Run(ctx, map[string]any{"task": task, "event": "task_completed"})
+		duration := time.Since(start).Seconds()
+
+		if sessionErr != nil {
+			log.Printf("[EventTaskCompleted] Supervisor session failed for %s: %v", truncateID(taskID), sessionErr)
+			recordModelFailure(ctx, database, modelID, taskID, "session_error")
+			return
+		}
+
+		err = pool.SubmitWithDestination(ctx, sliceID, destID, func() error {
+			log.Printf("[EventTaskCompleted] Task %s completed via %s: %s", truncateID(taskID), destID, truncateOutput(result.Output))
+			recordModelSuccess(ctx, database, modelID, taskType, duration)
 			return nil
 		})
 		if err != nil {
@@ -266,18 +315,23 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		planID, _ := plan["id"].(string)
+		destID := selectDestination("supervisor", planID, "plan_review")
+		if destID == "" {
+			log.Printf("[EventPlanCreated] No destination available for plan %s", truncateID(planID))
+			return
+		}
 
 		session, err := factory.Create("supervisor")
 		if err != nil {
 			return
 		}
 
-		err = pool.SubmitWithDestination(ctx, "plans", "opencode", func() error {
+		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "plan_created"})
 			if err != nil {
 				return err
 			}
-			log.Printf("[EventPlanCreated] Plan %s triaged: %s", truncateID(planID), truncateOutput(result.Output))
+			log.Printf("[EventPlanCreated] Plan %s triaged via %s: %s", truncateID(planID), destID, truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -292,18 +346,23 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		planID, _ := plan["id"].(string)
+		destID := selectDestination("supervisor", planID, "council_done")
+		if destID == "" {
+			log.Printf("[EventCouncilDone] No destination available for plan %s", truncateID(planID))
+			return
+		}
 
 		session, err := factory.Create("supervisor")
 		if err != nil {
 			return
 		}
 
-		err = pool.SubmitWithDestination(ctx, "plans", "opencode", func() error {
+		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "council_done"})
 			if err != nil {
 				return err
 			}
-			log.Printf("[EventCouncilDone] Council done for %s: %s", truncateID(planID), truncateOutput(result.Output))
+			log.Printf("[EventCouncilDone] Council done for %s via %s: %s", truncateID(planID), destID, truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -318,18 +377,23 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		cmdID, _ := cmd["id"].(string)
+		destID := selectDestination("maintenance", cmdID, "maintenance")
+		if destID == "" {
+			log.Printf("[EventMaintenanceCmd] No destination available for command %s", truncateID(cmdID))
+			return
+		}
 
 		session, err := factory.Create("maintenance")
 		if err != nil {
 			return
 		}
 
-		err = pool.SubmitWithDestination(ctx, "maintenance", "opencode", func() error {
+		err = pool.SubmitWithDestination(ctx, "maintenance", destID, func() error {
 			result, err := session.Run(ctx, map[string]any{"command": cmd, "event": "maintenance_command"})
 			if err != nil {
 				return err
 			}
-			log.Printf("[EventMaintenanceCmd] Command %s executed: %s", truncateID(cmdID), truncateOutput(result.Output))
+			log.Printf("[EventMaintenanceCmd] Command %s executed via %s: %s", truncateID(cmdID), destID, truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -338,17 +402,23 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 	})
 
 	router.On(runtime.EventResearchReady, func(event runtime.Event) {
+		destID := selectDestination("supervisor", "", "research_review")
+		if destID == "" {
+			log.Printf("[EventResearchReady] No destination available")
+			return
+		}
+
 		session, err := factory.Create("supervisor")
 		if err != nil {
 			return
 		}
 
-		err = pool.SubmitWithDestination(ctx, "research", "opencode", func() error {
+		err = pool.SubmitWithDestination(ctx, "research", destID, func() error {
 			result, err := session.Run(ctx, map[string]any{"event": "research_ready", "record": string(event.Record)})
 			if err != nil {
 				return err
 			}
-			log.Printf("[EventResearchReady] Research reviewed: %s", truncateOutput(result.Output))
+			log.Printf("[EventResearchReady] Research reviewed via %s: %s", destID, truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -364,6 +434,11 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		planID, _ := plan["id"].(string)
+		destID := selectDestination("planner", planID, "planning")
+		if destID == "" {
+			log.Printf("[EventPRDReady] No destination available for plan %s", truncateID(planID))
+			return
+		}
 
 		session, err := factory.Create("planner")
 		if err != nil {
@@ -371,13 +446,13 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.SubmitWithDestination(ctx, "planning", "opencode", func() error {
+		err = pool.SubmitWithDestination(ctx, "planning", destID, func() error {
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "prd_ready"})
 			if err != nil {
 				log.Printf("[EventPRDReady] Planner session failed for %s: %v", truncateID(planID), err)
 				return err
 			}
-			log.Printf("[EventPRDReady] Plan %s planned: %s", truncateID(planID), truncateOutput(result.Output))
+			log.Printf("[EventPRDReady] Plan %s planned via %s: %s", truncateID(planID), destID, truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -393,6 +468,11 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		planID, _ := plan["id"].(string)
+		destID := selectDestination("supervisor", planID, "plan_review")
+		if destID == "" {
+			log.Printf("[EventPlanReview] No destination available for plan %s", truncateID(planID))
+			return
+		}
 
 		session, err := factory.Create("supervisor")
 		if err != nil {
@@ -400,13 +480,13 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.SubmitWithDestination(ctx, "plans", "opencode", func() error {
+		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "plan_review"})
 			if err != nil {
 				log.Printf("[EventPlanReview] Supervisor session failed for %s: %v", truncateID(planID), err)
 				return err
 			}
-			log.Printf("[EventPlanReview] Plan %s reviewed: %s", truncateID(planID), truncateOutput(result.Output))
+			log.Printf("[EventPlanReview] Plan %s reviewed via %s: %s", truncateID(planID), destID, truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -421,18 +501,23 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		taskID, _ := testResult["task_id"].(string)
+		destID := selectDestination("supervisor", taskID, "test_review")
+		if destID == "" {
+			log.Printf("[EventTestResults] No destination available for task %s", truncateID(taskID))
+			return
+		}
 
 		session, err := factory.Create("supervisor")
 		if err != nil {
 			return
 		}
 
-		err = pool.SubmitWithDestination(ctx, "testing", "opencode", func() error {
+		err = pool.SubmitWithDestination(ctx, "testing", destID, func() error {
 			result, err := session.Run(ctx, map[string]any{"test_result": testResult, "event": "test_results"})
 			if err != nil {
 				return err
 			}
-			log.Printf("[EventTestResults] Task %s tests processed: %s", truncateID(taskID), truncateOutput(result.Output))
+			log.Printf("[EventTestResults] Task %s tests processed via %s: %s", truncateID(taskID), destID, truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
@@ -496,6 +581,34 @@ func toString(v any) string {
 		return strconv.FormatBool(val)
 	default:
 		return fmt.Sprintf("%v", val)
+	}
+}
+
+func recordModelSuccess(ctx context.Context, database *db.DB, modelID, taskType string, durationSeconds float64) {
+	if modelID == "" {
+		return
+	}
+	_, err := database.RPC(ctx, "record_model_success", map[string]any{
+		"p_model_id":         modelID,
+		"p_task_type":        taskType,
+		"p_duration_seconds": durationSeconds,
+	})
+	if err != nil {
+		log.Printf("[Learning] Failed to record model success: %v", err)
+	}
+}
+
+func recordModelFailure(ctx context.Context, database *db.DB, modelID, taskID, failureType string) {
+	if modelID == "" {
+		return
+	}
+	_, err := database.RPC(ctx, "record_model_failure", map[string]any{
+		"p_model_id":     modelID,
+		"p_failure_type": failureType,
+		"p_task_id":      taskID,
+	})
+	if err != nil {
+		log.Printf("[Learning] Failed to record model failure: %v", err)
 	}
 }
 

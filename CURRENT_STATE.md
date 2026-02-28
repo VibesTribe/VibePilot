@@ -2,19 +2,19 @@
 
 **Required reading: FIVE files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
-2. **`docs/SESSION_34_HANDOFF.md`** - Latest session details and next priorities
-3. **`docs/SECURITY_BOOTSTRAP.md`** - How credentials work (READ THIS FIRST)
-4. **`docs/GOVERNOR_HANDOFF.md`** - Full implementation details
+2. **`docs/SESSION_35_HANDOFF.md`** - Latest session: dynamic routing implementation
+3. **`docs/SYSTEM_REFERENCE.md`** - What we have and how it works
+4. **`docs/SECURITY_BOOTSTRAP.md`** - How credentials work
 5. **`docs/core_philosophy.md`** - Strategic mindset and principles
 
 **Read all five → Know everything → Do anything**
 
 ---
 
-**Last Updated:** 2026-02-27
-**Updated By:** GLM-5 - Session 34
+**Last Updated:** 2026-02-28
+**Updated By:** GLM-5 - Session 35
 **Branch:** `main`
-**Status:** ACTIVE - Event persistence, usage tracking, startup recovery implemented
+**Status:** ACTIVE - Dynamic routing, TOOL: removed, learning wired
 
 ---
 
@@ -26,44 +26,68 @@
 vibepilot-governor.service (Go binary)
 ├── Polls Supabase every 1s
 ├── Max 8 concurrent per module, 160 total
-├── OpenCode limit: 5 concurrent
+├── Dynamic routing via config (NO hardcoded destinations)
 ├── Reads secrets from vault at runtime
 ├── Startup recovery: finds and recovers orphaned sessions
-└── Usage tracking: multi-window rate limit enforcement
+├── Usage tracking: multi-window rate limit enforcement
+└── Learning: records model success/failure after task completion
 ```
 
 **Status:** `systemctl status vibepilot-governor`
+
+## Architecture Principle
+
+```
+Model = Intelligence (thinks, outputs)
+Transport/CLI = Provides tools natively (read/write/bash)
+Destination = Where/how access happens (has capabilities)
+Agent = Role with capabilities needed (for routing)
+Prompt packet = Task + expected output format
+
+Routing = config/routing.json (strategies, restrictions, categories)
+Destinations = config/destinations.json (status, type, provides_tools)
+Models = config/models.json (availability, access_via)
+
+NO HARDCODED DESTINATIONS. Everything configurable.
+```
+
+## Dynamic Routing
+
+```
+Event fires
+    ↓
+selectDestination(agentID, taskID, taskType)
+    ↓
+Get strategy for agent (internal_only for governance agents)
+    ↓
+Get priority order from routing.json
+    ↓
+For each category: find active destination
+    ↓
+Return destination ID or "" if none available
+```
+
+**Internal agents (planner, supervisor, council, etc.)** → internal_only strategy → never external
+**Task execution** → default strategy → external first, then internal
 
 ## Codebase Structure (Clean)
 
 ```
 vibepilot/
 ├── governor/              # ACTIVE - Go binary (everything)
-│   ├── cmd/governor/      # Main entry point + startup recovery
+│   ├── cmd/governor/      # Main entry point + event handlers + routing
 │   ├── internal/
 │   │   ├── db/            # Supabase client + RPC allowlist
 │   │   ├── vault/         # Secret decryption
-│   │   ├── runtime/       # Events, sessions, usage_tracker, model_loader
-│   │   ├── destinations/  # CLI runners (opencode)
-│   │   └── tools/         # Agent tools
-│   └── config/            # JSON configs
-├── config/                # JSON configs (models, agents, etc.)
+│   │   ├── runtime/       # Events, sessions, router, usage_tracker
+│   │   ├── destinations/  # CLI/API runners
+│   │   └── tools/         # Tool registry
+│   └── config/            # JSON configs (routing.json, destinations.json, etc.)
 ├── prompts/               # Agent behavior definitions (.md)
 ├── docs/                  # Documentation
 ├── scripts/               # Deploy scripts
-├── legacy/                # DEAD CODE - kept for reference
-│   └── python/            # All Python moved here
-└── .env                   # EMPTY (keys in systemd override)
+└── legacy/                # DEAD CODE - kept for reference
 ```
-
-## What's NOT Running
-
-| Item | Status |
-|------|--------|
-| Python orchestrator | Disabled, moved to legacy/ |
-| `.env` with keys | Empty, keys removed |
-| venv/ | Moved to legacy/ |
-| All `.py` files | Moved to legacy/ |
 
 ---
 
@@ -93,43 +117,35 @@ vibepilot/
 
 ---
 
-## Session 34 Changes (Current)
+## Session 35 Changes (Current)
 
-### 1. Bug Fix: "signal: terminated" 
-- **Root cause:** `cleanup_zombies.sh` killed governor children
-- **Fix:** Script now checks cgroup membership before killing
-- **File:** `scripts/cleanup_zombies.sh`
+### 1. Removed TOOL: Format
+- **Problem:** Rigid string parsing, fragile, OpenCode ignores it
+- **Solution:** Models output in expected format, Governor handles execution
+- **Files:** session.go (simplified), tools.go (removed parsing)
+- **Lines removed:** ~100 lines of TOOL: parsing code
 
-### 2. Event Persistence & Recovery
-- **New tables:** `event_checkpoints`, `runner_sessions`, `event_queue`, `system_config`
-- **Schema:** `docs/supabase-schema/032_event_persistence.sql`
-- **Startup recovery:** Governor finds and recovers orphaned sessions
-- **RPCs added:** 8 new functions for recovery operations
+### 2. Destination Capabilities
+- **New field:** `provides_tools` in destinations.json
+- **CLI destinations:** Provide read/write/bash/webfetch natively
+- **API destinations:** Provide nothing (Governor executes)
+- **Methods:** `HasNativeTools()`, `ProvidesTool()`
 
-### 3. Usage Tracking System
-- **Multi-window tracking:** minute/hour/day/week
-- **Buffer percentage:** 80% default (configurable per model)
-- **Auto-calculated spacing:** Based on rate limits
-- **Cooldown countdown:** Per-model configurable
-- **Files:** `governor/internal/runtime/usage_tracker.go`
+### 3. Agent Capabilities
+- **Renamed:** `tools` → `capabilities` in agents.json
+- **Purpose:** Defines what agent NEEDS for routing decisions
+- **Method:** `AgentConfig.HasCapability()`
 
-### 4. Model Profiles
-- **Full rate limit profiles:** Per-model in `models.json`
-- **API pricing:** For theoretical cost calculation
-- **Per-model recovery config:** Cooldown, timeout, thresholds
-- **Learned data:** best_for_task_types, failure_rates (schema ready)
-- **Files:** `governor/config/models.json`, `model_loader.go`
+### 4. Learning Loop Wired
+- **Functions:** `recordModelSuccess()`, `recordModelFailure()`
+- **Location:** main.go event handlers
+- **Trigger:** After supervisor approves + tests pass
+- **Tracks:** model_id, task_type, duration_seconds
 
-### 5. Config Improvements
-- **session.go:** Reads timeout/maxTurns from config
-- **events.go:** Configurable query limits
-- **runners.go:** CLI args configurable via destinations.json
-- **system.json:** Added `recovery` and `defaults` sections
-
-### 6. GCE Cleanup
-- **Removed:** OpenClaw, Docker, Playwright, Python caches
-- **Saved:** ~3GB disk, ~330MB RAM
-- **Verified:** No orphaned terminals
+### 5. Prompts Updated
+- **planner.md:** Removed TOOL: references, defines output format
+- **supervisor.md:** Removed TOOL: references, describes actions
+- **Principle:** Prompt = behavior + output format, NOT tool calls
 
 ---
 
@@ -137,58 +153,72 @@ vibepilot/
 
 | Setting | Config File | Field |
 |---------|-------------|-------|
+| Routing strategies | routing.json | `strategies.*.priority` |
+| Agent restrictions | routing.json | `agent_restrictions` |
+| Destination categories | routing.json | `destination_categories` |
+| Destination capabilities | destinations.json | `provides_tools` |
+| Agent capabilities | agents.json | `capabilities` |
+| Destination status | destinations.json | `status` (active/inactive) |
+| Model availability | models.json | `status`, `access_via` |
 | Orphan threshold | system.json | `recovery.orphan_threshold_seconds` |
 | Max task attempts | system.json | `recovery.max_task_attempts` |
-| Model failure threshold | system.json | `recovery.model_failure_threshold` |
 | Buffer percentage | models.json | Each model's `buffer_pct` |
-| Request spacing | models.json | Each model's `spacing_min_seconds` |
-| Cooldown duration | models.json | Each model's `recovery.cooldown_minutes` |
 | Rate limits | models.json | Each model's `rate_limits.*` |
 | Concurrency limits | system.json | `concurrency.limits.*` |
-| Event query limit | system.json | `runtime.event_query_limit` |
 
 ---
 
 ## Remaining Gaps (Priority Order)
 
-### CRITICAL - Blocks Real Work
+### DONE - Session 35
 
-| Gap | Description | Effort |
-|-----|-------------|--------|
-| **Tool protocol** | OpenCode ignores `TOOL:` format, can't do db operations reliably | High |
+| Task | Status |
+|------|--------|
+| Dynamic routing | ✅ Deployed and verified |
+| Python cleanup | ✅ Moved to legacy/ |
+| TOOL: format removal | ✅ Complete |
 
-### IMPORTANT - Learning Loop Not Connected
+### NEXT - Future Sessions
 
-| Gap | Description | Effort |
-|-----|-------------|--------|
-| **record_model_success/failure** | RPCs exist, nothing calls them after task completion | Medium |
-| **Orchestrator feedback** | No automatic feedback from completed tasks to routing decisions | Medium |
+| Priority | Task | Notes |
+|----------|------|-------|
+| HIGH | Add courier destinations | Web platforms to destinations.json (type: "web") |
+| HIGH | Wire model scoring RPC | get_model_score_for_task in Supabase |
+| MEDIUM | Rate limit checking | Router checks destination limits |
+| MEDIUM | API output execution | Governor parses and executes for API runners |
+| LOW | Courier runner | Web platform execution implementation |
 
-### FUTURE - Scale Optimization
+### Verified Working
 
-| Gap | Description | Effort |
-|-----|-------------|--------|
-| Queue-based execution | Priority/weighting for 50+ concurrent | Medium |
-| Multi-host distribution | Single point of failure currently | High |
-| Observability | Prometheus/Grafana for metrics | Medium |
+```bash
+# Check routing in action
+sudo journalctl -u vibepilot-governor -f | grep Router
+```
+
+Expected output:
+```
+[Router] Agent planner using strategy internal_only with priority [internal]
+[Router] Selected destination opencode (category: internal, model: glm-5)
+```
 
 ---
 
 ## For Next Session
 
-**Priority 1: Tool Protocol**
-- How should OpenCode do database operations?
-- Options: TOOL: format adapter, OpenCode tool server, different protocol
+**Priority 1: Add Web Destinations**
+- Add chatgpt-web, claude-web, gemini-web to destinations.json
+- Set type="web", status="active" or "inactive"
+- Router will pick them for task execution (default strategy: external first)
 
-**Priority 2: Wire Learning Loop**
-- After task completion → call `record_model_success` or `record_model_failure`
-- Supervisor or governor code needs to call these RPCs
-- Orchestrator reads `models.learned` for routing decisions
+**Priority 2: Wire Model Scoring**
+- Create get_model_score_for_task RPC in Supabase
+- Router uses it to pick best model for task type
+- Learning data actually used for routing
 
-**Priority 3: Test End-to-End**
-- Run a full task through the system
-- Verify recovery works on crash
-- Verify learning accumulates
+**Priority 3: Test Full Flow**
+- Create a real PRD
+- Watch it flow through: PRD → Planner → Supervisor → Tasks → Execution
+- Verify routing logs show correct destinations
 
 ---
 
@@ -197,5 +227,8 @@ vibepilot/
 - Don't look for keys in `.env` (it's empty)
 - Don't use Python code (it's in legacy/)
 - Don't hardcode keys anywhere
+- Don't hardcode destination IDs in code
+- Don't hardcode routing logic in code
+- Don't add TOOL: format back - it's gone for good
 - Don't modify cleanup script without understanding cgroup logic
 - Don't hardcode any defaults - everything in config files
