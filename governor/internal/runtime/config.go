@@ -18,6 +18,7 @@ type SystemConfig struct {
 	Events      EventsConfig           `json:"events"`
 	Sandbox     SandboxConfig          `json:"sandbox"`
 	WebTools    WebToolsConfig         `json:"web_tools"`
+	PRDWatcher  PRDWatcherSystemConfig `json:"prd_watcher"`
 	Recovery    map[string]interface{} `json:"recovery"`
 	Defaults    map[string]interface{} `json:"defaults"`
 	PromptsDir  string                 `json:"prompts_dir"`
@@ -102,6 +103,14 @@ type WebToolsConfig struct {
 	MaxFetchLength   int    `json:"max_fetch_length"`
 	MaxRelatedTopics int    `json:"max_related_topics"`
 	TimeoutSeconds   int    `json:"timeout_seconds"`
+}
+
+type PRDWatcherSystemConfig struct {
+	Enabled         bool   `json:"enabled"`
+	RepoPath        string `json:"repo_path"`
+	Branch          string `json:"branch"`
+	Directory       string `json:"directory"`
+	IntervalSeconds int    `json:"interval_seconds"`
 }
 
 type AgentConfig struct {

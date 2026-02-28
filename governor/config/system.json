@@ -86,5 +86,12 @@
     "max_fetch_length": 10000,
     "max_related_topics": 5,
     "timeout_seconds": 30
+  },
+  "prd_watcher": {
+    "enabled": true,
+    "repo_path": "/home/mjlockboxsocial/vibepilot",
+    "branch": "main",
+    "directory": "docs/prd",
+    "interval_seconds": 10
   }
 }
