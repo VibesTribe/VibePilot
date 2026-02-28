@@ -163,26 +163,13 @@ vibepilot/
 **What works:**
 - Config loading, dynamic routing, event polling, vault, gitree library
 
-**What's missing (CRITICAL):**
-- Decision parsing - Governor doesn't parse agent JSON outputs
-- State transitions - No status updates based on decisions
-- Rejection handling - No wipe/reassign/escalate logic
-- GitHub commits - gitree.CommitOutput exists but never called
-- PRD detection - github client exists but not wired
-
-**Verdict:** Infrastructure works. Brain is missing.
-
-### READY TO DEPLOY
-
-| Step | Action | File/Command |
-|------|--------|--------------|
-| 1 | Run migration in Supabase | `docs/supabase-schema/033_model_scoring_rpc.sql` |
-| 2 | Deploy governor | `sudo scripts/deploy-governor.sh` |
-
-### DONE - Session 37
-- ✅ decision.go - Parse agent outputs
+### FILES TO CREATE (3 files)
+- ✅ decision.go - Parse agent outputs + extractJSON for markdown blocks
 - ✅ context_builder.go - Build context from existing RPCs
 - ✅ prd_watcher.go - Detect new PRDs
+- ✅ task_runner.md - New agent for executing tasks
+- ✅ task_runner agent in agents.json
+- ✅ EventTaskAvailable - task_runner executes, commits to GitHub, sets status
 - ✅ EventTaskReview - Parse decision, call record_failure, update status
 - ✅ EventPRDReady - Parse planner output, commit to GitHub
 - ✅ EventPlanReview - Parse initial review, set status
@@ -191,21 +178,49 @@ vibepilot/
 - ✅ Context builder wired to planner and supervisor sessions
 - ✅ PRD watcher wired to main.go
 - ✅ All changes use existing RPCs, no new tables
+- ✅ JSON parsing handles markdown code blocks (\`\`\`json)
 
 ### CRITICAL ITEMS - ALL DONE
 - ✅ Wire Council output → set_council_consensus
 - ✅ Wire test results → update status + merge + unlock
 - ✅ Context builder to session.go
+- ✅ Runner output committed to GitHub
+- ✅ Task execution uses task_runner (not orchestrator)
 
 ### NEXT - Session 38+
 
 | Priority | Task | Notes |
 |----------|------|-------|
-| **CRITICAL** | Decision parser | Parse agent JSON outputs in main.go |
-| **CRITICAL** | State transitions | Update Supabase status based on decisions |
-| **CRITICAL** | Rejection handler | Wipe branch, count failures, reassign/escalate |
-| **CRITICAL** | Wire gitree.CommitOutput | Actually commit runner output to GitHub |
-| **CRITICAL** | Wire PRD detection | Poll GitHub, create plan records |
+| **TEST** | Full flow test | Create real PRD, watch end-to-end |
+| LOW | Daily learning task | Updates agent prompts with new learnings |
+| LOW | Rate limit checking | Router checks destination limits |
+| LOW | Courier runner | Web platform execution |
+
+### WHAT'S NOW WORKING
+
+1. ✅ PRD detected → plan created in Supabase
+2. ✅ Planner receives learned rules + recent failures
+3. ✅ Planner output parsed → saved to GitHub
+4. ✅ Supervisor receives learned context
+5. ✅ Supervisor decision parsed → failure recorded → status updated
+6. ✅ Council votes parsed → consensus set → planner rules created
+7. ✅ Test results parsed → merge/reset/await based on outcome
+8. ✅ Task runner executes → commits output → sets review status
+9. ✅ JSON parsing handles markdown code blocks (\`\`\`json)
+
+### FILES TO CREATE (3 files)
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| `decision.go` | Parse Supervisor, Council, Planner outputs | ~150 |
+| `context_builder.go` | Call existing RPCs to build context | ~130 |
+| `prd_watcher.go` | Poll git for new PRDs | ~130 |
+
+**Total new code: ~410 lines**
+
+### NO NEW TABLES
+### NO NEW RPCs
+### USES EXISTING INFRASTRUCTURE
 | HIGH | Rate limit checking | Router checks destination limits |
 | MEDIUM | API output execution | Governor parses and executes for API runners |
 | LOW | Courier runner | Web platform execution implementation |
