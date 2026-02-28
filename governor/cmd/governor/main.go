@@ -211,12 +211,6 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			sliceID = "default"
 		}
 
-		destID := selectDestination("orchestrator", taskID, taskType)
-		if destID == "" {
-			log.Printf("[EventTaskAvailable] No destination available for task %s", truncateID(taskID))
-			return
-		}
-
 		branchName := fmt.Sprintf("task/%s", taskNumber)
 		if taskNumber == "" {
 			branchName = fmt.Sprintf("task/%s", truncateID(taskID))
@@ -228,19 +222,65 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			log.Printf("[EventTaskAvailable] Created branch %s for task %s", branchName, truncateID(taskID))
 		}
 
-		session, err := factory.Create("orchestrator")
+		_, err := database.RPC(ctx, "update_task_status", map[string]any{
+			"p_task_id": taskID,
+			"p_status":  "in_progress",
+		})
 		if err != nil {
-			log.Printf("[EventTaskAvailable] Failed to create orchestrator session: %v", err)
+			log.Printf("[EventTaskAvailable] Failed to update status to in_progress: %v", err)
+		}
+
+		destID := selectDestination("task_runner", taskID, taskType)
+		if destID == "" {
+			log.Printf("[EventTaskAvailable] No destination available for task %s", truncateID(taskID))
+			return
+		}
+
+		session, err := factory.CreateWithContext(ctx, "task_runner", taskType)
+		if err != nil {
+			log.Printf("[EventTaskAvailable] Failed to create task_runner session: %v", err)
 			return
 		}
 
 		err = pool.SubmitWithDestination(ctx, sliceID, destID, func() error {
 			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_available"})
 			if err != nil {
-				log.Printf("[EventTaskAvailable] Orchestrator session failed for %s: %v", truncateID(taskID), err)
+				log.Printf("[EventTaskAvailable] Task runner failed for %s: %v", truncateID(taskID), err)
 				return err
 			}
-			log.Printf("[EventTaskAvailable] Task %s routed via %s: %s", truncateID(taskID), destID, truncateOutput(result.Output))
+
+			runnerOutput := map[string]any{
+				"raw_output": result.Output,
+				"model_id":   "unknown",
+				"task_id":    taskID,
+				"duration":   result.Duration.Seconds(),
+			}
+
+			taskOutput, parseErr := runtime.ParseTaskRunnerOutput(result.Output)
+			if parseErr != nil {
+				log.Printf("[EventTaskAvailable] Failed to parse runner output: %v", parseErr)
+				runnerOutput["parse_error"] = parseErr.Error()
+			} else {
+				runnerOutput["files"] = taskOutput.Files
+				runnerOutput["summary"] = taskOutput.Summary
+				runnerOutput["status"] = taskOutput.Status
+			}
+
+			if err := git.CommitOutput(ctx, branchName, runnerOutput); err != nil {
+				log.Printf("[EventTaskAvailable] Failed to commit output to %s: %v", branchName, err)
+			} else {
+				log.Printf("[EventTaskAvailable] Committed output to %s", branchName)
+			}
+
+			_, err = database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "review",
+			})
+			if err != nil {
+				log.Printf("[EventTaskAvailable] Failed to update status to review: %v", err)
+			}
+
+			log.Printf("[EventTaskAvailable] Task %s output committed, status=review", truncateID(taskID))
 			return nil
 		})
 		if err != nil {
@@ -369,10 +409,16 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 		taskID, _ := task["id"].(string)
 		taskType, _ := task["type"].(string)
+		taskNumber, _ := task["task_number"].(string)
 		modelID, _ := task["model_id"].(string)
 		sliceID, _ := task["slice_id"].(string)
 		if sliceID == "" {
 			sliceID = "complete"
+		}
+
+		branchName := fmt.Sprintf("task/%s", taskNumber)
+		if taskNumber == "" {
+			branchName = fmt.Sprintf("task/%s", truncateID(taskID))
 		}
 
 		destID := selectDestination("supervisor", taskID, taskType)
@@ -382,7 +428,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		session, err := factory.Create("supervisor")
+		session, err := factory.CreateWithContext(ctx, "supervisor", taskType)
 		if err != nil {
 			recordModelFailure(ctx, database, modelID, taskID, "session_create_failed")
 			return
@@ -398,14 +444,30 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		err = pool.SubmitWithDestination(ctx, sliceID, destID, func() error {
-			log.Printf("[EventTaskCompleted] Task %s completed via %s: %s", truncateID(taskID), destID, truncateOutput(result.Output))
-			recordModelSuccess(ctx, database, modelID, taskType, duration)
-			return nil
+		output := map[string]any{
+			"output":     result.Output,
+			"model_id":   modelID,
+			"task_id":    taskID,
+			"duration":   duration,
+			"tokens_in":  result.TokensIn,
+			"tokens_out": result.TokensOut,
+		}
+		if err := git.CommitOutput(ctx, branchName, output); err != nil {
+			log.Printf("[EventTaskCompleted] Failed to commit output to %s: %v", branchName, err)
+		} else {
+			log.Printf("[EventTaskCompleted] Committed output to %s", branchName)
+		}
+
+		_, err = database.RPC(ctx, "update_task_status", map[string]any{
+			"p_task_id": taskID,
+			"p_status":  "review",
 		})
 		if err != nil {
-			log.Printf("[EventTaskCompleted] Failed to submit to pool: %v", err)
+			log.Printf("[EventTaskCompleted] Failed to update task status to review: %v", err)
 		}
+
+		recordModelSuccess(ctx, database, modelID, taskType, duration)
+		log.Printf("[EventTaskCompleted] Task %s output committed, status=review", truncateID(taskID))
 	})
 
 	router.On(runtime.EventPlanCreated, func(event runtime.Event) {

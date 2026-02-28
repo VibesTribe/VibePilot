@@ -74,6 +74,14 @@
       "capabilities": [],
       "default_destination": "opencode",
       "description": "Safety net - monitors for failures, escalates issues"
+    },
+    {
+      "id": "task_runner",
+      "name": "Task Runner",
+      "prompt": "task_runner.md",
+      "capabilities": ["file_access"],
+      "default_destination": "opencode",
+      "description": "Executes individual tasks - receives packet, produces code"
     }
   ]
 }

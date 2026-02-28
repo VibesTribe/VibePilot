@@ -1,6 +1,9 @@
 package runtime
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 type SupervisorDecision struct {
 	Action     string `json:"action"`
@@ -74,9 +77,28 @@ type InitialReviewDecision struct {
 	TaskCount  int      `json:"task_count"`
 }
 
+type TaskRunnerOutput struct {
+	TaskID  string `json:"task_id"`
+	Status  string `json:"status"`
+	Summary string `json:"summary"`
+	Files   []struct {
+		Path    string `json:"path"`
+		Content string `json:"content"`
+	} `json:"files_created"`
+	Tests struct {
+		Files []struct {
+			Path    string `json:"path"`
+			Content string `json:"content"`
+		} `json:"files_created"`
+		Summary string `json:"summary"`
+	} `json:"tests"`
+	Notes string `json:"notes"`
+}
+
 func ParseSupervisorDecision(output string) (*SupervisorDecision, error) {
 	var d SupervisorDecision
-	if err := json.Unmarshal([]byte(output), &d); err != nil {
+	jsonStr := extractJSON(output)
+	if err := json.Unmarshal([]byte(jsonStr), &d); err != nil {
 		return nil, err
 	}
 	return &d, nil
@@ -84,7 +106,8 @@ func ParseSupervisorDecision(output string) (*SupervisorDecision, error) {
 
 func ParseCouncilVote(output string) (*CouncilVote, error) {
 	var v CouncilVote
-	if err := json.Unmarshal([]byte(output), &v); err != nil {
+	jsonStr := extractJSON(output)
+	if err := json.Unmarshal([]byte(jsonStr), &v); err != nil {
 		return nil, err
 	}
 	return &v, nil
@@ -92,7 +115,8 @@ func ParseCouncilVote(output string) (*CouncilVote, error) {
 
 func ParsePlannerOutput(output string) (*PlannerOutput, error) {
 	var p PlannerOutput
-	if err := json.Unmarshal([]byte(output), &p); err != nil {
+	jsonStr := extractJSON(output)
+	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil {
 		return nil, err
 	}
 	return &p, nil
@@ -100,7 +124,8 @@ func ParsePlannerOutput(output string) (*PlannerOutput, error) {
 
 func ParseTestResults(output string) (*TestResults, error) {
 	var t TestResults
-	if err := json.Unmarshal([]byte(output), &t); err != nil {
+	jsonStr := extractJSON(output)
+	if err := json.Unmarshal([]byte(jsonStr), &t); err != nil {
 		return nil, err
 	}
 	return &t, nil
@@ -108,10 +133,54 @@ func ParseTestResults(output string) (*TestResults, error) {
 
 func ParseInitialReview(output string) (*InitialReviewDecision, error) {
 	var r InitialReviewDecision
-	if err := json.Unmarshal([]byte(output), &r); err != nil {
+	jsonStr := extractJSON(output)
+	if err := json.Unmarshal([]byte(jsonStr), &r); err != nil {
 		return nil, err
 	}
 	return &r, nil
+}
+
+func ParseTaskRunnerOutput(output string) (*TaskRunnerOutput, error) {
+	var t TaskRunnerOutput
+	jsonStr := extractJSON(output)
+	if err := json.Unmarshal([]byte(jsonStr), &t); err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+func extractJSON(output string) string {
+	output = strings.TrimSpace(output)
+
+	if strings.Contains(output, "```") {
+		lines := strings.Split(output, "\n")
+		var jsonLines []string
+		inBlock := false
+		for _, line := range lines {
+			if strings.HasPrefix(line, "```") {
+				if inBlock {
+					break
+				}
+				inBlock = true
+				continue
+			}
+			if inBlock {
+				jsonLines = append(jsonLines, line)
+			}
+		}
+		result := strings.Join(jsonLines, "\n")
+		if result != "" {
+			return result
+		}
+	}
+
+	firstBrace := strings.Index(output, "{")
+	lastBrace := strings.LastIndex(output, "}")
+	if firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace {
+		return output[firstBrace : lastBrace+1]
+	}
+
+	return output
 }
 
 func CategorizeFailure(issueType string) string {
