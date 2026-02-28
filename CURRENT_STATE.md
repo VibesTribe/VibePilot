@@ -15,7 +15,7 @@
 **Last Updated:** 2026-02-28
 **Updated By:** GLM-5 - Session 36
 **Branch:** `main`
-**Status:** ACTIVE - Documentation complete, branch creation done, model scoring RPC next
+**Status:** ACTIVE - Ready for full flow test after deployment
 
 ---
 
@@ -32,7 +32,7 @@ vibepilot-governor.service (Go binary)
 ├── Reads secrets from vault at runtime
 ├── Startup recovery: finds and recovers orphaned sessions
 ├── Usage tracking: multi-window rate limit enforcement
-└── Learning: records model success/failure (RPC stub returns 0.5)
+└── Learning: model scoring RPC (ready to deploy)
 ```
 
 **Status:** `systemctl status vibepilot-governor`
@@ -68,7 +68,7 @@ Get priority order from routing.json
     ↓
 For each category: find active destination
     ↓
-Get model score from RPC (currently returns 0.5 - not yet wired)
+Get model score from RPC (success_rate from task_runs)
     ↓
 Return destination ID or "" if none available
 ```
@@ -153,13 +153,21 @@ vibepilot/
 - ✅ Courier vs Internal clarified
 - ✅ "Hats" concept documented
 - ✅ All changes go through task system documented
-- ✅ Session 35 changes committed and pushed
+- ✅ Model scoring RPC created (033_model_scoring_rpc.sql)
+- ✅ Model scoring added to RPC allowlist
+
+### READY TO DEPLOY
+
+| Step | Action | File/Command |
+|------|--------|--------------|
+| 1 | Run migration in Supabase | `docs/supabase-schema/033_model_scoring_rpc.sql` |
+| 2 | Deploy governor | `sudo scripts/deploy-governor.sh` |
 
 ### NEXT - Session 37+
 
 | Priority | Task | Notes |
 |----------|------|-------|
-| **HIGH** | Wire model scoring RPC | `get_model_score_for_task` in Supabase |
+| **TEST** | Full flow test | Create real PRD, watch it flow end-to-end |
 | MEDIUM | Rate limit checking | Router checks destination limits |
 | MEDIUM | API output execution | Governor parses and executes for API runners |
 | LOW | Courier runner | Web platform execution implementation |
@@ -169,12 +177,11 @@ vibepilot/
 
 ## For Next Session
 
-**Priority 1: Wire Model Scoring RPC**
-- Create `get_model_score_for_task` RPC in Supabase
-- Computes score from task_runs table on-the-fly
-- Router uses it to pick best model for task type
-- Currently returns 0.5 (stub) - needs real implementation
-- Location: Supabase SQL function, called from router.go
+**Priority 1: Deploy and Test**
+1. Run `033_model_scoring_rpc.sql` in Supabase SQL Editor
+2. Deploy governor: `sudo scripts/deploy-governor.sh`
+3. Create real PRD
+4. Watch full flow: PRD → Planner → Council → Tasks → Execution → Merge
 
 **Priority 2: Rate Limit Checking**
 - Router checks if destination is at limit before selecting
