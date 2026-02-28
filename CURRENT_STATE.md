@@ -8,14 +8,14 @@
 5. **`docs/SESSION_35_HANDOFF.md`** - Dynamic routing implementation details
 6. **`docs/core_philosophy.md`** - Strategic mindset and principles
 
-**Read all five → Know everything → Do anything**
+**Read all six → Know everything → Do anything**
 
 ---
 
 **Last Updated:** 2026-02-28
 **Updated By:** GLM-5 - Session 36
 **Branch:** `main`
-**Status:** ACTIVE - Dynamic routing committed, documentation updated, branch creation next
+**Status:** ACTIVE - Documentation complete, branch creation done, model scoring RPC next
 
 ---
 
@@ -28,10 +28,11 @@ vibepilot-governor.service (Go binary)
 ├── Polls Supabase every 1s
 ├── Max 8 concurrent per module, 160 total
 ├── Dynamic routing via config (NO hardcoded destinations)
+├── Branch creation when Orchestrator assigns task
 ├── Reads secrets from vault at runtime
 ├── Startup recovery: finds and recovers orphaned sessions
 ├── Usage tracking: multi-window rate limit enforcement
-└── Learning: records model success/failure after task completion
+└── Learning: records model success/failure (RPC stub returns 0.5)
 ```
 
 **Status:** `systemctl status vibepilot-governor`
@@ -44,12 +45,14 @@ Transport/CLI = Provides tools natively (read/write/bash)
 Destination = Where/how access happens (has capabilities)
 Agent = Role with capabilities needed (for routing)
 Prompt packet = Task + expected output format
+Hat = Prompt/role a model wears for a specific task
 
 Routing = config/routing.json (strategies, restrictions, categories)
 Destinations = config/destinations.json (status, type, provides_tools)
 Models = config/models.json (availability, access_via)
 
 NO HARDCODED DESTINATIONS. Everything configurable.
+ALL CHANGES GO THROUGH TASK SYSTEM. Nothing implemented directly.
 ```
 
 ## Dynamic Routing
@@ -65,11 +68,21 @@ Get priority order from routing.json
     ↓
 For each category: find active destination
     ↓
+Get model score from RPC (currently returns 0.5 - not yet wired)
+    ↓
 Return destination ID or "" if none available
 ```
 
 **Internal agents (planner, supervisor, council, etc.)** → internal_only strategy → never external
 **Task execution** → default strategy → external first, then internal
+
+## "Hats" Concept
+
+Models don't have fixed roles. Orchestrator assigns any available model to wear the appropriate "hat" (use the right prompt) for each task.
+
+Example:
+- Task needs maintenance work → Orchestrator picks available model → Model wears "maintenance hat"
+- Task needs planning → Orchestrator picks available model → Model wears "planner hat"
 
 ## Codebase Structure (Clean)
 
@@ -81,11 +94,13 @@ vibepilot/
 │   │   ├── db/            # Supabase client + RPC allowlist
 │   │   ├── vault/         # Secret decryption
 │   │   ├── runtime/       # Events, sessions, router, usage_tracker
+│   │   ├── gitree/        # Git operations (branch, commit, merge, delete)
 │   │   ├── destinations/  # CLI/API runners
 │   │   └── tools/         # Tool registry
 │   └── config/            # JSON configs (routing.json, destinations.json, etc.)
 ├── prompts/               # Agent behavior definitions (.md)
 ├── docs/                  # Documentation
+├── research/              # Review docs for human (on research branch)
 ├── scripts/               # Deploy scripts
 └── legacy/                # DEAD CODE - kept for reference
 ```
@@ -129,48 +144,57 @@ vibepilot/
 - ✅ Full documentation update (vibepilot_process.md)
 - ✅ Failure handling flow documented
 - ✅ Learning system documented (docs/learning_system.md)
-- ✅ Branch creation on orchestrator assignment
+- ✅ Branch creation on orchestrator assignment (main.go)
 - ✅ Research branch created for review docs
 - ✅ "What I've Learned" sections added to agent prompts
 - ✅ Supervisor decision matrix (simple/complex/human)
-- ✅ Learning system documented
 - ✅ System Researcher flow documented
 - ✅ Branch lifecycle documented
 - ✅ Courier vs Internal clarified
+- ✅ "Hats" concept documented
+- ✅ All changes go through task system documented
 - ✅ Session 35 changes committed and pushed
 
 ### NEXT - Session 37+
 
 | Priority | Task | Notes |
 |----------|------|-------|
-| **HIGH** | Branch creation on assignment | gitree.CreateBranch("task/T001") when Orchestrator assigns |
-| **HIGH** | Wire model scoring RPC | get_model_score_for_task in Supabase |
+| **HIGH** | Wire model scoring RPC | `get_model_score_for_task` in Supabase |
 | MEDIUM | Rate limit checking | Router checks destination limits |
 | MEDIUM | API output execution | Governor parses and executes for API runners |
 | LOW | Courier runner | Web platform execution implementation |
-| LATER | Learning system implementation | Store/retrieve learned scores, pattern detection |
-
----
+| LOW | Learning system implementation | Daily learning task, pattern detection |
 
 ---
 
 ## For Next Session
 
-**Priority 1: Branch Creation on Assignment**
-- When Orchestrator assigns task, call gitree.CreateBranch("task/T001")
-- Branch naming: task/{task_number} (simple, human-readable)
-- Happens BEFORE runner executes
-- Location: main.go EventTaskAvailable handler
-
-**Priority 2: Wire Model Scoring RPC**
-- Create get_model_score_for_task RPC in Supabase
+**Priority 1: Wire Model Scoring RPC**
+- Create `get_model_score_for_task` RPC in Supabase
+- Computes score from task_runs table on-the-fly
 - Router uses it to pick best model for task type
-- Learning data actually used for routing
+- Currently returns 0.5 (stub) - needs real implementation
+- Location: Supabase SQL function, called from router.go
 
-**Priority 3: Learning System Design**
-- Discuss with human before implementing
-- Data storage: task_runs, model_scores, failure_patterns
+**Priority 2: Rate Limit Checking**
+- Router checks if destination is at limit before selecting
+- Uses usage_tracker data
+- Prevents routing to rate-limited destinations
+
+**Priority 3: Learning System Implementation**
+- Daily task to update agent prompts with learnings
+- Pattern detection in task_runs
 - All agents learn from outcomes
+
+---
+
+## Key Principles
+
+- **All changes go through task system** - Nothing implemented directly
+- **Hats, not fixed roles** - Any model can wear any hat
+- **Everything configurable** - Nothing hardcoded
+- **Everything learns** - All agents improve over time
+- **Human reviews only** complex suggestions, API credit, UI/UX
 
 ---
 
@@ -184,4 +208,4 @@ vibepilot/
 - Don't add TOOL: format back - it's gone for good
 - Don't modify cleanup script without understanding cgroup logic
 - Don't hardcode any defaults - everything in config files
-- Don't implement learning system without discussing with human first
+- Don't implement anything directly - all changes through task system

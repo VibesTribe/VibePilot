@@ -55,6 +55,7 @@ var defaultRPCAllowlist = map[string]bool{
 	"record_model_failure":        true,
 	"record_model_success":        true,
 	"check_model_availability":    true,
+	"get_model_score_for_task":    true,
 	"get_event_checkpoint":        true,
 	"update_event_checkpoint":     true,
 }
