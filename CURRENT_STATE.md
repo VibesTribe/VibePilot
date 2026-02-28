@@ -186,8 +186,16 @@ vibepilot/
 - ✅ EventTaskReview - Parse decision, call record_failure, update status
 - ✅ EventPRDReady - Parse planner output, commit to GitHub
 - ✅ EventPlanReview - Parse initial review, set status
+- ✅ EventCouncilDone - Parse votes, set consensus, create planner rules
+- ✅ EventTestResults - Parse outcome, merge/reset/await based on result
+- ✅ Context builder wired to planner and supervisor sessions
 - ✅ PRD watcher wired to main.go
 - ✅ All changes use existing RPCs, no new tables
+
+### CRITICAL ITEMS - ALL DONE
+- ✅ Wire Council output → set_council_consensus
+- ✅ Wire test results → update status + merge + unlock
+- ✅ Context builder to session.go
 
 ### NEXT - Session 38+
 
