@@ -1,12 +1,13 @@
 # VibePilot Current State
 
-**Required reading: SIX files**
+**Required reading: SEVEN files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
-2. **`docs/vibepilot_process.md`** - COMPLETE process flow, all roles, failure handling, learning
-3. **`docs/learning_system.md`** - Learning system design, review flow, thresholds
-4. **`docs/SYSTEM_REFERENCE.md`** - What we have and how it works
-5. **`docs/SESSION_35_HANDOFF.md`** - Dynamic routing implementation details
-6. **`docs/core_philosophy.md`** - Strategic mindset and principles
+2. **`AUDIT_REPORT.md`** - FULL CODE AUDIT - What works, what doesn't, what's missing
+3. **`docs/vibepilot_process.md`** - COMPLETE process flow, all roles, failure handling, learning
+4. **`docs/learning_system.md`** - Learning system design, review flow, thresholds
+5. **`docs/SYSTEM_REFERENCE.md`** - What we have and how it works
+6. **`docs/SESSION_35_HANDOFF.md`** - Dynamic routing implementation details
+7. **`docs/core_philosophy.md`** - Strategic mindset and principles
 
 **Read all six → Know everything → Do anything**
 
@@ -15,7 +16,7 @@
 **Last Updated:** 2026-02-28
 **Updated By:** GLM-5 - Session 36
 **Branch:** `main`
-**Status:** ACTIVE - Ready for full flow test after deployment
+**Status:** AUDIT COMPLETE - Infrastructure works, brain missing. See AUDIT_REPORT.md
 
 ---
 
@@ -155,6 +156,21 @@ vibepilot/
 - ✅ All changes go through task system documented
 - ✅ Model scoring RPC created (033_model_scoring_rpc.sql)
 - ✅ Model scoring added to RPC allowlist
+- ✅ FULL CODE AUDIT COMPLETE
+
+### AUDIT FINDINGS (Session 36)
+
+**What works:**
+- Config loading, dynamic routing, event polling, vault, gitree library
+
+**What's missing (CRITICAL):**
+- Decision parsing - Governor doesn't parse agent JSON outputs
+- State transitions - No status updates based on decisions
+- Rejection handling - No wipe/reassign/escalate logic
+- GitHub commits - gitree.CommitOutput exists but never called
+- PRD detection - github client exists but not wired
+
+**Verdict:** Infrastructure works. Brain is missing.
 
 ### READY TO DEPLOY
 
@@ -167,31 +183,30 @@ vibepilot/
 
 | Priority | Task | Notes |
 |----------|------|-------|
-| **TEST** | Full flow test | Create real PRD, watch it flow end-to-end |
-| MEDIUM | Rate limit checking | Router checks destination limits |
+| **CRITICAL** | Decision parser | Parse agent JSON outputs in main.go |
+| **CRITICAL** | State transitions | Update Supabase status based on decisions |
+| **CRITICAL** | Rejection handler | Wipe branch, count failures, reassign/escalate |
+| **CRITICAL** | Wire gitree.CommitOutput | Actually commit runner output to GitHub |
+| **CRITICAL** | Wire PRD detection | Poll GitHub, create plan records |
+| HIGH | Rate limit checking | Router checks destination limits |
 | MEDIUM | API output execution | Governor parses and executes for API runners |
 | LOW | Courier runner | Web platform execution implementation |
-| LOW | Learning system implementation | Daily learning task, pattern detection |
 
 ---
 
 ## For Next Session
 
-**Priority 1: Deploy and Test**
-1. Run `033_model_scoring_rpc.sql` in Supabase SQL Editor
-2. Deploy governor: `sudo scripts/deploy-governor.sh`
-3. Create real PRD
-4. Watch full flow: PRD → Planner → Council → Tasks → Execution → Merge
+**READ AUDIT_REPORT.md FIRST.**
 
-**Priority 2: Rate Limit Checking**
-- Router checks if destination is at limit before selecting
-- Uses usage_tracker data
-- Prevents routing to rate-limited destinations
+**Critical Priority: Build the brain**
 
-**Priority 3: Learning System Implementation**
-- Daily task to update agent prompts with learnings
-- Pattern detection in task_runs
-- All agents learn from outcomes
+The Governor needs to:
+1. **Parse agent outputs** - Extract decision JSON from agent response
+2. **Take action** - Update status, wipe branches, reassign, escalate
+3. **Commit to GitHub** - Call gitree.CommitOutput with runner output
+4. **Detect PRDs** - Poll GitHub for new PRDs, create plan records
+
+**Do NOT add more infrastructure.** Build the decision loop.
 
 ---
 
