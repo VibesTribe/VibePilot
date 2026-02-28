@@ -66,15 +66,16 @@
       "status": "active",
       
       "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_hour": 900,
-        "requests_per_day": 1500,
+        "requests_per_minute": 10,
+        "requests_per_hour": 150,
+        "requests_per_day": 250,
+        "tokens_per_minute": 250000,
         "tokens_per_day": 1000000
       },
       
       "throttle_behavior": "hard_cutoff",
       "buffer_pct": 80,
-      "spacing_min_seconds": 5,
+      "spacing_min_seconds": 6,
       
       "api_pricing": {
         "input_per_1m_usd": 0.30,
@@ -129,6 +130,7 @@
         "output_per_1m_usd": 0.42,
         "input_per_1m_cached_usd": 0.028
       },
+      "cache_supported": true,
       
       "recovery": {
         "on_rate_limit": "cooldown",
@@ -430,6 +432,202 @@
       "strengths": ["coding", "reasoning", "generous_free_tier"],
       "weaknesses": [],
       "notes": "Generous free tier. Good for bulk courier tasks."
+    },
+    
+    {
+      "id": "llama-3.3-70b-versatile",
+      "name": "Llama 3.3 70B (Groq)",
+      "provider": "meta",
+      "access_type": "api",
+      "context_limit": 128000,
+      "capabilities": ["code", "reasoning", "tools"],
+      "access_via": ["groq-api"],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_hour": null,
+        "requests_per_day": 1000,
+        "tokens_per_minute": 12000,
+        "tokens_per_day": 100000
+      },
+      
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 2,
+      
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 180
+      },
+      
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      
+      "strengths": ["ultra_fast", "code", "reasoning"],
+      "weaknesses": ["lower_context_than_gemini"],
+      "notes": "Groq free tier. Ultra fast inference. Good for quick decisions."
+    },
+    
+    {
+      "id": "llama-3.1-8b-instant",
+      "name": "Llama 3.1 8B Instant (Groq)",
+      "provider": "meta",
+      "access_type": "api",
+      "context_limit": 128000,
+      "capabilities": ["code", "chat"],
+      "access_via": ["groq-api"],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_hour": null,
+        "requests_per_day": 14400,
+        "tokens_per_minute": 6000,
+        "tokens_per_day": 500000
+      },
+      
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 2,
+      
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 2,
+        "timeout_seconds": 60,
+        "heartbeat_interval_seconds": 15,
+        "orphan_threshold_seconds": 120
+      },
+      
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      
+      "strengths": ["ultra_fast", "simple_tasks", "chat"],
+      "weaknesses": ["smaller_model"],
+      "notes": "Groq free tier. Fastest. Good for micro-decisions."
+    },
+    
+    {
+      "id": "qwen3-32b",
+      "name": "Qwen 3 32B (Groq)",
+      "provider": "alibaba",
+      "access_type": "api",
+      "context_limit": 128000,
+      "capabilities": ["code", "reasoning", "multilingual"],
+      "access_via": ["groq-api"],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      
+      "rate_limits": {
+        "requests_per_minute": 60,
+        "requests_per_hour": null,
+        "requests_per_day": 1000,
+        "tokens_per_minute": 6000,
+        "tokens_per_day": 500000
+      },
+      
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 1,
+      
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 2,
+        "timeout_seconds": 120,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 180
+      },
+      
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      
+      "strengths": ["multilingual", "code", "fast"],
+      "weaknesses": [],
+      "notes": "Groq free tier. Strong multilingual support."
+    },
+    
+    {
+      "id": "kimi-k2-instruct",
+      "name": "Kimi K2 (OpenRouter/Groq)",
+      "provider": "moonshot",
+      "access_type": "api",
+      "context_limit": 500000,
+      "capabilities": ["code", "reasoning", "tools", "long_horizon"],
+      "access_via": ["groq-api", "openrouter-api"],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      
+      "rate_limits": {
+        "requests_per_minute": 60,
+        "requests_per_hour": null,
+        "requests_per_day": 1000,
+        "tokens_per_minute": 10000,
+        "tokens_per_day": 300000
+      },
+      
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 1,
+      
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      
+      "strengths": ["long_horizon", "tool_chaining", "complex_reasoning", "500k_context"],
+      "weaknesses": [],
+      "notes": "Available on Groq (free) and OpenRouter. 200+ tool call chains. Best for complex agentic tasks."
     }
   ],
   
