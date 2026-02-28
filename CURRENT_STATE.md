@@ -14,9 +14,9 @@
 ---
 
 **Last Updated:** 2026-02-28
-**Updated By:** GLM-5 - Session 36
+**Updated By:** GLM-5 - Session 37
 **Branch:** `main`
-**Status:** AUDIT COMPLETE - Infrastructure works, brain missing. See AUDIT_REPORT.md
+**Status:** ACTIVE - Decision parsing implemented, PRD detection wired
 
 ---
 
@@ -179,7 +179,17 @@ vibepilot/
 | 1 | Run migration in Supabase | `docs/supabase-schema/033_model_scoring_rpc.sql` |
 | 2 | Deploy governor | `sudo scripts/deploy-governor.sh` |
 
-### NEXT - Session 37+
+### DONE - Session 37
+- ✅ decision.go - Parse agent outputs
+- ✅ context_builder.go - Build context from existing RPCs
+- ✅ prd_watcher.go - Detect new PRDs
+- ✅ EventTaskReview - Parse decision, call record_failure, update status
+- ✅ EventPRDReady - Parse planner output, commit to GitHub
+- ✅ EventPlanReview - Parse initial review, set status
+- ✅ PRD watcher wired to main.go
+- ✅ All changes use existing RPCs, no new tables
+
+### NEXT - Session 38+
 
 | Priority | Task | Notes |
 |----------|------|-------|
