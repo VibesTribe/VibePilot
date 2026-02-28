@@ -88,8 +88,9 @@ func (s *Session) Run(ctx context.Context, input map[string]any) (*SessionResult
 }
 
 type SessionFactory struct {
-	config       *Config
-	destinations map[string]DestinationRunner
+	config         *Config
+	destinations   map[string]DestinationRunner
+	contextBuilder *ContextBuilder
 }
 
 func NewSessionFactory(cfg *Config) *SessionFactory {
@@ -97,6 +98,10 @@ func NewSessionFactory(cfg *Config) *SessionFactory {
 		config:       cfg,
 		destinations: make(map[string]DestinationRunner),
 	}
+}
+
+func (f *SessionFactory) SetContextBuilder(cb *ContextBuilder) {
+	f.contextBuilder = cb
 }
 
 func (f *SessionFactory) RegisterDestination(id string, runner DestinationRunner) {
@@ -121,6 +126,46 @@ func (f *SessionFactory) Create(agentID string, opts ...SessionOption) (*Session
 	prompt, err := f.config.LoadPrompt(agent.Prompt)
 	if err != nil {
 		return nil, fmt.Errorf("load prompt: %w", err)
+	}
+
+	destID := agent.DefaultDestination
+	dest, ok := f.destinations[destID]
+	if !ok {
+		return nil, fmt.Errorf("destination %s not registered", destID)
+	}
+
+	sessionID := fmt.Sprintf("%s-%d", agentID, time.Now().UnixNano())
+
+	cfgOpts := []SessionOption{
+		WithTimeout(time.Duration(f.config.GetRuntimeConfig().AgentTimeoutSeconds) * time.Second),
+	}
+	cfgOpts = append(cfgOpts, opts...)
+
+	return NewSession(sessionID, agentID, dest, destID, prompt, cfgOpts...), nil
+}
+
+func (f *SessionFactory) CreateWithContext(ctx context.Context, agentID string, taskType string, opts ...SessionOption) (*Session, error) {
+	agent := f.config.GetAgent(agentID)
+	if agent == nil {
+		return nil, fmt.Errorf("agent %s not found", agentID)
+	}
+
+	prompt, err := f.config.LoadPrompt(agent.Prompt)
+	if err != nil {
+		return nil, fmt.Errorf("load prompt: %w", err)
+	}
+
+	if f.contextBuilder != nil && taskType != "" {
+		var extraContext string
+		switch agentID {
+		case "planner":
+			extraContext, _ = f.contextBuilder.BuildPlannerContext(ctx, taskType)
+		case "supervisor":
+			extraContext, _ = f.contextBuilder.BuildSupervisorContext(ctx, taskType)
+		}
+		if extraContext != "" {
+			prompt += extraContext
+		}
 	}
 
 	destID := agent.DefaultDestination

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -65,6 +66,9 @@ func main() {
 
 	sessionFactory := runtime.NewSessionFactory(cfg)
 	registerDestinations(sessionFactory, cfg, v)
+
+	contextBuilder := runtime.NewContextBuilder(database)
+	sessionFactory.SetContextBuilder(contextBuilder)
 
 	pool := runtime.NewAgentPoolWithConcurrency(
 		cfg.System.Runtime.MaxConcurrentPerModule,
@@ -264,7 +268,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		session, err := factory.Create("supervisor")
+		session, err := factory.CreateWithContext(ctx, "supervisor", taskType)
 		if err != nil {
 			log.Printf("[EventTaskReview] Failed to create supervisor session: %v", err)
 			return
@@ -454,11 +458,73 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
-			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "council_done"})
+			_, err := session.Run(ctx, map[string]any{"plan": plan, "event": "council_done"})
 			if err != nil {
 				return err
 			}
-			log.Printf("[EventCouncilDone] Council done for %s via %s: %s", truncateID(planID), destID, truncateOutput(result.Output))
+
+			councilReviews, _ := plan["council_reviews"].([]interface{})
+			approved := 0
+			revisionNeeded := 0
+			blocked := 0
+
+			for _, r := range councilReviews {
+				if rm, ok := r.(map[string]interface{}); ok {
+					vote, _ := rm["vote"].(string)
+					switch vote {
+					case "APPROVED":
+						approved++
+					case "REVISION_NEEDED":
+						revisionNeeded++
+					case "BLOCKED":
+						blocked++
+					}
+				}
+			}
+
+			var consensus string
+			if approved == 3 {
+				consensus = "approved"
+			} else if blocked > 0 {
+				consensus = "blocked"
+			} else {
+				consensus = "revision_needed"
+			}
+
+			log.Printf("[EventCouncilDone] Plan %s consensus: %s (approved=%d, revision=%d, blocked=%d)", truncateID(planID), consensus, approved, revisionNeeded, blocked)
+
+			_, err = database.RPC(ctx, "set_council_consensus", map[string]any{
+				"p_plan_id":   planID,
+				"p_consensus": consensus,
+			})
+			if err != nil {
+				log.Printf("[EventCouncilDone] Failed to set council consensus: %v", err)
+			}
+
+			if consensus == "revision_needed" || consensus == "blocked" {
+				for _, r := range councilReviews {
+					if rm, ok := r.(map[string]interface{}); ok {
+						concerns, _ := rm["concerns"].([]interface{})
+						for _, c := range concerns {
+							if cm, ok := c.(map[string]interface{}); ok {
+								description, _ := cm["description"].(string)
+								if description != "" {
+									_, err := database.RPC(ctx, "create_planner_rule", map[string]any{
+										"p_applies_to": "*",
+										"p_rule_type":  "council_feedback",
+										"p_rule_text":  "Avoid: " + description,
+										"p_source":     "council",
+									})
+									if err != nil {
+										log.Printf("[EventCouncilDone] Failed to create planner rule: %v", err)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
 			return nil
 		})
 		if err != nil {
@@ -536,7 +602,16 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
-		session, err := factory.Create("planner")
+		projectType := "general"
+		if prdPath, ok := plan["prd_path"].(string); ok {
+			if strings.Contains(strings.ToLower(prdPath), "dashboard") || strings.Contains(strings.ToLower(prdPath), "ui") {
+				projectType = "frontend"
+			} else if strings.Contains(strings.ToLower(prdPath), "api") {
+				projectType = "backend"
+			}
+		}
+
+		session, err := factory.CreateWithContext(ctx, "planner", projectType)
 		if err != nil {
 			log.Printf("[EventPRDReady] Failed to create planner session: %v", err)
 			return
@@ -660,6 +735,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		taskID, _ := testResult["task_id"].(string)
+		taskNumber, _ := testResult["task_number"].(string)
 		destID := selectDestination("supervisor", taskID, "test_review")
 		if destID == "" {
 			log.Printf("[EventTestResults] No destination available for task %s", truncateID(taskID))
@@ -676,7 +752,68 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			if err != nil {
 				return err
 			}
-			log.Printf("[EventTestResults] Task %s tests processed via %s: %s", truncateID(taskID), destID, truncateOutput(result.Output))
+
+			testOutput, parseErr := runtime.ParseTestResults(result.Output)
+			if parseErr != nil {
+				log.Printf("[EventTestResults] Failed to parse test output: %v", parseErr)
+				log.Printf("[EventTestResults] Raw output: %s", truncateOutput(result.Output))
+				return nil
+			}
+
+			log.Printf("[EventTestResults] Task %s test outcome: %s, next: %s", truncateID(taskID), testOutput.TestOutcome, testOutput.NextAction)
+
+			switch testOutput.NextAction {
+			case "final_merge":
+				branchName := fmt.Sprintf("task/%s", taskNumber)
+				sliceID, _ := testResult["slice_id"].(string)
+				if sliceID == "" {
+					sliceID = "default"
+				}
+				targetBranch := fmt.Sprintf("module/%s", sliceID)
+
+				if err := git.MergeBranch(ctx, branchName, targetBranch); err != nil {
+					log.Printf("[EventTestResults] Failed to merge %s to %s: %v", branchName, targetBranch, err)
+					return nil
+				}
+
+				if err := git.DeleteBranch(ctx, branchName); err != nil {
+					log.Printf("[EventTestResults] Failed to delete branch %s: %v", branchName, err)
+				}
+
+				_, err := database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "complete",
+				})
+				if err != nil {
+					log.Printf("[EventTestResults] Failed to update task status to complete: %v", err)
+				}
+
+				_, err = database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
+					"p_completed_task_id": taskID,
+				})
+				if err != nil {
+					log.Printf("[EventTestResults] Failed to unlock dependents: %v", err)
+				}
+
+			case "return_for_fix":
+				_, err := database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "available",
+				})
+				if err != nil {
+					log.Printf("[EventTestResults] Failed to reset task for fix: %v", err)
+				}
+
+			case "await_human_approval":
+				_, err := database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "awaiting_human",
+				})
+				if err != nil {
+					log.Printf("[EventTestResults] Failed to set task awaiting_human: %v", err)
+				}
+			}
+
 			return nil
 		})
 		if err != nil {
