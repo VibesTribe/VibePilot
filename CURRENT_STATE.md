@@ -1,11 +1,12 @@
 # VibePilot Current State
 
-**Required reading: FIVE files**
+**Required reading: SIX files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
 2. **`docs/vibepilot_process.md`** - COMPLETE process flow, all roles, failure handling, learning
-3. **`docs/SYSTEM_REFERENCE.md`** - What we have and how it works
-4. **`docs/SESSION_35_HANDOFF.md`** - Dynamic routing implementation details
-5. **`docs/core_philosophy.md`** - Strategic mindset and principles
+3. **`docs/learning_system.md`** - Learning system design, review flow, thresholds
+4. **`docs/SYSTEM_REFERENCE.md`** - What we have and how it works
+5. **`docs/SESSION_35_HANDOFF.md`** - Dynamic routing implementation details
+6. **`docs/core_philosophy.md`** - Strategic mindset and principles
 
 **Read all five → Know everything → Do anything**
 
@@ -127,6 +128,11 @@ vibepilot/
 ### DONE - Session 36
 - ✅ Full documentation update (vibepilot_process.md)
 - ✅ Failure handling flow documented
+- ✅ Learning system documented (docs/learning_system.md)
+- ✅ Branch creation on orchestrator assignment
+- ✅ Research branch created for review docs
+- ✅ "What I've Learned" sections added to agent prompts
+- ✅ Supervisor decision matrix (simple/complex/human)
 - ✅ Learning system documented
 - ✅ System Researcher flow documented
 - ✅ Branch lifecycle documented
