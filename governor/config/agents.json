@@ -1,11 +1,13 @@
 {
-  "version": "2.0",
+  "$schema": "./schemas/agents.schema.json",
+  "version": "2.1",
+  "description": "Agent configurations. Capabilities define what the agent needs for routing - destinations provide tools natively.",
   "agents": [
     {
       "id": "consultant",
       "name": "Consultant",
       "prompt": "consultant.md",
-      "tools": ["web_search", "web_fetch", "db_query", "file_read", "file_write"],
+      "capabilities": ["web_access", "file_access", "interactive"],
       "default_destination": "opencode",
       "description": "Human entry point - transforms ideas into zero-ambiguity PRDs"
     },
@@ -13,7 +15,7 @@
       "id": "planner",
       "name": "Planner",
       "prompt": "planner.md",
-      "tools": ["db_query", "db_update", "file_read", "file_write"],
+      "capabilities": ["file_access"],
       "default_destination": "opencode",
       "description": "Breaks PRD into atomic tasks with prompt packets"
     },
@@ -21,7 +23,7 @@
       "id": "supervisor",
       "name": "Supervisor",
       "prompt": "supervisor.md",
-      "tools": ["db_query", "db_update", "db_rpc", "file_read"],
+      "capabilities": ["file_access"],
       "default_destination": "opencode",
       "description": "Quality control - approves/rejects, decides simple vs complex"
     },
@@ -29,7 +31,7 @@
       "id": "council",
       "name": "Council",
       "prompt": "council.md",
-      "tools": ["db_query", "file_read", "web_search"],
+      "capabilities": ["file_access", "web_access"],
       "default_destination": "opencode",
       "description": "Deep review for complex decisions - 3 lenses, consensus"
     },
@@ -37,7 +39,7 @@
       "id": "orchestrator",
       "name": "Vibes",
       "prompt": "orchestrator.md",
-      "tools": ["db_query", "db_update", "db_rpc"],
+      "capabilities": [],
       "default_destination": "opencode",
       "description": "Human interface (Vibes) - dispatches tasks, tracks ROI, answers questions"
     },
@@ -45,7 +47,7 @@
       "id": "maintenance",
       "name": "Maintenance",
       "prompt": "maintenance.md",
-      "tools": ["git_create_branch", "git_read_branch", "git_commit", "git_merge", "git_delete_branch", "file_read", "file_write", "file_delete", "sandbox_test", "run_lint", "run_typecheck"],
+      "capabilities": ["git_access", "file_access", "sandbox_execution"],
       "default_destination": "opencode",
       "description": "Code changes - ONLY agent with write access to repo"
     },
@@ -53,7 +55,7 @@
       "id": "researcher",
       "name": "System Researcher",
       "prompt": "system_researcher.md",
-      "tools": ["web_search", "web_fetch", "db_query"],
+      "capabilities": ["web_access"],
       "default_destination": "opencode",
       "description": "Daily research for system improvements"
     },
@@ -61,7 +63,7 @@
       "id": "tester",
       "name": "Tester",
       "prompt": "testers.md",
-      "tools": ["file_read", "sandbox_test", "run_lint", "run_typecheck"],
+      "capabilities": ["file_access", "sandbox_execution"],
       "default_destination": "opencode",
       "description": "Code validation - runs tests, lint, typecheck"
     },
@@ -69,7 +71,7 @@
       "id": "watcher",
       "name": "Watcher",
       "prompt": "watcher.md",
-      "tools": ["db_query", "db_update", "db_rpc"],
+      "capabilities": [],
       "default_destination": "opencode",
       "description": "Safety net - monitors for failures, escalates issues"
     }

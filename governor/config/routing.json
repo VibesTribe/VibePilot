@@ -1,0 +1,51 @@
+{
+  "$schema": "./schemas/routing.schema.json",
+  "version": "1.0",
+  "description": "Routing configuration. All priority and restrictions are configurable. Nothing hardcoded in code.",
+  
+  "default_strategy": "default",
+  
+  "strategies": {
+    "default": {
+      "description": "External first if task allows, then internal",
+      "priority": ["external", "internal"]
+    },
+    "internal_only": {
+      "description": "Never use external platforms",
+      "priority": ["internal"]
+    },
+    "external_only": {
+      "description": "Only use external platforms",
+      "priority": ["external"]
+    }
+  },
+  
+  "agent_restrictions": {
+    "internal_only": ["planner", "supervisor", "council", "orchestrator", "maintenance", "watcher", "tester"],
+    "default": ["consultant", "researcher", "courier", "task_runner"]
+  },
+  
+  "destination_categories": {
+    "external": {
+      "description": "Web platforms accessed by couriers",
+      "check_field": "type",
+      "check_values": ["web"]
+    },
+    "internal": {
+      "description": "CLI and API destinations",
+      "check_field": "type", 
+      "check_values": ["cli", "api"]
+    }
+  },
+  
+  "selection_criteria": {
+    "status": "active",
+    "not_at_limit": true,
+    "prefer_learned_best": true
+  },
+  
+  "fallback": {
+    "on_category_unavailable": "try_next_priority",
+    "on_all_unavailable": "pause_and_alert"
+  }
+}

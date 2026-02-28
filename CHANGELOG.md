@@ -6,6 +6,79 @@
 
 ---
 
+# 2026-02-28 (Session 35)
+
+## Summary
+
+Removed rigid TOOL: format, implemented dynamic routing, wired learning loop. NO MORE HARDCODED DESTINATIONS.
+
+### Major Work
+
+1. **Removed TOOL: Format**
+   - Deleted `ParseToolCalls`, `ToolCall` struct, `FormatToolResults` from tools.go
+   - Removed TOOL: instruction appending from session.go
+   - Simplified session to single-turn execution
+   - Models output in expected format, Governor handles execution
+
+2. **Dynamic Routing (CRITICAL FIX)**
+   - Created `runtime/router.go` - destination selection based on config
+   - Created `config/routing.json` - strategies, agent restrictions, categories
+   - Removed ALL hardcoded `"opencode"` from event handlers
+   - Routing now based on: agent type, task type, destination availability
+   - Fallback chain: external → internal → pause if nothing available
+   - Internal agents (planner, supervisor, council, etc.) never go to external platforms
+   - Everything configurable via routing.json - NO hardcoded routing logic
+
+3. **Destination Capabilities**
+   - Added `provides_tools` to destinations.json
+   - CLI destinations (opencode, kimi): provide read/write/bash/webfetch
+   - API destinations (deepseek-api, gemini-api): provide nothing
+   - `DestinationConfig.HasNativeTools()`, `DestinationConfig.ProvidesTool()` methods
+
+4. **Agent Capabilities**
+   - Renamed `tools` → `capabilities` in agents.json
+   - Defines what agent NEEDS (not what it calls)
+   - Used for routing decisions
+   - `AgentConfig.HasCapability()` method
+
+5. **Learning Loop Wired**
+   - `recordModelSuccess()` / `recordModelFailure()` helper functions
+   - Called in EventTaskCompleted after supervisor approves + tests pass
+   - Tracks model_id, task_type, duration_seconds
+
+6. **Prompt Updates**
+   - planner.md: Removed TOOL: references, defines output format only
+   - supervisor.md: Removed TOOL: references, describes actions not tool calls
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `governor/internal/runtime/session.go` | Simplified, removed TOOL: |
+| `governor/internal/runtime/tools.go` | Removed TOOL: parsing |
+| `governor/internal/runtime/config.go` | Added routing config, helpers |
+| `governor/internal/runtime/router.go` | NEW - dynamic destination selection |
+| `governor/cmd/governor/main.go` | Dynamic routing, removed all hardcoded destinations |
+| `governor/config/destinations.json` | Added provides_tools |
+| `governor/config/agents.json` | Renamed tools → capabilities |
+| `governor/config/routing.json` | NEW - routing strategies and restrictions |
+| `prompts/planner.md` | Removed TOOL:, output format only |
+| `prompts/supervisor.md` | Removed TOOL:, output format only |
+
+### Architecture Principle
+
+```
+Model = Intelligence
+Transport/CLI = Provides tools natively
+Destination = Where/how access happens
+Agent = Role with capabilities needed
+Prompt packet = Task + expected output format
+
+Model outputs in expected format → Governor executes (if needed)
+```
+
+---
+
 # 2026-02-27 (Session 34)
 
 ## Summary

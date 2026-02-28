@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
-	"strings"
 )
 
 type ToolResult struct {
@@ -34,14 +32,20 @@ func (r *ToolRegistry) Register(name string, executor ToolExecutor) {
 	r.tools[name] = executor
 }
 
-func (r *ToolRegistry) Execute(ctx context.Context, agentID, toolName string, args map[string]any) ToolResult {
-	if !r.config.AgentHasTool(agentID, toolName) {
-		return ToolResult{
-			Success: false,
-			Error:   fmt.Sprintf("tool %s not available to agent %s", toolName, agentID),
-		}
-	}
+func (r *ToolRegistry) HasTool(name string) bool {
+	_, ok := r.tools[name]
+	return ok
+}
 
+func (r *ToolRegistry) ListTools() []string {
+	names := make([]string, 0, len(r.tools))
+	for name := range r.tools {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (r *ToolRegistry) Execute(ctx context.Context, toolName string, args map[string]any) ToolResult {
 	toolCfg := r.config.GetTool(toolName)
 	if toolCfg == nil {
 		return ToolResult{
@@ -129,59 +133,4 @@ func validateParamType(name, expectedType string, value any) error {
 		}
 	}
 	return nil
-}
-
-var toolCallPattern = regexp.MustCompile(`(?i)TOOL:\s*([a-z_][a-z0-9_]*)\s*(\{[\s\S]*?\})?`)
-
-func ParseToolCalls(output string) []ToolCall {
-	var calls []ToolCall
-
-	matches := toolCallPattern.FindAllStringSubmatch(output, -1)
-	for _, match := range matches {
-		if len(match) < 2 {
-			continue
-		}
-
-		call := ToolCall{
-			Name: strings.TrimSpace(match[1]),
-		}
-
-		if len(match) > 2 && match[2] != "" {
-			var args map[string]any
-			if err := json.Unmarshal([]byte(match[2]), &args); err == nil {
-				call.Args = args
-			}
-		}
-
-		if call.Args == nil {
-			call.Args = make(map[string]any)
-		}
-
-		calls = append(calls, call)
-	}
-
-	return calls
-}
-
-type ToolCall struct {
-	Name string         `json:"name"`
-	Args map[string]any `json:"args"`
-}
-
-func (c ToolCall) String() string {
-	argsJSON, _ := json.Marshal(c.Args)
-	return fmt.Sprintf("TOOL: %s %s", c.Name, string(argsJSON))
-}
-
-func FormatToolResults(results map[string]ToolResult) string {
-	var sb strings.Builder
-	sb.WriteString("TOOL RESULTS:\n")
-	for name, result := range results {
-		if result.Success {
-			sb.WriteString(fmt.Sprintf("- %s: SUCCESS %s\n", name, string(result.Result)))
-		} else {
-			sb.WriteString(fmt.Sprintf("- %s: ERROR %s\n", name, result.Error))
-		}
-	}
-	return sb.String()
 }

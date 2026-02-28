@@ -32,7 +32,7 @@ You receive JSON with a plan record from the database:
 }
 ```
 
-**YOUR FIRST ACTION:** Use `file_read` tool to read the PRD from the path in `plan.prd_path`.
+**YOUR FIRST ACTION:** Read the PRD from the path in `plan.prd_path`.
 
 Then parse the markdown PRD and extract:
 - Problem statement
@@ -45,45 +45,29 @@ Then proceed to create tasks.
 
 ---
 
-## SAVING THE PLAN
+## OUTPUT
 
-After creating your plan with all tasks, dependencies, and prompt packets:
+After creating your plan with all tasks, dependencies, and prompt packets, output the following:
 
-### Step 1: Save Plan to GitHub
-
-Save the complete plan as a markdown file in the plans directory:
-
-```
-TOOL: file_write
+```json
 {
-  "path": "docs/plans/{project-name}-plan.md",
-  "content": "# PLAN: [Project Name]\n\n## Overview\n[Brief description]\n\n## Tasks\n\n### T001: [Task Title]\n**Confidence:** 0.98\n**Dependencies:** none\n**Type:** feature\n**Requires Codebase:** false\n\n#### Prompt Packet\n```\n[Full prompt packet following the template below]\n```\n\n#### Expected Output\n```json\n{\n  \"files_created\": [\"path/to/file\"],\n  \"files_modified\": [],\n  \"tests_required\": [\"path/to/test\"]\n}\n```\n\n---\n\n### T002: [Next Task]\n...\n"
+  "action": "plan_created",
+  "plan_id": "<plan.id from input>",
+  "plan_path": "docs/plans/{project-name}-plan.md",
+  "plan_content": "# PLAN: [Project Name]\n\n## Overview\n[Brief description]\n\n## Tasks\n\n### T001: [Task Title]\n**Confidence:** 0.98\n**Dependencies:** none\n**Type:** feature\n**Requires Codebase:** false\n\n#### Prompt Packet\n```\n[Full prompt packet following the template below]\n```\n\n#### Expected Output\n```json\n{\n  \"files_created\": [\"path/to/file\"],\n  \"files_modified\": [],\n  \"tests_required\": [\"path/to/test\"]\n}\n```\n\n---\n\n### T002: [Next Task]\n...\n",
+  "total_tasks": 12,
+  "status": "review"
 }
 ```
 
-The plan file must contain ALL tasks with complete prompt packets. Use the project name from the PRD to create a descriptive filename.
-
-### Step 2: Update Supabase Record
-
-After successfully saving the plan file, update the plan record:
-
-```
-TOOL: db_update
-{
-  "table": "plans",
-  "id": "<plan.id from input>",
-  "data": {
-    "plan_path": "docs/plans/{project-name}-plan.md",
-    "status": "review"
-  }
-}
-```
+The plan file will be saved to `plan_path` and the database updated automatically.
 
 **IMPORTANT:**
 - Set `status` to `"review"` - this signals the Supervisor to review your plan
-- Set `plan_path` to the exact path where you saved the plan file
-- DO NOT create tasks in Supabase directly - that happens after plan approval
-- DO NOT skip any tasks - every task from your plan must be in the markdown file
+- Set `plan_path` to the desired path for the plan file (e.g., `docs/plans/auth-feature-plan.md`)
+- Include complete plan content in `plan_content` field
+- DO NOT skip any tasks - every task from your plan must be included
+- Use the project name from the PRD to create a descriptive filename
 
 ### What Happens Next
 

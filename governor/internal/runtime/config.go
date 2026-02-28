@@ -105,14 +105,22 @@ type WebToolsConfig struct {
 }
 
 type AgentConfig struct {
-	ID                 string          `json:"id"`
-	Name               string          `json:"name,omitempty"`
-	Prompt             string          `json:"prompt"`
-	Tools              []string        `json:"tools"`
-	Model              string          `json:"model,omitempty"`
-	DefaultDestination string          `json:"default_destination"`
-	Description        string          `json:"description,omitempty"`
-	Capabilities       map[string]bool `json:"capabilities,omitempty"`
+	ID                 string   `json:"id"`
+	Name               string   `json:"name,omitempty"`
+	Prompt             string   `json:"prompt"`
+	Capabilities       []string `json:"capabilities,omitempty"`
+	Model              string   `json:"model,omitempty"`
+	DefaultDestination string   `json:"default_destination"`
+	Description        string   `json:"description,omitempty"`
+}
+
+func (a *AgentConfig) HasCapability(capability string) bool {
+	for _, c := range a.Capabilities {
+		if c == capability {
+			return true
+		}
+	}
+	return false
 }
 
 type AgentsFile struct {
@@ -179,18 +187,36 @@ type ModelsFile struct {
 	Models []ModelConfig `json:"models"`
 }
 
+type RoutingStrategy struct {
+	Description string   `json:"description"`
+	Priority    []string `json:"priority"`
+}
+
+type RoutingConfig struct {
+	Version               string                     `json:"version,omitempty"`
+	Description           string                     `json:"description,omitempty"`
+	DefaultStrategy       string                     `json:"default_strategy"`
+	Strategies            map[string]RoutingStrategy `json:"strategies"`
+	AgentRestrictions     map[string][]string        `json:"agent_restrictions"`
+	DestinationCategories map[string]map[string]any  `json:"destination_categories"`
+	SelectionCriteria     map[string]any             `json:"selection_criteria"`
+	Fallback              map[string]string          `json:"fallback"`
+}
+
 type Config struct {
 	System       *SystemConfig
 	Agents       *AgentsFile
 	Tools        *ToolsFile
 	Destinations *DestinationsFile
 	Models       *ModelsFile
+	Routing      *RoutingConfig
 
 	systemPath       string
 	agentsPath       string
 	toolsPath        string
 	destinationsPath string
 	modelsPath       string
+	routingPath      string
 	promptsDir       string
 
 	mu sync.RWMutex
@@ -203,6 +229,7 @@ func LoadConfig(configDir string) (*Config, error) {
 		toolsPath:        filepath.Join(configDir, "tools.json"),
 		destinationsPath: filepath.Join(configDir, "destinations.json"),
 		modelsPath:       filepath.Join(configDir, "models.json"),
+		routingPath:      filepath.Join(configDir, "routing.json"),
 		promptsDir:       filepath.Join(configDir, "prompts"),
 	}
 
@@ -245,6 +272,12 @@ func (c *Config) Reload() error {
 		c.Models = models
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("load models.json: %w", err)
+	}
+
+	if routing, err := loadJSON[RoutingConfig](c.routingPath); err == nil {
+		c.Routing = routing
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("load routing.json: %w", err)
 	}
 
 	if c.System == nil {
@@ -371,17 +404,12 @@ func (c *Config) LoadPrompt(promptPath string) (string, error) {
 	return string(data), nil
 }
 
-func (c *Config) AgentHasTool(agentID, toolName string) bool {
+func (c *Config) AgentHasCapability(agentID, capability string) bool {
 	agent := c.GetAgent(agentID)
 	if agent == nil {
 		return false
 	}
-	for _, t := range agent.Tools {
-		if t == toolName {
-			return true
-		}
-	}
-	return false
+	return agent.HasCapability(capability)
 }
 
 func (c *Config) GetDatabaseURL() string {
@@ -466,6 +494,80 @@ func (c *Config) GetRuntimeConfig() *RuntimeConfig {
 		}
 	}
 	return &c.System.Runtime
+}
+
+func (c *Config) GetRoutingStrategy(agentID string) string {
+	if c.Routing == nil {
+		return "default"
+	}
+
+	internalOnly := c.Routing.AgentRestrictions["internal_only"]
+	for _, id := range internalOnly {
+		if id == agentID {
+			return "internal_only"
+		}
+	}
+
+	return c.Routing.DefaultStrategy
+}
+
+func (c *Config) GetStrategyPriority(strategyName string) []string {
+	if c.Routing == nil {
+		return []string{"internal"}
+	}
+
+	strategy, ok := c.Routing.Strategies[strategyName]
+	if !ok {
+		return []string{"internal"}
+	}
+
+	return strategy.Priority
+}
+
+func (c *Config) GetDestinationCategory(destID string) string {
+	if c.Routing == nil || c.Destinations == nil {
+		return "internal"
+	}
+
+	dest := c.GetDestination(destID)
+	if dest == nil {
+		return "internal"
+	}
+
+	for categoryName, categoryDef := range c.Routing.DestinationCategories {
+		checkField, _ := categoryDef["check_field"].(string)
+		checkValues, _ := categoryDef["check_values"].([]interface{})
+
+		var fieldValue string
+		switch checkField {
+		case "type":
+			fieldValue = dest.Type
+		case "status":
+			fieldValue = dest.Status
+		}
+
+		for _, v := range checkValues {
+			if vs, ok := v.(string); ok && vs == fieldValue {
+				return categoryName
+			}
+		}
+	}
+
+	return "internal"
+}
+
+func (c *Config) GetDestinationsInCategory(category string) []DestinationConfig {
+	if c.Destinations == nil {
+		return nil
+	}
+
+	var result []DestinationConfig
+	for _, dest := range c.Destinations.Destinations {
+		if c.GetDestinationCategory(dest.ID) == category && dest.Status == "active" {
+			result = append(result, dest)
+		}
+	}
+	return result
 }
 
 func loadJSON[T any](path string) (*T, error) {
