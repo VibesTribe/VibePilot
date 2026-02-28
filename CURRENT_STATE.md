@@ -2,9 +2,9 @@
 
 **Required reading: FIVE files**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
-2. **`docs/SESSION_35_HANDOFF.md`** - Latest session: dynamic routing implementation
+2. **`docs/vibepilot_process.md`** - COMPLETE process flow, all roles, failure handling, learning
 3. **`docs/SYSTEM_REFERENCE.md`** - What we have and how it works
-4. **`docs/SECURITY_BOOTSTRAP.md`** - How credentials work
+4. **`docs/SESSION_35_HANDOFF.md`** - Dynamic routing implementation details
 5. **`docs/core_philosophy.md`** - Strategic mindset and principles
 
 **Read all five → Know everything → Do anything**
@@ -12,9 +12,9 @@
 ---
 
 **Last Updated:** 2026-02-28
-**Updated By:** GLM-5 - Session 35
+**Updated By:** GLM-5 - Session 36
 **Branch:** `main`
-**Status:** ACTIVE - Dynamic routing, TOOL: removed, learning wired
+**Status:** ACTIVE - Dynamic routing committed, documentation updated, branch creation next
 
 ---
 
@@ -117,108 +117,54 @@ vibepilot/
 
 ---
 
-## Session 35 Changes (Current)
-
-### 1. Removed TOOL: Format
-- **Problem:** Rigid string parsing, fragile, OpenCode ignores it
-- **Solution:** Models output in expected format, Governor handles execution
-- **Files:** session.go (simplified), tools.go (removed parsing)
-- **Lines removed:** ~100 lines of TOOL: parsing code
-
-### 2. Destination Capabilities
-- **New field:** `provides_tools` in destinations.json
-- **CLI destinations:** Provide read/write/bash/webfetch natively
-- **API destinations:** Provide nothing (Governor executes)
-- **Methods:** `HasNativeTools()`, `ProvidesTool()`
-
-### 3. Agent Capabilities
-- **Renamed:** `tools` → `capabilities` in agents.json
-- **Purpose:** Defines what agent NEEDS for routing decisions
-- **Method:** `AgentConfig.HasCapability()`
-
-### 4. Learning Loop Wired
-- **Functions:** `recordModelSuccess()`, `recordModelFailure()`
-- **Location:** main.go event handlers
-- **Trigger:** After supervisor approves + tests pass
-- **Tracks:** model_id, task_type, duration_seconds
-
-### 5. Prompts Updated
-- **planner.md:** Removed TOOL: references, defines output format
-- **supervisor.md:** Removed TOOL: references, describes actions
-- **Principle:** Prompt = behavior + output format, NOT tool calls
-
----
-
-## What's Configurable (No Hardcoded Values)
-
-| Setting | Config File | Field |
-|---------|-------------|-------|
-| Routing strategies | routing.json | `strategies.*.priority` |
-| Agent restrictions | routing.json | `agent_restrictions` |
-| Destination categories | routing.json | `destination_categories` |
-| Destination capabilities | destinations.json | `provides_tools` |
-| Agent capabilities | agents.json | `capabilities` |
-| Destination status | destinations.json | `status` (active/inactive) |
-| Model availability | models.json | `status`, `access_via` |
-| Orphan threshold | system.json | `recovery.orphan_threshold_seconds` |
-| Max task attempts | system.json | `recovery.max_task_attempts` |
-| Buffer percentage | models.json | Each model's `buffer_pct` |
-| Rate limits | models.json | Each model's `rate_limits.*` |
-| Concurrency limits | system.json | `concurrency.limits.*` |
-
----
-
-## Remaining Gaps (Priority Order)
+## Session Progress
 
 ### DONE - Session 35
+- ✅ Dynamic routing (router.go, routing.json)
+- ✅ Python moved to legacy/
+- ✅ TOOL: format removed
 
-| Task | Status |
-|------|--------|
-| Dynamic routing | ✅ Deployed and verified |
-| Python cleanup | ✅ Moved to legacy/ |
-| TOOL: format removal | ✅ Complete |
+### DONE - Session 36
+- ✅ Full documentation update (vibepilot_process.md)
+- ✅ Failure handling flow documented
+- ✅ Learning system documented
+- ✅ System Researcher flow documented
+- ✅ Branch lifecycle documented
+- ✅ Courier vs Internal clarified
+- ✅ Session 35 changes committed and pushed
 
-### NEXT - Future Sessions
+### NEXT - Session 37+
 
 | Priority | Task | Notes |
 |----------|------|-------|
-| HIGH | Add courier destinations | Web platforms to destinations.json (type: "web") |
-| HIGH | Wire model scoring RPC | get_model_score_for_task in Supabase |
+| **HIGH** | Branch creation on assignment | gitree.CreateBranch("task/T001") when Orchestrator assigns |
+| **HIGH** | Wire model scoring RPC | get_model_score_for_task in Supabase |
 | MEDIUM | Rate limit checking | Router checks destination limits |
 | MEDIUM | API output execution | Governor parses and executes for API runners |
 | LOW | Courier runner | Web platform execution implementation |
+| LATER | Learning system implementation | Store/retrieve learned scores, pattern detection |
 
-### Verified Working
-
-```bash
-# Check routing in action
-sudo journalctl -u vibepilot-governor -f | grep Router
-```
-
-Expected output:
-```
-[Router] Agent planner using strategy internal_only with priority [internal]
-[Router] Selected destination opencode (category: internal, model: glm-5)
-```
+---
 
 ---
 
 ## For Next Session
 
-**Priority 1: Add Web Destinations**
-- Add chatgpt-web, claude-web, gemini-web to destinations.json
-- Set type="web", status="active" or "inactive"
-- Router will pick them for task execution (default strategy: external first)
+**Priority 1: Branch Creation on Assignment**
+- When Orchestrator assigns task, call gitree.CreateBranch("task/T001")
+- Branch naming: task/{task_number} (simple, human-readable)
+- Happens BEFORE runner executes
+- Location: main.go EventTaskAvailable handler
 
-**Priority 2: Wire Model Scoring**
+**Priority 2: Wire Model Scoring RPC**
 - Create get_model_score_for_task RPC in Supabase
 - Router uses it to pick best model for task type
 - Learning data actually used for routing
 
-**Priority 3: Test Full Flow**
-- Create a real PRD
-- Watch it flow through: PRD → Planner → Supervisor → Tasks → Execution
-- Verify routing logs show correct destinations
+**Priority 3: Learning System Design**
+- Discuss with human before implementing
+- Data storage: task_runs, model_scores, failure_patterns
+- All agents learn from outcomes
 
 ---
 
@@ -232,3 +178,4 @@ Expected output:
 - Don't add TOOL: format back - it's gone for good
 - Don't modify cleanup script without understanding cgroup logic
 - Don't hardcode any defaults - everything in config files
+- Don't implement learning system without discussing with human first
