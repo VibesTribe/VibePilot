@@ -30,6 +30,8 @@ Create a markdown file at `docs/test/system-validated.md` that contains:
 2. A confirmation message indicating successful autonomous execution
 3. The plan ID that triggered this validation
 
+After creating the file, commit it to GitHub with message: "validation: system flow test complete"
+
 ## FILES TO CREATE
 - `docs/test/system-validated.md` - Validation marker file
 
@@ -65,12 +67,14 @@ This file was created automatically by VibePilot to validate the complete system
 - [ ] File contains plan ID 8e8a400d-7b3f-455c-b052-dfa8b31eca6b
 - [ ] File contains success confirmation message
 - [ ] File is valid markdown
+- [ ] Changes committed to GitHub
 
 ## TESTS REQUIRED
 No automated tests required. Manual verification:
 1. Check file exists at correct path
 2. Verify timestamp is present and valid
 3. Verify file contains expected content
+4. Verify commit exists in GitHub
 
 ## OUTPUT FORMAT
 Return JSON:
@@ -82,7 +86,7 @@ Return JSON:
   "files_modified": [],
   "summary": "Created system validation file with timestamp",
   "tests_written": [],
-  "notes": "File created successfully. Ready for GitHub commit."
+  "notes": "File created and committed successfully."
 }
 ```
 
@@ -91,6 +95,7 @@ Return JSON:
 - Add additional content beyond what's specified
 - Create additional files
 - Skip the timestamp
+- Skip the GitHub commit
 ```
 
 #### Expected Output
@@ -99,12 +104,20 @@ Return JSON:
   "files_created": ["docs/test/system-validated.md"],
   "files_modified": [],
   "tests_required": [],
+  "git_committed": true,
+  "commit_message": "validation: system flow test complete",
   "acceptance_criteria_met": [
-    "File exists at correct path",
-    "Contains timestamp",
-    "Contains plan ID",
-    "Contains success message",
-    "Valid markdown format"
+    "File exists at docs/test/system-validated.md",
+    "File contains ISO 8601 timestamp",
+    "File contains plan ID 8e8a400d-7b3f-455c-b052-dfa8b31eca6b",
+    "File contains success message",
+    "File is valid markdown",
+    "Changes committed to GitHub"
+  ],
+  "verification_commands": [
+    "test -f docs/test/system-validated.md",
+    "grep -q 'Timestamp:' docs/test/system-validated.md",
+    "grep -q '8e8a400d-7b3f-455c-b052-dfa8b31eca6b' docs/test/system-validated.md"
   ]
 }
 ```
@@ -114,8 +127,8 @@ Return JSON:
 ## Summary
 
 **Total Tasks:** 1
-**Estimated Context:** 2000 tokens
+**Estimated Context:** 2500 tokens
 **Critical Path:** T001
 **Confidence:** 1.0
 
-This is a simple validation test with a single atomic task. No dependencies, minimal context required, and 100% clarity on expected output.
+This is a simple validation test with a single atomic task. No dependencies, minimal context required, and 100% clarity on expected output. The expected output includes specific verification commands that can be run to confirm task completion.
