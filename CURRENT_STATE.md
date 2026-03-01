@@ -14,9 +14,9 @@
 ---
 
 **Last Updated:** 2026-03-01
-**Updated By:** GLM-5 - Session 39 Complete
+**Updated By:** GLM-5 - Session 40 Complete
 **Branch:** `main`
-**Status:** ACTIVE - All critical gaps fixed, security hardened, ready for testing
+**Status:** ACTIVE - Infinite event loop fixed, processing state implemented
 
 ---
 
@@ -36,7 +36,8 @@ vibepilot-governor.service (Go binary)
 ├── Learning: model scoring RPC (ready to deploy)
 ├── Revision loop: max rounds configurable (default: 6)
 ├── Council execution: 3 members, parallel or sequential
-└── Plan lifecycle: all states configurable via JSON
+├── Plan lifecycle: all states configurable via JSON
+└── Processing state: prevents duplicate event firing (migration 042)
 ```
 
 **Status:** `systemctl status vibepilot-governor`
@@ -275,6 +276,27 @@ vibepilot/
 - ✅ Path traversal protection - symlinks and absolute paths blocked
 - ✅ Error logging - no silently ignored errors
 
+### DONE - Session 40 (Infinite Event Loop Fix)
+
+**Root Cause:**
+- Events fired every poll (1s) while agent worked on plan/task
+- Status didn't change until work completed (minutes)
+- Same event fired hundreds of times, spawning duplicate agents
+- Capacity exhausted, all sessions killed
+
+**Solution - Processing State:**
+- ✅ Migration 042: `processing_by` and `processing_at` columns on plans and tasks
+- ✅ Event detection filters `processing_by IS NULL` - only fire for idle items
+- ✅ Handlers claim processing atomically before spawning agent
+- ✅ Clear processing on completion, error, or pool submission failure
+- ✅ Recovery goroutine: clears stale processing (configurable timeout)
+- ✅ Fixed `record_planner_revision` RPC parameter format (TEXT[] not JSONB)
+- ✅ Added `record_supervisor_rule` RPC to allowlist
+
+**New Config Options:**
+- `recovery.processing_timeout_seconds`: 300 (default)
+- `recovery.processing_recovery_interval_seconds`: 60 (default)
+
 ### NEXT - Full Flow Test
 
 | Priority | Task | Notes |
@@ -294,6 +316,7 @@ vibepilot/
 | 036 | revision_loop.sql | ✅ Applied |
 | 040 | update_task_status.sql | ✅ Applied |
 | 041 | research_suggestions.sql | ✅ Applied |
+| 042 | processing_state.sql | ✅ Applied |
 
 ---
 
