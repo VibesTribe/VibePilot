@@ -1,15 +1,15 @@
 # PLAN: Echo Test
 
 ## Overview
-Simple smoke test to verify VibePilot planning flow works end-to-end by creating a single test file.
+Verify the basic VibePilot planning flow works end-to-end by creating a simple test file.
 
 ## Tasks
 
 ### T001: Create Echo Test File
-**Confidence:** 0.98
+**Confidence:** 1.00
 **Dependencies:** none
-**Type:** test
-**Category:** configuration
+**Type:** feature
+**Category:** coding
 **Requires Codebase:** false
 
 #### Prompt Packet
@@ -17,16 +17,16 @@ Simple smoke test to verify VibePilot planning flow works end-to-end by creating
 # TASK: T001 - Create Echo Test File
 
 ## CONTEXT
-This is a smoke test task to verify the VibePilot planning and execution flow works correctly. The task creates a simple text file with a specific message to confirm the system can execute basic file creation operations.
+This is a smoke test to verify the VibePilot planning and execution flow works correctly. The task creates a single file with a specific message to confirm the system can plan and execute tasks end-to-end.
 
 ## DEPENDENCIES
 None.
 
 ## WHAT TO BUILD
-Create a single text file named `test-echo.txt` in the project root directory containing the exact message "Echo successful" (without quotes).
+Create a single text file named `test-echo.txt` in the project root directory with the exact content "Echo successful" (no quotes, no trailing newline required).
 
 ## FILES TO CREATE
-- `test-echo.txt` - Simple text file to verify execution flow
+- `test-echo.txt` - A simple text file containing the verification message
 
 ## FILES TO MODIFY
 None.
@@ -34,18 +34,16 @@ None.
 ## TECHNICAL SPECIFICATIONS
 
 ### File Content
-- Filename: test-echo.txt
-- Content: Echo successful
-- Encoding: UTF-8
-- No trailing newline required
+- File name: `test-echo.txt`
+- Content: `Echo successful`
+- Location: Project root directory (`/home/mjlockboxsocial/vibepilot/`)
 
 ## ACCEPTANCE CRITERIA
 - [ ] File `test-echo.txt` exists in project root
-- [ ] File contains exactly "Echo successful" (no extra whitespace or characters)
-- [ ] Task completes without errors
+- [ ] File contains exactly "Echo successful" (case-sensitive)
 
 ## TESTS REQUIRED
-None - this is a smoke test without automated tests.
+None - this is a smoke test per PRD specifications.
 
 ## OUTPUT FORMAT
 Return JSON:
@@ -55,17 +53,18 @@ Return JSON:
   "model_name": "[your model name]",
   "files_created": ["test-echo.txt"],
   "files_modified": [],
-  "summary": "Created echo test file with success message",
+  "summary": "Created test-echo.txt with verification message",
   "tests_written": [],
   "notes": "Smoke test file created successfully"
 }
 ```
 
 ## DO NOT
-- Add extra content to the file
-- Create additional files
-- Add dependencies or configuration
-- Overcomplicate this simple task
+- Create multiple files
+- Add complex logic
+- Create test files
+- Add additional content or formatting to the file
+- Modify any existing files
 ```
 
 #### Expected Output
@@ -79,20 +78,14 @@ Return JSON:
 
 ---
 
-## Plan Summary
+## Summary
 
 **Total Tasks:** 1
-**Estimated Context:** 2,000 tokens
 **Critical Path:** T001
-**Dependencies:** None
+**Estimated Total Context:** 500 tokens
+**Plan Status:** Ready for execution
 
-**Confidence Score:** 0.98
-
-**Breakdown:**
-- Context Fit: 1.0 (minimal context needed)
-- Dependency Complexity: 1.0 (no dependencies)
-- Task Clarity: 0.95 (extremely clear requirements)
-- Codebase Need: 1.0 (no codebase awareness needed)
-- One-Shot Capable: 1.0 (single file creation)
-
-Average: (1.0 + 1.0 + 0.95 + 1.0 + 1.0) / 5 = 0.99 → 0.98 (conservative)
+This plan is a minimal smoke test to verify the VibePilot system can:
+1. Generate a plan from a PRD
+2. Create a task with complete prompt packet
+3. Execute the task to create the expected output
