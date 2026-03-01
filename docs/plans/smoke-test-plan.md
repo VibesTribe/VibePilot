@@ -1,96 +1,88 @@
 # PLAN: Smoke Test
 
 ## Overview
-This plan verifies the complete VibePilot end-to-end flow by creating a single timestamp file. The goal is to validate that the system can successfully: generate a plan from a PRD, pass supervisor review, create and execute a task, and merge the result to main.
+Verify the complete VibePilot flow: PRD → Planner → Plan → Supervisor → Tasks → Execution → Merge by creating a single timestamp file.
 
-## Success Criteria Mapped
-1. ✅ Plan auto-generated (this document)
-2. ✅ Single task defined (T001)
-3. ✅ File `smoke-test.txt` creation specified
-4. ✅ Task can complete in one execution
-5. ✅ Ready for supervisor review
+## PRD Reference
+- **PRD Path:** docs/prds/smoke-test.md
+- **Plan ID:** 105a63ec-a5cd-40d1-909a-465c80cd65ff
 
-## Critical Path
-- T001 (no dependencies)
-
-## Total Tasks: 1
-## Estimated Total Context: 1,500 tokens
-
----
+## Success Criteria
+1. Plan is auto-generated from PRD
+2. Plan passes supervisor review (simple complexity)
+3. Single task is created and executed
+4. File `smoke-test.txt` is created with timestamp
+5. Task completes and merges to main
 
 ## Tasks
 
 ### T001: Create Smoke Test Timestamp File
-
-**Confidence:** 0.99  
-**Dependencies:** none  
-**Type:** feature  
-**Category:** coding  
-**Requires Codebase:** false  
-
-#### Purpose
-Create a single file `smoke-test.txt` containing a timestamp to verify the complete VibePilot execution flow from PRD to merge.
+**Confidence:** 1.00
+**Dependencies:** none
+**Type:** feature
+**Category:** coding
+**Requires Codebase:** false
 
 #### Prompt Packet
 ```
 # TASK: T001 - Create Smoke Test Timestamp File
 
 ## CONTEXT
-This is a smoke test to verify the complete VibePilot system works end-to-end. The system has received a PRD, generated this plan, and now needs to execute the simplest possible task to validate the entire pipeline.
+This is a smoke test to verify the complete VibePilot flow from PRD to execution. The task is intentionally simple to validate that the system can:
+- Parse a PRD
+- Generate a plan
+- Create a task
+- Execute the task
+- Verify completion
 
-The file you create will serve as proof that:
-- The Planner successfully decomposed the PRD into tasks
-- The Supervisor approved the plan
-- An Executor received and completed the task
-- The result can be merged to main branch
+The smoke test file will serve as proof that the entire pipeline is working correctly.
 
 ## DEPENDENCIES
-None. This is a standalone task with no prerequisites.
+None.
 
 ## WHAT TO BUILD
-Create a single text file named `smoke-test.txt` in the root directory of the repository. The file should contain exactly one line with the current timestamp in the format:
-
-```
-Smoke test passed at YYYY-MM-DD HH:MM:SS UTC
-```
-
-For example:
-```
-Smoke test passed at 2026-03-01 16:15:30 UTC
-```
+Create a single text file named `smoke-test.txt` in the project root directory containing a timestamp message that verifies the VibePilot flow completed successfully.
 
 ## FILES TO CREATE
-- `smoke-test.txt` - Contains timestamp proving successful execution
+- `smoke-test.txt` - A timestamp file to verify end-to-end flow completion
 
 ## FILES TO MODIFY
 None.
 
 ## TECHNICAL SPECIFICATIONS
 
-### File Format
-- Filename: `smoke-test.txt`
-- Location: Repository root (same level as README.md)
-- Encoding: UTF-8
-- Content: Single line of text
-- Timestamp format: `YYYY-MM-DD HH:MM:SS UTC`
-- Line ending: Unix style (LF)
+### File Content
+The file must contain exactly:
+```
+Smoke test passed at [YYYY-MM-DD HH:MM:SS UTC]
+```
 
-### No Dependencies Required
-- No imports needed
-- No configuration files
-- No tests required (this IS the test)
-- No code to write
+Replace `[YYYY-MM-DD HH:MM:SS UTC]` with the current UTC timestamp in the format shown.
+
+### File Location
+- Path: `./smoke-test.txt` (project root)
+- Encoding: UTF-8
+- Line ending: Unix (LF)
+
+### Example Output
+```
+Smoke test passed at 2026-03-01 16:10:00 UTC
+```
 
 ## ACCEPTANCE CRITERIA
-- [ ] File `smoke-test.txt` exists in repository root
-- [ ] File contains exactly one line
-- [ ] Line starts with "Smoke test passed at "
-- [ ] Timestamp is in correct format (YYYY-MM-DD HH:MM:SS UTC)
-- [ ] Timestamp reflects current execution time
-- [ ] File is properly encoded as UTF-8
+- [ ] File `smoke-test.txt` exists in project root
+- [ ] File contains text "Smoke test passed at " followed by timestamp
+- [ ] Timestamp is in format YYYY-MM-DD HH:MM:SS UTC
+- [ ] Timestamp reflects the time of file creation
+- [ ] File is UTF-8 encoded
+- [ ] No additional files are created
+- [ ] No existing files are modified
 
 ## TESTS REQUIRED
-None. This task IS the test for the VibePilot system itself.
+Manual verification only:
+1. Verify file exists at `./smoke-test.txt`
+2. Verify file contains expected content format
+3. Verify timestamp is current and in correct format
 
 ## OUTPUT FORMAT
 Return JSON:
@@ -100,20 +92,19 @@ Return JSON:
   "model_name": "[your model name]",
   "files_created": ["smoke-test.txt"],
   "files_modified": [],
-  "summary": "Created smoke-test.txt with current timestamp",
+  "summary": "Created smoke test file with current timestamp",
   "tests_written": [],
-  "notes": "Smoke test file created successfully. Ready for commit and merge."
+  "notes": "File created successfully at [timestamp]"
 }
 ```
 
 ## DO NOT
-- Create additional files beyond `smoke-test.txt`
-- Add complex logic or validation
-- Create directories
+- Create multiple files
 - Modify any existing files
-- Add dependencies or imports
-- Write tests (this task validates the system, not code)
-- Over-engineer this simple task
+- Add complex logic or error handling
+- Make external API calls
+- Create directories
+- Add comments or additional content beyond the specified format
 ```
 
 #### Expected Output
@@ -123,58 +114,26 @@ Return JSON:
   "files_modified": [],
   "tests_required": [],
   "acceptance_criteria_met": [
-    "File smoke-test.txt exists in repository root",
-    "File contains timestamp in correct format",
-    "Single line with no extra content"
+    "File smoke-test.txt exists in project root",
+    "File contains correct timestamp format",
+    "No other files created or modified"
   ]
 }
 ```
 
-#### Routing Hints
-- **Requires Codebase:** false
-- **Estimated Context:** 1,500 tokens
-- **One-Shot Capable:** true
-- **Model Strength Needed:** basic file creation
-
 ---
 
-## Plan Metadata
-- **Plan Version:** 1.0
-- **PRD ID:** e0cd17f4-cf6e-4448-aba7-28df9d62a713
-- **Created:** 2026-03-01
-- **Total Estimated Context:** 1,500 tokens
-- **Critical Path Length:** 1 task
-- **Parallelization Potential:** N/A (single task)
+## Summary
 
-## Confidence Analysis
+**Total Tasks:** 1
+**Estimated Context:** ~500 tokens
+**Critical Path:** T001
+**Complexity:** Simple
+**Confidence:** 1.00
 
-### Task T001 Confidence: 0.99
-- **Context Fit (25%):** 1.0 - Requires only 1.5K context, well under 8K limit
-- **Dependency Complexity (25%):** 1.0 - Zero dependencies
-- **Task Clarity (20%):** 1.0 - Output is unambiguous (single file, specific format)
-- **Codebase Need (15%):** 1.0 - No codebase awareness required
-- **One-Shot Capable (15%):** 0.95 - Can complete in single turn without iteration
-
-**Calculation:** (1.0×0.25) + (1.0×0.25) + (1.0×0.20) + (1.0×0.15) + (0.95×0.15) = **0.99**
-
-### Overall Plan Confidence: 0.99
-All P0 features covered. Single atomic task. Zero ambiguity. Ready for execution.
-
-## Validation Checklist
-- [x] All P0 features addressed (1/1)
-- [x] All acceptance criteria mapped to tasks
-- [x] Critical path identified
-- [x] No circular dependencies
-- [x] All tasks have confidence ≥ 0.95
-- [x] All tasks have complete prompt packets
-- [x] All tasks have defined expected output
-- [x] Context estimates reasonable
-- [x] No ambiguity or gaps
-
-## Next Steps
-1. Supervisor reviews this plan
-2. If approved, task T001 is created in Supabase
-3. Orchestrator assigns T001 to an executor
-4. Executor creates `smoke-test.txt`
-5. Result is committed and merged to main
-6. Smoke test complete ✅
+## Notes
+- This is a minimal smoke test with zero dependencies
+- Single atomic task that can be executed independently
+- No codebase context required
+- Designed to validate the entire VibePilot pipeline
+- All P0 features from PRD are covered by T001
