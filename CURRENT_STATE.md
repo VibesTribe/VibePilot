@@ -244,6 +244,12 @@ vibepilot/
 - ✅ Category passed for routing consideration
 - ✅ Agent hat now works - model receives instructions it can follow
 
+**Task Validation + Feedback Loop:**
+- ✅ Tasks validated at creation: confidence >= 0.95, non-empty prompt, category, expected output
+- ✅ Validation failure → revision_needed (not error) with specific feedback
+- ✅ Planner receives validation feedback via revision loop
+- ✅ Supervisor rule recorded for learning (safety net catches missed issues)
+
 ### NEXT - Full Flow Test
 
 | Priority | Task | Notes |
