@@ -686,22 +686,26 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 				return err
 			}
 
+			log.Printf("[EventPRDReady] Raw output for %s (len=%d): %s", truncateID(planID), len(result.Output), truncateOutput(result.Output))
+
 			plannerOutput, parseErr := runtime.ParsePlannerOutput(result.Output)
 			if parseErr != nil {
 				log.Printf("[EventPRDReady] Failed to parse planner output: %v", parseErr)
-				log.Printf("[EventPRDReady] Raw output: %s", truncateOutput(result.Output))
 				return nil
+			}
+
+			if plannerOutput.Status == "" {
+				plannerOutput.Status = "review"
 			}
 
 			log.Printf("[EventPRDReady] Plan %s created with %d tasks, status: %s", truncateID(planID), plannerOutput.TotalTasks, plannerOutput.Status)
 
 			if plannerOutput.PlanPath != "" && plannerOutput.PlanContent != "" {
 				branchName := "docs/plans"
-				output := map[string]any{
-					"files": []map[string]any{
-						{"path": plannerOutput.PlanPath, "content": plannerOutput.PlanContent},
-					},
+				files := []interface{}{
+					map[string]interface{}{"path": plannerOutput.PlanPath, "content": plannerOutput.PlanContent},
 				}
+				output := map[string]interface{}{"files": files}
 				if err := git.CommitOutput(ctx, branchName, output); err != nil {
 					log.Printf("[EventPRDReady] Failed to commit plan to GitHub: %v", err)
 				}
@@ -978,8 +982,8 @@ func truncateID(id string) string {
 }
 
 func truncateOutput(output string) string {
-	if len(output) > 200 {
-		return output[:200] + "..."
+	if len(output) > 1000 {
+		return output[:1000] + "..."
 	}
 	return output
 }
