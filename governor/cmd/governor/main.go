@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -1274,9 +1275,44 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			switch review.Decision {
 			case "approved":
 				if err := createTasksFromApprovedPlan(ctx, database, plan); err != nil {
-					log.Printf("[EventPlanReview] Failed to create tasks: %v", err)
-					newStatus = "error"
-					statusError = err
+					var validationErr *ValidationFailedError
+					if errors.As(err, &validationErr) {
+						log.Printf("[EventPlanReview] Task validation failed for plan %s - sending back to planner", truncateID(planID))
+						newStatus = "revision_needed"
+
+						var concerns []string
+						var taskNumbers []string
+						for _, e := range validationErr.Errors {
+							concerns = append(concerns, fmt.Sprintf("%s: %s", e.TaskNumber, e.Issue))
+							taskNumbers = append(taskNumbers, e.TaskNumber)
+						}
+
+						concernsJSON, _ := json.Marshal(concerns)
+						_, recordErr := database.RPC(ctx, "record_planner_revision", map[string]any{
+							"p_plan_id":                planID,
+							"p_concerns":               concernsJSON,
+							"p_tasks_needing_revision": taskNumbers,
+						})
+						if recordErr != nil {
+							log.Printf("[EventPlanReview] Failed to record validation feedback: %v", recordErr)
+						}
+
+						_, recordErr = database.RPC(ctx, "record_supervisor_rule", map[string]any{
+							"p_rule_text":  fmt.Sprintf("Plan passed review but failed task validation: %s", strings.Join(concerns, "; ")),
+							"p_applies_to": "plan_review",
+							"p_source":     "validation_safety_net",
+						})
+						if recordErr != nil {
+							log.Printf("[EventPlanReview] Failed to record supervisor rule: %v", recordErr)
+						}
+
+						log.Printf("[EventPlanReview] Validation concerns: %v", concerns)
+						statusError = err
+					} else {
+						log.Printf("[EventPlanReview] Failed to create tasks: %v", err)
+						newStatus = "error"
+						statusError = err
+					}
 				} else {
 					newStatus = "approved"
 				}
@@ -1623,6 +1659,69 @@ type TaskData struct {
 	ExpectedOutput   string
 }
 
+type ValidationError struct {
+	TaskNumber string
+	Issue      string
+	Severity   string
+}
+
+func (e *ValidationError) Error() string {
+	return fmt.Sprintf("task %s: %s", e.TaskNumber, e.Issue)
+}
+
+type ValidationFailedError struct {
+	Errors []ValidationError
+}
+
+func (e *ValidationFailedError) Error() string {
+	var msgs []string
+	for _, err := range e.Errors {
+		msgs = append(msgs, fmt.Sprintf("%s (%s)", err.Issue, err.TaskNumber))
+	}
+	return strings.Join(msgs, "; ")
+}
+
+func validateTasks(tasks []TaskData) *ValidationFailedError {
+	var errors []ValidationError
+	minConfidence := 0.95
+
+	for _, task := range tasks {
+		if task.Confidence < minConfidence {
+			errors = append(errors, ValidationError{
+				TaskNumber: task.TaskNumber,
+				Issue:      fmt.Sprintf("confidence %.2f below minimum %.2f - task must be split further", task.Confidence, minConfidence),
+				Severity:   "high",
+			})
+		}
+		if task.PromptPacket == "" {
+			errors = append(errors, ValidationError{
+				TaskNumber: task.TaskNumber,
+				Issue:      "empty prompt packet - task has no instructions",
+				Severity:   "critical",
+			})
+		}
+		if task.Category == "" {
+			errors = append(errors, ValidationError{
+				TaskNumber: task.TaskNumber,
+				Issue:      "missing category - needed for routing to appropriate model",
+				Severity:   "medium",
+			})
+		}
+		if task.ExpectedOutput == "" {
+			errors = append(errors, ValidationError{
+				TaskNumber: task.TaskNumber,
+				Issue:      "missing expected output - supervisor cannot verify completion",
+				Severity:   "medium",
+			})
+		}
+	}
+
+	if len(errors) > 0 {
+		return &ValidationFailedError{Errors: errors}
+	}
+	return nil
+}
+
 func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[string]any) error {
 	planID, _ := plan["id"].(string)
 	planPath, _ := plan["plan_path"].(string)
@@ -1650,13 +1749,13 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 
 	log.Printf("[createTasksFromApprovedPlan] Found %d tasks in plan %s", len(tasks), truncateID(planID))
 
+	if validationErr := validateTasks(tasks); validationErr != nil {
+		log.Printf("[createTasksFromApprovedPlan] Validation failed for plan %s: %v", truncateID(planID), validationErr)
+		return validationErr
+	}
+
 	createdCount := 0
 	for _, task := range tasks {
-		if task.PromptPacket == "" {
-			log.Printf("[createTasksFromApprovedPlan] WARNING: Task %s has empty prompt packet - skipping", task.TaskNumber)
-			continue
-		}
-
 		routingFlag := "web"
 		if task.RequiresCodebase {
 			routingFlag = "internal"
