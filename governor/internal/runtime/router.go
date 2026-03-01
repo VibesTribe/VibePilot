@@ -81,6 +81,11 @@ func (r *Router) isDestinationAvailable(ctx context.Context, destID string) bool
 		return false
 	}
 
+	if dest.Type != "cli" && dest.Type != "api" {
+		log.Printf("[Router] Skipping non-executable destination type: %s for %s", dest.Type, destID)
+		return false
+	}
+
 	return true
 }
 
