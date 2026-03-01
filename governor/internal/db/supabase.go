@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
 	"time"
 )
 
@@ -14,6 +16,12 @@ const (
 	DefaultHTTPTimeoutSecs  = 30
 	DefaultErrorTruncateLen = 200
 )
+
+var tableNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+func isValidTableName(name string) bool {
+	return tableNameRegex.MatchString(name)
+}
 
 type DBConfig struct {
 	HTTPTimeoutSecs  int
@@ -120,15 +128,25 @@ func (d *DB) RPC(ctx context.Context, name string, params map[string]interface{}
 }
 
 func (d *DB) Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error) {
+	if !isValidTableName(table) {
+		return nil, fmt.Errorf("invalid table name: %s", table)
+	}
+
 	path := table + "?select=*"
 
 	for key, val := range filters {
-		if key == "limit" {
-			path = path + "&limit=" + fmt.Sprintf("%v", val)
-		} else if key == "order" {
-			path = path + "&order=" + fmt.Sprintf("%v", val)
-		} else {
-			path = path + "&" + key + "=eq." + fmt.Sprintf("%v", val)
+		if !isValidTableName(key) && key != "limit" && key != "order" && key != "or" {
+			continue
+		}
+		switch key {
+		case "limit":
+			path = path + "&limit=" + url.QueryEscape(fmt.Sprintf("%v", val))
+		case "order":
+			path = path + "&order=" + url.QueryEscape(fmt.Sprintf("%v", val))
+		case "or":
+			path = path + "&or=" + url.QueryEscape(fmt.Sprintf("%v", val))
+		default:
+			path = path + "&" + url.QueryEscape(key) + "=eq." + url.QueryEscape(fmt.Sprintf("%v", val))
 		}
 	}
 
@@ -141,6 +159,9 @@ func (d *DB) Query(ctx context.Context, table string, filters map[string]any) (j
 }
 
 func (d *DB) Insert(ctx context.Context, table string, data map[string]any) (json.RawMessage, error) {
+	if !isValidTableName(table) {
+		return nil, fmt.Errorf("invalid table name: %s", table)
+	}
 	result, err := d.REST(ctx, "POST", table, data)
 	if err != nil {
 		return nil, err
@@ -149,7 +170,10 @@ func (d *DB) Insert(ctx context.Context, table string, data map[string]any) (jso
 }
 
 func (d *DB) Update(ctx context.Context, table, id string, data map[string]any) (json.RawMessage, error) {
-	path := table + "?id=eq." + id
+	if !isValidTableName(table) {
+		return nil, fmt.Errorf("invalid table name: %s", table)
+	}
+	path := table + "?id=eq." + url.QueryEscape(id)
 	result, err := d.REST(ctx, "PATCH", path, data)
 	if err != nil {
 		return nil, err
@@ -158,7 +182,10 @@ func (d *DB) Update(ctx context.Context, table, id string, data map[string]any) 
 }
 
 func (d *DB) Delete(ctx context.Context, table, id string) error {
-	path := table + "?id=eq." + id
+	if !isValidTableName(table) {
+		return fmt.Errorf("invalid table name: %s", table)
+	}
+	path := table + "?id=eq." + url.QueryEscape(id)
 	_, err := d.REST(ctx, "DELETE", path, nil)
 	return err
 }

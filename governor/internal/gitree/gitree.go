@@ -5,14 +5,31 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
 
 const DefaultGitTimeout = 60 * time.Second
+
+var branchNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_/.-]+$`)
+
+func isValidBranchName(name string) bool {
+	if name == "" || len(name) > 250 {
+		return false
+	}
+	if strings.HasPrefix(name, "-") || strings.HasSuffix(name, "/") {
+		return false
+	}
+	if strings.Contains(name, "//") || strings.Contains(name, "..") {
+		return false
+	}
+	return branchNameRegex.MatchString(name)
+}
 
 type Gitree struct {
 	repoPath          string
@@ -63,6 +80,9 @@ func (g *Gitree) isTaskOrModuleBranch(branchName string) bool {
 }
 
 func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
+	if !isValidBranchName(branchName) {
+		return fmt.Errorf("invalid branch name: %s", branchName)
+	}
 	if g.isProtected(branchName) {
 		return fmt.Errorf("cannot create branch: '%s' is protected", branchName)
 	}
@@ -83,7 +103,9 @@ func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
 		return fmt.Errorf("create orphan branch: %w - %s", err, out.String())
 	}
 
-	g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run()
+	if err := g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run(); err != nil {
+		log.Printf("[Gitree] Warning: rm -rf --cached failed: %v", err)
+	}
 
 	commitCmd := g.gitCommand(ctx, "commit", "--allow-empty", "-m", "Initialize task branch")
 	var commitOut bytes.Buffer
@@ -101,12 +123,18 @@ func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
 		return fmt.Errorf("push branch: %w - %s", err, pushOut.String())
 	}
 
-	g.gitCommand(ctx, "checkout", "main").Run()
+	if err := g.gitCommand(ctx, "checkout", "main").Run(); err != nil {
+		log.Printf("[Gitree] Warning: checkout main failed: %v", err)
+	}
 
 	return nil
 }
 
 func (g *Gitree) CommitOutput(ctx context.Context, branchName string, output interface{}) error {
+	if !isValidBranchName(branchName) {
+		return fmt.Errorf("invalid branch name: %s", branchName)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
 
@@ -226,6 +254,13 @@ func (g *Gitree) ReadBranchOutput(ctx context.Context, branchName string) ([]str
 }
 
 func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch string) error {
+	if !isValidBranchName(sourceBranch) {
+		return fmt.Errorf("invalid source branch name: %s", sourceBranch)
+	}
+	if !isValidBranchName(targetBranch) {
+		return fmt.Errorf("invalid target branch name: %s", targetBranch)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, g.timeout*2)
 	defer cancel()
 
@@ -233,8 +268,12 @@ func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch str
 		return fmt.Errorf("cannot merge '%s' to protected branch '%s': only module/* branches can merge to protected branches", sourceBranch, targetBranch)
 	}
 
-	g.gitCommand(ctx, "checkout", targetBranch).Run()
-	g.gitCommand(ctx, "pull", "origin", targetBranch).Run()
+	if err := g.gitCommand(ctx, "checkout", targetBranch).Run(); err != nil {
+		log.Printf("[Gitree] Warning: checkout %s failed: %v", targetBranch, err)
+	}
+	if err := g.gitCommand(ctx, "pull", "origin", targetBranch).Run(); err != nil {
+		log.Printf("[Gitree] Warning: pull %s failed: %v", targetBranch, err)
+	}
 
 	var out bytes.Buffer
 	cmd := g.gitCommand(ctx, "merge", sourceBranch)
@@ -249,6 +288,10 @@ func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch str
 }
 
 func (g *Gitree) DeleteBranch(ctx context.Context, branchName string) error {
+	if !isValidBranchName(branchName) {
+		return fmt.Errorf("invalid branch name: %s", branchName)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
 
@@ -256,8 +299,12 @@ func (g *Gitree) DeleteBranch(ctx context.Context, branchName string) error {
 		return fmt.Errorf("cannot delete protected branch: %s", branchName)
 	}
 
-	g.gitCommand(ctx, "branch", "-D", branchName).Run()
-	g.gitCommand(ctx, "push", "origin", "--delete", branchName).Run()
+	if err := g.gitCommand(ctx, "branch", "-D", branchName).Run(); err != nil {
+		log.Printf("[Gitree] Warning: branch -D %s failed: %v", branchName, err)
+	}
+	if err := g.gitCommand(ctx, "push", "origin", "--delete", branchName).Run(); err != nil {
+		log.Printf("[Gitree] Warning: push --delete %s failed: %v", branchName, err)
+	}
 	return nil
 }
 
@@ -276,14 +323,20 @@ func (g *Gitree) ClearBranch(ctx context.Context, branchName string) error {
 		return fmt.Errorf("checkout branch: %w", err)
 	}
 
-	g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run()
-	g.gitCommand(ctx, "clean", "-fd").Run()
+	if err := g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run(); err != nil {
+		log.Printf("[Gitree] Warning: rm -rf --cached failed: %v", err)
+	}
+	if err := g.gitCommand(ctx, "clean", "-fd").Run(); err != nil {
+		log.Printf("[Gitree] Warning: clean -fd failed: %v", err)
+	}
 
 	var out bytes.Buffer
 	cmd := g.gitCommand(ctx, "commit", "--allow-empty", "-m", "clear for retry")
 	cmd.Stdout = &out
 	cmd.Stderr = &out
-	cmd.Run()
+	if err := cmd.Run(); err != nil {
+		log.Printf("[Gitree] Warning: commit failed: %v", err)
+	}
 
 	return g.gitCommand(ctx, "push", "-f").Run()
 }
