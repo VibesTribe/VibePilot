@@ -91,7 +91,7 @@
     "enabled": true,
     "repo_path": "/home/mjlockboxsocial/vibepilot",
     "branch": "main",
-    "directory": "docs/prd",
+    "directory": "docs/prds",
     "interval_seconds": 10
   }
 }
