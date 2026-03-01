@@ -510,6 +510,22 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		planID, _ := plan["id"].(string)
+
+		councilReviews, _ := plan["council_reviews"].([]interface{})
+
+		if len(councilReviews) == 0 {
+			log.Printf("[EventCouncilDone] No council reviews for plan %s - direct supervisor approval, creating tasks", truncateID(planID))
+			if err := createTasksFromApprovedPlan(ctx, database, plan); err != nil {
+				log.Printf("[EventCouncilDone] Failed to create tasks: %v", err)
+				_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
+					"p_plan_id":      planID,
+					"p_status":       "error",
+					"p_review_notes": map[string]any{"error": err.Error()},
+				})
+			}
+			return
+		}
+
 		destID := selectDestination("supervisor", planID, "council_done")
 		if destID == "" {
 			log.Printf("[EventCouncilDone] No destination available for plan %s", truncateID(planID))
@@ -527,7 +543,6 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 				return err
 			}
 
-			councilReviews, _ := plan["council_reviews"].([]interface{})
 			approved := 0
 			revisionNeeded := 0
 			blocked := 0
@@ -546,16 +561,29 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 				}
 			}
 
+			memberCount := cfg.GetCouncilMemberCount()
+			consensusMethod := cfg.GetConsensusMethod()
+
 			var consensus string
-			if approved == 3 {
-				consensus = "approved"
-			} else if blocked > 0 {
-				consensus = "blocked"
+			if consensusMethod == "unanimous_approval" {
+				if approved == memberCount {
+					consensus = "approved"
+				} else if blocked > 0 {
+					consensus = "blocked"
+				} else {
+					consensus = "revision_needed"
+				}
 			} else {
-				consensus = "revision_needed"
+				if approved == memberCount {
+					consensus = "approved"
+				} else if blocked > 0 {
+					consensus = "blocked"
+				} else {
+					consensus = "revision_needed"
+				}
 			}
 
-			log.Printf("[EventCouncilDone] Plan %s consensus: %s (approved=%d, revision=%d, blocked=%d)", truncateID(planID), consensus, approved, revisionNeeded, blocked)
+			log.Printf("[EventCouncilDone] Plan %s consensus: %s (approved=%d, revision=%d, blocked=%d, method=%s)", truncateID(planID), consensus, approved, revisionNeeded, blocked, consensusMethod)
 
 			_, err = database.RPC(ctx, "set_council_consensus", map[string]any{
 				"p_plan_id":   planID,
@@ -767,11 +795,15 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			log.Printf("[EventPlanReview] Plan %s review: decision=%s complexity=%s", truncateID(planID), review.Decision, review.Complexity)
 
 			var newStatus string
+			var statusError error
 			switch review.Decision {
 			case "approved":
-				newStatus = "approved"
 				if err := createTasksFromApprovedPlan(ctx, database, plan); err != nil {
 					log.Printf("[EventPlanReview] Failed to create tasks: %v", err)
+					newStatus = "error"
+					statusError = err
+				} else {
+					newStatus = "approved"
 				}
 			case "needs_revision":
 				newStatus = "revision_needed"
@@ -791,20 +823,28 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 				newStatus = "revision_needed"
 			}
 
+			reviewNotes := map[string]any{
+				"complexity": review.Complexity,
+				"reasoning":  review.Reasoning,
+				"concerns":   review.Concerns,
+				"task_count": review.TaskCount,
+			}
+			if statusError != nil {
+				reviewNotes["error"] = statusError.Error()
+			}
+
 			_, err = database.RPC(ctx, "update_plan_status", map[string]any{
-				"p_plan_id": planID,
-				"p_status":  newStatus,
-				"p_review_notes": map[string]any{
-					"complexity": review.Complexity,
-					"reasoning":  review.Reasoning,
-					"concerns":   review.Concerns,
-					"task_count": review.TaskCount,
-				},
+				"p_plan_id":      planID,
+				"p_status":       newStatus,
+				"p_review_notes": reviewNotes,
 			})
 			if err != nil {
 				log.Printf("[EventPlanReview] Failed to update plan status: %v", err)
 			}
 
+			if statusError != nil {
+				return statusError
+			}
 			return nil
 		})
 		if err != nil {
