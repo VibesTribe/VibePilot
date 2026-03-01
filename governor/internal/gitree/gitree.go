@@ -85,7 +85,25 @@ func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
 
 	g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run()
 
-	return g.gitCommand(ctx, "push", "-u", "origin", branchName).Run()
+	commitCmd := g.gitCommand(ctx, "commit", "--allow-empty", "-m", "Initialize task branch")
+	var commitOut bytes.Buffer
+	commitCmd.Stdout = &commitOut
+	commitCmd.Stderr = &commitOut
+	if err := commitCmd.Run(); err != nil {
+		return fmt.Errorf("initial commit: %w - %s", err, commitOut.String())
+	}
+
+	pushCmd := g.gitCommand(ctx, "push", "-u", "origin", branchName)
+	var pushOut bytes.Buffer
+	pushCmd.Stdout = &pushOut
+	pushCmd.Stderr = &pushOut
+	if err := pushCmd.Run(); err != nil {
+		return fmt.Errorf("push branch: %w - %s", err, pushOut.String())
+	}
+
+	g.gitCommand(ctx, "checkout", "main").Run()
+
+	return nil
 }
 
 func (g *Gitree) CommitOutput(ctx context.Context, branchName string, output interface{}) error {
