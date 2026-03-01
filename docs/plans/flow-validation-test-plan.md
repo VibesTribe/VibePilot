@@ -108,10 +108,18 @@ Return JSON:
 #### Expected Output
 ```json
 {
+  "task_id": "T001",
   "files_created": ["docs/test/flow-validation.md"],
   "files_modified": [],
   "tests_required": [],
-  "acceptance_criteria_met": [
+  "verification_steps": [
+    "assert file_exists('docs/test/flow-validation.md')",
+    "assert file_contains('docs/test/flow-validation.md', '✅ PASS')",
+    "assert file_contains('docs/test/flow-validation.md', 'autonomous agent flow is operational')",
+    "assert file_contains('docs/test/flow-validation.md', 'Created:')",
+    "assert file_committed_to_github('docs/test/flow-validation.md')"
+  ],
+  "acceptance_criteria": [
     "File exists at docs/test/flow-validation.md",
     "File contains '✅ PASS'",
     "File contains 'autonomous agent flow is operational'",
