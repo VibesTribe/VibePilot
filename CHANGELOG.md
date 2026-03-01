@@ -6,6 +6,132 @@
 
 ---
 
+# 2026-03-01 (Session 39 Complete)
+
+## Summary
+
+Major session fixing critical gaps, implementing system research flow, and hardening security.
+
+## Critical Fixes
+
+### 1. Prompt Packet Delivery (Type 1 Error)
+- Task execution was broken - models received no instructions
+- `task_packets` table had data but code never fetched it
+- Added `GetTaskPacket()` to DB package
+- `EventTaskAvailable` now fetches and passes full packet
+
+### 2. Task Validation + Feedback Loop
+- Validates: confidence >= 0.95, non-empty prompt, category, expected output
+- Failure → `revision_needed` with specific feedback (not error)
+- Planner and supervisor learn from failures
+- All thresholds configurable via `system.json`
+
+### 3. Council Integration
+- Council-approved plans now create tasks
+- `EventCouncilDone` handles consensus=approved
+- Robust JSONB handling for council_reviews
+
+### 4. System Research Flow
+- Migration 041: `research_suggestions` table
+- Type-based complexity routing (configurable):
+  - Simple → Supervisor → maintenance command
+  - Complex → Council → consensus
+  - Human → Flagged immediately
+- Full council review for research items
+
+## Security Hardening
+
+### P0 Fixes
+| Issue | Fix |
+|-------|-----|
+| Hardcoded paths | `cfg.GetRepoPath()` from config |
+| Command injection | Branch name regex validation |
+
+### P1 Fixes
+| Issue | Fix |
+|-------|-----|
+| Query builder injection | URL encoding + table name validation |
+| Ignored errors | All `.Run()` calls now log errors |
+| Path traversal | Symlink and absolute path checks |
+
+### Validation Patterns
+- Branch names: `^[a-zA-Z0-9_/.-]+$`
+- Table names: `^[a-zA-Z_][a-zA-Z0-9_]*$`
+- Paths: No `..`, no absolute, symlink-resolved
+
+## New Config Fields
+
+```json
+{
+  "git": {
+    "default_timeout_seconds": 60,
+    "default_merge_target": "main",
+    "branch_name_pattern": "^[a-zA-Z0-9_/-]+$"
+  },
+  "logging": {
+    "max_output_length": 5000,
+    "max_id_display": 8
+  },
+  "validation": {
+    "min_task_confidence": 0.95,
+    "require_prompt_packet": true,
+    "require_category": true,
+    "require_expected_output": true
+  }
+}
+```
+
+## Files Changed
+
+| File | Changes |
+|------|---------|
+| `governor/cmd/governor/main.go` | EventTaskAvailable, EventCouncilDone, EventResearchReady, EventResearchCouncil, validation, repoPath from config |
+| `governor/internal/db/supabase.go` | TaskPacket, GetTaskPacket, table validation, URL encoding |
+| `governor/internal/db/rpc.go` | New RPC allowlist entries |
+| `governor/internal/gitree/gitree.go` | Branch validation, error logging |
+| `governor/internal/runtime/events.go` | detectResearchSuggestions, hasCouncilReviews |
+| `governor/internal/runtime/decision.go` | ResearchReviewDecision, ParseResearchReview |
+| `governor/internal/runtime/config.go` | ValidationConfig, LoggingConfig, GitConfig fields, getters |
+| `governor/internal/tools/file_tools.go` | Path traversal protection |
+| `governor/config/system.json` | git, logging, validation sections |
+| `docs/supabase-schema/041_research_suggestions.sql` | New table and RPCs |
+
+## Commits (11 total)
+
+1. `dad77e49` - fix: task execution receives full prompt packet
+2. `64447844` - docs: session 39 part 2
+3. `2c997368` - feat: add task validation with feedback loop
+4. `b947183c` - fix: EventCouncilDone handles validation
+5. `dc179f6f` - feat: configurable validation thresholds
+6. `568e1d26` - docs: configurable validation
+7. `5fdebcd3` - fix: council approval creates tasks
+8. `936930a9` - docs: council integration
+9. `e480cccf` - feat: implement full system research flow
+10. `0ff6b796` - docs: system research flow
+11. `6eb88af2` - docs: migration status
+12. `75aab74f` - security: fix hardcoded paths, command injection
+13. `badc1e1f` - security: improve path traversal protection
+14. `9300b8f3` - docs: security audit fixes
+
+## Migrations Applied
+
+| # | File | Status |
+|---|------|--------|
+| 034 | task_improvements.sql | ✅ Applied |
+| 035 | fix_plan_path.sql | ✅ Applied |
+| 036 | revision_loop.sql | ✅ Applied |
+| 040 | update_task_status.sql | ✅ Applied |
+| 041 | research_suggestions.sql | ✅ Applied |
+
+## System Status
+
+- **Governor:** Running, stable, security hardened
+- **Flow:** PRD → Planner → Supervisor/Council → Tasks → Execution → Review → Merge
+- **Research:** Detection → Routing → Council/Supervisor → Maintenance
+- **Security:** No hardcoded paths, input validation, error logging
+
+---
+
 # 2026-03-01 (Session 39 - Part 2)
 
 ## Summary
