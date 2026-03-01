@@ -14,7 +14,30 @@ type FileReadTool struct {
 }
 
 func NewFileReadTool(repoPath string) *FileReadTool {
-	return &FileReadTool{repoPath: repoPath}
+	absPath, _ := filepath.Abs(repoPath)
+	return &FileReadTool{repoPath: absPath}
+}
+
+func (t *FileReadTool) isPathAllowed(path string) bool {
+	if strings.Contains(path, "..") {
+		return false
+	}
+	if filepath.IsAbs(path) {
+		return false
+	}
+
+	fullPath := filepath.Join(t.repoPath, path)
+	realPath, err := filepath.EvalSymlinks(fullPath)
+	if err != nil {
+		realPath = fullPath
+	}
+
+	realRepo, err := filepath.EvalSymlinks(t.repoPath)
+	if err != nil {
+		realRepo = t.repoPath
+	}
+
+	return strings.HasPrefix(realPath, realRepo+string(os.PathSeparator)) || realPath == realRepo
 }
 
 func (t *FileReadTool) Execute(ctx context.Context, args map[string]any) (json.RawMessage, error) {
@@ -23,8 +46,8 @@ func (t *FileReadTool) Execute(ctx context.Context, args map[string]any) (json.R
 		return nil, fmt.Errorf("path parameter required")
 	}
 
-	if strings.Contains(path, "..") {
-		return nil, fmt.Errorf("path traversal not allowed")
+	if !t.isPathAllowed(path) {
+		return nil, fmt.Errorf("path not allowed: potential traversal attack")
 	}
 
 	fullPath := filepath.Join(t.repoPath, path)
@@ -50,7 +73,32 @@ type FileWriteTool struct {
 }
 
 func NewFileWriteTool(repoPath string) *FileWriteTool {
-	return &FileWriteTool{repoPath: repoPath}
+	absPath, _ := filepath.Abs(repoPath)
+	return &FileWriteTool{repoPath: absPath}
+}
+
+func (t *FileWriteTool) isPathAllowed(path string) bool {
+	if strings.Contains(path, "..") {
+		return false
+	}
+	if filepath.IsAbs(path) {
+		return false
+	}
+
+	fullPath := filepath.Join(t.repoPath, path)
+
+	dirPath := filepath.Dir(fullPath)
+	realDir, err := filepath.EvalSymlinks(dirPath)
+	if err != nil {
+		realDir = dirPath
+	}
+
+	realRepo, err := filepath.EvalSymlinks(t.repoPath)
+	if err != nil {
+		realRepo = t.repoPath
+	}
+
+	return strings.HasPrefix(realDir, realRepo+string(os.PathSeparator)) || realDir == realRepo
 }
 
 func (t *FileWriteTool) Execute(ctx context.Context, args map[string]any) (json.RawMessage, error) {
@@ -63,8 +111,8 @@ func (t *FileWriteTool) Execute(ctx context.Context, args map[string]any) (json.
 		return nil, fmt.Errorf("content parameter required")
 	}
 
-	if strings.Contains(path, "..") {
-		return nil, fmt.Errorf("path traversal not allowed")
+	if !t.isPathAllowed(path) {
+		return nil, fmt.Errorf("path not allowed: potential traversal attack")
 	}
 
 	fullPath := filepath.Join(t.repoPath, path)
