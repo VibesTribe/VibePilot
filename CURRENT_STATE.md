@@ -249,6 +249,7 @@ vibepilot/
 - ✅ Validation failure → revision_needed (not error) with specific feedback
 - ✅ Planner receives validation feedback via revision loop
 - ✅ Supervisor rule recorded for learning (safety net catches missed issues)
+- ✅ All validation thresholds configurable via system.json (not hardcoded)
 
 ### NEXT - Full Flow Test
 
