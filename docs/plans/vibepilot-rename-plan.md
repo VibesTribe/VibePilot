@@ -111,7 +111,14 @@ Return JSON:
 {
   "files_created": ["docs/plans/vibeflow-audit-report.md"],
   "files_modified": [],
-  "tests_required": []
+  "tests_required": [],
+  "acceptance_criteria_met": [
+    "All files containing vibeflow identified",
+    "Each occurrence classified by type",
+    "Files categorized as content-only vs rename + content",
+    "Audit report saved to docs/plans/vibeflow-audit-report.md",
+    "Total count of occurrences documented"
+  ]
 }
 ```
 
@@ -233,7 +240,14 @@ Return JSON:
     "docs/UPDATE_CONSIDERATIONS.md",
     "docs/SYSTEM_REFERENCE.md"
   ],
-  "tests_required": []
+  "tests_required": [],
+  "acceptance_criteria_met": [
+    "All 8 files updated with correct replacements",
+    "Case-sensitive replacements applied correctly",
+    "External URLs preserved where appropriate",
+    "No unintended changes to formatting or structure",
+    "grep search shows no remaining vibeflow except external refs"
+  ]
 }
 ```
 
@@ -347,7 +361,14 @@ Return JSON:
     "docs/research/raindrop-vibepilot-20260219.md"
   ],
   "files_modified": [],
-  "tests_required": []
+  "tests_required": [],
+  "acceptance_criteria_met": [
+    "All 4 files renamed successfully",
+    "Content updated with vibeflow to vibepilot replacements",
+    "Old files removed",
+    "New files contain all original content minus brand changes",
+    "File permissions preserved"
+  ]
 }
 ```
 
@@ -419,7 +440,13 @@ Return JSON:
 {
   "files_created": [],
   "files_modified": ["docs/prd/dashboard-text-change-vibeflow-to-vibepilot.md"],
-  "tests_required": []
+  "tests_required": [],
+  "acceptance_criteria_met": [
+    "Product name references updated to vibepilot",
+    "Historical context preserved where appropriate",
+    "Document still reads naturally",
+    "No unintended changes to technical details"
+  ]
 }
 ```
 
@@ -493,7 +520,13 @@ Return JSON:
 {
   "files_created": [],
   "files_modified": ["config/prompts/consultant.md"],
-  "tests_required": []
+  "tests_required": [],
+  "acceptance_criteria_met": [
+    "All config files with vibeflow references identified",
+    "References updated to vibepilot",
+    "Prompt templates still functional",
+    "No syntax errors introduced"
+  ]
 }
 ```
 
@@ -575,7 +608,13 @@ Return JSON:
 {
   "files_created": ["docs/plans/vibepilot-test-plan.json"],
   "files_modified": [],
-  "tests_required": []
+  "tests_required": [],
+  "acceptance_criteria_met": [
+    "Plan JSON file renamed",
+    "Internal references updated",
+    "Valid JSON structure maintained",
+    "Old file removed"
+  ]
 }
 ```
 
@@ -678,7 +717,15 @@ Return JSON:
 {
   "files_created": ["scripts/validate_no_vibeflow.sh"],
   "files_modified": [],
-  "tests_required": []
+  "tests_required": [],
+  "acceptance_criteria_met": [
+    "Script created in scripts directory",
+    "Executable permissions set",
+    "Searches dashboard docs and config directories",
+    "Returns exit code 0 if no occurrences found",
+    "Returns exit code 1 and lists occurrences if found",
+    "Handles binary files gracefully"
+  ]
 }
 ```
 
@@ -783,7 +830,14 @@ Return JSON:
 {
   "files_created": ["docs/plans/validation-report.md"],
   "files_modified": [],
-  "tests_required": []
+  "tests_required": [],
+  "acceptance_criteria_met": [
+    "Validation script executed successfully",
+    "Zero vibeflow occurrences found in dashboard docs config",
+    "Validation report created documenting results",
+    "If any occurrences found they are fixed and re-validated",
+    "All modified files listed in report"
+  ]
 }
 ```
 
