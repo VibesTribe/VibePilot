@@ -8,71 +8,99 @@ import (
 )
 
 var defaultRPCAllowlist = map[string]bool{
-	"get_available_tasks":               true,
-	"get_task_by_id":                    true,
-	"claim_task":                        true,
-	"update_task_status":                true,
-	"reset_task":                        true,
-	"record_task_run":                   true,
-	"calculate_roi":                     true,
-	"get_best_runner":                   true,
-	"record_runner_result":              true,
-	"increment_in_flight":               true,
-	"decrement_in_flight":               true,
-	"log_orchestrator_event":            true,
-	"append_routing_history":            true,
-	"record_failure":                    true,
-	"get_heuristic":                     true,
-	"upsert_heuristic":                  true,
-	"get_recent_failures":               true,
-	"record_heuristic_result":           true,
-	"get_problem_solution":              true,
-	"record_solution_result":            true,
-	"create_planner_rule":               true,
-	"get_planner_rules":                 true,
-	"record_planner_rule_applied":       true,
-	"deactivate_planner_rule":           true,
-	"create_supervisor_rule":            true,
-	"get_supervisor_rules":              true,
-	"record_supervisor_rule_hit":        true,
-	"create_tester_rule":                true,
-	"get_tester_rules":                  true,
-	"record_tester_rule_hit":            true,
-	"archive_runner":                    true,
-	"boost_runner":                      true,
-	"revive_runner":                     true,
-	"log_security_audit":                true,
-	"vibes_query":                       true,
-	"get_dashboard_stats":               true,
-	"create_plan":                       true,
-	"update_plan_status":                true,
-	"add_council_review":                true,
-	"set_council_consensus":             true,
-	"create_tasks":                      true,
-	"create_task_with_packet":           true,
-	"record_planner_revision":           true,
-	"unlock_dependent_tasks":            true,
-	"find_orphaned_sessions":            true,
-	"recover_orphaned_session":          true,
-	"record_model_failure":              true,
-	"record_model_success":              true,
-	"check_model_availability":          true,
-	"get_model_score_for_task":          true,
-	"get_event_checkpoint":              true,
-	"update_event_checkpoint":           true,
-	"increment_revision_round":          true,
-	"check_revision_limit":              true,
-	"record_revision_feedback":          true,
-	"store_council_reviews":             true,
+	// Task management
+	"get_available_tasks":     true,
+	"update_task_status":      true,
+	"create_task_with_packet": true,
+	"unlock_dependent_tasks":  true,
+
+	// Plan lifecycle
+	"create_plan":              true,
+	"update_plan_status":       true,
+	"increment_revision_round": true,
+	"check_revision_limit":     true,
+	"record_revision_feedback": true,
+	"record_planner_revision":  true,
+	"add_council_review":       true,
+	"set_council_consensus":    true,
+	"store_council_reviews":    true,
+
+	// Processing state (migration 042)
+	"set_processing":           true,
+	"clear_processing":         true,
+	"find_stale_processing":    true,
+	"recover_stale_processing": true,
+
+	// Failure & learning
+	"record_failure":           true,
+	"record_model_failure":     true,
+	"record_model_success":     true,
+	"get_model_score_for_task": true,
+	"check_model_availability": true,
+
+	// Planner learning
+	"create_planner_rule":         true,
+	"get_planner_rules":           true,
+	"record_planner_rule_applied": true,
+	"deactivate_planner_rule":     true,
+
+	// Supervisor learning
+	"create_supervisor_rule":           true,
+	"get_supervisor_rules":             true,
+	"record_supervisor_rule":           true,
+	"record_supervisor_rule_triggered": true,
+
+	// Tester learning
+	"create_tester_rule":     true,
+	"get_tester_rules":       true,
+	"record_tester_rule_hit": true,
+
+	// Test results (migration 043)
+	"create_test_result":        true,
+	"update_test_result_status": true,
+
+	// Research flow
 	"create_research_suggestion":        true,
 	"update_research_suggestion_status": true,
-	"set_processing":                    true,
-	"clear_processing":                  true,
-	"find_stale_processing":             true,
-	"recover_stale_processing":          true,
-	"record_supervisor_rule":            true,
-	"create_test_result":                true,
-	"update_test_result_status":         true,
+
+	// Maintenance
+	"create_maintenance_command": true,
+
+	// Session recovery
+	"find_orphaned_sessions":   true,
+	"recover_orphaned_session": true,
+
+	// Event tracking
+	"get_event_checkpoint":    true,
+	"update_event_checkpoint": true,
+
+	// Heuristics
+	"get_heuristic":           true,
+	"upsert_heuristic":        true,
+	"get_recent_failures":     true,
+	"record_heuristic_result": true,
+	"get_problem_solution":    true,
+	"record_solution_result":  true,
+
+	// Runner management
+	"archive_runner":       true,
+	"boost_runner":         true,
+	"revive_runner":        true,
+	"get_best_runner":      true,
+	"record_runner_result": true,
+	"increment_in_flight":  true,
+	"decrement_in_flight":  true,
+
+	// Logging
+	"log_orchestrator_event": true,
+	"log_security_audit":     true,
+	"append_routing_history": true,
+
+	// Vibes interface
+	"vibes_query": true,
+
+	// Dashboard (may be used by frontend)
+	"get_dashboard_stats": true,
 }
 
 type RPCAllowlist struct {

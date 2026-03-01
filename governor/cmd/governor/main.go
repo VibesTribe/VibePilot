@@ -55,6 +55,8 @@ func main() {
 	git := gitree.New(&gitree.Config{
 		RepoPath:          repoPath,
 		ProtectedBranches: protectedBranches,
+		Timeout:           time.Duration(cfg.GetGitTimeoutSeconds()) * time.Second,
+		RemoteName:        cfg.GetRemoteName(),
 	})
 
 	v := vault.New(database)
@@ -569,14 +571,15 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		switch decision.Decision {
 		case "pass":
 			if decision.NextAction == "final_merge" {
-				if err := git.MergeBranch(ctx, branchName, "main"); err != nil {
-					log.Printf("[EventTaskCompleted] Failed to merge %s to main: %v", branchName, err)
+				targetBranch := cfg.GetDefaultMergeTarget()
+				if err := git.MergeBranch(ctx, branchName, targetBranch); err != nil {
+					log.Printf("[EventTaskCompleted] Failed to merge %s to %s: %v", branchName, targetBranch, err)
 					_, err = database.RPC(ctx, "update_task_status", map[string]any{
 						"p_task_id": taskID,
 						"p_status":  "escalated",
 					})
 				} else {
-					log.Printf("[EventTaskCompleted] Merged %s to main", branchName)
+					log.Printf("[EventTaskCompleted] Merged %s to %s", branchName, targetBranch)
 					_, err = database.RPC(ctx, "update_task_status", map[string]any{
 						"p_task_id": taskID,
 						"p_status":  "merged",

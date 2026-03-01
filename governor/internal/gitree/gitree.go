@@ -35,12 +35,14 @@ type Gitree struct {
 	repoPath          string
 	protectedBranches map[string]bool
 	timeout           time.Duration
+	remoteName        string
 }
 
 type Config struct {
 	RepoPath          string
 	ProtectedBranches []string
 	Timeout           time.Duration
+	RemoteName        string
 }
 
 func New(cfg *Config) *Gitree {
@@ -59,6 +61,11 @@ func New(cfg *Config) *Gitree {
 		timeout = DefaultGitTimeout
 	}
 
+	remoteName := cfg.RemoteName
+	if remoteName == "" {
+		remoteName = "origin"
+	}
+
 	protected := make(map[string]bool)
 	for _, branch := range cfg.ProtectedBranches {
 		protected[strings.TrimSpace(branch)] = true
@@ -68,6 +75,7 @@ func New(cfg *Config) *Gitree {
 		repoPath:          repoPath,
 		protectedBranches: protected,
 		timeout:           timeout,
+		remoteName:        remoteName,
 	}
 }
 
@@ -115,7 +123,7 @@ func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
 		return fmt.Errorf("initial commit: %w - %s", err, commitOut.String())
 	}
 
-	pushCmd := g.gitCommand(ctx, "push", "-u", "origin", branchName)
+	pushCmd := g.gitCommand(ctx, "push", "-u", g.remoteName, branchName)
 	var pushOut bytes.Buffer
 	pushCmd.Stdout = &pushOut
 	pushCmd.Stderr = &pushOut
@@ -144,7 +152,7 @@ func (g *Gitree) CommitOutput(ctx context.Context, branchName string, output int
 	checkoutCmd.Stderr = &checkoutOut
 	if err := checkoutCmd.Run(); err != nil {
 		if strings.Contains(checkoutOut.String(), "did not match") || strings.Contains(checkoutOut.String(), "not found") {
-			fetchCmd := g.gitCommand(ctx, "fetch", "origin", branchName)
+			fetchCmd := g.gitCommand(ctx, "fetch", g.remoteName, branchName)
 			if fetchErr := fetchCmd.Run(); fetchErr == nil {
 				trackCmd := g.gitCommand(ctx, "checkout", "--track", "origin/"+branchName)
 				if trackErr := trackCmd.Run(); trackErr != nil {
@@ -271,7 +279,7 @@ func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch str
 	if err := g.gitCommand(ctx, "checkout", targetBranch).Run(); err != nil {
 		log.Printf("[Gitree] Warning: checkout %s failed: %v", targetBranch, err)
 	}
-	if err := g.gitCommand(ctx, "pull", "origin", targetBranch).Run(); err != nil {
+	if err := g.gitCommand(ctx, "pull", g.remoteName, targetBranch).Run(); err != nil {
 		log.Printf("[Gitree] Warning: pull %s failed: %v", targetBranch, err)
 	}
 
@@ -284,7 +292,7 @@ func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch str
 		return fmt.Errorf("merge: %w - %s", err, out.String())
 	}
 
-	return g.gitCommand(ctx, "push", "origin", targetBranch).Run()
+	return g.gitCommand(ctx, "push", g.remoteName, targetBranch).Run()
 }
 
 func (g *Gitree) DeleteBranch(ctx context.Context, branchName string) error {
@@ -302,7 +310,7 @@ func (g *Gitree) DeleteBranch(ctx context.Context, branchName string) error {
 	if err := g.gitCommand(ctx, "branch", "-D", branchName).Run(); err != nil {
 		log.Printf("[Gitree] Warning: branch -D %s failed: %v", branchName, err)
 	}
-	if err := g.gitCommand(ctx, "push", "origin", "--delete", branchName).Run(); err != nil {
+	if err := g.gitCommand(ctx, "push", g.remoteName, "--delete", branchName).Run(); err != nil {
 		log.Printf("[Gitree] Warning: push --delete %s failed: %v", branchName, err)
 	}
 	return nil
@@ -361,7 +369,7 @@ func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 
 	g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run()
 
-	return g.gitCommand(ctx, "push", "-u", "origin", branchName).Run()
+	return g.gitCommand(ctx, "push", "-u", g.remoteName, branchName).Run()
 }
 
 func (g *Gitree) gitCommand(ctx context.Context, args ...string) *exec.Cmd {

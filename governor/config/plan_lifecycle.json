@@ -1,0 +1,124 @@
+{
+  "version": "1.0",
+  "description": "Plan lifecycle configuration - states, transitions, revision rules, complexity detection, consensus rules. All configurable.",
+  
+  "states": {
+    "draft": {
+      "description": "Plan created from PRD, awaiting planner",
+      "transitions": ["review"],
+      "on_enter_event": "prd_ready"
+    },
+    "review": {
+      "description": "Plan ready for supervisor review",
+      "transitions": ["approved", "revision_needed", "council_review"],
+      "on_enter_event": "plan_review"
+    },
+    "revision_needed": {
+      "description": "Plan needs changes from planner",
+      "transitions": ["review", "pending_human"],
+      "on_enter_event": "revision_needed"
+    },
+    "council_review": {
+      "description": "Complex plan, council reviewing",
+      "transitions": ["approved", "revision_needed", "blocked", "pending_human"],
+      "on_enter_event": "council_review"
+    },
+    "approved": {
+      "description": "Plan approved, creating tasks",
+      "transitions": ["active"],
+      "on_enter_event": "plan_approved"
+    },
+    "blocked": {
+      "description": "Plan blocked, needs human",
+      "transitions": ["pending_human", "revision_needed"],
+      "on_enter_event": "plan_blocked"
+    },
+    "pending_human": {
+      "description": "Awaiting human decision",
+      "transitions": ["approved", "revision_needed", "cancelled"]
+    },
+    "active": {
+      "description": "Tasks created and running",
+      "final": true
+    },
+    "cancelled": {
+      "description": "Plan cancelled",
+      "final": true
+    },
+    "error": {
+      "description": "Plan in error state (task creation failed, etc)",
+      "transitions": ["review", "pending_human"],
+      "on_enter_event": "plan_error"
+    }
+  },
+  
+  "revision_rules": {
+    "max_rounds": 6,
+    "on_max_rounds": "pending_human",
+    "description": "After max_rounds revisions, escalate to human. Change max_rounds to adjust tolerance for revision loops."
+  },
+  
+  "complexity_rules": {
+    "simple": {
+      "description": "Simple plans skip council, go straight to approval",
+      "conditions": {
+        "max_tasks": 2,
+        "no_categories": ["ui", "frontend", "visual", "security", "breaking_change"],
+        "min_confidence": 0.95
+      }
+    },
+    "complex": {
+      "description": "Complex plans require council review",
+      "conditions": {
+        "min_tasks": 5,
+        "has_categories": ["ui", "security", "breaking_change"],
+        "confidence_below": 0.85,
+        "touches_patterns": ["core/**", "auth/**", "migrations/**", "schema/**"]
+      }
+    },
+    "default": "review"
+  },
+  
+  "consensus_rules": {
+    "method": "unanimous_approval",
+    "description": "How council reaches consensus. Options: unanimous_approval, majority, weighted",
+    "methods": {
+      "unanimous_approval": {
+        "approved": "all vote APPROVED",
+        "blocked": "any vote BLOCKED",
+        "revision_needed": "any vote REVISION_NEEDED and no BLOCKED"
+      },
+      "majority": {
+        "approved": "majority vote APPROVED",
+        "blocked": "majority vote BLOCKED",
+        "revision_needed": "majority vote REVISION_NEEDED"
+      },
+      "weighted": {
+        "description": "Future: different lenses have different weights",
+        "weights": {
+          "user_alignment": 1.0,
+          "architecture": 1.5,
+          "feasibility": 1.2
+        },
+        "approved_threshold": 2.5
+      }
+    },
+    "blocked_on": "any_blocked",
+    "revision_on": "any_revision_needed"
+  },
+  
+  "council_rules": {
+    "member_count": 3,
+    "lenses": ["user_alignment", "architecture", "feasibility"],
+    "description": "Council reviews plans through multiple lenses. Each lens focuses on different aspects.",
+    "strategy": {
+      "preferred": "parallel_different_models",
+      "fallback": "sequential_same_model_different_hats",
+      "description": "Use different models if available for true independence. Fall back to same model with different hats."
+    },
+    "context": {
+      "include_prd": true,
+      "description": "Council sees both plan AND original PRD to validate alignment"
+    }
+  }
+}
