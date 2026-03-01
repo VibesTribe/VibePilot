@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -146,7 +147,12 @@ func (d *DB) Query(ctx context.Context, table string, filters map[string]any) (j
 		case "or":
 			path = path + "&or=" + url.QueryEscape(fmt.Sprintf("%v", val))
 		default:
-			path = path + "&" + url.QueryEscape(key) + "=eq." + url.QueryEscape(fmt.Sprintf("%v", val))
+			valStr := fmt.Sprintf("%v", val)
+			if strings.HasPrefix(valStr, "is.") || strings.HasPrefix(valStr, "not.") || strings.HasPrefix(valStr, "lt.") || strings.HasPrefix(valStr, "lte.") || strings.HasPrefix(valStr, "gt.") || strings.HasPrefix(valStr, "gte.") || strings.HasPrefix(valStr, "like.") || strings.HasPrefix(valStr, "ilike.") || strings.HasPrefix(valStr, "in.") {
+				path = path + "&" + url.QueryEscape(key) + "=" + url.QueryEscape(valStr)
+			} else {
+				path = path + "&" + url.QueryEscape(key) + "=eq." + url.QueryEscape(valStr)
+			}
 		}
 	}
 
