@@ -8,7 +8,7 @@ Simple smoke test to verify VibePilot planning flow works end-to-end by creating
 ### T001: Create Echo Test File
 **Confidence:** 0.98
 **Dependencies:** none
-**Type:** verification
+**Type:** test
 **Category:** configuration
 **Requires Codebase:** false
 
