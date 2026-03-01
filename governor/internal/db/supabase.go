@@ -215,3 +215,30 @@ func (d *DB) GetRunners(ctx context.Context) ([]Runner, error) {
 
 	return runners, nil
 }
+
+type TaskPacket struct {
+	TaskID         string          `json:"task_id"`
+	Prompt         string          `json:"prompt"`
+	TechSpec       json.RawMessage `json:"tech_spec,omitempty"`
+	ExpectedOutput string          `json:"expected_output,omitempty"`
+	Context        json.RawMessage `json:"context,omitempty"`
+	Version        int             `json:"version,omitempty"`
+}
+
+func (d *DB) GetTaskPacket(ctx context.Context, taskID string) (*TaskPacket, error) {
+	data, err := d.REST(ctx, "GET", "task_packets?task_id=eq."+taskID+"&limit=1", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var packets []TaskPacket
+	if err := json.Unmarshal(data, &packets); err != nil {
+		return nil, fmt.Errorf("unmarshal: %w", err)
+	}
+
+	if len(packets) == 0 {
+		return nil, fmt.Errorf("task packet not found for task %s", taskID)
+	}
+
+	return &packets[0], nil
+}

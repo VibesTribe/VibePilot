@@ -209,10 +209,32 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		taskID, _ := task["id"].(string)
 		taskType, _ := task["type"].(string)
 		taskNumber, _ := task["task_number"].(string)
+		taskCategory, _ := task["category"].(string)
 		sliceID, _ := task["slice_id"].(string)
 		if sliceID == "" {
 			sliceID = "default"
 		}
+
+		taskPacket, err := database.GetTaskPacket(ctx, taskID)
+		if err != nil {
+			log.Printf("[EventTaskAvailable] Failed to fetch task packet for %s: %v", truncateID(taskID), err)
+			_, _ = database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "error",
+			})
+			return
+		}
+
+		if taskPacket.Prompt == "" {
+			log.Printf("[EventTaskAvailable] Task %s has empty prompt packet - cannot execute", truncateID(taskID))
+			_, _ = database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "error",
+			})
+			return
+		}
+
+		log.Printf("[EventTaskAvailable] Task %s packet loaded: prompt_len=%d category=%s", truncateID(taskID), len(taskPacket.Prompt), taskCategory)
 
 		branchName := fmt.Sprintf("task/%s", taskNumber)
 		if taskNumber == "" {
@@ -225,7 +247,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			log.Printf("[EventTaskAvailable] Created branch %s for task %s", branchName, truncateID(taskID))
 		}
 
-		_, err := database.RPC(ctx, "update_task_status", map[string]any{
+		_, err = database.RPC(ctx, "update_task_status", map[string]any{
 			"p_task_id": taskID,
 			"p_status":  "in_progress",
 		})
@@ -233,20 +255,39 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			log.Printf("[EventTaskAvailable] Failed to update status to in_progress: %v", err)
 		}
 
-		destID := selectDestination("task_runner", taskID, taskType)
+		destID := selectDestination("task_runner", taskID, taskCategory)
 		if destID == "" {
-			log.Printf("[EventTaskAvailable] No destination available for task %s", truncateID(taskID))
+			destID = selectDestination("task_runner", taskID, taskType)
+		}
+		if destID == "" {
+			log.Printf("[EventTaskAvailable] No destination available for task %s (category=%s, type=%s)", truncateID(taskID), taskCategory, taskType)
 			return
 		}
 
-		session, err := factory.CreateWithContext(ctx, "task_runner", taskType)
+		session, err := factory.CreateWithContext(ctx, "task_runner", taskCategory)
 		if err != nil {
 			log.Printf("[EventTaskAvailable] Failed to create task_runner session: %v", err)
 			return
 		}
 
 		err = pool.SubmitWithDestination(ctx, sliceID, destID, func() error {
-			result, err := session.Run(ctx, map[string]any{"task": task, "event": "task_available"})
+			var contextData map[string]any
+			if len(taskPacket.Context) > 0 {
+				json.Unmarshal(taskPacket.Context, &contextData)
+			}
+
+			result, err := session.Run(ctx, map[string]any{
+				"task_id":         taskID,
+				"task_number":     taskNumber,
+				"title":           task["title"],
+				"type":            taskType,
+				"category":        taskCategory,
+				"prompt_packet":   taskPacket.Prompt,
+				"expected_output": taskPacket.ExpectedOutput,
+				"context":         contextData,
+				"dependencies":    task["dependencies"],
+				"event":           "task_available",
+			})
 			if err != nil {
 				log.Printf("[EventTaskAvailable] Task runner failed for %s: %v", truncateID(taskID), err)
 				return err
