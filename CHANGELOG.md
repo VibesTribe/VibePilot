@@ -63,6 +63,14 @@ This was a Type 1 error - a fundamental architectural gap that made the entire e
     - Supervisor rule recorded so it learns what to catch earlier
     - Creates a safety net + learning loop
 
+ 5. **Configurable Validation Thresholds**
+    - All validation requirements now configurable via system.json
+    - `validation.min_task_confidence` - default 0.95
+    - `validation.require_prompt_packet` - default true
+    - `validation.require_category` - default true
+    - `validation.require_expected_output` - default true
+    - No hardcoded thresholds - change config, not code
+
  ## Files Changed
 
 | File | Change |
