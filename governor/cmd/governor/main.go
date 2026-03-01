@@ -630,7 +630,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 		if len(councilReviews) == 0 {
 			log.Printf("[EventCouncilDone] No council reviews for plan %s - direct supervisor approval, creating tasks", truncateID(planID))
-			if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig()); err != nil {
+			if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig(), cfg.GetRepoPath()); err != nil {
 				var validationErr *ValidationFailedError
 				if errors.As(err, &validationErr) {
 					log.Printf("[EventCouncilDone] Task validation failed for plan %s - sending back to planner", truncateID(planID))
@@ -735,7 +735,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 			switch consensus {
 			case "approved":
-				if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig()); err != nil {
+				if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig(), cfg.GetRepoPath()); err != nil {
 					var validationErr *ValidationFailedError
 					if errors.As(err, &validationErr) {
 						log.Printf("[EventCouncilDone] Task validation failed for plan %s - sending back to planner", truncateID(planID))
@@ -960,7 +960,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		var prdContent string
 		if includePRD {
 			if prdPath, ok := plan["prd_path"].(string); ok && prdPath != "" {
-				fullPath := filepath.Join("/home/mjlockboxsocial/vibepilot", prdPath)
+				fullPath := filepath.Join(cfg.GetRepoPath(), prdPath)
 				if content, err := os.ReadFile(fullPath); err == nil {
 					prdContent = string(content)
 				}
@@ -1620,7 +1620,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			var statusError error
 			switch review.Decision {
 			case "approved":
-				if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig()); err != nil {
+				if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig(), cfg.GetRepoPath()); err != nil {
 					var validationErr *ValidationFailedError
 					if errors.As(err, &validationErr) {
 						log.Printf("[EventPlanReview] Task validation failed for plan %s - sending back to planner", truncateID(planID))
@@ -2098,7 +2098,7 @@ func validateTasks(tasks []TaskData, validationCfg *runtime.ValidationConfig) *V
 	return nil
 }
 
-func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[string]any, validationCfg *runtime.ValidationConfig) error {
+func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[string]any, validationCfg *runtime.ValidationConfig, repoPath string) error {
 	planID, _ := plan["id"].(string)
 	planPath, _ := plan["plan_path"].(string)
 
@@ -2106,7 +2106,6 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 		return fmt.Errorf("plan has no plan_path")
 	}
 
-	repoPath := "/home/mjlockboxsocial/vibepilot"
 	fullPath := filepath.Join(repoPath, planPath)
 
 	planContent, err := os.ReadFile(fullPath)

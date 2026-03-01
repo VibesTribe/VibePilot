@@ -22,6 +22,7 @@ type SystemConfig struct {
 	Recovery    map[string]interface{} `json:"recovery"`
 	Defaults    map[string]interface{} `json:"defaults"`
 	Validation  ValidationConfig       `json:"validation"`
+	Logging     LoggingConfig          `json:"logging"`
 	PromptsDir  string                 `json:"prompts_dir"`
 }
 
@@ -51,10 +52,18 @@ type VaultConfig struct {
 }
 
 type GitConfig struct {
-	Host              string   `json:"host"`
-	RepoEnv           string   `json:"repo_env"`
-	TokenEnv          string   `json:"token_env"`
-	ProtectedBranches []string `json:"protected_branches"`
+	Host               string   `json:"host"`
+	RepoEnv            string   `json:"repo_env"`
+	TokenEnv           string   `json:"token_env"`
+	ProtectedBranches  []string `json:"protected_branches"`
+	DefaultTimeoutSecs int      `json:"default_timeout_seconds"`
+	DefaultMergeTarget string   `json:"default_merge_target"`
+	BranchNamePattern  string   `json:"branch_name_pattern"`
+}
+
+type LoggingConfig struct {
+	MaxOutputLength int `json:"max_output_length"`
+	MaxIDDisplay    int `json:"max_id_display"`
 }
 
 type RuntimeConfig struct {
@@ -549,6 +558,47 @@ func (c *Config) GetProtectedBranches() []string {
 		return []string{"main", "master"}
 	}
 	return c.System.Git.ProtectedBranches
+}
+
+func (c *Config) GetRepoPath() string {
+	if c.System == nil {
+		return "."
+	}
+	if c.System.PRDWatcher.RepoPath != "" {
+		return c.System.PRDWatcher.RepoPath
+	}
+	return "."
+}
+
+func (c *Config) GetGitTimeout() int {
+	if c.System == nil || c.System.Git.DefaultTimeoutSecs == 0 {
+		return 60
+	}
+	return c.System.Git.DefaultTimeoutSecs
+}
+
+func (c *Config) GetDefaultMergeTarget() string {
+	if c.System == nil || c.System.Git.DefaultMergeTarget == "" {
+		return "main"
+	}
+	return c.System.Git.DefaultMergeTarget
+}
+
+func (c *Config) GetBranchNamePattern() string {
+	if c.System == nil || c.System.Git.BranchNamePattern == "" {
+		return "^[a-zA-Z0-9_/-]+$"
+	}
+	return c.System.Git.BranchNamePattern
+}
+
+func (c *Config) GetLoggingConfig() *LoggingConfig {
+	if c.System == nil {
+		return &LoggingConfig{
+			MaxOutputLength: 5000,
+			MaxIDDisplay:    8,
+		}
+	}
+	return &c.System.Logging
 }
 
 func (c *Config) GetHTTPAllowlist() []string {

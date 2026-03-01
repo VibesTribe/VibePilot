@@ -99,5 +99,14 @@
     "branch": "main",
     "directory": "docs/prds",
     "interval_seconds": 10
+  },
+  "git": {
+    "default_timeout_seconds": 60,
+    "default_merge_target": "main",
+    "branch_name_pattern": "^[a-zA-Z0-9_/-]+$"
+  },
+  "logging": {
+    "max_output_length": 5000,
+    "max_id_display": 8
   }
 }
