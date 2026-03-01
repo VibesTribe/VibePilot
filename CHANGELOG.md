@@ -6,6 +6,64 @@
 
 ---
 
+# 2026-03-01 (Session 40 Complete)
+
+## Summary
+
+Fixed critical infinite event loop bug - events were firing every poll cycle (1s) while agents worked, spawning duplicate agents until capacity exhausted.
+
+## Root Cause
+
+Plans/tasks stayed in same status while agent worked (minutes). Poller saw same status → fired same event → spawned another agent → repeat forever.
+
+## Solution: Processing State
+
+### New Schema (Migration 042)
+- `processing_by` TEXT column on plans and tasks - tracks which agent is working
+- `processing_at` TIMESTAMPTZ - when processing started (for timeout recovery)
+- Indexes on processing_by for fast filtering
+
+### New RPCs
+- `set_processing(table, id, processing_by)` - atomic claim, returns TRUE if succeeded
+- `clear_processing(table, id)` - release claim
+- `find_stale_processing(table, timeout)` - find stuck items for recovery
+- `recover_stale_processing(table, id, reason)` - recover and clear
+
+### Event Detection Update
+All event detectors now filter `processing_by IS NULL` - only fire for items not being processed.
+
+### Handler Updates
+Every handler now:
+1. Claims processing atomically before spawning agent
+2. Defers clear_processing on completion/error
+3. Clears processing if pool submission fails
+
+### Recovery Mechanism
+New goroutine `runProcessingRecovery` runs every 60s (configurable):
+- Finds plans/tasks stuck in processing > 300s (configurable)
+- Clears processing so they become pickable again
+- Logs recovery for audit
+
+## Other Fixes
+
+### RPC Parameter Format
+- `record_planner_revision` was receiving JSON-encoded bytes, Supabase expected TEXT[]
+- Fixed to pass raw []string
+
+### RPC Allowlist
+- Added `record_supervisor_rule` RPC (was missing)
+- Added all new processing RPCs
+
+## Files Changed
+- `docs/supabase-schema/042_processing_state.sql` (new)
+- `governor/cmd/governor/main.go`
+- `governor/config/system.json`
+- `governor/internal/db/rpc.go`
+- `governor/internal/runtime/config.go`
+- `governor/internal/runtime/events.go`
+
+---
+
 # 2026-03-01 (Session 39 Complete)
 
 ## Summary
