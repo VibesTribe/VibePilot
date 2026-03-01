@@ -101,22 +101,9 @@ Return JSON:
 #### Expected Output
 ```json
 {
-  "task_id": "T001",
   "files_created": ["docs/test/system-validated.md"],
   "files_modified": [],
   "tests_required": [],
-  "commit_required": {
-    "message": "validation: system flow test complete",
-    "files": ["docs/test/system-validated.md"]
-  },
-  "verification": {
-    "commands": [
-      "test -f docs/test/system-validated.md",
-      "grep -q 'Timestamp:' docs/test/system-validated.md",
-      "grep -q '8e8a400d-7b3f-455c-b052-dfa8b31eca6b' docs/test/system-validated.md"
-    ],
-    "git_check": "git log --oneline -1 | grep -q 'validation: system flow test complete'"
-  },
   "acceptance_criteria_met": [
     "File exists at docs/test/system-validated.md",
     "File contains ISO 8601 timestamp",
@@ -137,4 +124,4 @@ Return JSON:
 **Critical Path:** T001
 **Confidence:** 1.0
 
-This is a simple validation test with a single atomic task. No dependencies, minimal context required, and 100% clarity on expected output. The expected output includes specific verification commands that can be run to confirm task completion.
+This is a simple validation test with a single atomic task. No dependencies, minimal context required, and 100% clarity on expected output.
