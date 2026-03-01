@@ -92,8 +92,24 @@ func (g *Gitree) CommitOutput(ctx context.Context, branchName string, output int
 	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
 
-	if err := g.gitCommand(ctx, "checkout", branchName).Run(); err != nil {
-		return fmt.Errorf("checkout branch: %w", err)
+	var checkoutOut bytes.Buffer
+	checkoutCmd := g.gitCommand(ctx, "checkout", branchName)
+	checkoutCmd.Stdout = &checkoutOut
+	checkoutCmd.Stderr = &checkoutOut
+	if err := checkoutCmd.Run(); err != nil {
+		if strings.Contains(checkoutOut.String(), "did not match") || strings.Contains(checkoutOut.String(), "not found") {
+			fetchCmd := g.gitCommand(ctx, "fetch", "origin", branchName)
+			if fetchErr := fetchCmd.Run(); fetchErr == nil {
+				trackCmd := g.gitCommand(ctx, "checkout", "--track", "origin/"+branchName)
+				if trackErr := trackCmd.Run(); trackErr != nil {
+					return fmt.Errorf("checkout tracking branch: %w", trackErr)
+				}
+			} else {
+				return fmt.Errorf("checkout branch (not found locally or remotely): %w", err)
+			}
+		} else {
+			return fmt.Errorf("checkout branch: %w", err)
+		}
 	}
 
 	outputMap, ok := output.(map[string]interface{})

@@ -447,6 +447,22 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
+		decision, parseErr := runtime.ParseSupervisorDecision(result.Output)
+		if parseErr != nil {
+			log.Printf("[EventTaskCompleted] Failed to parse decision for %s: %v", truncateID(taskID), parseErr)
+			log.Printf("[EventTaskCompleted] Raw output: %s", truncateOutput(result.Output))
+			_, err = database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "escalated",
+			})
+			if err != nil {
+				log.Printf("[EventTaskCompleted] Failed to escalate task: %v", err)
+			}
+			return
+		}
+
+		log.Printf("[EventTaskCompleted] Task %s decision: %s, next: %s", truncateID(taskID), decision.Decision, decision.NextAction)
+
 		output := map[string]any{
 			"output":     result.Output,
 			"model_id":   modelID,
@@ -454,6 +470,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			"duration":   duration,
 			"tokens_in":  result.TokensIn,
 			"tokens_out": result.TokensOut,
+			"decision":   decision.Decision,
 		}
 		if err := git.CommitOutput(ctx, branchName, output); err != nil {
 			log.Printf("[EventTaskCompleted] Failed to commit output to %s: %v", branchName, err)
@@ -461,16 +478,71 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			log.Printf("[EventTaskCompleted] Committed output to %s", branchName)
 		}
 
-		_, err = database.RPC(ctx, "update_task_status", map[string]any{
-			"p_task_id": taskID,
-			"p_status":  "review",
-		})
-		if err != nil {
-			log.Printf("[EventTaskCompleted] Failed to update task status to review: %v", err)
+		switch decision.Decision {
+		case "pass":
+			if decision.NextAction == "final_merge" {
+				if err := git.MergeBranch(ctx, branchName, "main"); err != nil {
+					log.Printf("[EventTaskCompleted] Failed to merge %s to main: %v", branchName, err)
+					_, err = database.RPC(ctx, "update_task_status", map[string]any{
+						"p_task_id": taskID,
+						"p_status":  "escalated",
+					})
+				} else {
+					log.Printf("[EventTaskCompleted] Merged %s to main", branchName)
+					_, err = database.RPC(ctx, "update_task_status", map[string]any{
+						"p_task_id": taskID,
+						"p_status":  "merged",
+					})
+					git.DeleteBranch(ctx, branchName)
+				}
+			} else {
+				_, err = database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "approval",
+				})
+			}
+			recordModelSuccess(ctx, database, modelID, taskType, duration)
+
+		case "fail":
+			for _, issue := range decision.Issues {
+				failureCategory := runtime.CategorizeFailure(issue.Type)
+				_, err := database.RPC(ctx, "record_failure", map[string]any{
+					"p_task_id":          taskID,
+					"p_failure_type":     issue.Type,
+					"p_failure_category": failureCategory,
+					"p_failure_details":  map[string]any{"description": issue.Description, "severity": issue.Severity},
+					"p_model_id":         modelID,
+					"p_task_type":        taskType,
+				})
+				if err != nil {
+					log.Printf("[EventTaskCompleted] Failed to record failure: %v", err)
+				}
+			}
+
+			switch decision.NextAction {
+			case "return_to_runner":
+				_, err = database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "available",
+				})
+			default:
+				_, err = database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "escalated",
+				})
+			}
+			recordModelFailure(ctx, database, modelID, taskID, decision.NextAction)
+
+		default:
+			_, err = database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "escalated",
+			})
 		}
 
-		recordModelSuccess(ctx, database, modelID, taskType, duration)
-		log.Printf("[EventTaskCompleted] Task %s output committed, status=review", truncateID(taskID))
+		if err != nil {
+			log.Printf("[EventTaskCompleted] Failed to update task status: %v", err)
+		}
 	})
 
 	router.On(runtime.EventPlanCreated, func(event runtime.Event) {
