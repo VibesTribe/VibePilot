@@ -78,6 +78,19 @@ This was a Type 1 error - a fundamental architectural gap that made the entire e
     - Council path also validates tasks and sends feedback on failure
     - Flow: Supervisor → council_review → Council reviews → consensus → tasks
 
+ 7. **System Research Flow (Self-Improvement)**
+    - Core infrastructure for VibePilot to improve itself
+    - Migration 041: research_suggestions table with type-based complexity
+    - Simple items (new_model, new_platform, pricing_change, config_tweak):
+      → Supervisor reviews → creates maintenance command
+    - Complex items (architecture, new_data_store, security, workflow_change):
+      → Council reviews → consensus determines outcome
+    - Human items (api_credit_exhausted, ui_ux_change):
+      → Flagged for human review immediately
+    - EventResearchReady: Routes based on auto-determined complexity
+    - EventResearchCouncil: Full 3-member council review
+    - All routing configurable via type→complexity mapping (not hardcoded)
+
  ## Files Changed
 
 | File | Change |

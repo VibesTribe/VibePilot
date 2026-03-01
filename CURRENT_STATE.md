@@ -258,6 +258,15 @@ vibepilot/
 - ✅ Council-approved plans now create tasks with validation
 - ✅ Robust JSONB handling for council_reviews field
 
+**System Research Flow (Self-Improvement):**
+- ✅ research_suggestions table with type-based complexity routing
+- ✅ Simple items (new_model, pricing_change): Supervisor approves → maintenance command
+- ✅ Complex items (architecture, security): Council reviews → consensus
+- ✅ Human items (api_credit_exhausted, ui_ux): Flagged for human immediately
+- ✅ EventResearchReady: Routes based on complexity
+- ✅ EventResearchCouncil: Full council review for research
+- ✅ Maintenance commands created for approved research
+
 ### NEXT - Full Flow Test
 
 | Priority | Task | Notes |
