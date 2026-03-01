@@ -1600,12 +1600,21 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 func parseTasksFromPlanMarkdown(content string) ([]TaskData, error) {
 	var tasks []TaskData
 
-	sections := strings.Split(content, "### ")
-	for _, section := range sections {
-		if !strings.HasPrefix(section, "T") {
+	taskHeaderRegex := regexp.MustCompile(`(?m)^### (T\d+):`)
+	matches := taskHeaderRegex.FindAllStringSubmatchIndex(content, -1)
+
+	for i, match := range matches {
+		if len(match) < 4 {
 			continue
 		}
 
+		start := match[0]
+		end := len(content)
+		if i+1 < len(matches) {
+			end = matches[i+1][0]
+		}
+
+		section := content[start:end]
 		task, err := parseTaskSection(section)
 		if err != nil {
 			log.Printf("[parseTasksFromPlanMarkdown] Failed to parse task section: %v", err)
@@ -1614,6 +1623,8 @@ func parseTasksFromPlanMarkdown(content string) ([]TaskData, error) {
 
 		if task.TaskNumber != "" && task.Title != "" && task.PromptPacket != "" {
 			tasks = append(tasks, task)
+		} else {
+			log.Printf("[parseTasksFromPlanMarkdown] Task %s incomplete: title=%q prompt_len=%d", task.TaskNumber, task.Title, len(task.PromptPacket))
 		}
 	}
 
@@ -1625,17 +1636,17 @@ func parseTaskSection(section string) (TaskData, error) {
 	task.Type = "feature"
 	task.Category = "coding"
 
-	lines := strings.SplitN(section, "\n", 2)
-	if len(lines) < 2 {
-		return task, fmt.Errorf("section too short")
+	headerEnd := strings.Index(section, "\n")
+	if headerEnd == -1 {
+		return task, fmt.Errorf("no newline in section")
 	}
 
-	header := lines[0]
-	body := lines[1]
+	header := section[3:headerEnd]
+	body := section[headerEnd+1:]
 
 	parts := strings.SplitN(header, ":", 2)
 	if len(parts) < 2 {
-		return task, fmt.Errorf("invalid header format")
+		return task, fmt.Errorf("invalid header format: %s", header)
 	}
 
 	task.TaskNumber = strings.TrimSpace(parts[0])
@@ -1669,21 +1680,35 @@ func parseTaskSection(section string) (TaskData, error) {
 		task.RequiresCodebase = strings.ToLower(codebaseMatch[1]) == "true"
 	}
 
-	ppStart := strings.Index(body, "#### Prompt Packet\n```\n")
+	ppStart := strings.Index(body, "#### Prompt Packet")
 	if ppStart != -1 {
-		ppContent := body[ppStart+len("#### Prompt Packet\n```\n"):]
-		ppEnd := strings.Index(ppContent, "\n```\n")
-		if ppEnd != -1 {
-			task.PromptPacket = strings.TrimSpace(ppContent[:ppEnd])
+		ppContent := body[ppStart:]
+		codeStart := strings.Index(ppContent, "```\n")
+		if codeStart != -1 {
+			ppContent = ppContent[codeStart+4:]
+			ppEnd := strings.Index(ppContent, "\n```\n")
+			if ppEnd == -1 {
+				ppEnd = strings.Index(ppContent, "\n```")
+			}
+			if ppEnd != -1 {
+				task.PromptPacket = strings.TrimSpace(ppContent[:ppEnd])
+			}
 		}
 	}
 
-	eoStart := strings.Index(body, "#### Expected Output\n```json\n")
+	eoStart := strings.Index(body, "#### Expected Output")
 	if eoStart != -1 {
-		eoContent := body[eoStart+len("#### Expected Output\n```json\n"):]
-		eoEnd := strings.Index(eoContent, "\n```\n")
-		if eoEnd != -1 {
-			task.ExpectedOutput = strings.TrimSpace(eoContent[:eoEnd])
+		eoContent := body[eoStart:]
+		codeStart := strings.Index(eoContent, "```\n")
+		if codeStart != -1 {
+			eoContent = eoContent[codeStart+4:]
+			eoEnd := strings.Index(eoContent, "\n```\n")
+			if eoEnd == -1 {
+				eoEnd = strings.Index(eoContent, "\n```")
+			}
+			if eoEnd != -1 {
+				task.ExpectedOutput = strings.TrimSpace(eoContent[:eoEnd])
+			}
 		}
 	}
 
