@@ -79,22 +79,25 @@ type InitialReviewDecision struct {
 	TasksNeedingRevision []string `json:"tasks_needing_revision"`
 }
 
+type File struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
 type TaskRunnerOutput struct {
-	TaskID  string `json:"task_id"`
-	Status  string `json:"status"`
+	TaskID   string          `json:"task_id"`
+	Status   string          `json:"status"`
+	Summary  string          `json:"summary"`
+	FilesRaw json.RawMessage `json:"files_created,omitempty"`
+	Files    []File          `json:"-"`
+	TestsRaw json.RawMessage `json:"tests,omitempty"`
+	Tests    TestSection     `json:"-"`
+	Notes    string          `json:"notes"`
+}
+
+type TestSection struct {
+	Files   []File `json:"files_created"`
 	Summary string `json:"summary"`
-	Files   []struct {
-		Path    string `json:"path"`
-		Content string `json:"content"`
-	} `json:"files_created"`
-	Tests struct {
-		Files []struct {
-			Path    string `json:"path"`
-			Content string `json:"content"`
-		} `json:"files_created"`
-		Summary string `json:"summary"`
-	} `json:"tests"`
-	Notes string `json:"notes"`
 }
 
 func ParseSupervisorDecision(output string) (*SupervisorDecision, error) {
@@ -148,7 +151,46 @@ func ParseTaskRunnerOutput(output string) (*TaskRunnerOutput, error) {
 	if err := json.Unmarshal([]byte(jsonStr), &t); err != nil {
 		return nil, err
 	}
+
+	if len(t.FilesRaw) > 0 {
+		t.Files = parseFilesArray(t.FilesRaw)
+	}
+
+	if len(t.TestsRaw) > 0 {
+		var testsWrapper struct {
+			Files   json.RawMessage `json:"files_created"`
+			Summary string          `json:"summary"`
+		}
+		if err := json.Unmarshal(t.TestsRaw, &testsWrapper); err == nil {
+			t.Tests.Files = parseFilesArray(testsWrapper.Files)
+			t.Tests.Summary = testsWrapper.Summary
+		}
+	}
+
 	return &t, nil
+}
+
+func parseFilesArray(raw json.RawMessage) []File {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	var files []File
+
+	var objectFiles []File
+	if err := json.Unmarshal(raw, &objectFiles); err == nil {
+		return objectFiles
+	}
+
+	var stringFiles []string
+	if err := json.Unmarshal(raw, &stringFiles); err == nil {
+		for _, path := range stringFiles {
+			files = append(files, File{Path: path})
+		}
+		return files
+	}
+
+	return files
 }
 
 func extractJSON(output string) string {

@@ -164,18 +164,6 @@
       "models_available": ["deepseek-r1", "deepseek-v3"],
       "provides_tools": [],
       "notes": "Courier destination. Free DeepSeek R1 & V3. No login required. Good backup."
-    },
-    {
-      "id": "poe-web",
-      "name": "Poe",
-      "type": "web",
-      "status": "active",
-      "url": "https://poe.com",
-      "provider": "quora",
-      "requires_auth": "browser_login",
-      "models_available": ["gpt-4", "claude-3.5", "gemini-2", "many-others"],
-      "provides_tools": [],
-      "notes": "Courier destination. Multi-model aggregator. Subscription or daily free credits."
     }
   ]
 }
