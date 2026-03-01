@@ -6,6 +6,78 @@
 
 ---
 
+# 2026-03-01 (Session 39 - Part 2)
+
+## Summary
+
+**CRITICAL FIX:** Task execution was completely broken - models received no instructions. The prompt packets were being stored but never fetched and passed to the task runner.
+
+## The Problem
+
+When a task became available for execution:
+1. The task row was fetched from `tasks` table ✓
+2. But the `task_packets` table (containing the actual instructions) was NEVER queried ✗
+3. The model received: `{"task": {...metadata...}, "event": "task_available"}`
+4. The model did NOT receive: `prompt_packet`, `expected_output`, `context`
+5. Result: Model had NO IDEA what to build
+
+This was a Type 1 error - a fundamental architectural gap that made the entire execution flow non-functional.
+
+## The Fix
+
+1. **Added `GetTaskPacket()` to DB package**
+   - Fetches from `task_packets` table by `task_id`
+   - Returns: `Prompt`, `ExpectedOutput`, `Context`, `TechSpec`
+   - Located in: `governor/internal/db/supabase.go`
+
+2. **Modified `EventTaskAvailable` handler**
+   - Now fetches task packet BEFORE creating session
+   - Passes full packet to session.Run():
+     ```go
+     {
+       "task_id": "...",
+       "task_number": "T001",
+       "title": "...",
+       "category": "coding",
+       "prompt_packet": "...FULL INSTRUCTIONS...",
+       "expected_output": "...",
+       "context": {...},
+       "dependencies": [...],
+       "event": "task_available"
+     }
+     ```
+   - Error handling for missing/empty packets (sets task to error status)
+   - Category is now passed for routing consideration
+
+3. **Agent Hat Now Works**
+   - The `task_runner.md` prompt (the "hat") expects `prompt_packet` in input
+   - Now it actually receives it
+   - Model can follow instructions instead of guessing
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `governor/internal/db/supabase.go` | Added `TaskPacket` struct and `GetTaskPacket()` |
+| `governor/cmd/governor/main.go` | EventTaskAvailable now fetches and passes packet |
+
+## Commits
+
+- `dad77e49` - fix: task execution now receives full prompt packet from task_packets table
+
+## Impact
+
+This fix restores the core execution flow. Without it:
+- Plans could be created ✓
+- Plans could be reviewed ✓
+- Tasks could be created ✓
+- But tasks could NOT be executed (no instructions) ✗
+
+Now the full flow works:
+- PRD → Planner → Plan → Supervisor → Tasks → **Execution with instructions** → Review → Merge
+
+---
+
 # 2026-03-01 (Session 39)
 
 ## Summary

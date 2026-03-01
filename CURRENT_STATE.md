@@ -14,9 +14,9 @@
 ---
 
 **Last Updated:** 2026-03-01
-**Updated By:** GLM-5 - Session 39
+**Updated By:** GLM-5 - Session 39 (Part 2)
 **Branch:** `main`
-**Status:** ACTIVE - Bug fixes applied, governor stable
+**Status:** ACTIVE - Critical prompt packet fix applied
 
 ---
 
@@ -236,12 +236,20 @@ vibepilot/
 - ✅ Removed poe-web destination (web courier not implemented)
 - ✅ Set stuck task T001 to 'escalated' status
 
-### NEXT - Testing
+**CRITICAL FIX - Prompt Packet Delivery:**
+- ✅ Added `GetTaskPacket()` to DB package - fetches from `task_packets` table
+- ✅ EventTaskAvailable now fetches prompt packet BEFORE execution
+- ✅ Task runner receives full context: `prompt_packet`, `expected_output`, `context`
+- ✅ Error handling for missing/empty packets (sets task to error)
+- ✅ Category passed for routing consideration
+- ✅ Agent hat now works - model receives instructions it can follow
+
+### NEXT - Full Flow Test
 
 | Priority | Task | Notes |
 |----------|------|-------|
-| **TEST** | Full flow test | Create new PRD to test complete flow |
-| **TEST** | Verify branch creation | Ensure task branches are created properly |
+| **TEST** | Full flow test | Create new PRD to test complete flow with prompt packets |
+| **TEST** | Verify prompt delivery | Check logs show "prompt_len=N" where N > 0 |
 | **TEST** | Council execution | Create complex PRD to trigger council |
 
 ---
