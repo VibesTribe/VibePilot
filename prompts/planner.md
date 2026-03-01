@@ -54,7 +54,7 @@ After creating your plan with all tasks, dependencies, and prompt packets, outpu
   "action": "plan_created",
   "plan_id": "<plan.id from input>",
   "plan_path": "docs/plans/{project-name}-plan.md",
-  "plan_content": "# PLAN: [Project Name]\n\n## Overview\n[Brief description]\n\n## Tasks\n\n### T001: [Task Title]\n**Confidence:** 0.98\n**Dependencies:** none\n**Type:** feature\n**Requires Codebase:** false\n\n#### Prompt Packet\n```\n[Full prompt packet following the template below]\n```\n\n#### Expected Output\n```json\n{\n  \"files_created\": [\"path/to/file\"],\n  \"files_modified\": [],\n  \"tests_required\": [\"path/to/test\"]\n}\n```\n\n---\n\n### T002: [Next Task]\n...\n",
+  "plan_content": "# PLAN: [Project Name]\n\n## Overview\n[Brief description]\n\n## Tasks\n\n### T001: [Task Title]\n**Confidence:** 0.98\n**Dependencies:** none\n**Type:** feature\n**Category:** coding\n**Requires Codebase:** false\n\n#### Prompt Packet\n```\n[Full prompt packet following the template below]\n```\n\n#### Expected Output\n```json\n{\n  \"files_created\": [\"path/to/file\"],\n  \"files_modified\": [],\n  \"tests_required\": [\"path/to/test\"]\n}\n```\n\n---\n\n### T002: [Next Task]\n...\n",
   "total_tasks": 12,
   "status": "review"
 }
@@ -167,10 +167,9 @@ You return JSON:
         
         "routing_hints": {
           "requires_codebase": false,
-          "requires_cli": false,
-          "estimated_context": 4000,
-          "suggested_model": "kimi-k2.5"
-        }
+          "estimated_context": 4000
+        },
+        "category": "coding"
       }
     ]
   },
@@ -331,8 +330,31 @@ Return JSON:
 | `code_context` | Must read actual code from dependency | +2000-10000 tokens |
 
 **Rule:** If a task has 4+ `code_context` dependencies, OR estimated context > 32K:
-- Set `requires_cli: true`
-- Add `cli_reason: "4+ code_context dependencies"` or `"Context estimate: 45K"`
+- Set `Requires Codebase: true`
+
+---
+
+## TASK CATEGORIES
+
+Each task should have a category that describes the primary type of work:
+
+| Category | When to Use |
+|----------|-------------|
+| `coding` | Writing or modifying code |
+| `research` | Investigating, analyzing, comparing options |
+| `image` | Creating or modifying images/graphics |
+| `testing` | Writing or running tests |
+| `documentation` | Writing docs, README, comments |
+| `configuration` | Config files, settings, environment |
+| `refactoring` | Restructuring existing code |
+| `security` | Security-related changes |
+| `database` | Schema changes, migrations |
+| `api` | API endpoints, integrations |
+| `ui` | User interface changes |
+| `infrastructure` | Deployment, CI/CD, infrastructure |
+
+Categories help the Orchestrator select models with appropriate capabilities.
+This is a freeform field - use what best describes the task.
 
 ---
 

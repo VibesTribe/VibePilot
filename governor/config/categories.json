@@ -1,0 +1,22 @@
+{
+  "description": "Task categories for orchestrator routing. Freeform - add/remove as needed.",
+  "categories": [
+    "coding",
+    "research",
+    "image",
+    "testing",
+    "documentation",
+    "configuration",
+    "refactoring",
+    "security",
+    "database",
+    "api",
+    "ui",
+    "infrastructure"
+  ],
+  "notes": [
+    "Categories help orchestrator select models with appropriate capabilities",
+    "This list is suggestions only - any category string is valid",
+    "Modify this file to add/remove categories as the system evolves"
+  ]
+}

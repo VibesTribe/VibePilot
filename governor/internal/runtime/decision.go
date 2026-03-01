@@ -68,13 +68,15 @@ type TestResults struct {
 }
 
 type InitialReviewDecision struct {
-	Action     string   `json:"action"`
-	PlanID     string   `json:"plan_id"`
-	Decision   string   `json:"decision"`
-	Complexity string   `json:"complexity"`
-	Reasoning  string   `json:"reasoning"`
-	Concerns   []string `json:"concerns"`
-	TaskCount  int      `json:"task_count"`
+	Action               string   `json:"action"`
+	PlanID               string   `json:"plan_id"`
+	Decision             string   `json:"decision"`
+	Complexity           string   `json:"complexity"`
+	Reasoning            string   `json:"reasoning"`
+	Concerns             []string `json:"concerns"`
+	TaskCount            int      `json:"task_count"`
+	TasksReviewed        []string `json:"tasks_reviewed"`
+	TasksNeedingRevision []string `json:"tasks_needing_revision"`
 }
 
 type TaskRunnerOutput struct {
