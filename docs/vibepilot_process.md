@@ -1,9 +1,9 @@
 # VibePilot Process - Complete System Flow
 
 **Created:** 2026-02-19
-**Updated:** 2026-02-28 (Session 36 - full clarification)
+**Updated:** 2026-03-01 (Session 38 - revision loop, configurable lifecycle)
 **Status:** Current
-**Session:** 36
+**Session:** 38
 
 ---
 
@@ -21,6 +21,27 @@ This document captures the complete VibePilot process: how ideas become code, wh
 - Always lean, clean, fully functional
 - Great foundational architecture, no shortcuts or stubs
 - Everything learns from everything
+
+---
+
+## CONFIGURABLE LIFECYCLE
+
+All plan lifecycle rules are configurable via `config/plan_lifecycle.json`:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `revision_rules.max_rounds` | 6 | Max revision cycles before human escalation |
+| `revision_rules.on_max_rounds` | `pending_human` | Action when limit reached |
+| `council_rules.member_count` | 3 | Number of council members |
+| `council_rules.lenses` | user_alignment, architecture, feasibility | Review perspectives |
+| `council_rules.strategy.preferred` | parallel_different_models | Run council in parallel if possible |
+| `council_rules.strategy.fallback` | sequential_same_model_different_hats | Sequential with different hats if only 1 model |
+| `council_rules.context.include_prd` | true | Council sees PRD for comparison |
+| `consensus_rules.method` | unanimous_approval | How consensus is calculated |
+| `complexity_rules.simple.max_tasks` | 2 | Tasks threshold for simple classification |
+| `complexity_rules.complex.min_tasks` | 5 | Tasks threshold for complex classification |
+
+**Nothing is hardcoded. Change the config, change the behavior.**
 
 ---
 
@@ -82,13 +103,19 @@ Everything else is called as needed.
 │                         SUPERVISOR PLAN REVIEW                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  Supervisor receives plan                                                   │
+│  Supervisor receives plan (status = 'review')                               │
 │          ↓                                                                   │
 │  Assessment:                                                                │
-│    - Simple plan (1-2 independent tasks)?                                   │
-│        → Approve directly                                                   │
+│    - Simple plan (≤2 tasks, no UI/security, high confidence)?               │
+│        → Approve directly OR request revision                               │
 │    - Complex / could affect things?                                         │
 │        → Route to Council for review                                        │
+│                                                                              │
+│  SUPERVISOR CAN REQUEST REVISION FOR ANY PLAN (simple or complex)           │
+│    - If concerns found → status = 'revision_needed'                         │
+│    - Planner gets feedback + revision history                               │
+│    - revision_round increments                                              │
+│    - If revision_round > max_rounds → escalate to human                     │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
           ↓ (if complex)
@@ -96,12 +123,15 @@ Everything else is called as needed.
 │                         COUNCIL REVIEW                                       │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  3 Council Members review INDEPENDENTLY (no collusion)                      │
+│  Council receives: PLAN + ORIGINAL PRD (for alignment check)                │
+│          ↓                                                                   │
+│  3 Council Members review INDEPENDENTLY (configurable)                      │
 │                                                                              │
 │  Lens 1: User Alignment                                                     │
 │    - Does this match human's intent?                                        │
 │    - Are P0/P1/P2 priorities preserved?                                     │
 │    - Nothing missing? Nothing extra?                                        │
+│    - Does plan follow the PRD?                                              │
 │                                                                              │
 │  Lens 2: Architecture & Technical                                           │
 │    - Is the design sound?                                                   │
@@ -113,13 +143,17 @@ Everything else is called as needed.
 │    - Dependencies realistic?                                                │
 │    - Prompt packets complete?                                               │
 │                                                                              │
+│  EXECUTION STRATEGY (configurable):                                         │
+│    - If 3+ internal models available → Parallel (true independence)         │
+│    - If only 1 model available → Sequential with different hats             │
+│                                                                              │
 │  Each member votes: APPROVED / REVISION_NEEDED / BLOCKED                   │
 │          ↓                                                                   │
-│  Consensus?                                                                 │
-│    - All APPROVED → Plan approved                                           │
-│    - Any REVISION_NEEDED → Planner fixes + learns → Resubmit               │
+│  Consensus (configurable method):                                           │
+│    - unanimous_approval: All APPROVED → Plan approved                       │
+│    - majority: >50% APPROVED → Plan approved                                │
 │    - Any BLOCKED → Escalate to human                                        │
-│    - Max 6 rounds → Supervisor decides or escalate to human                │
+│    - Any REVISION_NEEDED → Planner fixes + learns → Resubmit               │
 │                                                                              │
 │  PLANNER LEARNS from Council feedback:                                      │
 │    - Better task breakdown patterns                                         │
@@ -129,18 +163,51 @@ Everything else is called as needed.
 └─────────────────────────────────────────────────────────────────────────────┘
           ↓
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    SUPERVISOR FINAL APPROVAL                                 │
+│                         REVISION LOOP                                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  Supervisor sees Council approval                                           │
+│  When status = 'revision_needed':                                           │
 │          ↓                                                                   │
-│  Quick check on plan                                                        │
+│  1. Check revision_round vs max_rounds (from config)                        │
+│     - If exceeded → status = 'pending_human' (escalate)                     │
+│     - If under limit → continue                                             │
 │          ↓                                                                   │
-│  Approves plan                                                              │
+│  2. Increment revision_round                                                │
+│          ↓                                                                   │
+│  3. Planner receives:                                                       │
+│     - Original plan                                                         │
+│     - ALL feedback (supervisor OR council)                                  │
+│     - Full revision_history (all previous rounds)                           │
+│     - Current round number                                                  │
+│          ↓                                                                   │
+│  4. Planner updates plan                                                    │
+│          ↓                                                                   │
+│  5. Plan status → 'review' (back to supervisor)                             │
+│          ↓                                                                   │
+│  6. Loop continues until:                                                   │
+│     - Approved → Create tasks                                               │
+│     - Blocked → Escalate to human                                           │
+│     - max_rounds exceeded → Escalate to human                               │
+│                                                                              │
+│  All feedback recorded in revision_history for audit trail.                 │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+          ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PLAN APPROVED → TASKS CREATED                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Plan approved (direct OR after council)                                    │
 │          ↓                                                                   │
 │  Tasks created in Supabase:                                                 │
 │    - Each task: id, number, prompt_packet, status='pending'                │
 │    - Dependencies mapped from plan                                          │
+│    - plan_path set correctly (migration 035 fix)                            │
+│                                                                              │
+│  If task creation fails:                                                    │
+│    - Plan status → 'error'                                                  │
+│    - Error logged in review_notes                                           │
+│    - Does NOT proceed to 'approved' (bug fix)                               │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
           ↓

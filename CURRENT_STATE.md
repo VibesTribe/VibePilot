@@ -13,10 +13,10 @@
 
 ---
 
-**Last Updated:** 2026-02-28
-**Updated By:** GLM-5 - Session 37
+**Last Updated:** 2026-03-01
+**Updated By:** GLM-5 - Session 38
 **Branch:** `main`
-**Status:** ACTIVE - Decision parsing implemented, PRD detection wired
+**Status:** ACTIVE - Revision loop implemented, council execution complete
 
 ---
 
@@ -33,7 +33,10 @@ vibepilot-governor.service (Go binary)
 ├── Reads secrets from vault at runtime
 ├── Startup recovery: finds and recovers orphaned sessions
 ├── Usage tracking: multi-window rate limit enforcement
-└── Learning: model scoring RPC (ready to deploy)
+├── Learning: model scoring RPC (ready to deploy)
+├── Revision loop: max rounds configurable (default: 6)
+├── Council execution: 3 members, parallel or sequential
+└── Plan lifecycle: all states configurable via JSON
 ```
 
 **Status:** `systemctl status vibepilot-governor`
@@ -51,10 +54,35 @@ Hat = Prompt/role a model wears for a specific task
 Routing = config/routing.json (strategies, restrictions, categories)
 Destinations = config/destinations.json (status, type, provides_tools)
 Models = config/models.json (availability, access_via)
+Plan Lifecycle = config/plan_lifecycle.json (states, transitions, rules)
 
 NO HARDCODED DESTINATIONS. Everything configurable.
 ALL CHANGES GO THROUGH TASK SYSTEM. Nothing implemented directly.
 ```
+
+## Plan Lifecycle (NEW)
+
+```
+config/plan_lifecycle.json controls:
+├── states: draft → review → [approved | revision_needed | council_review]
+├── revision_rules: max_rounds (default: 6), on_max_rounds action
+├── complexity_rules: simple vs complex detection thresholds
+├── consensus_rules: unanimous_approval | majority | weighted
+└── council_rules: member_count, lenses, parallel vs sequential strategy
+```
+
+## Event System (UPDATED)
+
+| Event | Fires When | Handler Action |
+|-------|------------|----------------|
+| `EventPRDReady` | status = `draft` | Planner creates plan |
+| `EventPlanReview` | status = `review` | Supervisor reviews |
+| `EventRevisionNeeded` | status = `revision_needed` | Planner revises with feedback |
+| `EventCouncilReview` | status = `council_review` | 3 council members review |
+| `EventCouncilComplete` | council done | Consensus calculated |
+| `EventPlanApproved` | status = `approved` (direct) | Tasks created |
+| `EventPlanBlocked` | status = `blocked` | Awaits human |
+| `EventPlanError` | status = `error` | Logged for recovery |
 
 ## Dynamic Routing
 
@@ -94,15 +122,21 @@ vibepilot/
 │   ├── internal/
 │   │   ├── db/            # Supabase client + RPC allowlist
 │   │   ├── vault/         # Secret decryption
-│   │   ├── runtime/       # Events, sessions, router, usage_tracker
+│   │   ├── runtime/       # Events, sessions, router, usage_tracker, config
 │   │   ├── gitree/        # Git operations (branch, commit, merge, delete)
 │   │   ├── destinations/  # CLI/API runners
 │   │   └── tools/         # Tool registry
 │   └── config/            # JSON configs (routing.json, destinations.json, etc.)
+├── config/                # Root config files
+│   ├── plan_lifecycle.json  # NEW - Plan states, revision rules, council rules
+│   ├── routing.json        # Routing strategies
+│   ├── destinations.json   # Execution destinations
+│   └── ...
 ├── prompts/               # Agent behavior definitions (.md)
 ├── docs/                  # Documentation
-├── research/              # Review docs for human (on research branch)
+│   └── supabase-schema/   # SQL migrations (034, 035, 036)
 ├── scripts/               # Deploy scripts
+│   └── opencode-count.sh  # Check opencode session count
 └── legacy/                # DEAD CODE - kept for reference
 ```
 
@@ -131,6 +165,7 @@ vibepilot/
 | `sudo systemctl restart vibepilot-governor` | Restart |
 | `cd ~/vibepilot/governor && go build -o governor ./cmd/governor` | Build |
 | `sudo scripts/deploy-governor.sh` | Full deploy |
+| `~/vibepilot/scripts/opencode-count.sh` | Check opencode session count |
 
 ---
 
@@ -158,17 +193,11 @@ vibepilot/
 - ✅ Model scoring added to RPC allowlist
 - ✅ FULL CODE AUDIT COMPLETE
 
-### AUDIT FINDINGS (Session 36)
-
-**What works:**
-- Config loading, dynamic routing, event polling, vault, gitree library
-
-### FILES TO CREATE (3 files)
+### DONE - Session 37
 - ✅ decision.go - Parse agent outputs + extractJSON for markdown blocks
 - ✅ context_builder.go - Build context from existing RPCs
 - ✅ prd_watcher.go - Detect new PRDs
 - ✅ task_runner.md - New agent for executing tasks
-- ✅ task_runner agent in agents.json
 - ✅ EventTaskAvailable - task_runner executes, commits to GitHub, sets status
 - ✅ EventTaskReview - Parse decision, call record_failure, update status
 - ✅ EventPRDReady - Parse planner output, commit to GitHub
@@ -177,69 +206,44 @@ vibepilot/
 - ✅ EventTestResults - Parse outcome, merge/reset/await based on result
 - ✅ Context builder wired to planner and supervisor sessions
 - ✅ PRD watcher wired to main.go
-- ✅ All changes use existing RPCs, no new tables
-- ✅ JSON parsing handles markdown code blocks (\`\`\`json)
 
-### CRITICAL ITEMS - ALL DONE
-- ✅ Wire Council output → set_council_consensus
-- ✅ Wire test results → update status + merge + unlock
-- ✅ Context builder to session.go
-- ✅ Runner output committed to GitHub
-- ✅ Task execution uses task_runner (not orchestrator)
+### DONE - Session 38 (Phase 1 & 2)
 
-### NEXT - Session 38+
+**Phase 1 - Critical Bug Fixes:**
+- ✅ Migration 034: confidence/category columns, create_task_with_packet RPC
+- ✅ Migration 035: update_plan_status sets plan_path
+- ✅ Migration 036: revision_round, revision_history, council tracking
+- ✅ config/plan_lifecycle.json: All plan rules configurable
+- ✅ BUG FIX: Task creation failure → status = "error" (not "approved")
+- ✅ BUG FIX: Council check before processing consensus
+- ✅ Config loader: GetMaxRevisionRounds(), GetCouncilMemberCount(), etc.
+
+**Phase 2 - Event Renaming & Revision Loop:**
+- ✅ New events: EventRevisionNeeded, EventCouncilReview, EventCouncilComplete, EventPlanApproved, EventPlanBlocked, EventPlanError
+- ✅ detectPlanEvents: Correct event firing based on status
+- ✅ EventRevisionNeeded handler: Planner gets feedback, round limit enforced
+- ✅ EventCouncilReview handler: 3 members, parallel/sequential, configurable
+- ✅ EventPlanApproved handler: Direct approval creates tasks
+- ✅ Consensus calculation: Uses config (unanimous_approval, majority, weighted)
+- ✅ Council loads PRD for comparison (configurable)
+
+### NEXT - Testing
 
 | Priority | Task | Notes |
 |----------|------|-------|
-| **TEST** | Full flow test | Create real PRD, watch end-to-end |
-| LOW | Daily learning task | Updates agent prompts with new learnings |
-| LOW | Rate limit checking | Router checks destination limits |
-| LOW | Courier runner | Web platform execution |
-
-### WHAT'S NOW WORKING
-
-1. ✅ PRD detected → plan created in Supabase
-2. ✅ Planner receives learned rules + recent failures
-3. ✅ Planner output parsed → saved to GitHub
-4. ✅ Supervisor receives learned context
-5. ✅ Supervisor decision parsed → failure recorded → status updated
-6. ✅ Council votes parsed → consensus set → planner rules created
-7. ✅ Test results parsed → merge/reset/await based on outcome
-8. ✅ Task runner executes → commits output → sets review status
-9. ✅ JSON parsing handles markdown code blocks (\`\`\`json)
-
-### FILES TO CREATE (3 files)
-
-| File | Purpose | Lines |
-|------|---------|-------|
-| `decision.go` | Parse Supervisor, Council, Planner outputs | ~150 |
-| `context_builder.go` | Call existing RPCs to build context | ~130 |
-| `prd_watcher.go` | Poll git for new PRDs | ~130 |
-
-**Total new code: ~410 lines**
-
-### NO NEW TABLES
-### NO NEW RPCs
-### USES EXISTING INFRASTRUCTURE
-| HIGH | Rate limit checking | Router checks destination limits |
-| MEDIUM | API output execution | Governor parses and executes for API runners |
-| LOW | Courier runner | Web platform execution implementation |
+| **TEST** | Full flow test | Reset broken plan or create new PRD |
+| **TEST** | Verify migrations applied | Check Supabase has new columns |
+| **TEST** | Council execution | Create complex PRD to trigger council |
 
 ---
 
-## For Next Session
+## Migrations Required
 
-**READ AUDIT_REPORT.md FIRST.**
-
-**Critical Priority: Build the brain**
-
-The Governor needs to:
-1. **Parse agent outputs** - Extract decision JSON from agent response
-2. **Take action** - Update status, wipe branches, reassign, escalate
-3. **Commit to GitHub** - Call gitree.CommitOutput with runner output
-4. **Detect PRDs** - Poll GitHub for new PRDs, create plan records
-
-**Do NOT add more infrastructure.** Build the decision loop.
+| # | File | Status |
+|---|------|--------|
+| 034 | task_improvements.sql | Apply to Supabase |
+| 035 | fix_plan_path.sql | Apply to Supabase |
+| 036 | revision_loop.sql | Apply to Supabase |
 
 ---
 
@@ -247,7 +251,7 @@ The Governor needs to:
 
 - **All changes go through task system** - Nothing implemented directly
 - **Hats, not fixed roles** - Any model can wear any hat
-- **Everything configurable** - Nothing hardcoded
+- **Everything configurable** - Nothing hardcoded (max_rounds, member_count, etc.)
 - **Everything learns** - All agents improve over time
 - **Human reviews only** complex suggestions, API credit, UI/UX
 
@@ -264,3 +268,4 @@ The Governor needs to:
 - Don't modify cleanup script without understanding cgroup logic
 - Don't hardcode any defaults - everything in config files
 - Don't implement anything directly - all changes through task system
+- Don't hardcode revision rounds or council member counts - use config
