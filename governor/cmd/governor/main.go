@@ -767,6 +767,9 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			switch review.Decision {
 			case "approved":
 				newStatus = "approved"
+				if err := createTasksFromPlan(ctx, database, plan, review.TaskCount); err != nil {
+					log.Printf("[EventPlanReview] Failed to create tasks: %v", err)
+				}
 			case "council_review":
 				newStatus = "council_review"
 			default:
@@ -1073,4 +1076,28 @@ func runStartupRecovery(ctx context.Context, database *db.DB, cfg RecoveryConfig
 	}
 
 	log.Printf("[Recovery] Recovery complete - %d session(s) recovered", len(orphanList))
+}
+
+func createTasksFromPlan(ctx context.Context, database *db.DB, plan map[string]any, taskCount int) error {
+	planID, _ := plan["id"].(string)
+
+	for i := 1; i <= taskCount; i++ {
+		title := fmt.Sprintf("Task %d from plan %s", i, truncateID(planID))
+
+		_, err := database.Insert(ctx, "tasks", map[string]any{
+			"plan_id":      planID,
+			"title":        title,
+			"type":         "feature",
+			"status":       "available",
+			"priority":     5,
+			"dependencies": []string{},
+		})
+		if err != nil {
+			log.Printf("[createTasksFromPlan] Failed to create task %d: %v", i, err)
+			continue
+		}
+		log.Printf("[createTasksFromPlan] Created task: %s", title)
+	}
+
+	return nil
 }
