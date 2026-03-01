@@ -14,7 +14,10 @@
     "host": "github",
     "repo_env": "GITHUB_REPO",
     "token_env": "GITHUB_TOKEN",
-    "protected_branches": ["main", "master", "research-considerations"]
+    "protected_branches": ["main", "master", "research-considerations"],
+    "default_timeout_seconds": 60,
+    "default_merge_target": "main",
+    "branch_name_pattern": "^[a-zA-Z0-9_/-]+$"
   },
   "runtime": {
     "max_concurrent_per_module": 8,
@@ -97,13 +100,8 @@
     "enabled": true,
     "repo_path": "/home/mjlockboxsocial/vibepilot",
     "branch": "main",
-    "directory": "docs/prds",
+    "directory": "docs/prd",
     "interval_seconds": 10
-  },
-  "git": {
-    "default_timeout_seconds": 60,
-    "default_merge_target": "main",
-    "branch_name_pattern": "^[a-zA-Z0-9_/-]+$"
   },
   "logging": {
     "max_output_length": 5000,
