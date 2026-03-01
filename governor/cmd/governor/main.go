@@ -1213,6 +1213,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 				reviewNotes["error"] = statusError.Error()
 			}
 
+			log.Printf("[EventPlanReview] Updating plan %s status to: %s", truncateID(planID), newStatus)
 			_, err = database.RPC(ctx, "update_plan_status", map[string]any{
 				"p_plan_id":      planID,
 				"p_status":       newStatus,
@@ -1220,6 +1221,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			})
 			if err != nil {
 				log.Printf("[EventPlanReview] Failed to update plan status: %v", err)
+			} else {
+				log.Printf("[EventPlanReview] Plan %s status updated to: %s", truncateID(planID), newStatus)
 			}
 
 			if statusError != nil {
