@@ -289,8 +289,7 @@ func (w *PollingWatcher) detectPlanEvents(ctx context.Context, lastSeen map[stri
 			case "council_review":
 				eventType = EventCouncilReview
 			case "approved":
-				councilReviews, _ := plan["council_reviews"].([]interface{})
-				if len(councilReviews) > 0 {
+				if hasCouncilReviews(plan) {
 					eventType = EventCouncilComplete
 				} else {
 					eventType = EventPlanApproved
@@ -517,4 +516,22 @@ func (r *EventRouter) Start(ctx context.Context) error {
 			go h(event)
 		}
 	})
+}
+
+func hasCouncilReviews(plan map[string]any) bool {
+	reviews := plan["council_reviews"]
+	if reviews == nil {
+		return false
+	}
+
+	switch v := reviews.(type) {
+	case []interface{}:
+		return len(v) > 0
+	case []map[string]interface{}:
+		return len(v) > 0
+	case string:
+		return v != "" && v != "[]" && v != "null"
+	default:
+		return false
+	}
 }

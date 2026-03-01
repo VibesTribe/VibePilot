@@ -626,7 +626,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 		planID, _ := plan["id"].(string)
 
-		councilReviews, _ := plan["council_reviews"].([]interface{})
+		councilReviews := extractCouncilReviews(plan)
 
 		if len(councilReviews) == 0 {
 			log.Printf("[EventCouncilDone] No council reviews for plan %s - direct supervisor approval, creating tasks", truncateID(planID))
@@ -690,16 +690,14 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			blocked := 0
 
 			for _, r := range councilReviews {
-				if rm, ok := r.(map[string]interface{}); ok {
-					vote, _ := rm["vote"].(string)
-					switch vote {
-					case "APPROVED":
-						approved++
-					case "REVISION_NEEDED":
-						revisionNeeded++
-					case "BLOCKED":
-						blocked++
-					}
+				vote, _ := r["vote"].(string)
+				switch vote {
+				case "APPROVED":
+					approved++
+				case "REVISION_NEEDED":
+					revisionNeeded++
+				case "BLOCKED":
+					blocked++
 				}
 			}
 
@@ -735,23 +733,54 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 				log.Printf("[EventCouncilDone] Failed to set council consensus: %v", err)
 			}
 
-			if consensus == "revision_needed" || consensus == "blocked" {
+			switch consensus {
+			case "approved":
+				if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig()); err != nil {
+					var validationErr *ValidationFailedError
+					if errors.As(err, &validationErr) {
+						log.Printf("[EventCouncilDone] Task validation failed for plan %s - sending back to planner", truncateID(planID))
+						var concerns []string
+						var taskNumbers []string
+						for _, e := range validationErr.Errors {
+							concerns = append(concerns, fmt.Sprintf("%s: %s", e.TaskNumber, e.Issue))
+							taskNumbers = append(taskNumbers, e.TaskNumber)
+						}
+						concernsJSON, _ := json.Marshal(concerns)
+						_, _ = database.RPC(ctx, "record_planner_revision", map[string]any{
+							"p_plan_id":                planID,
+							"p_concerns":               concernsJSON,
+							"p_tasks_needing_revision": taskNumbers,
+						})
+						_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
+							"p_plan_id":      planID,
+							"p_status":       "revision_needed",
+							"p_review_notes": map[string]any{"validation_errors": concerns, "source": "council_approved_but_validation_failed"},
+						})
+					} else {
+						log.Printf("[EventCouncilDone] Failed to create tasks: %v", err)
+						_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
+							"p_plan_id":      planID,
+							"p_status":       "error",
+							"p_review_notes": map[string]any{"error": err.Error()},
+						})
+					}
+				}
+
+			case "revision_needed", "blocked":
 				for _, r := range councilReviews {
-					if rm, ok := r.(map[string]interface{}); ok {
-						concerns, _ := rm["concerns"].([]interface{})
-						for _, c := range concerns {
-							if cm, ok := c.(map[string]interface{}); ok {
-								description, _ := cm["description"].(string)
-								if description != "" {
-									_, err := database.RPC(ctx, "create_planner_rule", map[string]any{
-										"p_applies_to": "*",
-										"p_rule_type":  "council_feedback",
-										"p_rule_text":  "Avoid: " + description,
-										"p_source":     "council",
-									})
-									if err != nil {
-										log.Printf("[EventCouncilDone] Failed to create planner rule: %v", err)
-									}
+					concerns, _ := r["concerns"].([]interface{})
+					for _, c := range concerns {
+						if cm, ok := c.(map[string]interface{}); ok {
+							description, _ := cm["description"].(string)
+							if description != "" {
+								_, err := database.RPC(ctx, "create_planner_rule", map[string]any{
+									"p_applies_to": "*",
+									"p_rule_type":  "council_feedback",
+									"p_rule_text":  "Avoid: " + description,
+									"p_source":     "council",
+								})
+								if err != nil {
+									log.Printf("[EventCouncilDone] Failed to create planner rule: %v", err)
 								}
 							}
 						}
@@ -1585,6 +1614,28 @@ func truncateOutput(output string) string {
 		return output[:5000] + "..."
 	}
 	return output
+}
+
+func extractCouncilReviews(plan map[string]any) []map[string]any {
+	reviews := plan["council_reviews"]
+	if reviews == nil {
+		return nil
+	}
+
+	switch v := reviews.(type) {
+	case []interface{}:
+		var result []map[string]any
+		for _, item := range v {
+			if m, ok := item.(map[string]interface{}); ok {
+				result = append(result, m)
+			}
+		}
+		return result
+	case []map[string]interface{}:
+		return v
+	default:
+		return nil
+	}
 }
 
 type RecoveryConfig struct {
