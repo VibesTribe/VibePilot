@@ -630,7 +630,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 		if len(councilReviews) == 0 {
 			log.Printf("[EventCouncilDone] No council reviews for plan %s - direct supervisor approval, creating tasks", truncateID(planID))
-			if err := createTasksFromApprovedPlan(ctx, database, plan); err != nil {
+			if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig()); err != nil {
 				var validationErr *ValidationFailedError
 				if errors.As(err, &validationErr) {
 					log.Printf("[EventCouncilDone] Task validation failed for plan %s - sending back to planner", truncateID(planID))
@@ -1301,7 +1301,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			var statusError error
 			switch review.Decision {
 			case "approved":
-				if err := createTasksFromApprovedPlan(ctx, database, plan); err != nil {
+				if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig()); err != nil {
 					var validationErr *ValidationFailedError
 					if errors.As(err, &validationErr) {
 						log.Printf("[EventPlanReview] Task validation failed for plan %s - sending back to planner", truncateID(planID))
@@ -1708,33 +1708,41 @@ func (e *ValidationFailedError) Error() string {
 	return strings.Join(msgs, "; ")
 }
 
-func validateTasks(tasks []TaskData) *ValidationFailedError {
+func validateTasks(tasks []TaskData, validationCfg *runtime.ValidationConfig) *ValidationFailedError {
 	var errors []ValidationError
-	minConfidence := 0.95
+
+	if validationCfg == nil {
+		validationCfg = &runtime.ValidationConfig{
+			MinTaskConfidence:     0.95,
+			RequirePromptPacket:   true,
+			RequireCategory:       true,
+			RequireExpectedOutput: true,
+		}
+	}
 
 	for _, task := range tasks {
-		if task.Confidence < minConfidence {
+		if task.Confidence < validationCfg.MinTaskConfidence {
 			errors = append(errors, ValidationError{
 				TaskNumber: task.TaskNumber,
-				Issue:      fmt.Sprintf("confidence %.2f below minimum %.2f - task must be split further", task.Confidence, minConfidence),
+				Issue:      fmt.Sprintf("confidence %.2f below minimum %.2f - task must be split further", task.Confidence, validationCfg.MinTaskConfidence),
 				Severity:   "high",
 			})
 		}
-		if task.PromptPacket == "" {
+		if validationCfg.RequirePromptPacket && task.PromptPacket == "" {
 			errors = append(errors, ValidationError{
 				TaskNumber: task.TaskNumber,
 				Issue:      "empty prompt packet - task has no instructions",
 				Severity:   "critical",
 			})
 		}
-		if task.Category == "" {
+		if validationCfg.RequireCategory && task.Category == "" {
 			errors = append(errors, ValidationError{
 				TaskNumber: task.TaskNumber,
 				Issue:      "missing category - needed for routing to appropriate model",
 				Severity:   "medium",
 			})
 		}
-		if task.ExpectedOutput == "" {
+		if validationCfg.RequireExpectedOutput && task.ExpectedOutput == "" {
 			errors = append(errors, ValidationError{
 				TaskNumber: task.TaskNumber,
 				Issue:      "missing expected output - supervisor cannot verify completion",
@@ -1749,7 +1757,7 @@ func validateTasks(tasks []TaskData) *ValidationFailedError {
 	return nil
 }
 
-func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[string]any) error {
+func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[string]any, validationCfg *runtime.ValidationConfig) error {
 	planID, _ := plan["id"].(string)
 	planPath, _ := plan["plan_path"].(string)
 
@@ -1776,7 +1784,7 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 
 	log.Printf("[createTasksFromApprovedPlan] Found %d tasks in plan %s", len(tasks), truncateID(planID))
 
-	if validationErr := validateTasks(tasks); validationErr != nil {
+	if validationErr := validateTasks(tasks, validationCfg); validationErr != nil {
 		log.Printf("[createTasksFromApprovedPlan] Validation failed for plan %s: %v", truncateID(planID), validationErr)
 		return validationErr
 	}

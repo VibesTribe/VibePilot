@@ -21,7 +21,15 @@ type SystemConfig struct {
 	PRDWatcher  PRDWatcherSystemConfig `json:"prd_watcher"`
 	Recovery    map[string]interface{} `json:"recovery"`
 	Defaults    map[string]interface{} `json:"defaults"`
+	Validation  ValidationConfig       `json:"validation"`
 	PromptsDir  string                 `json:"prompts_dir"`
+}
+
+type ValidationConfig struct {
+	MinTaskConfidence     float64 `json:"min_task_confidence"`
+	RequirePromptPacket   bool    `json:"require_prompt_packet"`
+	RequireCategory       bool    `json:"require_category"`
+	RequireExpectedOutput bool    `json:"require_expected_output"`
 }
 
 // DatabaseConfig specifies how to connect to Supabase.
@@ -648,6 +656,18 @@ func (c *Config) GetRuntimeConfig() *RuntimeConfig {
 		}
 	}
 	return &c.System.Runtime
+}
+
+func (c *Config) GetValidationConfig() *ValidationConfig {
+	if c.System == nil {
+		return &ValidationConfig{
+			MinTaskConfidence:     0.95,
+			RequirePromptPacket:   true,
+			RequireCategory:       true,
+			RequireExpectedOutput: true,
+		}
+	}
+	return &c.System.Validation
 }
 
 func (c *Config) GetRoutingStrategy(agentID string) string {

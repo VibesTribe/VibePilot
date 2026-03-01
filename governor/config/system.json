@@ -41,6 +41,12 @@
     "spacing_min_seconds": 1,
     "cooldown_minutes": 30
   },
+  "validation": {
+    "min_task_confidence": 0.95,
+    "require_prompt_packet": true,
+    "require_category": true,
+    "require_expected_output": true
+  },
   "concurrency": {
     "limits": {
       "opencode": 5,
