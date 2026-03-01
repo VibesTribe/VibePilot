@@ -108,7 +108,6 @@ Return JSON:
 #### Expected Output
 ```json
 {
-  "task_id": "T001",
   "files_created": ["docs/test/flow-validation.md"],
   "files_modified": [],
   "tests_required": [],
@@ -116,14 +115,9 @@ Return JSON:
     "File exists at docs/test/flow-validation.md",
     "File contains '✅ PASS'",
     "File contains 'autonomous agent flow is operational'",
-    "File contains valid ISO 8601 timestamp"
-  ],
-  "verification_checks": {
-    "file_exists": true,
-    "contains_pass_indicator": true,
-    "contains_flow_text": true,
-    "contains_timestamp": true
-  }
+    "File contains valid ISO 8601 timestamp",
+    "File committed to GitHub"
+  ]
 }
 ```
 
