@@ -103,7 +103,15 @@ Return JSON:
 {
   "files_created": ["docs/test/system-validated.md"],
   "files_modified": [],
-  "tests_required": []
+  "tests_required": [],
+  "acceptance_criteria_met": [
+    "File exists at docs/test/system-validated.md",
+    "File contains ISO 8601 timestamp",
+    "File contains plan ID",
+    "File contains success confirmation message",
+    "File is valid markdown",
+    "Changes committed to GitHub"
+  ]
 }
 ```
 
