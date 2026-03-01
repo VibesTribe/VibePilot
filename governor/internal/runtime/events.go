@@ -11,17 +11,23 @@ import (
 type EventType string
 
 const (
-	EventTaskAvailable  EventType = "task_available"
-	EventTaskCompleted  EventType = "task_completed"
-	EventTaskReview     EventType = "task_review"
-	EventPlanReview     EventType = "plan_review"
-	EventPlanCreated    EventType = "plan_created"
-	EventCouncilDone    EventType = "council_done"
-	EventResearchReady  EventType = "research_ready"
-	EventMaintenanceCmd EventType = "maintenance_command"
-	EventPRDReady       EventType = "prd_ready"
-	EventTestResults    EventType = "test_results"
-	EventHumanQuery     EventType = "human_query"
+	EventTaskAvailable   EventType = "task_available"
+	EventTaskCompleted   EventType = "task_completed"
+	EventTaskReview      EventType = "task_review"
+	EventPlanReview      EventType = "plan_review"
+	EventPlanCreated     EventType = "plan_created"
+	EventCouncilDone     EventType = "council_done"
+	EventResearchReady   EventType = "research_ready"
+	EventMaintenanceCmd  EventType = "maintenance_command"
+	EventPRDReady        EventType = "prd_ready"
+	EventTestResults     EventType = "test_results"
+	EventHumanQuery      EventType = "human_query"
+	EventRevisionNeeded  EventType = "revision_needed"
+	EventCouncilReview   EventType = "council_review"
+	EventCouncilComplete EventType = "council_complete"
+	EventPlanApproved    EventType = "plan_approved"
+	EventPlanBlocked     EventType = "plan_blocked"
+	EventPlanError       EventType = "plan_error"
 )
 
 type Event struct {
@@ -248,6 +254,8 @@ func (w *PollingWatcher) detectPlanEvents(ctx context.Context, lastSeen map[stri
 	allStatuses := make([]string, 0)
 	allStatuses = append(allStatuses, eventsCfg.PlanStatusesApproved...)
 	allStatuses = append(allStatuses, eventsCfg.PlanStatusesCouncil...)
+	allStatuses = append(allStatuses, eventsCfg.PlanStatusesPendingHuman...)
+	allStatuses = append(allStatuses, "error", "blocked")
 
 	orFilter := buildOrFilter(allStatuses, "status")
 
@@ -275,10 +283,30 @@ func (w *PollingWatcher) detectPlanEvents(ctx context.Context, lastSeen map[stri
 			lastSeen[key] = ts
 
 			var eventType EventType
-			if contains(eventsCfg.PlanStatusesCouncil, status) {
+			switch status {
+			case "revision_needed":
+				eventType = EventRevisionNeeded
+			case "council_review":
+				eventType = EventCouncilReview
+			case "approved":
+				councilReviews, _ := plan["council_reviews"].([]interface{})
+				if len(councilReviews) > 0 {
+					eventType = EventCouncilComplete
+				} else {
+					eventType = EventPlanApproved
+				}
+			case "blocked":
+				eventType = EventPlanBlocked
+			case "error":
+				eventType = EventPlanError
+			case "pending_human":
 				eventType = EventPlanCreated
-			} else if contains(eventsCfg.PlanStatusesApproved, status) {
-				eventType = EventCouncilDone
+			default:
+				if contains(eventsCfg.PlanStatusesCouncil, status) {
+					eventType = EventPlanCreated
+				} else if contains(eventsCfg.PlanStatusesApproved, status) {
+					eventType = EventCouncilDone
+				}
 			}
 
 			if eventType != "" {

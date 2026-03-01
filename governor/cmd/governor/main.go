@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -621,6 +622,385 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		})
 		if err != nil {
 			log.Printf("[EventCouncilDone] Failed to submit to pool: %v", err)
+		}
+	})
+
+	router.On(runtime.EventRevisionNeeded, func(event runtime.Event) {
+		var plan map[string]any
+		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			return
+		}
+
+		planID, _ := plan["id"].(string)
+
+		maxRounds := cfg.GetMaxRevisionRounds()
+		onMaxRounds := cfg.GetOnMaxRoundsAction()
+
+		limitReached, _ := database.RPC(ctx, "check_revision_limit", map[string]any{
+			"p_plan_id":    planID,
+			"p_max_rounds": maxRounds,
+		})
+
+		var limitReachedBool bool
+		if limitReached != nil {
+			var result []bool
+			if err := json.Unmarshal(limitReached, &result); err == nil && len(result) > 0 {
+				limitReachedBool = result[0]
+			}
+		}
+
+		if limitReachedBool {
+			log.Printf("[EventRevisionNeeded] Plan %s revision limit (%d) reached, escalating to human", truncateID(planID), maxRounds)
+			_, err := database.RPC(ctx, "update_plan_status", map[string]any{
+				"p_plan_id": planID,
+				"p_status":  onMaxRounds,
+				"p_review_notes": map[string]any{
+					"error":      "revision_limit_reached",
+					"max_rounds": maxRounds,
+				},
+			})
+			if err != nil {
+				log.Printf("[EventRevisionNeeded] Failed to update plan status: %v", err)
+			}
+			return
+		}
+
+		_, err := database.RPC(ctx, "increment_revision_round", map[string]any{
+			"p_plan_id": planID,
+		})
+		if err != nil {
+			log.Printf("[EventRevisionNeeded] Failed to increment revision round: %v", err)
+		}
+
+		revisionHistory, _ := plan["revision_history"].([]interface{})
+		var latestFeedback map[string]any
+		if len(revisionHistory) > 0 {
+			if rh, ok := revisionHistory[len(revisionHistory)-1].(map[string]any); ok {
+				latestFeedback = rh
+			}
+		}
+
+		destID := selectDestination("planner", planID, "revision")
+		if destID == "" {
+			log.Printf("[EventRevisionNeeded] No destination available for plan %s", truncateID(planID))
+			return
+		}
+
+		session, err := factory.CreateWithContext(ctx, "planner", "revision")
+		if err != nil {
+			log.Printf("[EventRevisionNeeded] Failed to create planner session: %v", err)
+			return
+		}
+
+		err = pool.SubmitWithDestination(ctx, "planning", destID, func() error {
+			result, err := session.Run(ctx, map[string]any{
+				"plan":             plan,
+				"event":            "revision_needed",
+				"revision_history": revisionHistory,
+				"latest_feedback":  latestFeedback,
+			})
+			if err != nil {
+				log.Printf("[EventRevisionNeeded] Planner session failed for %s: %v", truncateID(planID), err)
+				return err
+			}
+
+			plannerOutput, parseErr := runtime.ParsePlannerOutput(result.Output)
+			if parseErr != nil {
+				log.Printf("[EventRevisionNeeded] Failed to parse planner output: %v", parseErr)
+				return nil
+			}
+
+			log.Printf("[EventRevisionNeeded] Plan %s revised, status: %s", truncateID(planID), plannerOutput.Status)
+
+			if plannerOutput.PlanPath != "" && plannerOutput.PlanContent != "" {
+				files := []interface{}{
+					map[string]interface{}{"path": plannerOutput.PlanPath, "content": plannerOutput.PlanContent},
+				}
+				output := map[string]interface{}{"files": files}
+				if err := git.CommitOutput(ctx, "docs/plans", output); err != nil {
+					log.Printf("[EventRevisionNeeded] Failed to commit plan to GitHub: %v", err)
+				}
+			}
+
+			newStatus := plannerOutput.Status
+			if newStatus == "" {
+				newStatus = "review"
+			}
+
+			_, err = database.RPC(ctx, "update_plan_status", map[string]any{
+				"p_plan_id":      planID,
+				"p_status":       newStatus,
+				"p_plan_path":    plannerOutput.PlanPath,
+				"p_review_notes": map[string]any{"plan_content": plannerOutput.PlanContent, "total_tasks": plannerOutput.TotalTasks, "revised": true},
+			})
+			if err != nil {
+				log.Printf("[EventRevisionNeeded] Failed to update plan status: %v", err)
+			}
+
+			return nil
+		})
+		if err != nil {
+			log.Printf("[EventRevisionNeeded] Failed to submit to pool: %v", err)
+		}
+	})
+
+	router.On(runtime.EventPlanApproved, func(event runtime.Event) {
+		var plan map[string]any
+		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			return
+		}
+
+		planID, _ := plan["id"].(string)
+		log.Printf("[EventPlanApproved] Plan %s approved (direct), creating tasks", truncateID(planID))
+
+		if err := createTasksFromApprovedPlan(ctx, database, plan); err != nil {
+			log.Printf("[EventPlanApproved] Failed to create tasks: %v", err)
+			_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
+				"p_plan_id":      planID,
+				"p_status":       "error",
+				"p_review_notes": map[string]any{"error": err.Error()},
+			})
+			return
+		}
+
+		_, err := database.RPC(ctx, "update_plan_status", map[string]any{
+			"p_plan_id": planID,
+			"p_status":  "approved",
+		})
+		if err != nil {
+			log.Printf("[EventPlanApproved] Failed to update plan status: %v", err)
+		}
+	})
+
+	router.On(runtime.EventPlanBlocked, func(event runtime.Event) {
+		var plan map[string]any
+		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			return
+		}
+
+		planID, _ := plan["id"].(string)
+		log.Printf("[EventPlanBlocked] Plan %s blocked - requires human intervention", truncateID(planID))
+	})
+
+	router.On(runtime.EventPlanError, func(event runtime.Event) {
+		var plan map[string]any
+		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			return
+		}
+
+		planID, _ := plan["id"].(string)
+		reviewNotes, _ := plan["review_notes"].(map[string]any)
+		errorMsg, _ := reviewNotes["error"].(string)
+		log.Printf("[EventPlanError] Plan %s in error state: %s", truncateID(planID), errorMsg)
+	})
+
+	router.On(runtime.EventCouncilReview, func(event runtime.Event) {
+		var plan map[string]any
+		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			return
+		}
+
+		planID, _ := plan["id"].(string)
+		memberCount := cfg.GetCouncilMemberCount()
+		lenses := cfg.GetCouncilLenses()
+		includePRD := cfg.ShouldCouncilIncludePRD()
+
+		var prdContent string
+		if includePRD {
+			if prdPath, ok := plan["prd_path"].(string); ok && prdPath != "" {
+				fullPath := filepath.Join("/home/mjlockboxsocial/vibepilot", prdPath)
+				if content, err := os.ReadFile(fullPath); err == nil {
+					prdContent = string(content)
+				}
+			}
+		}
+
+		destID := selectDestination("council", planID, "council_review")
+		if destID == "" {
+			log.Printf("[EventCouncilReview] No destination available for plan %s", truncateID(planID))
+			return
+		}
+
+		councilMode := "sequential_same_model_different_hats"
+		councilModels := []map[string]any{}
+
+		availableDests := destRouter.GetAvailableDestinations()
+		internalDests := 0
+		for _, d := range availableDests {
+			category := cfg.GetDestinationCategory(d)
+			if category == "internal" {
+				internalDests++
+			}
+		}
+
+		if internalDests >= memberCount {
+			councilMode = "parallel_different_models"
+		}
+
+		log.Printf("[EventCouncilReview] Plan %s council starting (mode: %s, members: %d)", truncateID(planID), councilMode, memberCount)
+
+		reviews := make([]map[string]any, memberCount)
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+
+		for i := 0; i < memberCount; i++ {
+			wg.Add(1)
+			go func(memberIndex int) {
+				defer wg.Done()
+
+				lens := lenses[memberIndex%len(lenses)]
+				session, err := factory.CreateWithContext(ctx, "council", lens)
+				if err != nil {
+					log.Printf("[EventCouncilReview] Failed to create council session for member %d: %v", memberIndex+1, err)
+					return
+				}
+
+				contextData := map[string]any{
+					"plan":          plan,
+					"lens":          lens,
+					"member_number": memberIndex + 1,
+				}
+				if prdContent != "" {
+					contextData["prd_content"] = prdContent
+				}
+
+				result, err := session.Run(ctx, contextData)
+				if err != nil {
+					log.Printf("[EventCouncilReview] Council member %d failed: %v", memberIndex+1, err)
+					return
+				}
+
+				vote, parseErr := runtime.ParseCouncilVote(result.Output)
+				if parseErr != nil {
+					log.Printf("[EventCouncilReview] Failed to parse vote from member %d: %v", memberIndex+1, parseErr)
+					return
+				}
+
+				mu.Lock()
+				reviews[memberIndex] = map[string]any{
+					"member_number": memberIndex + 1,
+					"lens":          lens,
+					"vote":          vote.Vote,
+					"concerns":      vote.Concerns,
+					"reasoning":     vote.Reasoning,
+					"destination":   destID,
+				}
+				councilModels = append(councilModels, map[string]any{
+					"lens":        lens,
+					"destination": destID,
+				})
+				mu.Unlock()
+
+				log.Printf("[EventCouncilReview] Member %d (%s) voted: %s", memberIndex+1, lens, vote.Vote)
+			}(i)
+		}
+		wg.Wait()
+
+		validReviews := make([]map[string]any, 0)
+		for _, r := range reviews {
+			if r != nil {
+				validReviews = append(validReviews, r)
+			}
+		}
+
+		if len(validReviews) == 0 {
+			log.Printf("[EventCouncilReview] No valid votes for plan %s", truncateID(planID))
+			return
+		}
+
+		reviewsJSON, _ := json.Marshal(validReviews)
+		modelsJSON, _ := json.Marshal(councilModels)
+		_, err := database.RPC(ctx, "store_council_reviews", map[string]any{
+			"p_plan_id": planID,
+			"p_reviews": reviewsJSON,
+			"p_mode":    councilMode,
+			"p_models":  modelsJSON,
+		})
+		if err != nil {
+			log.Printf("[EventCouncilReview] Failed to store council reviews: %v", err)
+		}
+
+		approved := 0
+		revisionNeeded := 0
+		blocked := 0
+		var allConcerns []string
+		var tasksNeedingRevision []string
+
+		for _, r := range validReviews {
+			vote, _ := r["vote"].(string)
+			switch vote {
+			case "APPROVED":
+				approved++
+			case "REVISION_NEEDED":
+				revisionNeeded++
+			case "BLOCKED":
+				blocked++
+			}
+			if concerns, ok := r["concerns"].([]interface{}); ok {
+				for _, c := range concerns {
+					if concern, ok := c.(string); ok {
+						allConcerns = append(allConcerns, concern)
+					}
+				}
+			}
+		}
+
+		consensusMethod := cfg.GetConsensusMethod()
+		var consensus string
+		if consensusMethod == "unanimous_approval" {
+			if approved == memberCount {
+				consensus = "approved"
+			} else if blocked > 0 {
+				consensus = "blocked"
+			} else {
+				consensus = "revision_needed"
+			}
+		} else {
+			if approved > memberCount/2 {
+				consensus = "approved"
+			} else if blocked > memberCount/2 {
+				consensus = "blocked"
+			} else {
+				consensus = "revision_needed"
+			}
+		}
+
+		log.Printf("[EventCouncilReview] Plan %s consensus: %s (approved=%d, revision=%d, blocked=%d, method=%s)", truncateID(planID), consensus, approved, revisionNeeded, blocked, consensusMethod)
+
+		var newStatus string
+		switch consensus {
+		case "approved":
+			newStatus = "approved"
+		case "blocked":
+			newStatus = "blocked"
+		case "revision_needed":
+			newStatus = "revision_needed"
+			tasksJSON, _ := json.Marshal(tasksNeedingRevision)
+			_, err := database.RPC(ctx, "record_revision_feedback", map[string]any{
+				"p_plan_id":                planID,
+				"p_source":                 "council",
+				"p_feedback":               map[string]any{"concerns": allConcerns},
+				"p_tasks_needing_revision": tasksJSON,
+			})
+			if err != nil {
+				log.Printf("[EventCouncilReview] Failed to record revision feedback: %v", err)
+			}
+		}
+
+		_, err = database.RPC(ctx, "update_plan_status", map[string]any{
+			"p_plan_id": planID,
+			"p_status":  newStatus,
+			"p_review_notes": map[string]any{
+				"consensus":        consensus,
+				"approved_count":   approved,
+				"revision_count":   revisionNeeded,
+				"blocked_count":    blocked,
+				"council_mode":     councilMode,
+				"consensus_method": consensusMethod,
+			},
+		})
+		if err != nil {
+			log.Printf("[EventCouncilReview] Failed to update plan status: %v", err)
 		}
 	})
 
