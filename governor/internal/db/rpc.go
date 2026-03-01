@@ -71,6 +71,8 @@ var defaultRPCAllowlist = map[string]bool{
 	"find_stale_processing":             true,
 	"recover_stale_processing":          true,
 	"record_supervisor_rule":            true,
+	"create_test_result":                true,
+	"update_test_result_status":         true,
 }
 
 type RPCAllowlist struct {
