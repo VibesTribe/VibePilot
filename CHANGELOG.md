@@ -49,12 +49,21 @@ This was a Type 1 error - a fundamental architectural gap that made the entire e
    - Error handling for missing/empty packets (sets task to error status)
    - Category is now passed for routing consideration
 
-3. **Agent Hat Now Works**
-   - The `task_runner.md` prompt (the "hat") expects `prompt_packet` in input
-   - Now it actually receives it
-   - Model can follow instructions instead of guessing
+ 3. **Agent Hat Now Works**
+    - The `task_runner.md` prompt (the "hat") expects `prompt_packet` in input
+    - Now it actually receives it
+    - Model can follow instructions instead of guessing
 
-## Files Changed
+ 4. **Task Validation + Feedback Loop**
+    - Tasks validated at creation time for quality requirements
+    - Checks: confidence >= 0.95, non-empty prompt packet, category, expected output
+    - If validation fails, plan goes to `revision_needed` (not `error`)
+    - Specific validation errors recorded as feedback for planner
+    - Planner receives feedback and can fix issues
+    - Supervisor rule recorded so it learns what to catch earlier
+    - Creates a safety net + learning loop
+
+ ## Files Changed
 
 | File | Change |
 |------|--------|

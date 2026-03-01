@@ -631,11 +631,38 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		if len(councilReviews) == 0 {
 			log.Printf("[EventCouncilDone] No council reviews for plan %s - direct supervisor approval, creating tasks", truncateID(planID))
 			if err := createTasksFromApprovedPlan(ctx, database, plan); err != nil {
-				log.Printf("[EventCouncilDone] Failed to create tasks: %v", err)
+				var validationErr *ValidationFailedError
+				if errors.As(err, &validationErr) {
+					log.Printf("[EventCouncilDone] Task validation failed for plan %s - sending back to planner", truncateID(planID))
+					var concerns []string
+					var taskNumbers []string
+					for _, e := range validationErr.Errors {
+						concerns = append(concerns, fmt.Sprintf("%s: %s", e.TaskNumber, e.Issue))
+						taskNumbers = append(taskNumbers, e.TaskNumber)
+					}
+					concernsJSON, _ := json.Marshal(concerns)
+					_, _ = database.RPC(ctx, "record_planner_revision", map[string]any{
+						"p_plan_id":                planID,
+						"p_concerns":               concernsJSON,
+						"p_tasks_needing_revision": taskNumbers,
+					})
+					_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
+						"p_plan_id":      planID,
+						"p_status":       "revision_needed",
+						"p_review_notes": map[string]any{"validation_errors": concerns},
+					})
+				} else {
+					log.Printf("[EventCouncilDone] Failed to create tasks: %v", err)
+					_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
+						"p_plan_id":      planID,
+						"p_status":       "error",
+						"p_review_notes": map[string]any{"error": err.Error()},
+					})
+				}
+			} else {
 				_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
-					"p_plan_id":      planID,
-					"p_status":       "error",
-					"p_review_notes": map[string]any{"error": err.Error()},
+					"p_plan_id": planID,
+					"p_status":  "approved",
 				})
 			}
 			return
