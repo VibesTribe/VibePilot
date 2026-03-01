@@ -251,6 +251,13 @@ vibepilot/
 - ✅ Supervisor rule recorded for learning (safety net catches missed issues)
 - ✅ All validation thresholds configurable via system.json (not hardcoded)
 
+**Council Integration for Complex Plans:**
+- ✅ Supervisor can route complex plans to council_review
+- ✅ Council members review in parallel or sequential (configurable)
+- ✅ Consensus calculated (unanimous or majority, configurable)
+- ✅ Council-approved plans now create tasks with validation
+- ✅ Robust JSONB handling for council_reviews field
+
 ### NEXT - Full Flow Test
 
 | Priority | Task | Notes |

@@ -71,6 +71,13 @@ This was a Type 1 error - a fundamental architectural gap that made the entire e
     - `validation.require_expected_output` - default true
     - No hardcoded thresholds - change config, not code
 
+ 6. **Council Integration for Complex Plans**
+    - Fixed: Council-approved plans now create tasks
+    - EventCouncilDone now creates tasks when consensus == "approved"
+    - Added robust JSONB type handling for council_reviews
+    - Council path also validates tasks and sends feedback on failure
+    - Flow: Supervisor → council_review → Council reviews → consensus → tasks
+
  ## Files Changed
 
 | File | Change |
