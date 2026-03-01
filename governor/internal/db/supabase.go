@@ -145,7 +145,7 @@ func (d *DB) Query(ctx context.Context, table string, filters map[string]any) (j
 		case "order":
 			path = path + "&order=" + url.QueryEscape(fmt.Sprintf("%v", val))
 		case "or":
-			path = path + "&or=" + url.QueryEscape(fmt.Sprintf("%v", val))
+			path = path + "&or=(" + url.QueryEscape(fmt.Sprintf("%v", val)) + ")"
 		default:
 			valStr := fmt.Sprintf("%v", val)
 			if strings.HasPrefix(valStr, "is.") || strings.HasPrefix(valStr, "not.") || strings.HasPrefix(valStr, "lt.") || strings.HasPrefix(valStr, "lte.") || strings.HasPrefix(valStr, "gt.") || strings.HasPrefix(valStr, "gte.") || strings.HasPrefix(valStr, "like.") || strings.HasPrefix(valStr, "ilike.") || strings.HasPrefix(valStr, "in.") {

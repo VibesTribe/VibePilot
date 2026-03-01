@@ -90,7 +90,7 @@ func main() {
 	}
 
 	pollInterval := time.Duration(cfg.System.Runtime.EventPollIntervalMs) * time.Millisecond
-	watcher := runtime.NewPollingWatcher(&dbQuerierAdapter{db: database, cfg: cfg}, pollInterval)
+	watcher := runtime.NewPollingWatcher(database, pollInterval)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1919,62 +1919,6 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 	})
 
 	_ = eventsCfg
-}
-
-type dbQuerierAdapter struct {
-	db  *db.DB
-	cfg *runtime.Config
-}
-
-func (q *dbQuerierAdapter) Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error) {
-	path := table
-
-	if columns, ok := filters["columns"].([]any); ok && len(columns) > 0 {
-		colStr := ""
-		for i, c := range columns {
-			if i > 0 {
-				colStr += ","
-			}
-			colStr += toString(c)
-		}
-		path = table + "?select=" + colStr
-	} else {
-		path = table + "?select=*"
-	}
-
-	for key, val := range filters {
-		if key == "columns" || key == "select" {
-			continue
-		}
-		if orVal, ok := val.(string); ok && key == "or" {
-			path = path + "&or=(" + orVal + ")"
-		} else {
-			path = path + "&" + key + "=eq." + toString(val)
-		}
-	}
-
-	if limit, ok := filters["limit"].(float64); ok {
-		path = path + "&limit=" + toString(int(limit))
-	}
-
-	return q.db.REST(ctx, "GET", path, nil)
-}
-
-func toString(v any) string {
-	switch val := v.(type) {
-	case string:
-		return val
-	case int:
-		return strconv.Itoa(val)
-	case int64:
-		return strconv.FormatInt(val, 10)
-	case float64:
-		return strconv.FormatFloat(val, 'f', -1, 64)
-	case bool:
-		return strconv.FormatBool(val)
-	default:
-		return fmt.Sprintf("%v", val)
-	}
 }
 
 func recordModelSuccess(ctx context.Context, database *db.DB, modelID, taskType string, durationSeconds float64) {
