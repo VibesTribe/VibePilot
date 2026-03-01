@@ -77,9 +77,34 @@ Review the plan against the PRD. Use your judgment - these are guidelines, not h
 - Cross-module dependencies
 - Security implications
 - External integrations
-- Any task confidence < 95%
 - Ambiguity or concerns in the plan
 - Large scope (many tasks with interdependencies)
+
+**PLAN NEEDS REVISION (Return to Planner):**
+- Any task with confidence < 95%
+- Any task missing prompt_packet or has empty/placeholder prompt
+- Any task missing expected_output
+- Any task with invalid or circular dependencies
+- Any task missing category
+- Incomplete plan (doesn't cover all P0 features)
+
+### Step 4: Validate Each Task
+
+For EVERY task in the plan, verify:
+
+| Check | Requirement | Fail Condition |
+|-------|-------------|----------------|
+| Prompt Packet | Complete, non-empty, executable instructions | Empty, placeholder, or missing |
+| Expected Output | Defined files, tests, deliverables | Missing or vague |
+| Confidence | ≥ 0.95 (95%) | Below 0.95 |
+| Dependencies | Valid task IDs, no circular refs | References non-existent tasks or creates cycle |
+| Category | Specified and appropriate | Missing or nonsensical |
+| Codebase Flag | Set correctly for task needs | Needs codebase but flagged as web-only |
+
+**IF ANY TASK FAILS VALIDATION:**
+- Set decision to `needs_revision`
+- List specific failures in concerns
+- Include task IDs in tasks_needing_revision
 
 ### Output Format
 
@@ -89,14 +114,26 @@ After evaluation, output your decision in this format:
 {
   "action": "initial_review_complete",
   "plan_id": "<plan.id>",
-  "decision": "approved" | "council_review",
+  "decision": "approved" | "needs_revision" | "council_review",
   "complexity": "simple" | "complex",
-  "reasoning": "Brief explanation of why simple or complex",
-  "concerns": ["List any concerns that led to council_review"],
+  "reasoning": "Brief explanation of decision",
+  "concerns": ["Specific issues that need to be addressed"],
   "task_count": 4,
-  "tasks_reviewed": ["T001", "T002", "T003", "T004"]
+  "tasks_reviewed": ["T001", "T002", "T003", "T004"],
+  "tasks_needing_revision": ["T003"],
+  "validation_results": {
+    "T001": {"valid": true},
+    "T002": {"valid": true},
+    "T003": {"valid": false, "issues": ["prompt_packet is empty", "confidence 0.82 below threshold"]},
+    "T004": {"valid": true}
+  }
 }
 ```
+
+**Decision Logic:**
+- `approved`: All tasks pass validation, plan is simple
+- `needs_revision`: Any task fails validation (return to Planner with specific concerns)
+- `council_review`: All tasks pass validation, but plan is complex
 
 ---
 

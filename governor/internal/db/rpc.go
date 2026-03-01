@@ -49,6 +49,8 @@ var defaultRPCAllowlist = map[string]bool{
 	"add_council_review":          true,
 	"set_council_consensus":       true,
 	"create_tasks":                true,
+	"create_task_with_packet":     true,
+	"record_planner_revision":     true,
 	"unlock_dependent_tasks":      true,
 	"find_orphaned_sessions":      true,
 	"recover_orphaned_session":    true,
