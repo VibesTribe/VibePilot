@@ -212,34 +212,105 @@ type RoutingConfig struct {
 	Fallback              map[string]string          `json:"fallback"`
 }
 
-type Config struct {
-	System       *SystemConfig
-	Agents       *AgentsFile
-	Tools        *ToolsFile
-	Destinations *DestinationsFile
-	Models       *ModelsFile
-	Routing      *RoutingConfig
+type PlanLifecycleConfig struct {
+	Version         string                 `json:"version"`
+	States          map[string]StateConfig `json:"states"`
+	RevisionRules   RevisionRulesConfig    `json:"revision_rules"`
+	ComplexityRules ComplexityRulesConfig  `json:"complexity_rules"`
+	ConsensusRules  ConsensusRulesConfig   `json:"consensus_rules"`
+	CouncilRules    CouncilRulesConfig     `json:"council_rules"`
+}
 
-	systemPath       string
-	agentsPath       string
-	toolsPath        string
-	destinationsPath string
-	modelsPath       string
-	routingPath      string
-	promptsDir       string
+type StateConfig struct {
+	Description  string   `json:"description"`
+	Transitions  []string `json:"transitions"`
+	OnEnterEvent string   `json:"on_enter_event"`
+	Final        bool     `json:"final"`
+}
+
+type RevisionRulesConfig struct {
+	MaxRounds   int    `json:"max_rounds"`
+	OnMaxRounds string `json:"on_max_rounds"`
+	Description string `json:"description"`
+}
+
+type ComplexityRulesConfig struct {
+	Simple  ComplexityCondition `json:"simple"`
+	Complex ComplexityCondition `json:"complex"`
+	Default string              `json:"default"`
+}
+
+type ComplexityCondition struct {
+	Description string         `json:"description"`
+	Conditions  map[string]any `json:"conditions"`
+}
+
+type ConsensusRulesConfig struct {
+	Method      string                           `json:"method"`
+	Description string                           `json:"description"`
+	Methods     map[string]ConsensusMethodConfig `json:"methods"`
+	BlockedOn   string                           `json:"blocked_on"`
+	RevisionOn  string                           `json:"revision_on"`
+}
+
+type ConsensusMethodConfig struct {
+	Approved       string             `json:"approved"`
+	Blocked        string             `json:"blocked"`
+	RevisionNeeded string             `json:"revision_needed"`
+	Description    string             `json:"description"`
+	Weights        map[string]float64 `json:"weights"`
+}
+
+type CouncilRulesConfig struct {
+	MemberCount int                   `json:"member_count"`
+	Lenses      []string              `json:"lenses"`
+	Description string                `json:"description"`
+	Strategy    CouncilStrategyConfig `json:"strategy"`
+	Context     CouncilContextConfig  `json:"context"`
+}
+
+type CouncilStrategyConfig struct {
+	Preferred   string `json:"preferred"`
+	Fallback    string `json:"fallback"`
+	Description string `json:"description"`
+}
+
+type CouncilContextConfig struct {
+	IncludePRD  bool   `json:"include_prd"`
+	Description string `json:"description"`
+}
+
+type Config struct {
+	System        *SystemConfig
+	Agents        *AgentsFile
+	Tools         *ToolsFile
+	Destinations  *DestinationsFile
+	Models        *ModelsFile
+	Routing       *RoutingConfig
+	PlanLifecycle *PlanLifecycleConfig
+
+	systemPath        string
+	agentsPath        string
+	toolsPath         string
+	destinationsPath  string
+	modelsPath        string
+	routingPath       string
+	planLifecyclePath string
+	promptsDir        string
 
 	mu sync.RWMutex
 }
 
 func LoadConfig(configDir string) (*Config, error) {
 	cfg := &Config{
-		systemPath:       filepath.Join(configDir, "system.json"),
-		agentsPath:       filepath.Join(configDir, "agents.json"),
-		toolsPath:        filepath.Join(configDir, "tools.json"),
-		destinationsPath: filepath.Join(configDir, "destinations.json"),
-		modelsPath:       filepath.Join(configDir, "models.json"),
-		routingPath:      filepath.Join(configDir, "routing.json"),
-		promptsDir:       filepath.Join(configDir, "prompts"),
+		systemPath:        filepath.Join(configDir, "system.json"),
+		agentsPath:        filepath.Join(configDir, "agents.json"),
+		toolsPath:         filepath.Join(configDir, "tools.json"),
+		destinationsPath:  filepath.Join(configDir, "destinations.json"),
+		modelsPath:        filepath.Join(configDir, "models.json"),
+		routingPath:       filepath.Join(configDir, "routing.json"),
+		planLifecyclePath: filepath.Join(configDir, "plan_lifecycle.json"),
+		promptsDir:        filepath.Join(configDir, "prompts"),
 	}
 
 	if err := cfg.Reload(); err != nil {
@@ -289,6 +360,12 @@ func (c *Config) Reload() error {
 		return fmt.Errorf("load routing.json: %w", err)
 	}
 
+	if planLifecycle, err := loadJSON[PlanLifecycleConfig](c.planLifecyclePath); err == nil {
+		c.PlanLifecycle = planLifecycle
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("load plan_lifecycle.json: %w", err)
+	}
+
 	if c.System == nil {
 		c.System = &SystemConfig{
 			Database: DatabaseConfig{
@@ -323,6 +400,32 @@ func (c *Config) Reload() error {
 			Sandbox: SandboxConfig{
 				DefaultTestCommand: "npm test",
 				TimeoutSeconds:     60,
+			},
+		}
+	}
+
+	if c.PlanLifecycle == nil {
+		c.PlanLifecycle = &PlanLifecycleConfig{
+			Version: "1.0",
+			RevisionRules: RevisionRulesConfig{
+				MaxRounds:   6,
+				OnMaxRounds: "pending_human",
+			},
+			ConsensusRules: ConsensusRulesConfig{
+				Method:     "unanimous_approval",
+				BlockedOn:  "any_blocked",
+				RevisionOn: "any_revision_needed",
+			},
+			CouncilRules: CouncilRulesConfig{
+				MemberCount: 3,
+				Lenses:      []string{"user_alignment", "architecture", "feasibility"},
+				Strategy: CouncilStrategyConfig{
+					Preferred: "parallel_different_models",
+					Fallback:  "sequential_same_model_different_hats",
+				},
+				Context: CouncilContextConfig{
+					IncludePRD: true,
+				},
 			},
 		}
 	}
@@ -476,6 +579,48 @@ func (c *Config) GetSandboxConfig() *SandboxConfig {
 		}
 	}
 	return &c.System.Sandbox
+}
+
+func (c *Config) GetMaxRevisionRounds() int {
+	if c.PlanLifecycle == nil {
+		return 6
+	}
+	return c.PlanLifecycle.RevisionRules.MaxRounds
+}
+
+func (c *Config) GetOnMaxRoundsAction() string {
+	if c.PlanLifecycle == nil {
+		return "pending_human"
+	}
+	return c.PlanLifecycle.RevisionRules.OnMaxRounds
+}
+
+func (c *Config) GetCouncilLenses() []string {
+	if c.PlanLifecycle == nil || c.PlanLifecycle.CouncilRules.Lenses == nil {
+		return []string{"user_alignment", "architecture", "feasibility"}
+	}
+	return c.PlanLifecycle.CouncilRules.Lenses
+}
+
+func (c *Config) GetCouncilMemberCount() int {
+	if c.PlanLifecycle == nil {
+		return 3
+	}
+	return c.PlanLifecycle.CouncilRules.MemberCount
+}
+
+func (c *Config) ShouldCouncilIncludePRD() bool {
+	if c.PlanLifecycle == nil {
+		return true
+	}
+	return c.PlanLifecycle.CouncilRules.Context.IncludePRD
+}
+
+func (c *Config) GetConsensusMethod() string {
+	if c.PlanLifecycle == nil {
+		return "unanimous_approval"
+	}
+	return c.PlanLifecycle.ConsensusRules.Method
 }
 
 func (c *Config) GetWebToolsConfig() *WebToolsConfig {
