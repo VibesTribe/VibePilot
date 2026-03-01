@@ -14,9 +14,9 @@
 ---
 
 **Last Updated:** 2026-03-01
-**Updated By:** GLM-5 - Session 38
+**Updated By:** GLM-5 - Session 39
 **Branch:** `main`
-**Status:** ACTIVE - Revision loop implemented, council execution complete
+**Status:** ACTIVE - Bug fixes applied, governor stable
 
 ---
 
@@ -227,23 +227,33 @@ vibepilot/
 - ✅ Consensus calculation: Uses config (unanimous_approval, majority, weighted)
 - ✅ Council loads PRD for comparison (configurable)
 
+### DONE - Session 39 (Bug Fixes)
+
+**Critical Bug Fixes:**
+- ✅ Fixed infinite task loop: EventTaskCompleted now properly handles supervisor decision
+- ✅ Fixed branch checkout: Fetches from remote if branch not found locally
+- ✅ Fixed JSON parsing: Handles both object arrays and string arrays for files_created
+- ✅ Removed poe-web destination (web courier not implemented)
+- ✅ Set stuck task T001 to 'escalated' status
+
 ### NEXT - Testing
 
 | Priority | Task | Notes |
 |----------|------|-------|
-| **TEST** | Full flow test | Reset broken plan or create new PRD |
-| **TEST** | Verify migrations applied | Check Supabase has new columns |
+| **TEST** | Full flow test | Create new PRD to test complete flow |
+| **TEST** | Verify branch creation | Ensure task branches are created properly |
 | **TEST** | Council execution | Create complex PRD to trigger council |
 
 ---
 
-## Migrations Required
+## Migrations Applied
 
 | # | File | Status |
 |---|------|--------|
-| 034 | task_improvements.sql | Apply to Supabase |
-| 035 | fix_plan_path.sql | Apply to Supabase |
-| 036 | revision_loop.sql | Apply to Supabase |
+| 034 | task_improvements.sql | ✅ Applied |
+| 035 | fix_plan_path.sql | ✅ Applied |
+| 036 | revision_loop.sql | ✅ Applied |
+| 040 | update_task_status.sql | ✅ Applied |
 
 ---
 
