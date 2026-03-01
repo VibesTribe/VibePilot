@@ -26,6 +26,7 @@ CREATE OR REPLACE FUNCTION create_task_with_packet(
   p_task_number TEXT,
   p_title TEXT,
   p_type TEXT,
+  p_prompt TEXT,
   p_status TEXT DEFAULT 'pending',
   p_priority INT DEFAULT 5,
   p_confidence FLOAT DEFAULT NULL,
@@ -33,7 +34,6 @@ CREATE OR REPLACE FUNCTION create_task_with_packet(
   p_routing_flag TEXT DEFAULT 'web',
   p_routing_flag_reason TEXT DEFAULT NULL,
   p_dependencies UUID[] DEFAULT '{}',
-  p_prompt TEXT,
   p_expected_output TEXT DEFAULT NULL,
   p_context JSONB DEFAULT '{}'
 )
