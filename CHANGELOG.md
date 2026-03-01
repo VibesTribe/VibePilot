@@ -6,6 +6,163 @@
 
 ---
 
+# 2026-03-01 (Session 38)
+
+## Summary
+
+Implemented revision loop, council execution, configurable plan lifecycle. Fixed critical bugs in plan flow. NO HARDCODED VALUES - everything configurable via JSON.
+
+## Phase 1: Critical Bug Fixes
+
+### Migrations Applied
+
+1. **Migration 034: Task Improvements**
+   - Added `confidence` FLOAT column to tasks
+   - Added `category` TEXT column to tasks
+   - Created `create_task_with_packet` RPC for atomic task creation
+   - Created `record_planner_revision` RPC for supervisor feedback
+
+2. **Migration 035: Fix plan_path**
+   - Updated `update_plan_status` RPC to accept `p_plan_path` parameter
+   - Planner output now correctly sets plan_path column
+   - Plan content stored in review_notes
+
+3. **Migration 036: Revision Loop Support**
+   - Added `revision_round` INT column to plans
+   - Added `revision_history` JSONB column to plans
+   - Added `council_mode` TEXT column (parallel_different_models / sequential_same_model_different_hats)
+   - Added `council_models` JSONB column for audit trail
+   - Created `record_revision_feedback` RPC
+   - Created `increment_revision_round` RPC
+   - Created `check_revision_limit` RPC
+   - Created `store_council_reviews` RPC
+
+### Config File Created
+
+4. **config/plan_lifecycle.json** (NEW)
+   - All plan states and transitions configurable
+   - revision_rules.max_rounds (default: 6, configurable)
+   - revision_rules.on_max_rounds (default: pending_human)
+   - complexity_rules (simple vs complex thresholds)
+   - consensus_rules.method (unanimous_approval, majority, weighted)
+   - council_rules.member_count (default: 3)
+   - council_rules.lenses (user_alignment, architecture, feasibility)
+   - council_rules.strategy (parallel vs sequential)
+
+### Bug Fixes
+
+5. **BUG FIX: Task creation failure handling**
+   - When task creation fails, status → "error" (not "approved")
+   - Error message stored in review_notes
+   - Handler returns error, doesn't silently continue
+
+6. **BUG FIX: Council check before consensus**
+   - EventCouncilDone checks if council_reviews exist
+   - If no reviews (direct approval), creates tasks directly
+   - Prevents garbage consensus (0/0/0 votes)
+
+7. **Config Loader Updates**
+   - Added `GetMaxRevisionRounds()` - reads from config
+   - Added `GetOnMaxRoundsAction()` - reads from config
+   - Added `GetCouncilMemberCount()` - reads from config
+   - Added `GetCouncilLenses()` - reads from config
+   - Added `ShouldCouncilIncludePRD()` - reads from config
+   - Added `GetConsensusMethod()` - reads from config
+   - All with sensible defaults if config missing
+
+## Phase 2: Event Renaming & Revision Loop
+
+### New Events
+
+1. **EventRevisionNeeded**
+   - Fires when status = "revision_needed"
+   - Handler: checks round limit, sends to planner with feedback
+
+2. **EventCouncilReview**
+   - Fires when status = "council_review"
+   - Handler: runs 3 council members (parallel or sequential)
+
+3. **EventCouncilComplete**
+   - Fires when council done with reviews
+   - (Uses existing EventCouncilDone)
+
+4. **EventPlanApproved**
+   - Fires when status = "approved" without council reviews
+   - Handler: creates tasks directly
+
+5. **EventPlanBlocked**
+   - Fires when status = "blocked"
+   - Handler: logs, awaits human intervention
+
+6. **EventPlanError**
+   - Fires when status = "error"
+   - Handler: logs error for recovery
+
+### Event Handler Updates
+
+7. **EventRevisionNeeded Handler**
+   - Checks revision limit from config
+   - Increments revision_round via RPC
+   - Sends to planner with:
+     - Original plan
+     - Full revision_history
+     - Latest feedback
+   - Planner updates plan → status back to "review"
+
+8. **EventCouncilReview Handler**
+   - Loads PRD content (configurable)
+   - Detects available internal destinations
+   - Chooses strategy:
+     - 3+ internal models → parallel_different_models
+     - 1 model → sequential_same_model_different_hats
+   - Runs 3 council members with different lenses
+   - Stores reviews in Supabase
+   - Calculates consensus using configured method
+   - Updates plan status based on consensus
+
+9. **EventPlanApproved Handler**
+   - Creates tasks via `createTasksFromApprovedPlan`
+   - Handles errors properly (status → "error")
+   - Updates plan status to "approved"
+
+### Documentation Updates
+
+10. **CURRENT_STATE.md**
+    - Updated architecture section with plan lifecycle
+    - Added event system documentation
+    - Added migrations required section
+    - Added Session 38 progress
+
+11. **docs/vibepilot_process.md**
+    - Added CONFIGURABLE LIFECYCLE section
+    - Updated SUPERVISOR PLAN REVIEW (can request revisions)
+    - Updated COUNCIL REVIEW (execution strategy, PRD comparison)
+    - Added REVISION LOOP section
+    - Updated PLAN APPROVED section (error handling)
+
+12. **scripts/opencode-count.sh**
+    - New utility to check opencode session count
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `config/plan_lifecycle.json` | NEW - All plan rules |
+| `docs/supabase-schema/036_revision_loop.sql` | NEW - Revision loop migration |
+| `governor/internal/runtime/config.go` | Added plan lifecycle loading + helper methods |
+| `governor/internal/runtime/events.go` | Added 6 new events, updated detectPlanEvents |
+| `governor/cmd/governor/main.go` | Added 5 new event handlers, fixed bugs |
+| `scripts/opencode-count.sh` | NEW - Session count utility |
+| `CURRENT_STATE.md` | Updated with Phase 1 & 2 progress |
+| `docs/vibepilot_process.md` | Updated with revision loop, configurable lifecycle |
+
+## Commits
+
+- `59953302` - feat: Phase 1 - revision loop config and critical bug fixes
+- `f05df0b7` - feat: Phase 2 - event renaming and revision loop implementation
+
+---
+
 # 2026-02-28 (Session 35)
 
 ## Summary
