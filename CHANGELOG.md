@@ -6,6 +6,54 @@
 
 ---
 
+# 2026-03-01 (Session 39)
+
+## Summary
+
+Fixed critical bugs causing infinite task loop and branch handling issues. All fixes are lean, configurable, and robust.
+
+## Bug Fixes
+
+1. **Fixed Infinite Task Loop**
+   - Root cause: EventTaskCompleted blindly set status to "review" after supervisor ran
+   - Fix: Properly parse supervisor decision and handle pass/fail/merge cases
+   - On pass + final_merge: merge branch to main, set status to "merged", delete branch
+   - On pass (other): set status to "approval"
+   - On fail: record failure, set status to "available" or "escalated"
+   - On parse error: set status to "escalated" for human review
+
+2. **Fixed Branch Checkout Failure**
+   - Root cause: Branch exists on remote but not locally
+   - Fix: If checkout fails, fetch from remote and try tracking branch
+   - Added better error messages for debugging
+
+3. **Fixed JSON Parsing for files_created**
+   - Root cause: Model might return `["path1", "path2"]` or `[{path, content}]`
+   - Fix: Use json.RawMessage to defer parsing, try both formats
+   - Added `parseFilesArray()` helper to handle both cases
+
+4. **Removed poe-web Destination**
+   - Web courier not implemented, poe-web was causing "Unknown destination type" warnings
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `governor/cmd/governor/main.go` | EventTaskCompleted: proper decision handling |
+| `governor/internal/gitree/gitree.go` | CommitOutput: fetch remote if needed |
+| `governor/internal/runtime/decision.go` | Flexible files_created parsing |
+| `governor/config/destinations.json` | Removed poe-web |
+
+## Commits
+
+- `7cd83dc8` - fix: task loop and branch handling issues
+
+## Manual Actions
+
+- Set stuck task T001 (a9a6f3f1) to "escalated" status to stop loop
+
+---
+
 # 2026-03-01 (Session 38)
 
 ## Summary
