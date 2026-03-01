@@ -103,24 +103,15 @@ Return JSON:
 {
   "files_created": ["docs/test/system-validated.md"],
   "files_modified": [],
-  "tests_required": [],
-  "git_committed": true,
-  "commit_message": "validation: system flow test complete",
-  "acceptance_criteria_met": [
-    "File exists at docs/test/system-validated.md",
-    "File contains ISO 8601 timestamp",
-    "File contains plan ID 8e8a400d-7b3f-455c-b052-dfa8b31eca6b",
-    "File contains success message",
-    "File is valid markdown",
-    "Changes committed to GitHub"
-  ],
-  "verification_commands": [
-    "test -f docs/test/system-validated.md",
-    "grep -q 'Timestamp:' docs/test/system-validated.md",
-    "grep -q '8e8a400d-7b3f-455c-b052-dfa8b31eca6b' docs/test/system-validated.md"
-  ]
+  "tests_required": []
 }
 ```
+
+**Verification:**
+- File exists: `test -f docs/test/system-validated.md`
+- Has timestamp: `grep -q 'Timestamp:' docs/test/system-validated.md`
+- Has plan ID: `grep -q '8e8a400d-7b3f-455c-b052-dfa8b31eca6b' docs/test/system-validated.md`
+- Git committed: `git log --oneline -1 | grep -q 'validation: system flow test complete'`
 
 ---
 
