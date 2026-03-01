@@ -36,7 +36,9 @@
     "model_failure_threshold": 3,
     "usage_threshold_pct": 80,
     "auto_bench_on_failures": true,
-    "auto_restore_after_cooldown": true
+    "auto_restore_after_cooldown": true,
+    "processing_timeout_seconds": 300,
+    "processing_recovery_interval_seconds": 60
   },
   "defaults": {
     "throttle_behavior": "slow_down",

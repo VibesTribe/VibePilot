@@ -720,6 +720,51 @@ func (c *Config) GetValidationConfig() *ValidationConfig {
 	return &c.System.Validation
 }
 
+func (c *Config) GetProcessingTimeoutSeconds() int {
+	if c.System == nil || c.System.Recovery == nil {
+		return 300
+	}
+	if v, ok := c.System.Recovery["processing_timeout_seconds"]; ok {
+		switch val := v.(type) {
+		case float64:
+			return int(val)
+		case int:
+			return val
+		}
+	}
+	return 300
+}
+
+func (c *Config) GetProcessingRecoveryIntervalSeconds() int {
+	if c.System == nil || c.System.Recovery == nil {
+		return 60
+	}
+	if v, ok := c.System.Recovery["processing_recovery_interval_seconds"]; ok {
+		switch val := v.(type) {
+		case float64:
+			return int(val)
+		case int:
+			return val
+		}
+	}
+	return 60
+}
+
+func (c *Config) GetOrphanThresholdSeconds() int {
+	if c.System == nil || c.System.Recovery == nil {
+		return 300
+	}
+	if v, ok := c.System.Recovery["orphan_threshold_seconds"]; ok {
+		switch val := v.(type) {
+		case float64:
+			return int(val)
+		case int:
+			return val
+		}
+	}
+	return 300
+}
+
 func (c *Config) GetRoutingStrategy(agentID string) string {
 	if c.Routing == nil {
 		return "default"
