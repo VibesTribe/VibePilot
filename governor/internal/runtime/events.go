@@ -18,6 +18,7 @@ const (
 	EventPlanCreated     EventType = "plan_created"
 	EventCouncilDone     EventType = "council_done"
 	EventResearchReady   EventType = "research_ready"
+	EventResearchCouncil EventType = "research_council"
 	EventMaintenanceCmd  EventType = "maintenance_command"
 	EventPRDReady        EventType = "prd_ready"
 	EventTestResults     EventType = "test_results"
@@ -114,6 +115,7 @@ func (w *PollingWatcher) checkForEvents(ctx context.Context, lastSeen map[string
 	w.detectPRDReady(ctx, lastSeen)
 	w.detectMaintenanceEvents(ctx, lastSeen)
 	w.detectTestResults(ctx, lastSeen)
+	w.detectResearchSuggestions(ctx, lastSeen)
 }
 
 func (w *PollingWatcher) getEventsConfig() *EventsConfig {
@@ -441,6 +443,70 @@ func (w *PollingWatcher) detectTestResults(ctx context.Context, lastSeen map[str
 				Record:    record,
 				Timestamp: time.Now(),
 			})
+		}
+	}
+}
+
+func (w *PollingWatcher) detectResearchSuggestions(ctx context.Context, lastSeen map[string]time.Time) {
+	// Detect pending research suggestions
+	suggestions, err := w.db.Query(ctx, "research_suggestions", map[string]any{
+		"status": "eq.pending",
+		"limit":  w.getQueryLimit(),
+	})
+	if err == nil {
+		var suggestionList []map[string]any
+		if err := json.Unmarshal(suggestions, &suggestionList); err == nil {
+			for _, suggestion := range suggestionList {
+				id, _ := suggestion["id"].(string)
+				createdAt, _ := suggestion["created_at"].(string)
+
+				key := fmt.Sprintf("research:%s", id)
+				ts, _ := time.Parse(time.RFC3339, createdAt)
+
+				if lastSeen[key].Before(ts) {
+					lastSeen[key] = ts
+
+					record, _ := json.Marshal(suggestion)
+					w.emit(Event{
+						Type:      EventResearchReady,
+						ID:        id,
+						Table:     "research_suggestions",
+						Record:    record,
+						Timestamp: time.Now(),
+					})
+				}
+			}
+		}
+	}
+
+	// Detect research suggestions ready for council review
+	councilSuggestions, err := w.db.Query(ctx, "research_suggestions", map[string]any{
+		"status": "eq.council_review",
+		"limit":  w.getQueryLimit(),
+	})
+	if err == nil {
+		var suggestionList []map[string]any
+		if err := json.Unmarshal(councilSuggestions, &suggestionList); err == nil {
+			for _, suggestion := range suggestionList {
+				id, _ := suggestion["id"].(string)
+				updatedAt, _ := suggestion["updated_at"].(string)
+
+				key := fmt.Sprintf("research_council:%s", id)
+				ts, _ := time.Parse(time.RFC3339, updatedAt)
+
+				if lastSeen[key].Before(ts) {
+					lastSeen[key] = ts
+
+					record, _ := json.Marshal(suggestion)
+					w.emit(Event{
+						Type:      EventResearchCouncil,
+						ID:        id,
+						Table:     "research_suggestions",
+						Record:    record,
+						Timestamp: time.Now(),
+					})
+				}
+			}
 		}
 	}
 }

@@ -79,6 +79,31 @@ type InitialReviewDecision struct {
 	TasksNeedingRevision []string `json:"tasks_needing_revision"`
 }
 
+type ResearchReviewDecision struct {
+	Action             string              `json:"action"`
+	SuggestionID       string              `json:"suggestion_id"`
+	Decision           string              `json:"decision"`
+	Complexity         string              `json:"complexity"`
+	Reasoning          string              `json:"reasoning"`
+	MaintenanceCommand *MaintenanceCommand `json:"maintenance_command,omitempty"`
+	Urgency            string              `json:"urgency,omitempty"`
+	Notes              string              `json:"notes,omitempty"`
+}
+
+type MaintenanceCommand struct {
+	Action  string                 `json:"action"`
+	Details map[string]interface{} `json:"details"`
+}
+
+func ParseResearchReview(output string) (*ResearchReviewDecision, error) {
+	var r ResearchReviewDecision
+	jsonStr := extractJSON(output)
+	if err := json.Unmarshal([]byte(jsonStr), &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
 type File struct {
 	Path    string `json:"path"`
 	Content string `json:"content"`
