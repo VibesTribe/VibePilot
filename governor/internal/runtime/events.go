@@ -161,7 +161,8 @@ func (w *PollingWatcher) detectTaskEvents(ctx context.Context, lastSeen map[stri
 	orFilter := buildOrFilter(allStatuses, "status")
 
 	tasks, err := w.db.Query(ctx, "tasks", map[string]any{
-		"or": orFilter,
+		"or":            orFilter,
+		"processing_by": "is.null",
 	})
 	if err != nil {
 		return
@@ -216,8 +217,9 @@ func (w *PollingWatcher) detectPlanReview(ctx context.Context, lastSeen map[stri
 	orFilter := buildOrFilter(eventsCfg.PlanStatusesReview, "status")
 
 	plans, err := w.db.Query(ctx, "plans", map[string]any{
-		"or":    orFilter,
-		"limit": w.getQueryLimit(),
+		"or":            orFilter,
+		"limit":         w.getQueryLimit(),
+		"processing_by": "is.null",
 	})
 	if err != nil {
 		return
@@ -262,7 +264,8 @@ func (w *PollingWatcher) detectPlanEvents(ctx context.Context, lastSeen map[stri
 	orFilter := buildOrFilter(allStatuses, "status")
 
 	plans, err := w.db.Query(ctx, "plans", map[string]any{
-		"or": orFilter,
+		"or":            orFilter,
+		"processing_by": "is.null",
 	})
 	if err != nil {
 		return
@@ -371,8 +374,9 @@ func (w *PollingWatcher) detectPRDReady(ctx context.Context, lastSeen map[string
 	orFilter := buildOrFilter(eventsCfg.PlanStatusesDraft, "status")
 
 	plans, err := w.db.Query(ctx, "plans", map[string]any{
-		"or":    orFilter,
-		"limit": w.getQueryLimit(),
+		"or":            orFilter,
+		"limit":         w.getQueryLimit(),
+		"processing_by": "is.null",
 	})
 	if err != nil {
 		return

@@ -66,6 +66,11 @@ var defaultRPCAllowlist = map[string]bool{
 	"store_council_reviews":             true,
 	"create_research_suggestion":        true,
 	"update_research_suggestion_status": true,
+	"set_processing":                    true,
+	"clear_processing":                  true,
+	"find_stale_processing":             true,
+	"recover_stale_processing":          true,
+	"record_supervisor_rule":            true,
 }
 
 type RPCAllowlist struct {
