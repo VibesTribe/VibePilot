@@ -55,7 +55,7 @@
   },
   "concurrency": {
     "limits": {
-      "opencode": 5,
+      "opencode": 2,
       "kimi": 5,
       "courier": 3,
       "gemini-api": 10,

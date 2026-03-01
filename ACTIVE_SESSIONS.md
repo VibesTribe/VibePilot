@@ -6,8 +6,8 @@ Track which AI agents are working on what. Update when starting or ending a sess
 
 | Agent | Branch | Focus | Started | Status |
 |-------|--------|-------|---------|--------|
-| kimi | research-considerations | Research, competitive analysis, docs | Feb 18 | Active - Available for parallel codebase analysis |
-| glm-5 | main | Core orchestration, infrastructure, production | Feb 18 | Active - Checking Supabase orchestrator functions |
+| kimi | research-considerations | Research, competitive analysis, docs | Feb 18 | Paused |
+| glm-5 | main | Core orchestration, infrastructure, production | Feb 18 | Active |
 
 ## Kimi's Capabilities for GLM
 

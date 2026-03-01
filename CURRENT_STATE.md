@@ -14,9 +14,9 @@
 ---
 
 **Last Updated:** 2026-03-01
-**Updated By:** GLM-5 - Session 40 Complete
+**Updated By:** GLM-5 - Session 41 Complete
 **Branch:** `main`
-**Status:** ACTIVE - Full audit complete, all issues fixed, ready for autonomous testing
+**Status:** ACTIVE - Duplicate event prevention complete, all handlers have processing claims
 
 ---
 
@@ -333,6 +333,35 @@ System is clean, configurable, aligned with process flow. Ready for full autonom
 | 041 | research_suggestions.sql | ✅ Applied |
 | 042 | processing_state.sql | ✅ Applied |
 | 043 | fix_schema_gaps.sql | ✅ Applied |
+| 044 | processing_state_all_tables.sql | 📝 Created (needs to be applied) |
+
+---
+
+### DONE - Session 41 (Duplicate Event Prevention)
+
+**Root Cause Analysis:**
+- Processing claims existed for plans/tasks but NOT for test_results, research_suggestions, maintenance_commands
+- 8 event handlers lacked processing claims, causing duplicate firing when handlers took >1s
+
+**Critical Fixes:**
+- ✅ Migration 044: Added processing_by columns to test_results, research_suggestions, maintenance_commands
+- ✅ Updated set_processing, clear_processing, find_stale_processing, recover_stale_processing RPCs for all 5 tables
+- ✅ EventTaskCompleted: Added processing claim
+- ✅ EventCouncilReview: Added processing claim
+- ✅ EventCouncilDone: Added processing claim
+- ✅ EventTestResults: Added processing claim (test_results table)
+- ✅ EventResearchReady: Added processing claim (research_suggestions table)
+- ✅ EventResearchCouncil: Added processing claim (research_suggestions table)
+- ✅ EventPlanCreated: Added processing claim
+- ✅ EventMaintenanceCmd: Added processing claim (maintenance_commands table)
+
+**Recovery Updates:**
+- ✅ runProcessingRecovery now recovers all 5 tables (plans, tasks, test_results, research_suggestions, maintenance_commands)
+
+**Event Detection Updates:**
+- ✅ detectTestResults: Added processing_by IS NULL filter
+- ✅ detectResearchSuggestions: Added processing_by IS NULL filter for both pending and council_review
+- ✅ detectMaintenanceEvents: Added processing_by IS NULL filter
 
 ---
 

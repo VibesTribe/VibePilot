@@ -331,7 +331,8 @@ func (w *PollingWatcher) detectMaintenanceEvents(ctx context.Context, lastSeen m
 	eventsCfg := w.getEventsConfig()
 
 	cmds, err := w.db.Query(ctx, "maintenance_commands", map[string]any{
-		"status": eventsCfg.MaintenanceStatus,
+		"status":        eventsCfg.MaintenanceStatus,
+		"processing_by": "is.null",
 	})
 	if err != nil {
 		return
@@ -417,8 +418,9 @@ func (w *PollingWatcher) detectTestResults(ctx context.Context, lastSeen map[str
 	}
 
 	results, err := w.db.Query(ctx, "test_results", map[string]any{
-		"status": eventsCfg.TestResultsStatus,
-		"limit":  w.getQueryLimit(),
+		"status":        eventsCfg.TestResultsStatus,
+		"limit":         w.getQueryLimit(),
+		"processing_by": "is.null",
 	})
 	if err != nil {
 		return
@@ -454,8 +456,9 @@ func (w *PollingWatcher) detectTestResults(ctx context.Context, lastSeen map[str
 func (w *PollingWatcher) detectResearchSuggestions(ctx context.Context, lastSeen map[string]time.Time) {
 	// Detect pending research suggestions
 	suggestions, err := w.db.Query(ctx, "research_suggestions", map[string]any{
-		"status": "eq.pending",
-		"limit":  w.getQueryLimit(),
+		"status":        "eq.pending",
+		"limit":         w.getQueryLimit(),
+		"processing_by": "is.null",
 	})
 	if err == nil {
 		var suggestionList []map[string]any
@@ -485,8 +488,9 @@ func (w *PollingWatcher) detectResearchSuggestions(ctx context.Context, lastSeen
 
 	// Detect research suggestions ready for council review
 	councilSuggestions, err := w.db.Query(ctx, "research_suggestions", map[string]any{
-		"status": "eq.council_review",
-		"limit":  w.getQueryLimit(),
+		"status":        "eq.council_review",
+		"limit":         w.getQueryLimit(),
+		"processing_by": "is.null",
 	})
 	if err == nil {
 		var suggestionList []map[string]any
