@@ -751,25 +751,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		planID, _ := plan["id"].(string)
-		log.Printf("[EventPlanApproved] Plan %s approved (direct), creating tasks", truncateID(planID))
-
-		if err := createTasksFromApprovedPlan(ctx, database, plan); err != nil {
-			log.Printf("[EventPlanApproved] Failed to create tasks: %v", err)
-			_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
-				"p_plan_id":      planID,
-				"p_status":       "error",
-				"p_review_notes": map[string]any{"error": err.Error()},
-			})
-			return
-		}
-
-		_, err := database.RPC(ctx, "update_plan_status", map[string]any{
-			"p_plan_id": planID,
-			"p_status":  "approved",
-		})
-		if err != nil {
-			log.Printf("[EventPlanApproved] Failed to update plan status: %v", err)
-		}
+		log.Printf("[EventPlanApproved] Plan %s already approved (direct), tasks should exist", truncateID(planID))
 	})
 
 	router.On(runtime.EventPlanBlocked, func(event runtime.Event) {
