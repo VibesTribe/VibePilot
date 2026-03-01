@@ -982,8 +982,8 @@ func truncateID(id string) string {
 }
 
 func truncateOutput(output string) string {
-	if len(output) > 1000 {
-		return output[:1000] + "..."
+	if len(output) > 5000 {
+		return output[:5000] + "..."
 	}
 	return output
 }
