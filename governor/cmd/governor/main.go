@@ -509,6 +509,22 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			sliceID = "complete"
 		}
 
+		processingBy := fmt.Sprintf("supervisor_completed:%d", time.Now().UnixNano())
+		claimed, err := database.RPC(ctx, "set_processing", map[string]any{
+			"p_table":         "tasks",
+			"p_id":            taskID,
+			"p_processing_by": processingBy,
+		})
+		if err != nil || claimed == nil {
+			log.Printf("[EventTaskCompleted] Task %s already being processed or claim failed", truncateID(taskID))
+			return
+		}
+		var claimSuccess bool
+		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
+			log.Printf("[EventTaskCompleted] Task %s already being processed", truncateID(taskID))
+			return
+		}
+
 		branchName := fmt.Sprintf("task/%s", taskNumber)
 		if taskNumber == "" {
 			branchName = fmt.Sprintf("task/%s", truncateID(taskID))
@@ -518,12 +534,14 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		if destID == "" {
 			log.Printf("[EventTaskCompleted] No destination available for task %s", truncateID(taskID))
 			recordModelFailure(ctx, database, modelID, taskID, "no_destination")
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
 			return
 		}
 
 		session, err := factory.CreateWithContext(ctx, "supervisor", taskType)
 		if err != nil {
 			recordModelFailure(ctx, database, modelID, taskID, "session_create_failed")
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
 			return
 		}
 
@@ -534,6 +552,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		if sessionErr != nil {
 			log.Printf("[EventTaskCompleted] Supervisor session failed for %s: %v", truncateID(taskID), sessionErr)
 			recordModelFailure(ctx, database, modelID, taskID, "session_error")
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
 			return
 		}
 
@@ -634,6 +653,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		if err != nil {
 			log.Printf("[EventTaskCompleted] Failed to update task status: %v", err)
 		}
+
+		database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
 	})
 
 	router.On(runtime.EventPlanCreated, func(event runtime.Event) {
@@ -643,18 +664,39 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		planID, _ := plan["id"].(string)
+
+		processingBy := fmt.Sprintf("plan_created:%d", time.Now().UnixNano())
+		claimed, claimErr := database.RPC(ctx, "set_processing", map[string]any{
+			"p_table":         "plans",
+			"p_id":            planID,
+			"p_processing_by": processingBy,
+		})
+		if claimErr != nil || claimed == nil {
+			log.Printf("[EventPlanCreated] Plan %s already being processed or claim failed", truncateID(planID))
+			return
+		}
+		var claimSuccess bool
+		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
+			log.Printf("[EventPlanCreated] Plan %s already being processed", truncateID(planID))
+			return
+		}
+
 		destID := selectDestination("supervisor", planID, "plan_review")
 		if destID == "" {
 			log.Printf("[EventPlanCreated] No destination available for plan %s", truncateID(planID))
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
 			return
 		}
 
 		session, err := factory.Create("supervisor")
 		if err != nil {
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
 			return
 		}
 
 		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
+			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "plan_created"})
 			if err != nil {
 				return err
@@ -664,6 +706,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		})
 		if err != nil {
 			log.Printf("[EventPlanCreated] Failed to submit to pool: %v", err)
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
 		}
 	})
 
@@ -674,6 +717,22 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		planID, _ := plan["id"].(string)
+
+		processingBy := fmt.Sprintf("council_done:%d", time.Now().UnixNano())
+		claimed, claimErr := database.RPC(ctx, "set_processing", map[string]any{
+			"p_table":         "plans",
+			"p_id":            planID,
+			"p_processing_by": processingBy,
+		})
+		if claimErr != nil || claimed == nil {
+			log.Printf("[EventCouncilDone] Plan %s already being processed or claim failed", truncateID(planID))
+			return
+		}
+		var claimSuccess bool
+		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
+			log.Printf("[EventCouncilDone] Plan %s already being processed", truncateID(planID))
+			return
+		}
 
 		councilReviews := extractCouncilReviews(plan)
 
@@ -714,21 +773,26 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 					"p_status":  "approved",
 				})
 			}
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
 			return
 		}
 
 		destID := selectDestination("supervisor", planID, "council_done")
 		if destID == "" {
 			log.Printf("[EventCouncilDone] No destination available for plan %s", truncateID(planID))
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
 			return
 		}
 
 		session, err := factory.Create("supervisor")
 		if err != nil {
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
 			return
 		}
 
 		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
+			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+
 			_, err := session.Run(ctx, map[string]any{"plan": plan, "event": "council_done"})
 			if err != nil {
 				return err
@@ -841,6 +905,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		})
 		if err != nil {
 			log.Printf("[EventCouncilDone] Failed to submit to pool: %v", err)
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
 		}
 	})
 
@@ -1024,6 +1089,23 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		planID, _ := plan["id"].(string)
+
+		processingBy := fmt.Sprintf("council_review:%d", time.Now().UnixNano())
+		claimed, err := database.RPC(ctx, "set_processing", map[string]any{
+			"p_table":         "plans",
+			"p_id":            planID,
+			"p_processing_by": processingBy,
+		})
+		if err != nil || claimed == nil {
+			log.Printf("[EventCouncilReview] Plan %s already being processed or claim failed", truncateID(planID))
+			return
+		}
+		var claimSuccess bool
+		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
+			log.Printf("[EventCouncilReview] Plan %s already being processed", truncateID(planID))
+			return
+		}
+
 		memberCount := cfg.GetCouncilMemberCount()
 		lenses := cfg.GetCouncilLenses()
 		includePRD := cfg.ShouldCouncilIncludePRD()
@@ -1128,19 +1210,20 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 		if len(validReviews) == 0 {
 			log.Printf("[EventCouncilReview] No valid votes for plan %s", truncateID(planID))
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
 			return
 		}
 
 		reviewsJSON, _ := json.Marshal(validReviews)
 		modelsJSON, _ := json.Marshal(councilModels)
-		_, err := database.RPC(ctx, "store_council_reviews", map[string]any{
+		_, storeErr := database.RPC(ctx, "store_council_reviews", map[string]any{
 			"p_plan_id": planID,
 			"p_reviews": reviewsJSON,
 			"p_mode":    councilMode,
 			"p_models":  modelsJSON,
 		})
-		if err != nil {
-			log.Printf("[EventCouncilReview] Failed to store council reviews: %v", err)
+		if storeErr != nil {
+			log.Printf("[EventCouncilReview] Failed to store council reviews: %v", storeErr)
 		}
 
 		approved := 0
@@ -1199,18 +1282,18 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		case "revision_needed":
 			newStatus = "revision_needed"
 			tasksJSON, _ := json.Marshal(tasksNeedingRevision)
-			_, err := database.RPC(ctx, "record_revision_feedback", map[string]any{
+			_, feedbackErr := database.RPC(ctx, "record_revision_feedback", map[string]any{
 				"p_plan_id":                planID,
 				"p_source":                 "council",
 				"p_feedback":               map[string]any{"concerns": allConcerns},
 				"p_tasks_needing_revision": tasksJSON,
 			})
-			if err != nil {
-				log.Printf("[EventCouncilReview] Failed to record revision feedback: %v", err)
+			if feedbackErr != nil {
+				log.Printf("[EventCouncilReview] Failed to record revision feedback: %v", feedbackErr)
 			}
 		}
 
-		_, err = database.RPC(ctx, "update_plan_status", map[string]any{
+		_, updateErr := database.RPC(ctx, "update_plan_status", map[string]any{
 			"p_plan_id": planID,
 			"p_status":  newStatus,
 			"p_review_notes": map[string]any{
@@ -1222,9 +1305,11 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 				"consensus_method": consensusMethod,
 			},
 		})
-		if err != nil {
-			log.Printf("[EventCouncilReview] Failed to update plan status: %v", err)
+		if updateErr != nil {
+			log.Printf("[EventCouncilReview] Failed to update plan status: %v", updateErr)
 		}
+
+		database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
 	})
 
 	router.On(runtime.EventMaintenanceCmd, func(event runtime.Event) {
@@ -1234,18 +1319,39 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		cmdID, _ := cmd["id"].(string)
+
+		processingBy := fmt.Sprintf("maintenance_cmd:%d", time.Now().UnixNano())
+		claimed, claimErr := database.RPC(ctx, "set_processing", map[string]any{
+			"p_table":         "maintenance_commands",
+			"p_id":            cmdID,
+			"p_processing_by": processingBy,
+		})
+		if claimErr != nil || claimed == nil {
+			log.Printf("[EventMaintenanceCmd] Command %s already being processed or claim failed", truncateID(cmdID))
+			return
+		}
+		var claimSuccess bool
+		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
+			log.Printf("[EventMaintenanceCmd] Command %s already being processed", truncateID(cmdID))
+			return
+		}
+
 		destID := selectDestination("maintenance", cmdID, "maintenance")
 		if destID == "" {
 			log.Printf("[EventMaintenanceCmd] No destination available for command %s", truncateID(cmdID))
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "maintenance_commands", "p_id": cmdID})
 			return
 		}
 
 		session, err := factory.Create("maintenance")
 		if err != nil {
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "maintenance_commands", "p_id": cmdID})
 			return
 		}
 
 		err = pool.SubmitWithDestination(ctx, "maintenance", destID, func() error {
+			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "maintenance_commands", "p_id": cmdID})
+
 			result, err := session.Run(ctx, map[string]any{"command": cmd, "event": "maintenance_command"})
 			if err != nil {
 				return err
@@ -1255,6 +1361,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		})
 		if err != nil {
 			log.Printf("[EventMaintenanceCmd] Failed to submit to pool: %v", err)
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "maintenance_commands", "p_id": cmdID})
 		}
 	})
 
@@ -1269,6 +1376,22 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		suggestionType, _ := suggestion["type"].(string)
 		complexity, _ := suggestion["complexity"].(string)
 
+		processingBy := fmt.Sprintf("research_ready:%d", time.Now().UnixNano())
+		claimed, claimErr := database.RPC(ctx, "set_processing", map[string]any{
+			"p_table":         "research_suggestions",
+			"p_id":            suggestionID,
+			"p_processing_by": processingBy,
+		})
+		if claimErr != nil || claimed == nil {
+			log.Printf("[EventResearchReady] Suggestion %s already being processed or claim failed", truncateID(suggestionID))
+			return
+		}
+		var claimSuccess bool
+		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
+			log.Printf("[EventResearchReady] Suggestion %s already being processed", truncateID(suggestionID))
+			return
+		}
+
 		log.Printf("[EventResearchReady] Processing research suggestion %s (type: %s, complexity: %s)", truncateID(suggestionID), suggestionType, complexity)
 
 		switch complexity {
@@ -1282,6 +1405,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			if err != nil {
 				log.Printf("[EventResearchReady] Failed to update status: %v", err)
 			}
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "research_suggestions", "p_id": suggestionID})
 			return
 
 		case "complex":
@@ -1294,21 +1418,26 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			if err != nil {
 				log.Printf("[EventResearchReady] Failed to update status: %v", err)
 			}
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "research_suggestions", "p_id": suggestionID})
 			return
 		}
 
 		destID := selectDestination("supervisor", suggestionID, "research_review")
 		if destID == "" {
 			log.Printf("[EventResearchReady] No destination available")
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "research_suggestions", "p_id": suggestionID})
 			return
 		}
 
 		session, err := factory.Create("supervisor")
 		if err != nil {
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "research_suggestions", "p_id": suggestionID})
 			return
 		}
 
 		err = pool.SubmitWithDestination(ctx, "research", destID, func() error {
+			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "research_suggestions", "p_id": suggestionID})
+
 			result, err := session.Run(ctx, map[string]any{
 				"event":      "research_review",
 				"suggestion": suggestion,
@@ -1385,6 +1514,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		})
 		if err != nil {
 			log.Printf("[EventResearchReady] Failed to submit to pool: %v", err)
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "research_suggestions", "p_id": suggestionID})
 		}
 	})
 
@@ -1397,6 +1527,22 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 		suggestionID, _ := suggestion["id"].(string)
 		title, _ := suggestion["title"].(string)
+
+		processingBy := fmt.Sprintf("research_council:%d", time.Now().UnixNano())
+		claimed, claimErr := database.RPC(ctx, "set_processing", map[string]any{
+			"p_table":         "research_suggestions",
+			"p_id":            suggestionID,
+			"p_processing_by": processingBy,
+		})
+		if claimErr != nil || claimed == nil {
+			log.Printf("[EventResearchCouncil] Suggestion %s already being processed or claim failed", truncateID(suggestionID))
+			return
+		}
+		var claimSuccess bool
+		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
+			log.Printf("[EventResearchCouncil] Suggestion %s already being processed", truncateID(suggestionID))
+			return
+		}
 
 		log.Printf("[EventResearchCouncil] Starting council review for %s: %s", truncateID(suggestionID), title)
 
@@ -1481,6 +1627,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 		if len(validReviews) == 0 {
 			log.Printf("[EventResearchCouncil] No valid votes for suggestion %s", truncateID(suggestionID))
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "research_suggestions", "p_id": suggestionID})
 			return
 		}
 
@@ -1571,6 +1718,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			})
 			log.Printf("[EventResearchCouncil] Research suggestion %s needs human review", truncateID(suggestionID))
 		}
+
+		database.RPC(ctx, "clear_processing", map[string]any{"p_table": "research_suggestions", "p_id": suggestionID})
 	})
 
 	router.On(runtime.EventPRDReady, func(event runtime.Event) {
@@ -1831,20 +1980,42 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
+		resultID, _ := testResult["id"].(string)
 		taskID, _ := testResult["task_id"].(string)
 		taskNumber, _ := testResult["task_number"].(string)
+
+		processingBy := fmt.Sprintf("test_results:%d", time.Now().UnixNano())
+		claimed, claimErr := database.RPC(ctx, "set_processing", map[string]any{
+			"p_table":         "test_results",
+			"p_id":            resultID,
+			"p_processing_by": processingBy,
+		})
+		if claimErr != nil || claimed == nil {
+			log.Printf("[EventTestResults] Test result %s already being processed or claim failed", truncateID(resultID))
+			return
+		}
+		var claimSuccess bool
+		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
+			log.Printf("[EventTestResults] Test result %s already being processed", truncateID(resultID))
+			return
+		}
+
 		destID := selectDestination("supervisor", taskID, "test_review")
 		if destID == "" {
 			log.Printf("[EventTestResults] No destination available for task %s", truncateID(taskID))
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "test_results", "p_id": resultID})
 			return
 		}
 
 		session, err := factory.Create("supervisor")
 		if err != nil {
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "test_results", "p_id": resultID})
 			return
 		}
 
 		err = pool.SubmitWithDestination(ctx, "testing", destID, func() error {
+			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "test_results", "p_id": resultID})
+
 			result, err := session.Run(ctx, map[string]any{"test_result": testResult, "event": "test_results"})
 			if err != nil {
 				return err
@@ -1915,6 +2086,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		})
 		if err != nil {
 			log.Printf("[EventTestResults] Failed to submit to pool: %v", err)
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "test_results", "p_id": resultID})
 		}
 	})
 
@@ -2096,6 +2268,9 @@ func runProcessingRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 		case <-ticker.C:
 			recoverStaleProcessing(ctx, database, "plans", timeout)
 			recoverStaleProcessing(ctx, database, "tasks", timeout)
+			recoverStaleProcessing(ctx, database, "test_results", timeout)
+			recoverStaleProcessing(ctx, database, "research_suggestions", timeout)
+			recoverStaleProcessing(ctx, database, "maintenance_commands", timeout)
 		}
 	}
 }
