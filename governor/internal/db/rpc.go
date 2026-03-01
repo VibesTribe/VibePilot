@@ -60,6 +60,10 @@ var defaultRPCAllowlist = map[string]bool{
 	"get_model_score_for_task":    true,
 	"get_event_checkpoint":        true,
 	"update_event_checkpoint":     true,
+	"increment_revision_round":    true,
+	"check_revision_limit":        true,
+	"record_revision_feedback":    true,
+	"store_council_reviews":       true,
 }
 
 type RPCAllowlist struct {
