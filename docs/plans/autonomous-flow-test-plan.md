@@ -97,14 +97,13 @@ Return JSON:
 #### Expected Output
 ```json
 {
+  "task_id": "T001",
+  "model_name": "[executor model name]",
   "files_created": ["docs/test/autonomous-flow-test.md"],
   "files_modified": [],
-  "tests_required": [],
-  "acceptance_criteria_met": [
-    "File exists at docs/test/autonomous-flow-test.md",
-    "File contains creation timestamp",
-    "File confirms autonomous flow validation"
-  ]
+  "summary": "Created autonomous flow test confirmation file with timestamp",
+  "tests_written": [],
+  "notes": "Simple validation file created successfully"
 }
 ```
 
