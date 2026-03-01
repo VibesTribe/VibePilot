@@ -15,6 +15,16 @@
 
 ---
 
+## ⚠️ CRITICAL: All Changes Must Be Committed to GitHub
+
+**Files created or modified locally are NOT deployed until pushed to GitHub.**
+
+- The human only sees what's in GitHub
+- Migrations, code changes, configs - all must be committed AND pushed
+- After making changes: `git add . && git commit -m "message" && git push origin <branch>`
+
+---
+
 ## Credentials & Secrets
 
 **Where keys live:**
