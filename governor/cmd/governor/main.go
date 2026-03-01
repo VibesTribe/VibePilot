@@ -716,7 +716,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			_, err = database.RPC(ctx, "update_plan_status", map[string]any{
 				"p_plan_id":      planID,
 				"p_status":       plannerOutput.Status,
-				"p_review_notes": map[string]any{"plan_path": plannerOutput.PlanPath, "total_tasks": plannerOutput.TotalTasks},
+				"p_plan_path":    plannerOutput.PlanPath,
+				"p_review_notes": map[string]any{"plan_content": plannerOutput.PlanContent, "total_tasks": plannerOutput.TotalTasks},
 			})
 			if err != nil {
 				log.Printf("[EventPRDReady] Failed to update plan status: %v", err)
