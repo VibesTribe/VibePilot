@@ -110,23 +110,7 @@ Return JSON:
 {
   "files_created": ["docs/test/flow-validation.md"],
   "files_modified": [],
-  "tests_required": [],
-  "verification_checks": {
-    "file_exists": "docs/test/flow-validation.md",
-    "content_contains": [
-      "✅ PASS",
-      "autonomous agent flow is operational",
-      "Created:"
-    ],
-    "format_valid": "Valid markdown with ISO 8601 timestamp"
-  },
-  "acceptance_criteria_met": [
-    "File exists at docs/test/flow-validation.md",
-    "File contains ✅ PASS",
-    "File contains autonomous agent flow is operational",
-    "File contains valid ISO 8601 timestamp",
-    "File ready for GitHub commit"
-  ]
+  "tests_required": []
 }
 ```
 
