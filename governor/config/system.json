@@ -17,7 +17,8 @@
     "protected_branches": ["main", "master", "research-considerations"],
     "default_timeout_seconds": 60,
     "default_merge_target": "main",
-    "branch_name_pattern": "^[a-zA-Z0-9_/-]+$"
+    "branch_name_pattern": "^[a-zA-Z0-9_/-]+$",
+    "remote_name": "origin"
   },
   "runtime": {
     "max_concurrent_per_module": 8,

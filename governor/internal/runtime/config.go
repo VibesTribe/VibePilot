@@ -59,6 +59,7 @@ type GitConfig struct {
 	DefaultTimeoutSecs int      `json:"default_timeout_seconds"`
 	DefaultMergeTarget string   `json:"default_merge_target"`
 	BranchNamePattern  string   `json:"branch_name_pattern"`
+	RemoteName         string   `json:"remote_name"`
 }
 
 type LoggingConfig struct {
@@ -589,6 +590,20 @@ func (c *Config) GetBranchNamePattern() string {
 		return "^[a-zA-Z0-9_/-]+$"
 	}
 	return c.System.Git.BranchNamePattern
+}
+
+func (c *Config) GetGitTimeoutSeconds() int {
+	if c.System == nil || c.System.Git.DefaultTimeoutSecs == 0 {
+		return 60
+	}
+	return c.System.Git.DefaultTimeoutSecs
+}
+
+func (c *Config) GetRemoteName() string {
+	if c.System == nil || c.System.Git.RemoteName == "" {
+		return "origin"
+	}
+	return c.System.Git.RemoteName
 }
 
 func (c *Config) GetLoggingConfig() *LoggingConfig {
