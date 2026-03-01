@@ -28,33 +28,38 @@ Three parallel audits performed:
 - **courier.md** was only in `config/prompts/` but governor reads from `prompts/`
   - Copied to correct location
 
-## Issues Still To Address (Non-Critical)
+## Non-Critical Issues Fixed
 
-### RPC Allowlist Cleanup Needed
-Several RPCs in allowlist don't exist in schema (harmless but confusing):
-- `calculate_roi` (schema has `calculate_task_roi`)
-- `claim_task` (schema has `claim_next_task`)
-- `create_tasks` (schema has `create_task_with_packet`)
-- `get_dashboard_stats` (not defined)
-- `get_task_by_id` (not defined)
-- `record_supervisor_rule_hit` (schema has `record_supervisor_rule_triggered`)
-- `record_task_run` (not defined)
-- `reset_task` (not defined)
+### RPC Allowlist Cleanup
+- Reorganized with clear categories and comments
+- Removed unused entries (claim_task, reset_task, record_task_run, etc.)
+- Added correct schema name `record_supervisor_rule_triggered`
+- Kept `get_dashboard_stats` for potential frontend use
 
-### Duplicate Directories
-- `prompts/` vs `config/prompts/` - need to consolidate
-- `config/` vs `governor/config/` - different content, confusing
+### Hardcoded Values Removed
+- **"main" branch** → Now uses `cfg.GetDefaultMergeTarget()`
+- **"origin" remote** → Now configurable via `git.remote_name` in system.json
+- Added `GetGitTimeoutSeconds()` and `GetRemoteName()` config methods
 
-### Hardcoded Values in Code (Low Priority)
-- "main" branch hardcoded in multiple places (should use config)
-- "origin" remote hardcoded
-- Some magic numbers (8 for ID truncation, 5000 for output)
+### Config Consolidation
+- **plan_lifecycle.json** copied to `governor/config/` (where governor reads from)
+- **config/prompts/** marked as deprecated with README
+- All active configs now in `governor/config/` (single source of truth)
 
-## Migration 043 Must Be Applied
+## Files Changed
 
-Run migration `043_fix_schema_gaps.sql` in Supabase to fix:
-1. record_supervisor_rule RPC
-2. test_results table creation
+| File | Change |
+|------|--------|
+| `docs/supabase-schema/043_fix_schema_gaps.sql` | New: Fix schema gaps |
+| `docs/supabase-schema/042_processing_state.sql` | Fix table reference |
+| `prompts/courier.md` | Copied from config/prompts/ |
+| `config/prompts/README.md` | Mark as deprecated |
+| `governor/config/plan_lifecycle.json` | Copied from config/ |
+| `governor/config/system.json` | Add git.remote_name |
+| `governor/internal/db/rpc.go` | Reorganize allowlist |
+| `governor/internal/gitree/gitree.go` | Configurable remote name |
+| `governor/internal/runtime/config.go` | Add getter methods |
+| `governor/cmd/governor/main.go` | Use config values |
 
 ---
 

@@ -317,22 +317,23 @@ vibepilot/
 | 040 | update_task_status.sql | ✅ Applied |
 | 041 | research_suggestions.sql | ✅ Applied |
 | 042 | processing_state.sql | ✅ Applied |
-| 043 | fix_schema_gaps.sql | ⏳ Needs to be applied |
+| 043 | fix_schema_gaps.sql | ✅ Applied |
 
 ---
 
-## Audit Findings (Session 40)
+## Audit Findings (Session 40) - All Fixed
 
 ### Critical Issues Fixed
-1. **record_supervisor_rule** - Was referencing non-existent `supervisor_rules` table
-2. **test_results table** - Was missing but code queries it
-3. **courier.md** - Was in wrong directory
+1. **record_supervisor_rule** - Now uses `supervisor_learned_rules` table
+2. **test_results table** - Created with full schema
+3. **courier.md** - Copied to correct `prompts/` directory
 
-### Non-Critical Issues (Technical Debt)
-- RPC allowlist has entries that don't match schema names
-- Duplicate prompt directories (prompts/ vs config/prompts/)
-- Duplicate config directories (config/ vs governor/config/)
-- Some hardcoded values ("main", "origin", magic numbers)
+### Non-Critical Issues Fixed
+1. **RPC allowlist** - Reorganized with categories, removed unused entries
+2. **Hardcoded "main" branch** - Now uses `cfg.GetDefaultMergeTarget()`
+3. **Hardcoded "origin" remote** - Now configurable via `git.remote_name`
+4. **plan_lifecycle.json** - Copied to `governor/config/`
+5. **config/prompts/** - Marked as deprecated with README
 
 ---
 
