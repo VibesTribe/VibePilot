@@ -6,6 +6,58 @@
 
 ---
 
+# 2026-03-01 (Session 40 Continued - Audit Fixes)
+
+## Full Code Audit Completed
+
+Three parallel audits performed:
+1. Governor code (main.go, events.go, config.go, rpc.go)
+2. Prompts and configs
+3. Schema and RPCs
+
+## Critical Issues Fixed
+
+### Schema Fixes (Migration 043)
+- **record_supervisor_rule** was inserting into non-existent `supervisor_rules` table
+  - Fixed to use `supervisor_learned_rules` (from migration 028)
+- **test_results table** was missing but referenced in events.go
+  - Created table with: task_id, task_number, test_type, status, outcome, output, etc.
+  - Added RPCs: `create_test_result`, `update_test_result_status`
+
+### Prompts Fixed
+- **courier.md** was only in `config/prompts/` but governor reads from `prompts/`
+  - Copied to correct location
+
+## Issues Still To Address (Non-Critical)
+
+### RPC Allowlist Cleanup Needed
+Several RPCs in allowlist don't exist in schema (harmless but confusing):
+- `calculate_roi` (schema has `calculate_task_roi`)
+- `claim_task` (schema has `claim_next_task`)
+- `create_tasks` (schema has `create_task_with_packet`)
+- `get_dashboard_stats` (not defined)
+- `get_task_by_id` (not defined)
+- `record_supervisor_rule_hit` (schema has `record_supervisor_rule_triggered`)
+- `record_task_run` (not defined)
+- `reset_task` (not defined)
+
+### Duplicate Directories
+- `prompts/` vs `config/prompts/` - need to consolidate
+- `config/` vs `governor/config/` - different content, confusing
+
+### Hardcoded Values in Code (Low Priority)
+- "main" branch hardcoded in multiple places (should use config)
+- "origin" remote hardcoded
+- Some magic numbers (8 for ID truncation, 5000 for output)
+
+## Migration 043 Must Be Applied
+
+Run migration `043_fix_schema_gaps.sql` in Supabase to fix:
+1. record_supervisor_rule RPC
+2. test_results table creation
+
+---
+
 # 2026-03-01 (Session 40 Complete)
 
 ## Summary
