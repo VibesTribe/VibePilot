@@ -16,7 +16,7 @@
 **Last Updated:** 2026-03-01
 **Updated By:** GLM-5 - Session 40 Complete
 **Branch:** `main`
-**Status:** ACTIVE - Infinite event loop fixed, processing state implemented
+**Status:** ACTIVE - Full audit complete, all issues fixed, ready for autonomous testing
 
 ---
 
@@ -297,13 +297,28 @@ vibepilot/
 - `recovery.processing_timeout_seconds`: 300 (default)
 - `recovery.processing_recovery_interval_seconds`: 60 (default)
 
-### NEXT - Full Flow Test
+### DONE - Session 40 (Full Code Audit)
 
-| Priority | Task | Notes |
-|----------|------|-------|
-| **TEST** | Full flow test | Create new PRD to test complete flow with prompt packets |
-| **TEST** | Verify prompt delivery | Check logs show "prompt_len=N" where N > 0 |
-| **TEST** | Council execution | Create complex PRD to trigger council |
+**Three Parallel Audits:**
+1. Governor code (main.go, events.go, config.go, rpc.go)
+2. Prompts and configs
+3. Schema and RPCs
+
+**Critical Fixes:**
+- ✅ Migration 043: `test_results` table created
+- ✅ Migration 043: `record_supervisor_rule` uses correct table
+- ✅ courier.md copied to `prompts/`
+
+**Non-Critical Fixes:**
+- ✅ RPC allowlist reorganized with categories
+- ✅ Hardcoded "main" → `cfg.GetDefaultMergeTarget()`
+- ✅ Hardcoded "origin" → configurable `git.remote_name`
+- ✅ `plan_lifecycle.json` copied to governor/config/
+- ✅ `config/prompts/` marked deprecated
+
+### NOW - Autonomous Testing
+
+System is clean, configurable, aligned with process flow. Ready for full autonomous test.
 
 ---
 
