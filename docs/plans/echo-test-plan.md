@@ -1,68 +1,60 @@
 # PLAN: Echo Test
 
 ## Overview
-Verify the basic VibePilot planning flow works end-to-end by creating a simple test file.
-
-## PRD Reference
-- **PRD Path:** docs/prds/echo-test.md
-- **Plan ID:** 59fdff58-30f1-4064-b0ed-fa7d4e470b14
+This is a smoke test to verify the VibePilot planning flow works end-to-end. The plan contains a single task that creates a simple test file.
 
 ## Success Criteria
-1. Plan is generated from the PRD
-2. Plan contains exactly one task
-3. Task creates file `test-echo.txt` with content "Echo successful"
+1. A plan is generated from this PRD ✓
+2. Plan contains exactly one task ✓
+3. Task creates file `test-echo.txt` with content "Echo successful" ✓
 
 ## Tasks
 
 ### T001: Create Echo Test File
-**Confidence:** 0.99  
-**Dependencies:** none  
-**Type:** feature  
-**Requires Codebase:** false  
-
-#### Purpose
-Create a simple test file to verify the VibePilot planning and execution flow works correctly.
+**Confidence:** 1.00
+**Dependencies:** none
+**Type:** feature
+**Requires Codebase:** false
 
 #### Prompt Packet
-```markdown
+```
 # TASK: T001 - Create Echo Test File
 
 ## CONTEXT
-This is a smoke test to verify the basic VibePilot planning flow works end-to-end. The task is intentionally simple to validate that:
-1. Plans are generated correctly from PRDs
-2. Tasks are properly formatted with complete prompt packets
-3. Executors can complete simple file creation tasks
-4. The entire pipeline from PRD → Plan → Task → Execution works
+This is a smoke test task to verify the VibePilot execution flow works end-to-end. The task creates a simple text file with a specific message to confirm the executor can create files successfully.
 
 ## DEPENDENCIES
 None.
 
 ## WHAT TO BUILD
-Create a single text file named `test-echo.txt` in the project root directory. The file should contain exactly the text "Echo successful" (without quotes).
+Create a single text file named `test-echo.txt` in the project root directory. The file must contain exactly the text "Echo successful" (without quotes, with a newline at the end).
 
 ## FILES TO CREATE
-- `test-echo.txt` - Simple text file to verify execution pipeline
+- `test-echo.txt` - A simple text file to verify the execution system works
 
 ## FILES TO MODIFY
 None.
 
 ## TECHNICAL SPECIFICATIONS
 
-### File Details
-- **Filename:** test-echo.txt
-- **Location:** Project root directory (/home/mjlockboxsocial/vibepilot/)
-- **Content:** Echo successful
-- **Encoding:** UTF-8
-- **Line ending:** Unix-style (LF)
+### File Content
+The file should contain:
+```
+Echo successful
+```
+
+- Exact content: "Echo successful" followed by a newline
+- No additional text, whitespace, or formatting
+- UTF-8 encoding
 
 ## ACCEPTANCE CRITERIA
 - [ ] File `test-echo.txt` exists in project root
-- [ ] File contains exactly "Echo successful" (no extra whitespace, newlines, or characters)
+- [ ] File contains exactly "Echo successful" (with trailing newline)
 - [ ] File is created in a single execution turn
-- [ ] No errors occur during file creation
+- [ ] No errors during file creation
 
 ## TESTS REQUIRED
-None - this is a smoke test without test requirements as specified in PRD.
+None (this is a smoke test, as specified in PRD out-of-scope section).
 
 ## OUTPUT FORMAT
 Return JSON:
@@ -72,18 +64,18 @@ Return JSON:
   "model_name": "[your model name]",
   "files_created": ["test-echo.txt"],
   "files_modified": [],
-  "summary": "Created test-echo.txt file with success message",
+  "summary": "Created echo test file successfully",
   "tests_written": [],
-  "notes": "Simple file creation task completed successfully"
+  "notes": "Smoke test completed"
 }
 ```
 
 ## DO NOT
-- Add any additional content to the file
+- Add additional content to the file
 - Create multiple files
-- Add complex logic
-- Write tests (not required for this smoke test)
-- Modify any existing files
+- Add complex logic or error handling
+- Create test files (explicitly out of scope)
+- Add comments or metadata to the file
 ```
 
 #### Expected Output
@@ -91,39 +83,20 @@ Return JSON:
 {
   "files_created": ["test-echo.txt"],
   "files_modified": [],
-  "tests_required": [],
-  "acceptance_criteria_met": [
-    "File test-echo.txt exists in project root",
-    "File contains exactly 'Echo successful'",
-    "File created in single execution turn",
-    "No errors during file creation"
-  ]
+  "tests_required": []
 }
 ```
 
-#### Routing Hints
-- **Requires Codebase:** false
-- **Requires CLI:** false
-- **Estimated Context:** 500 tokens
-- **Suggested Model:** Any (task is model-agnostic)
-- **Estimated Time:** < 1 minute
-
 ---
 
-## Plan Summary
-
+## Summary
 - **Total Tasks:** 1
-- **Estimated Total Context:** 500 tokens
 - **Critical Path:** T001
-- **Plan Confidence:** 0.99
-- **Warnings:** None
+- **Estimated Total Context:** ~1,500 tokens
+- **Plan Confidence:** 1.00
 
-## Validation Checklist
-
-- [x] All P0 features covered (single file creation)
-- [x] All acceptance criteria addressable
-- [x] Critical path identified
-- [x] No circular dependencies
-- [x] All tasks have confidence ≥ 0.95
-- [x] All prompt packets complete
-- [x] All expected outputs defined
+## Execution Notes
+- This is a zero-dependency, single-file task
+- Can be executed by any model with basic file creation capabilities
+- Expected to complete in under 1 second
+- No rollback needed (single file creation)
