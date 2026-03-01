@@ -228,6 +228,7 @@ COMMENT ON FUNCTION record_planner_revision(UUID, TEXT[], TEXT[]) IS
 
 -- ============================================================================
 -- RPC: RECORD SUPERVISOR RULE (Simplified for validation feedback)
+-- Uses supervisor_learned_rules table from migration 028
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION record_supervisor_rule(
@@ -239,17 +240,19 @@ CREATE OR REPLACE FUNCTION record_supervisor_rule(
 DECLARE
   v_rule_id UUID;
 BEGIN
-  INSERT INTO supervisor_rules (
-    rule_text,
-    applies_to,
+  INSERT INTO supervisor_learned_rules (
+    trigger_pattern,
+    trigger_condition,
+    action,
+    reason,
     source,
-    details,
     active
   ) VALUES (
-    p_rule_text,
     p_applies_to,
-    p_source,
     p_details,
+    'warn',
+    p_rule_text,
+    p_source,
     true
   )
   RETURNING id INTO v_rule_id;
@@ -259,7 +262,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 COMMENT ON FUNCTION record_supervisor_rule(TEXT, TEXT, TEXT, JSONB) IS 
-'Record a learned supervisor rule for future reviews.';
+'Record a learned supervisor rule for future reviews. Uses supervisor_learned_rules table.';
 
 -- ============================================================================
 -- VERIFICATION
