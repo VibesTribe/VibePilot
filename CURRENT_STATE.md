@@ -285,6 +285,7 @@ vibepilot/
 | 035 | fix_plan_path.sql | ✅ Applied |
 | 036 | revision_loop.sql | ✅ Applied |
 | 040 | update_task_status.sql | ✅ Applied |
+| 041 | research_suggestions.sql | ✅ Applied |
 
 ---
 
