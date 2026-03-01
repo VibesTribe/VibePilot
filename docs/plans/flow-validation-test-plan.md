@@ -34,11 +34,25 @@ None. This is a standalone task.
 ## WHAT TO BUILD
 Create a markdown documentation file at `docs/test/flow-validation.md` that confirms the autonomous flow is operational.
 
-The file should include:
-1. A clear title indicating this is a flow validation test
-2. A brief statement confirming the autonomous agent flow is working
-3. The current timestamp (when the file is created)
-4. Optional: A brief description of what flow was validated
+The file must contain EXACTLY this content (replace [TIMESTAMP] with current ISO 8601 timestamp):
+
+```markdown
+# Flow Validation Test
+
+**Status:** ✅ PASS
+
+**Created:** [TIMESTAMP]
+
+## Validation Complete
+
+The autonomous agent flow is operational:
+- PRD processed successfully
+- Plan created and approved
+- Task executed
+- Output verified
+
+This file confirms the end-to-end pipeline is working.
+```
 
 ## FILES TO CREATE
 - `docs/test/flow-validation.md` - Documentation file confirming autonomous flow is operational
@@ -54,42 +68,20 @@ None
 - Encoding: UTF-8
 
 ### Content Requirements
-- Must include timestamp in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ)
-- Must be valid markdown
-- Should be concise (10-20 lines maximum)
-
-### Example Structure
-```markdown
-# Flow Validation Test
-
-**Created:** [CURRENT_TIMESTAMP]
-
-## Status
-
-✅ Autonomous flow is operational!
-
-## Flow Validated
-
-PRD → Planner → Supervisor → Task Creation → Execution → Complete
-
-## Notes
-
-This file was automatically generated to validate the agent workflow.
-```
+- Must include exact content structure shown above
+- Timestamp in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ)
+- Must contain "✅ PASS" string
+- Must contain "autonomous agent flow is operational" string
 
 ## ACCEPTANCE CRITERIA
 - [ ] File exists at docs/test/flow-validation.md
-- [ ] File contains valid markdown
-- [ ] File includes current timestamp in ISO 8601 format
-- [ ] File confirms autonomous flow is working
-- [ ] File is properly formatted and readable
+- [ ] File contains "✅ PASS"
+- [ ] File contains "autonomous agent flow is operational"
+- [ ] File contains valid ISO 8601 timestamp
+- [ ] File committed to GitHub
 
 ## TESTS REQUIRED
-No automated tests required for this documentation task. Verification is manual:
-1. Confirm file exists at correct path
-2. Confirm file contains timestamp
-3. Confirm file is valid markdown
-4. Confirm file content matches requirements
+No automated tests required. Verification via file content checks.
 
 ## OUTPUT FORMAT
 Return JSON:
@@ -107,7 +99,7 @@ Return JSON:
 
 ## DO NOT
 - Create files outside of docs/test/ directory
-- Add complex content beyond what's specified
+- Add content beyond what's specified
 - Create additional test files
 - Modify any existing code or configuration
 - Skip the timestamp requirement
@@ -119,10 +111,21 @@ Return JSON:
   "files_created": ["docs/test/flow-validation.md"],
   "files_modified": [],
   "tests_required": [],
+  "verification_checks": {
+    "file_exists": "docs/test/flow-validation.md",
+    "content_contains": [
+      "✅ PASS",
+      "autonomous agent flow is operational",
+      "Created:"
+    ],
+    "format_valid": "Valid markdown with ISO 8601 timestamp"
+  },
   "acceptance_criteria_met": [
     "File exists at docs/test/flow-validation.md",
-    "File contains timestamp",
-    "File confirms autonomous flow is working"
+    "File contains ✅ PASS",
+    "File contains autonomous agent flow is operational",
+    "File contains valid ISO 8601 timestamp",
+    "File ready for GitHub commit"
   ]
 }
 ```
@@ -141,14 +144,14 @@ Return JSON:
 
 This is an intentionally simple plan to validate the autonomous agent workflow. The task is:
 - **Atomic:** Single, independent unit of work
-- **Clear:** Unambiguous requirements and expected output
-- **Testable:** Can be verified by checking file existence and content
+- **Clear:** Unambiguous requirements with specific content strings to verify
+- **Testable:** Can be verified by checking file existence and exact content
 - **One-Shot:** Can be completed in a single execution turn
 - **Low Risk:** Documentation only, no code changes
 
 Confidence Score: 1.0 (100%)
 - Context Fit: 1.0 (minimal context needed)
 - Dependency Complexity: 1.0 (no dependencies)
-- Task Clarity: 1.0 (crystal clear requirements)
+- Task Clarity: 1.0 (crystal clear requirements with exact content)
 - Codebase Need: 1.0 (no codebase awareness required)
 - One-Shot Capable: 1.0 (single turn completion)
