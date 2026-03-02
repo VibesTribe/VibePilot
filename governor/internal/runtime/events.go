@@ -28,6 +28,7 @@ const (
 	EventCouncilComplete EventType = "council_complete"
 	EventPlanApproved    EventType = "plan_approved"
 	EventPlanBlocked     EventType = "plan_blocked"
+	EventPRDIncomplete   EventType = "prd_incomplete"
 	EventPlanError       EventType = "plan_error"
 )
 
@@ -303,6 +304,8 @@ func (w *PollingWatcher) detectPlanEvents(ctx context.Context, lastSeen map[stri
 				}
 			case "blocked":
 				eventType = EventPlanBlocked
+			case "prd_incomplete":
+				eventType = EventPRDIncomplete
 			case "error":
 				eventType = EventPlanError
 			case "pending_human":
