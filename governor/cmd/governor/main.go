@@ -1043,7 +1043,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 					map[string]interface{}{"path": plannerOutput.PlanPath, "content": plannerOutput.PlanContent},
 				}
 				output := map[string]interface{}{"files": files}
-				if err := git.CommitOutput(ctx, "docs/plans", output); err != nil {
+				if err := git.CommitOutput(ctx, "main", output); err != nil {
 					log.Printf("[EventRevisionNeeded] Failed to commit plan to GitHub: %v", err)
 				}
 			}
@@ -1815,12 +1815,11 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			log.Printf("[EventPRDReady] Plan %s created with %d tasks, status: %s", truncateID(planID), plannerOutput.TotalTasks, plannerOutput.Status)
 
 			if plannerOutput.PlanPath != "" && plannerOutput.PlanContent != "" {
-				branchName := "docs/plans"
 				files := []interface{}{
 					map[string]interface{}{"path": plannerOutput.PlanPath, "content": plannerOutput.PlanContent},
 				}
 				output := map[string]interface{}{"files": files}
-				if err := git.CommitOutput(ctx, branchName, output); err != nil {
+				if err := git.CommitOutput(ctx, "main", output); err != nil {
 					log.Printf("[EventPRDReady] Failed to commit plan to GitHub: %v", err)
 				}
 			}
