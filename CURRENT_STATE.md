@@ -14,9 +14,43 @@
 ---
 
 **Last Updated:** 2026-03-02
-**Updated By:** GLM-5 - Session 42 Complete
+**Updated By:** GLM-5 - Session 42 (In Progress)
 **Branch:** `main`
-**Status:** ACTIVE - Prompt packets strengthened, JSON output format clarified
+**Status:** FIXING - Planner prompt simplified, parsing logic updated
+
+---
+
+## Session 42 Summary
+
+**Issues Found:**
+1. **Planner prompt too complex** (693 lines) - confusing for model
+2. **Prompt packets empty** - Dashboard expects `task.result.prompt_packet` but planner was outputting complex nested JSON
+3. **Parsing fragile** - Expected code blocks around prompt_packet, but format was inconsistent
+
+**Fixes Applied:**
+1. ✅ **Simplified planner prompt** (693 → 112 lines)
+   - Follows Vibeflow's clean task structure
+   - `task_id`, `title`, `context`, `files`, `acceptance_criteria`
+   - Self-contained `prompt_packet` (copy-paste ready)
+   - Clear `expected_output` format
+   - No complex nested examples
+   - Explicit JSON-only output requirement
+
+2. ✅ **Updated task parsing** in governor
+   - Supports both code block and plain text formats
+   - Falls back to raw content if no code blocks
+   - Handles prompt_packet and expected_output extraction
+
+**Still TODO:**
+- [ ] Apply migration 049 to Supabase (if not already applied)
+- [ ] Test with actual PRD to verify prompt packets are created correctly
+- [ ] Verify dashboard can display prompt packets from `task.result.prompt_packet`
+
+---
+
+### DONE - Session 42 (Prompt Packet Quality)
+
+...
 
 ---
 
