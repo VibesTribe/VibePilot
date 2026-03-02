@@ -1775,6 +1775,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 	})
 
 	router.On(runtime.EventPRDReady, func(event runtime.Event) {
+		startTime := time.Now()
 		var plan map[string]any
 		if err := json.Unmarshal(event.Record, &plan); err != nil {
 			log.Printf("[EventPRDReady] Failed to parse plan: %v", err)
@@ -1782,6 +1783,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		planID, _ := plan["id"].(string)
+		currentStatus, _ := plan["status"].(string)
 
 		processingBy := fmt.Sprintf("planner:%d", time.Now().UnixNano())
 		claimed, err := database.RPC(ctx, "set_processing", map[string]any{
@@ -1802,7 +1804,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		destID := selectDestination("planner", planID, "planning")
 		if destID == "" {
 			log.Printf("[EventPRDReady] No destination available for plan %s", truncateID(planID))
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "no_destination")
 			return
 		}
 
@@ -1818,18 +1820,21 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		session, err := factory.CreateWithContext(ctx, "planner", projectType)
 		if err != nil {
 			log.Printf("[EventPRDReady] Failed to create planner session: %v", err)
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "session_creation_failed")
 			return
 		}
 
 		err = pool.SubmitWithDestination(ctx, "planning", destID, func() error {
-			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			defer database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "review", "planning_complete")
 
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "prd_ready"})
 			if err != nil {
 				log.Printf("[EventPRDReady] Planner session failed for %s: %v", truncateID(planID), err)
+				database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), false, map[string]any{"error": err.Error()})
 				return err
 			}
+
+			database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), true, nil)
 
 			log.Printf("[EventPRDReady] Raw output for %s (len=%d): %s", truncateID(planID), len(result.Output), truncateOutput(result.Output))
 
@@ -1868,7 +1873,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return nil
 		})
 		if err != nil {
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "pool_submit_failed")
 			log.Printf("[EventPRDReady] Failed to submit to pool: %v", err)
 		}
 	})
