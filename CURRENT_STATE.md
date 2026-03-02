@@ -13,10 +13,10 @@
 
 ---
 
-**Last Updated:** 2026-03-01
-**Updated By:** GLM-5 - Session 41 Complete
+**Last Updated:** 2026-03-02
+**Updated By:** GLM-5 - Session 42 Complete
 **Branch:** `main`
-**Status:** ACTIVE - Duplicate event prevention complete, all handlers have processing claims
+**Status:** ACTIVE - Prompt packets strengthened, JSON output format clarified
 
 ---
 
@@ -316,9 +316,55 @@ vibepilot/
 - ✅ `plan_lifecycle.json` copied to governor/config/
 - ✅ `config/prompts/` marked deprecated
 
-### NOW - Autonomous Testing
+### DONE - Session 42 (Prompt Packet Quality)
 
-System is clean, configurable, aligned with process flow. Ready for full autonomous test.
+**Root Cause Analysis:**
+- Agents outputting markdown code blocks with language specifiers (\```json go)
+- Agents outputting conversational text before JSON
+- Prompt packets could be empty or placeholder text
+- Expected output missing task_number for supervisor reference
+
+**Critical Fixes:**
+- ✅ Planner: prompt_packet must be non-empty, complete, self-contained
+- ✅ Planner: expected_output must include task_number for supervisor reference
+- ✅ Planner: Added clear task structure showing prompt_packet vs metadata separation
+- ✅ Supervisor: Stricter validation of prompt_packet (no empty, no placeholders)
+- ✅ Supervisor: Added validation failure examples with specific guidance
+- ✅ Task Runner: task_number added to output format
+- ✅ All agents: Stronger warnings about NO markdown code blocks, NO conversational text
+- ✅ All agents: Added WRONG/CORRECT examples for output format
+
+**Prompt Architecture Clarified:**
+```
+Task record in DB:
+├── task_id, task_number, title (metadata)
+├── category (routing metadata)
+├── dependencies (planning metadata)
+├── prompt_packet (EXECUTOR RECEIVES THIS ONLY)
+├── expected_output (SUPERVISOR CHECKS THIS)
+└── confidence (planner quality metric)
+
+Orchestrator:
+├── Reads task record
+├── Strips metadata
+├── Passes ONLY prompt_packet to executor (internal or web)
+└── Executor outputs JSON with task_number for reference
+```
+
+---
+
+### NOW - Ready for Full Autonomous Test
+
+System has:
+- ✅ Duplicate event prevention (all 5 tables)
+- ✅ Processing state with recovery
+- ✅ Revision loop with round limits
+- ✅ Council execution for complex plans
+- ✅ Prompt packet quality requirements
+- ✅ JSON-only output enforcement
+- ✅ Supervisor validation of prompt packets
+
+Test PRD ready: `docs/prd/governor-startup-message.md`
 
 ---
 
@@ -333,7 +379,11 @@ System is clean, configurable, aligned with process flow. Ready for full autonom
 | 041 | research_suggestions.sql | ✅ Applied |
 | 042 | processing_state.sql | ✅ Applied |
 | 043 | fix_schema_gaps.sql | ✅ Applied |
-| 044 | processing_state_all_tables.sql | 📝 Created (needs to be applied) |
+| 044 | processing_state_all_tables.sql | ✅ Applied |
+| 045 | fix_processing_timestamp.sql | ✅ Applied |
+| 046 | add_blocked_error_status.sql | ✅ Applied |
+| 047 | fix_revision_history.sql | ✅ Applied |
+| 048 | add_prd_incomplete_status.sql | ✅ Applied |
 
 ---
 
