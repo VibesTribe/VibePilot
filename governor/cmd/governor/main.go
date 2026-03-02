@@ -658,12 +658,14 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 	})
 
 	router.On(runtime.EventPlanCreated, func(event runtime.Event) {
+		startTime := time.Now()
 		var plan map[string]any
 		if err := json.Unmarshal(event.Record, &plan); err != nil {
 			return
 		}
 
 		planID, _ := plan["id"].(string)
+		currentStatus, _ := plan["status"].(string)
 
 		processingBy := fmt.Sprintf("plan_created:%d", time.Now().UnixNano())
 		claimed, claimErr := database.RPC(ctx, "set_processing", map[string]any{
@@ -672,7 +674,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			"p_processing_by": processingBy,
 		})
 		if claimErr != nil || claimed == nil {
-			log.Printf("[EventPlanCreated] Plan %s already being processed or claim failed", truncateID(planID))
+			log.Printf("[EventPlanCreated] Plan %s already being processed", truncateID(planID))
 			return
 		}
 		var claimSuccess bool
@@ -684,28 +686,31 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		destID := selectDestination("supervisor", planID, "plan_review")
 		if destID == "" {
 			log.Printf("[EventPlanCreated] No destination available for plan %s", truncateID(planID))
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "no_destination")
 			return
 		}
 
 		session, err := factory.Create("supervisor")
 		if err != nil {
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "session_creation_failed")
 			return
 		}
 
 		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
-			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			defer database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "review", "plan_review_started")
 
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "plan_created"})
 			if err != nil {
+				database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), false, map[string]any{"error": err.Error()})
 				return err
 			}
+
+			database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), true, nil)
 			log.Printf("[EventPlanCreated] Plan %s triaged via %s: %s", truncateID(planID), destID, truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "pool_submit_failed")
 			log.Printf("[EventPlanCreated] Failed to submit to pool: %v", err)
 		}
 	})
