@@ -2598,11 +2598,14 @@ func parseTaskSection(section string) (TaskData, error) {
 		task.RequiresCodebase = strings.ToLower(codebaseMatch[1]) == "true"
 	}
 
+	// Parse Prompt Packet - supports both code block and plain text formats
 	ppStart := strings.Index(body, "#### Prompt Packet")
 	if ppStart != -1 {
-		ppContent := body[ppStart:]
+		ppContent := body[ppStart+19:]
+		ppContent = strings.TrimSpace(ppContent)
+
 		codeStart := strings.Index(ppContent, "```")
-		if codeStart != -1 {
+		if codeStart != -1 && codeStart < 10 {
 			ppContent = ppContent[codeStart+3:]
 			if strings.HasPrefix(ppContent, "json") || strings.HasPrefix(ppContent, "markdown") {
 				ppContent = ppContent[strings.Index(ppContent, "\n")+1:]
@@ -2613,14 +2616,24 @@ func parseTaskSection(section string) (TaskData, error) {
 			if ppEnd != -1 {
 				task.PromptPacket = strings.TrimSpace(ppContent[:ppEnd])
 			}
+		} else {
+			nextSection := strings.Index(ppContent, "\n#### ")
+			if nextSection != -1 {
+				task.PromptPacket = strings.TrimSpace(ppContent[:nextSection])
+			} else {
+				task.PromptPacket = strings.TrimSpace(ppContent)
+			}
 		}
 	}
 
+	// Parse Expected Output - supports both code block and plain text formats
 	eoStart := strings.Index(body, "#### Expected Output")
 	if eoStart != -1 {
-		eoContent := body[eoStart:]
+		eoContent := body[eoStart+19:]
+		eoContent = strings.TrimSpace(eoContent)
+
 		codeStart := strings.Index(eoContent, "```")
-		if codeStart != -1 {
+		if codeStart != -1 && codeStart < 10 {
 			eoContent = eoContent[codeStart+3:]
 			if strings.HasPrefix(eoContent, "json") || strings.HasPrefix(eoContent, "markdown") {
 				eoContent = eoContent[strings.Index(eoContent, "\n")+1:]
@@ -2630,6 +2643,13 @@ func parseTaskSection(section string) (TaskData, error) {
 			eoEnd := strings.Index(eoContent, "\n```")
 			if eoEnd != -1 {
 				task.ExpectedOutput = strings.TrimSpace(eoContent[:eoEnd])
+			}
+		} else {
+			nextSection := strings.Index(eoContent, "\n#### ")
+			if nextSection != -1 {
+				task.ExpectedOutput = strings.TrimSpace(eoContent[:nextSection])
+			} else {
+				task.ExpectedOutput = strings.TrimSpace(eoContent)
 			}
 		}
 	}
