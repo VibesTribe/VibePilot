@@ -80,6 +80,7 @@ func (w *PRDWatcher) checkForNewPRDs(ctx context.Context) {
 	}
 
 	lines := strings.Split(string(output), "\n")
+	prdCount := 0
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -91,11 +92,13 @@ func (w *PRDWatcher) checkForNewPRDs(ctx context.Context) {
 		if !strings.HasSuffix(line, ".md") {
 			continue
 		}
+		prdCount++
 
 		shaCmd := exec.CommandContext(ctx, "git", "rev-parse", w.cfg.Branch+":"+line)
 		shaCmd.Dir = w.cfg.RepoPath
 		shaOutput, err := shaCmd.Output()
 		if err != nil {
+			log.Printf("[PRDWatcher] Failed to get SHA for %s: %v", line, err)
 			continue
 		}
 		sha := strings.TrimSpace(string(shaOutput))
@@ -106,6 +109,7 @@ func (w *PRDWatcher) checkForNewPRDs(ctx context.Context) {
 		w.lastSeen[line] = sha
 
 		if w.planExistsForPRD(ctx, line) {
+			log.Printf("[PRDWatcher] Plan already exists for %s, skipping", line)
 			continue
 		}
 
@@ -115,6 +119,9 @@ func (w *PRDWatcher) checkForNewPRDs(ctx context.Context) {
 
 		log.Printf("[PRDWatcher] New PRD detected: %s", line)
 		w.createPlan(ctx, line)
+	}
+	if prdCount > 0 {
+		log.Printf("[PRDWatcher] Checked %d PRD files", prdCount)
 	}
 }
 
