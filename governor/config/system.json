@@ -21,8 +21,8 @@
     "remote_name": "origin"
   },
   "runtime": {
-    "max_concurrent_per_module": 8,
-    "max_concurrent_total": 160,
+    "max_concurrent_per_module": 1,
+    "max_concurrent_total": 1,
     "event_poll_interval_ms": 1000,
     "agent_timeout_seconds": 300,
     "max_tool_turns": 10,
@@ -55,7 +55,7 @@
   },
   "concurrency": {
     "limits": {
-      "opencode": 1,
+      "opencode": 2,
       "kimi": 5,
       "courier": 3,
       "gemini-api": 10,

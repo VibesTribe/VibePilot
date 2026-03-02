@@ -79,6 +79,100 @@ After you set status to "review":
 
 ---
 
+## REVISION HANDLING
+
+When your input includes `"event": "revision_needed"`, you are being asked to fix a plan that was rejected.
+
+### Input Format (Revision)
+
+```json
+{
+  "plan": {
+    "id": "uuid",
+    "project_id": "uuid",
+    "prd_path": "docs/prds/example.md",
+    "plan_path": "docs/plans/example-plan.md",
+    "status": "revision_needed",
+    "revision_round": 2
+  },
+  "event": "revision_needed",
+  "revision_history": [
+    {
+      "timestamp": "2026-03-01T12:00:00Z",
+      "concerns": ["T001 missing expected_output", "confidence too low on T003"],
+      "tasks_needing_revision": ["T001", "T003"]
+    }
+  ],
+  "latest_feedback": {
+    "concerns": [
+      "T001 expected_output.files_created is empty - supervisor cannot verify completion",
+      "T003 confidence is 0.85, must be ≥0.95"
+    ],
+    "suggestions": [
+      "Add files_created array to T001 expected_output listing: [validation-report.md, test-validation.py]",
+      "Split T003 into smaller tasks or add more context to increase confidence"
+    ],
+    "tasks_needing_revision": ["T001", "T003"],
+    "reasoning": "T001 cannot be verified without knowing what files it creates. T003 is too ambiguous for 95% confidence."
+  }
+}
+```
+
+### Your Revision Process
+
+**Step 1: Read the PRD again**
+- The PRD path is in `plan.prd_path`
+- Re-read it to understand requirements you may have missed
+
+**Step 2: Read the plan file**
+- The plan path is in `plan.plan_path`
+- Read your previous plan to see what you submitted
+
+**Step 3: Analyze the feedback**
+- `concerns`: What is wrong (specific issues)
+- `suggestions`: HOW to fix each concern
+- `tasks_needing_revision`: Which tasks to update
+- `revision_history`: What was already tried - don't repeat failed approaches
+
+**Step 4: Fix the specific tasks**
+- Update ONLY the tasks in `tasks_needing_revision`
+- Address each concern directly
+- Use the suggestions as guidance
+- Do NOT make vague changes - be specific
+
+**Step 5: Output the revised plan**
+- Same output format as initial planning
+- Include ALL tasks (not just revised ones)
+- Set `"status": "review"` in your output
+
+### If You Cannot Fix
+
+If the PRD lacks information needed to address the concerns:
+
+```json
+{
+  "action": "plan_revision",
+  "plan_id": "uuid-from-input",
+  "status": "prd_incomplete",
+  "blocked_reason": "PRD does not specify: [exact missing information needed]",
+  "plan_path": "docs/plans/example-plan.md",
+  "total_tasks": 0
+}
+```
+
+**Example blocked_reason:**
+```
+"PRD doesn't specify the output format for the validation report. Need to know: should it be markdown, JSON, or both? What sections must it include?"
+```
+
+This signals that a human needs to clarify the PRD before planning can continue. Be specific about what's missing.
+
+### Revision Round Limit
+
+The system allows a limited number of revision rounds (configurable, typically 3). Check `plan.revision_round` to see how many attempts have been made. If you're on the final round and cannot fix the issues, output `status: "prd_incomplete"` with a clear explanation.
+
+---
+
 ## INPUT FORMAT (After Reading PRD)
 
 You receive JSON:
