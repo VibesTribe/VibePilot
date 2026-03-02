@@ -88,9 +88,9 @@ CREATE OR REPLACE FUNCTION create_task_with_packet(
   p_category TEXT DEFAULT NULL,
   p_routing_flag TEXT DEFAULT 'web',
   p_routing_flag_reason TEXT DEFAULT NULL,
-  p_dependencies JSONB DEFAULT '[]',
+  p_dependencies JSONB DEFAULT '[]'::jsonb,
   p_expected_output TEXT DEFAULT NULL,
-  p_context JSONB DEFAULT '{}'
+  p_context JSONB DEFAULT '{}'::jsonb
 )
 RETURNS UUID AS $$
 DECLARE
