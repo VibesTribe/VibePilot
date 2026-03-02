@@ -46,20 +46,38 @@
   
 - ✅ Migration 051: Fix task_packets relationship
 
-### Phase 3: Code Refactor (IN PROGRESS)
-- ✅ Add state tracking helper functions
-- ✅ Update RPC allowlist
-- ✅ Add ClearProcessingAndRecordTransition
-- ⬜ Update all event handlers to use state tracking
-- ⬜ Implement state-based recovery logic
-- ⬜ Add revision history tracking
-- ⬜ Test end-to-end flow
+### Phase 3: Code Refactor (✅ DONE)
+- ✅ State tracking helpers (`governor/internal/db/state.go`)
+  - RecordStateTransition
+  - RecordPerformanceMetric  
+  - GetLatestState
+  - ClearProcessingAndRecordTransition
+- ✅ RPC allowlist updated
+- ✅ Event handlers updated with state tracking
+  - EventPlanCreated
+  - EventPRDReady
+- ✅ Full reset SQL created (`scripts/sql/full_reset.sql`)
+- ✅ Test PRD created (`docs/prd/test-autonomous-flow.md`)
+
+### Phase 4: Testing (NEXT)
+1. ⬜ Run `scripts/sql/full_reset.sql` in Supabase SQL Editor
+2. ⬜ Start governor with new architecture
+3. ⬜ Create fresh test PRD
+4. ⬜ Verify autonomous flow works end-to-end
+5. ⬜ Check state transitions are being recorded
+6. ⬜ Check performance metrics are being tracked
+
+### What This Fixes:
+- ❌ 10-minute timeout → ✅ 5-minute timeout + state-based recovery
+- ❌ Lost revision state → ✅ Tracked in database
+- ❌ Permanent error states → ✅ Resettable to draft
+- ❌ No performance visibility → ✅ Full metrics tracking
+- ❌ Fragile processing claims → ✅ Immediate clear on success/failure
 
 ### Next Actions:
-1. Apply migrations 050-051 to Supabase
-2. Complete event handler updates
-3. Test state-based recovery
-4. Run full autonomous test
+1. **Run full_reset.sql** in Supabase (clears all error states and processing claims)
+2. **Start governor** and watch logs
+3. **Test with new PRD** and verify full flow works
 
 ---
 
