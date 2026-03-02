@@ -96,6 +96,11 @@ var defaultRPCAllowlist = map[string]bool{
 	"log_security_audit":     true,
 	"append_routing_history": true,
 
+	// State tracking (migration 050)
+	"record_state_transition":   true,
+	"record_performance_metric": true,
+	"get_latest_state":          true,
+
 	// Vibes interface
 	"vibes_query": true,
 
