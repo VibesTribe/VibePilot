@@ -1091,6 +1091,32 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		log.Printf("[EventPlanBlocked] Plan %s blocked - requires human intervention", truncateID(planID))
 	})
 
+	router.On(runtime.EventPRDIncomplete, func(event runtime.Event) {
+		var plan map[string]any
+		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			return
+		}
+
+		planID, _ := plan["id"].(string)
+		reviewNotes, _ := plan["review_notes"].(map[string]any)
+		blockedReason, _ := reviewNotes["blocked_reason"].(string)
+
+		log.Printf("[EventPRDIncomplete] Plan %s PRD incomplete: %s", truncateID(planID), blockedReason)
+
+		// Transition to pending_human with the blocked reason
+		_, err := database.RPC(ctx, "update_plan_status", map[string]any{
+			"p_plan_id": planID,
+			"p_status":  "pending_human",
+			"p_review_notes": map[string]any{
+				"blocked_reason": blockedReason,
+				"action_needed":  "Update PRD with missing information",
+			},
+		})
+		if err != nil {
+			log.Printf("[EventPRDIncomplete] Failed to update plan status: %v", err)
+		}
+	})
+
 	router.On(runtime.EventPlanError, func(event runtime.Event) {
 		var plan map[string]any
 		if err := json.Unmarshal(event.Record, &plan); err != nil {

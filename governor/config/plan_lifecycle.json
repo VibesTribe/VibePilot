@@ -15,8 +15,13 @@
     },
     "revision_needed": {
       "description": "Plan needs changes from planner",
-      "transitions": ["review", "blocked", "pending_human"],
+      "transitions": ["review", "pending_human"],
       "on_enter_event": "revision_needed"
+    },
+    "prd_incomplete": {
+      "description": "PRD lacks required information",
+      "transitions": ["pending_human"],
+      "on_enter_event": "prd_incomplete"
     },
     "council_review": {
       "description": "Complex plan, council reviewing",
