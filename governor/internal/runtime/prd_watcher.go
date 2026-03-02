@@ -85,7 +85,7 @@ func (w *PRDWatcher) checkForNewPRDs(ctx context.Context) {
 		if line == "" {
 			continue
 		}
-		if !strings.HasPrefix(line, w.cfg.Directory) {
+		if !strings.HasPrefix(line, w.cfg.Directory+"/") {
 			continue
 		}
 		if !strings.HasSuffix(line, ".md") {
