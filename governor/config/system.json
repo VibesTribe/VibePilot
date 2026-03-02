@@ -38,8 +38,13 @@
     "usage_threshold_pct": 80,
     "auto_bench_on_failures": true,
     "auto_restore_after_cooldown": true,
-    "processing_timeout_seconds": 600,
-    "processing_recovery_interval_seconds": 30
+    "processing_timeout_seconds": 300,
+    "processing_recovery_interval_seconds": 10,
+    "clear_processing_on_success": true,
+    "clear_processing_on_failure": true,
+    "state_based_recovery": true,
+    "retry_on_error": true,
+    "escalate_after_max_retries": true
   },
   "defaults": {
     "throttle_behavior": "slow_down",
@@ -51,7 +56,10 @@
     "min_task_confidence": 0.95,
     "require_prompt_packet": true,
     "require_category": true,
-    "require_expected_output": true
+    "require_expected_output": true,
+    "max_revision_rounds": 6,
+    "on_max_rounds": "escalate",
+    "track_revision_history": true
   },
   "concurrency": {
     "limits": {
@@ -108,6 +116,14 @@
   },
   "logging": {
     "max_output_length": 5000,
-    "max_id_display": 8
+    "max_id_display": 8,
+    "log_state_transitions": true,
+    "log_performance_metrics": true
+  },
+  "performance": {
+    "target_prd_to_plan_seconds": 30,
+    "target_plan_to_tasks_seconds": 10,
+    "target_task_start_seconds": 5,
+    "target_total_flow_seconds": 120
   }
 }
