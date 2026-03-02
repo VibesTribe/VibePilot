@@ -178,7 +178,7 @@ func (w *PollingWatcher) detectTaskEvents(ctx context.Context, lastSeen map[stri
 		status, _ := task["status"].(string)
 		updatedAt, _ := task["updated_at"].(string)
 
-		key := fmt.Sprintf("task:%s", id)
+		key := fmt.Sprintf("task:%s:%s", id, status)
 		ts, _ := time.Parse(time.RFC3339, updatedAt)
 
 		if lastSeen[key].Before(ts) {
@@ -232,9 +232,10 @@ func (w *PollingWatcher) detectPlanReview(ctx context.Context, lastSeen map[stri
 
 	for _, plan := range planList {
 		id, _ := plan["id"].(string)
+		status, _ := plan["status"].(string)
 		updatedAt, _ := plan["updated_at"].(string)
 
-		key := fmt.Sprintf("plan_review:%s", id)
+		key := fmt.Sprintf("plan_review:%s:%s", id, status)
 		ts, _ := time.Parse(time.RFC3339, updatedAt)
 
 		if lastSeen[key].Before(ts) {
@@ -265,6 +266,7 @@ func (w *PollingWatcher) detectPlanEvents(ctx context.Context, lastSeen map[stri
 
 	plans, err := w.db.Query(ctx, "plans", map[string]any{
 		"or":            orFilter,
+		"limit":         w.getQueryLimit(),
 		"processing_by": "is.null",
 	})
 	if err != nil {
@@ -281,7 +283,7 @@ func (w *PollingWatcher) detectPlanEvents(ctx context.Context, lastSeen map[stri
 		status, _ := plan["status"].(string)
 		updatedAt, _ := plan["updated_at"].(string)
 
-		key := fmt.Sprintf("plan:%s", id)
+		key := fmt.Sprintf("plan:%s:%s", id, status)
 		ts, _ := time.Parse(time.RFC3339, updatedAt)
 
 		if lastSeen[key].Before(ts) {
@@ -304,7 +306,7 @@ func (w *PollingWatcher) detectPlanEvents(ctx context.Context, lastSeen map[stri
 			case "error":
 				eventType = EventPlanError
 			case "pending_human":
-				eventType = EventPlanCreated
+				eventType = "" // No event - human must intervene
 			default:
 				if contains(eventsCfg.PlanStatusesCouncil, status) {
 					eventType = EventPlanCreated
@@ -345,9 +347,10 @@ func (w *PollingWatcher) detectMaintenanceEvents(ctx context.Context, lastSeen m
 
 	for _, cmd := range cmdList {
 		id, _ := cmd["id"].(string)
+		status, _ := cmd["status"].(string)
 		createdAt, _ := cmd["created_at"].(string)
 
-		key := fmt.Sprintf("maintenance:%s", id)
+		key := fmt.Sprintf("maintenance:%s:%s", id, status)
 		ts, _ := time.Parse(time.RFC3339, createdAt)
 
 		if lastSeen[key].Before(ts) {
@@ -390,9 +393,10 @@ func (w *PollingWatcher) detectPRDReady(ctx context.Context, lastSeen map[string
 
 	for _, plan := range planList {
 		id, _ := plan["id"].(string)
+		status, _ := plan["status"].(string)
 		updatedAt, _ := plan["updated_at"].(string)
 
-		key := fmt.Sprintf("prd_ready:%s", id)
+		key := fmt.Sprintf("prd_ready:%s:%s", id, status)
 		ts, _ := time.Parse(time.RFC3339, updatedAt)
 
 		if lastSeen[key].Before(ts) {
@@ -433,9 +437,10 @@ func (w *PollingWatcher) detectTestResults(ctx context.Context, lastSeen map[str
 
 	for _, result := range resultList {
 		id, _ := result["id"].(string)
+		status, _ := result["status"].(string)
 		createdAt, _ := result["created_at"].(string)
 
-		key := fmt.Sprintf("test_result:%s", id)
+		key := fmt.Sprintf("test_result:%s:%s", id, status)
 		ts, _ := time.Parse(time.RFC3339, createdAt)
 
 		if lastSeen[key].Before(ts) {
@@ -465,9 +470,10 @@ func (w *PollingWatcher) detectResearchSuggestions(ctx context.Context, lastSeen
 		if err := json.Unmarshal(suggestions, &suggestionList); err == nil {
 			for _, suggestion := range suggestionList {
 				id, _ := suggestion["id"].(string)
+				status, _ := suggestion["status"].(string)
 				createdAt, _ := suggestion["created_at"].(string)
 
-				key := fmt.Sprintf("research:%s", id)
+				key := fmt.Sprintf("research:%s:%s", id, status)
 				ts, _ := time.Parse(time.RFC3339, createdAt)
 
 				if lastSeen[key].Before(ts) {
@@ -497,9 +503,10 @@ func (w *PollingWatcher) detectResearchSuggestions(ctx context.Context, lastSeen
 		if err := json.Unmarshal(councilSuggestions, &suggestionList); err == nil {
 			for _, suggestion := range suggestionList {
 				id, _ := suggestion["id"].(string)
+				status, _ := suggestion["status"].(string)
 				updatedAt, _ := suggestion["updated_at"].(string)
 
-				key := fmt.Sprintf("research_council:%s", id)
+				key := fmt.Sprintf("research_council:%s:%s", id, status)
 				ts, _ := time.Parse(time.RFC3339, updatedAt)
 
 				if lastSeen[key].Before(ts) {
