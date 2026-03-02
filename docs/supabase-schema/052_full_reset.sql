@@ -13,13 +13,11 @@ UPDATE research_suggestions SET processing_by = NULL, processing_at = NULL WHERE
 UPDATE maintenance_commands SET processing_by = NULL, processing_at = NULL WHERE processing_by IS NOT NULL;
 
 -- ============================================================================
--- PART 2: Reset error states to draft
--- ============================================================================
+-- PART 2: Reset error states to-- ============================================================================
 
 UPDATE plans 
 SET status = 'draft', 
-    revision_round = 0,
-    latest_feedback = NULL
+    revision_round = 0
 WHERE status = 'error';
 
 -- ============================================================================
