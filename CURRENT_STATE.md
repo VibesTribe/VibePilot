@@ -14,13 +14,56 @@
 ---
 
 **Last Updated:** 2026-03-02
-**Updated By:** GLM-5 - Session 42 (In Progress)
+**Updated By:** GLM-5 - Session 42 (Phase 3 In Progress)
 **Branch:** `main`
-**Status:** FIXING - Planner prompt simplified, parsing logic updated
+**Status:** BUILDING - Implementing state-based recovery architecture
 
 ---
 
-## Session 42 Summary
+## Architecture Improvements (Session 42)
+
+### Analysis Complete
+- ✅ Full architecture analysis: `ARCHITECTURE_ANALYSIS.md`
+- ✅ Identified broken processing claims (timeout-based)
+- ✅ Identified fragile revision flow
+- ✅ Designed state-based recovery system
+
+### Phase 1: Config (DONE)
+- ✅ Reduce processing timeout to 5 min (from 10)
+- ✅ Reduce recovery interval to 10s (from 30s)
+- ✅ Add state-based recovery config
+- ✅ Add revision tracking config (max_rounds, on_max_rounds)
+- ✅ Add performance targets
+- ✅ Add logging config for state transitions
+
+### Phase 2: Database (DONE - Migrations Ready)
+- ✅ Migration 050: State tracking and revision history
+  - plans: revision_round, revision_history, latest_feedback
+  - tasks: retry_count, last_error, last_error_at
+  - state_transitions table
+  - performance_metrics table
+  - Helper functions for recording
+  
+- ✅ Migration 051: Fix task_packets relationship
+
+### Phase 3: Code Refactor (IN PROGRESS)
+- ✅ Add state tracking helper functions
+- ✅ Update RPC allowlist
+- ✅ Add ClearProcessingAndRecordTransition
+- ⬜ Update all event handlers to use state tracking
+- ⬜ Implement state-based recovery logic
+- ⬜ Add revision history tracking
+- ⬜ Test end-to-end flow
+
+### Next Actions:
+1. Apply migrations 050-051 to Supabase
+2. Complete event handler updates
+3. Test state-based recovery
+4. Run full autonomous test
+
+---
+
+## Session 42 Earlier (Prompt Packet Fixes)
 
 **Issues Found:**
 1. **Planner prompt too complex** (693 lines) - confusing for model
