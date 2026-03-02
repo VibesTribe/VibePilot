@@ -2601,13 +2601,15 @@ func parseTaskSection(section string) (TaskData, error) {
 	ppStart := strings.Index(body, "#### Prompt Packet")
 	if ppStart != -1 {
 		ppContent := body[ppStart:]
-		codeStart := strings.Index(ppContent, "```\n")
+		codeStart := strings.Index(ppContent, "```")
 		if codeStart != -1 {
-			ppContent = ppContent[codeStart+4:]
-			ppEnd := strings.Index(ppContent, "\n```\n")
-			if ppEnd == -1 {
-				ppEnd = strings.Index(ppContent, "\n```")
+			ppContent = ppContent[codeStart+3:]
+			if strings.HasPrefix(ppContent, "json") || strings.HasPrefix(ppContent, "markdown") {
+				ppContent = ppContent[strings.Index(ppContent, "\n")+1:]
+			} else if strings.HasPrefix(ppContent, "\n") {
+				ppContent = ppContent[1:]
 			}
+			ppEnd := strings.Index(ppContent, "\n```")
 			if ppEnd != -1 {
 				task.PromptPacket = strings.TrimSpace(ppContent[:ppEnd])
 			}
@@ -2617,13 +2619,15 @@ func parseTaskSection(section string) (TaskData, error) {
 	eoStart := strings.Index(body, "#### Expected Output")
 	if eoStart != -1 {
 		eoContent := body[eoStart:]
-		codeStart := strings.Index(eoContent, "```\n")
+		codeStart := strings.Index(eoContent, "```")
 		if codeStart != -1 {
-			eoContent = eoContent[codeStart+4:]
-			eoEnd := strings.Index(eoContent, "\n```\n")
-			if eoEnd == -1 {
-				eoEnd = strings.Index(eoContent, "\n```")
+			eoContent = eoContent[codeStart+3:]
+			if strings.HasPrefix(eoContent, "json") || strings.HasPrefix(eoContent, "markdown") {
+				eoContent = eoContent[strings.Index(eoContent, "\n")+1:]
+			} else if strings.HasPrefix(eoContent, "\n") {
+				eoContent = eoContent[1:]
 			}
+			eoEnd := strings.Index(eoContent, "\n```")
 			if eoEnd != -1 {
 				task.ExpectedOutput = strings.TrimSpace(eoContent[:eoEnd])
 			}
