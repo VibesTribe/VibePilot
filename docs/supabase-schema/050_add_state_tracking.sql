@@ -76,6 +76,11 @@ COMMENT ON TABLE performance_metrics IS 'Tracks performance metrics for optimiza
 -- PART 5: Update create_task_with_packet to validate prompt_packet
 -- ============================================================================
 
+-- Drop existing function with exact signature from migration 037/049
+DROP FUNCTION IF EXISTS create_task_with_packet(
+  UUID, TEXT, TEXT, TEXT, TEXT, TEXT, INT, FLOAT, TEXT, TEXT, TEXT, JSONB, TEXT, JSONB
+);
+
 CREATE OR REPLACE FUNCTION create_task_with_packet(
   p_plan_id UUID,
   p_task_number TEXT,
