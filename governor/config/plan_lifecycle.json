@@ -15,7 +15,7 @@
     },
     "revision_needed": {
       "description": "Plan needs changes from planner",
-      "transitions": ["review", "pending_human"],
+      "transitions": ["review", "blocked", "pending_human"],
       "on_enter_event": "revision_needed"
     },
     "council_review": {
