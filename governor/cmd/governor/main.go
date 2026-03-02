@@ -355,8 +355,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return nil
 		})
 		if err != nil {
-			log.Printf("[EventTaskAvailable] Failed to submit to pool: %v", err)
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
+			log.Printf("[EventTaskAvailable] Failed to submit to pool: %v", err)
 		}
 	})
 
@@ -489,8 +489,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return nil
 		})
 		if err != nil {
-			log.Printf("[EventTaskReview] Failed to submit to pool: %v", err)
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
+			log.Printf("[EventTaskReview] Failed to submit to pool: %v", err)
 		}
 	})
 
@@ -705,8 +705,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return nil
 		})
 		if err != nil {
-			log.Printf("[EventPlanCreated] Failed to submit to pool: %v", err)
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			log.Printf("[EventPlanCreated] Failed to submit to pool: %v", err)
 		}
 	})
 
@@ -904,8 +904,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return nil
 		})
 		if err != nil {
-			log.Printf("[EventCouncilDone] Failed to submit to pool: %v", err)
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			log.Printf("[EventCouncilDone] Failed to submit to pool: %v", err)
 		}
 	})
 
@@ -936,6 +936,25 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		maxRounds := cfg.GetMaxRevisionRounds()
 		onMaxRounds := cfg.GetOnMaxRoundsAction()
 
+		currentRound, _ := plan["revision_round"].(float64)
+		if int(currentRound) >= maxRounds {
+			log.Printf("[EventRevisionNeeded] Plan %s revision limit (%d) reached (current: %d), escalating", truncateID(planID), maxRounds, int(currentRound))
+			_, err := database.RPC(ctx, "update_plan_status", map[string]any{
+				"p_plan_id": planID,
+				"p_status":  onMaxRounds,
+				"p_review_notes": map[string]any{
+					"error":         "revision_limit_reached",
+					"max_rounds":    maxRounds,
+					"current_round": int(currentRound),
+				},
+			})
+			if err != nil {
+				log.Printf("[EventRevisionNeeded] Failed to update plan status: %v", err)
+			}
+			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			return
+		}
+
 		limitReached, _ := database.RPC(ctx, "check_revision_limit", map[string]any{
 			"p_plan_id":    planID,
 			"p_max_rounds": maxRounds,
@@ -943,9 +962,11 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 		var limitReachedBool bool
 		if limitReached != nil {
-			var result []bool
-			if err := json.Unmarshal(limitReached, &result); err == nil && len(result) > 0 {
-				limitReachedBool = result[0]
+			if err := json.Unmarshal(limitReached, &limitReachedBool); err != nil {
+				var result []bool
+				if err := json.Unmarshal(limitReached, &result); err == nil && len(result) > 0 {
+					limitReachedBool = result[0]
+				}
 			}
 		}
 
@@ -1045,8 +1066,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return nil
 		})
 		if err != nil {
-			log.Printf("[EventRevisionNeeded] Failed to submit to pool: %v", err)
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			log.Printf("[EventRevisionNeeded] Failed to submit to pool: %v", err)
 		}
 	})
 
@@ -1360,8 +1381,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return nil
 		})
 		if err != nil {
-			log.Printf("[EventMaintenanceCmd] Failed to submit to pool: %v", err)
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "maintenance_commands", "p_id": cmdID})
+			log.Printf("[EventMaintenanceCmd] Failed to submit to pool: %v", err)
 		}
 	})
 
@@ -1513,8 +1534,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return nil
 		})
 		if err != nil {
-			log.Printf("[EventResearchReady] Failed to submit to pool: %v", err)
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "research_suggestions", "p_id": suggestionID})
+			log.Printf("[EventResearchReady] Failed to submit to pool: %v", err)
 		}
 	})
 
@@ -1817,8 +1838,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return nil
 		})
 		if err != nil {
-			log.Printf("[EventPRDReady] Failed to submit to pool: %v", err)
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			log.Printf("[EventPRDReady] Failed to submit to pool: %v", err)
 		}
 	})
 
@@ -1969,8 +1990,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return nil
 		})
 		if err != nil {
-			log.Printf("[EventPlanReview] Failed to submit to pool: %v", err)
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+			log.Printf("[EventPlanReview] Failed to submit to pool: %v", err)
 		}
 	})
 
@@ -2085,8 +2106,8 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return nil
 		})
 		if err != nil {
-			log.Printf("[EventTestResults] Failed to submit to pool: %v", err)
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "test_results", "p_id": resultID})
+			log.Printf("[EventTestResults] Failed to submit to pool: %v", err)
 		}
 	})
 

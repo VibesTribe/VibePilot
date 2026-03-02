@@ -53,8 +53,8 @@
   },
   
   "revision_rules": {
-    "max_rounds": 6,
-    "on_max_rounds": "pending_human",
+    "max_rounds": 4,
+    "on_max_rounds": "blocked",
     "description": "After max_rounds revisions, escalate to human. Change max_rounds to adjust tolerance for revision loops."
   },
   
