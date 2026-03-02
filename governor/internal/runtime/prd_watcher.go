@@ -109,9 +109,17 @@ func (w *PRDWatcher) checkForNewPRDs(ctx context.Context) {
 			continue
 		}
 
+		if w.isProcessedPRD(line) {
+			continue
+		}
+
 		log.Printf("[PRDWatcher] New PRD detected: %s", line)
 		w.createPlan(ctx, line)
 	}
+}
+
+func (w *PRDWatcher) isProcessedPRD(prdPath string) bool {
+	return strings.Contains(prdPath, "/processed/") || strings.HasSuffix(prdPath, "/processed")
 }
 
 func (w *PRDWatcher) planExistsForPRD(ctx context.Context, prdPath string) bool {
