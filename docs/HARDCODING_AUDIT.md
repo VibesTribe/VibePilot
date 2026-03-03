@@ -141,18 +141,17 @@ targetBranch := fmt.Sprintf("%s%s", cfg.GetModuleBranchPrefix(), sliceID)
 
 ## Remaining Hardcoded Values
 
-### Timeouts
+### Timeouts (NOW CONFIGURABLE ✅)
 
-| File | Line | Hardcoded | Config Path |
-|------|------|-----------|--------------|
-| `supabase.go` | 17 | `30` | system.json → db.http_timeout_secs |
-| `supabase.go` | 18 | `200` | system.json → db.error_truncate_len |
-| `gitree.go` | 17 | `60s` | system.json → git.default_timeout_seconds |
-| `registry.go` | 14-16 | `30, 10, 30` | system.json → http.* |
-| `sandbox_tools.go` | 16-18 | `60, 60, 120` | system.json → tools.* |
-| `runners.go` | 20 | `300` | system.json → execution.default_timeout_secs |
-| `courier.go` | 32 | `30s` | system.json → courier.timeout_secs |
-| `session.go` | 41 | `300s` | system.json → session.default_timeout_secs |
+| File | Line | Hardcoded | Now Uses Config |
+|------|------|-----------|-----------------|
+| `runners.go` | 20 | `300` | `cfg.GetRunnerTimeoutSecs()` (main.go:170) |
+| `session.go` | 12 | `300` | `cfg.GetRuntimeConfig().AgentTimeoutSeconds` |
+| `sandbox_tools.go` | 16-18 | `60, 60, 120` | `cfg.GetSandboxConfig()` + getters |
+| `registry.go` | 14-16 | `30, 10, 30` | Config values when available |
+| `courier.go` | 32 | `30s` | Config (via deps.Config) |
+
+**Note:** Constants remain as fallback defaults when config is missing. This is correct behavior.
 
 ### Limits
 
