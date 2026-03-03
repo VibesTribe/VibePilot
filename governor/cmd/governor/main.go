@@ -167,7 +167,7 @@ func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, 
 
 		switch dest.Type {
 		case "cli":
-			timeout := destinations.DefaultTimeoutSecs
+			timeout := cfg.GetRunnerTimeoutSecs()
 			if dest.TimeoutSeconds > 0 {
 				timeout = dest.TimeoutSeconds
 			}
