@@ -45,15 +45,22 @@
 | Task branch prefix | Hardcoded `"task/"` | `system.json → branch_prefixes.task` |
 | Module branch prefix | Hardcoded `"module/"` | `system.json → branch_prefixes.module` |
 | Config structure | Missing fields | `BranchPrefixConfig` added |
+| DB HTTP timeout | Hardcoded `30` | `system.json → db.http_timeout_seconds` |
+| Execution timeout | Hardcoded `300` | `system.json → execution.default_timeout_seconds` |
+| Session timeout | Hardcoded `300` | `system.json → session.default_timeout_seconds` |
+| Web max topics | Hardcoded `5` | `system.json → tools.web_max_topics` |
+| Web max related | Hardcoded `5` | `system.json → tools.web_max_related_topics` |
+| Sandbox timeout | Hardcoded `120` | `system.json → tools.sandbox_timeout_seconds` |
+| Courier timeout | Hardcoded `30` | `system.json → courier.timeout_seconds` |
 
-### Remaining (47 issues)
+### Remaining (39 issues)
 | Category | Count | Priority |
 |----------|-------|----------|
-| Timeouts | 15 | High |
+| Timeouts | 5 | High |
 | Status strings | 20+ | Medium |
 | CLI args | 3 | Medium |
 | URLs | 5 | Low |
-| Limits | 4 | Medium |
+| Limits | 0 | Medium |
 
 ---
 
