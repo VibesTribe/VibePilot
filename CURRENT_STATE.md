@@ -3,7 +3,7 @@
 **Required reading:**
 1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how
 2. **`docs/CORE_REBUILD_ANALYSIS.md`** - What to salvage, what to rebuild
-3. **`docs/CORE_STATE_MACHINE_DESIGN.md`** - Core architecture design
+3. **`docs/HARDCODING_AUDIT.md`** - Hardcoding audit & fixes
 4. **`docs/SYSTEM_REFERENCE.md`** - What we have and how it works
 5. **`docs/core_philosophy.md`** - Strategic mindset
 
@@ -12,17 +12,52 @@
 **Last Updated:** 2026-03-03
 **Updated By:** GLM-5
 **Branch:** `main`
-**Status:** REBUILDING - Core state machine implementation
+**Status:** HARDENING - Removing hardcoding, preparing for core rebuild
 
 ---
 
-## Core Rebuild Status (2026-03-03)
+## Session Summary (2026-03-03)
 
-**Decision:** Rebuild core state machine, Keep existing infrastructure.
+### What We Did:
+1. ✅ Full architecture audit - identified gaps vs VibeFlow 2.0 requirements
+2. ✅ Hardcoding audit - found 50+ violations of "no hardcoding" rule
+3. ✅ Fixed branch prefixes - now configurable via system.json
+4. ✅ Created comprehensive documentation backup
 
-### Documents Created This Session:
+### Documents Created:
 - ✅ `docs/CORE_REBUILD_ANALYSIS.md` - Full salvage/rebuild audit
 - ✅ `docs/CORE_STATE_MACHINE_DESIGN.md` - Core architecture design
+- ✅ `docs/HARDCODING_AUDIT.md` - All hardcoded values tracked
+
+### Fixes Committed:
+- ✅ Task branch prefix: `"task/"` → configurable
+- ✅ Module branch prefix: `"module/"` → configurable
+- ✅ Added `BranchPrefixConfig` to config system
+- ✅ Added `GetTaskBranchPrefix()` and `GetModuleBranchPrefix()` methods
+
+---
+
+## Hardcoding Status
+
+### Fixed ✅
+| Issue | Was | Now |
+|-------|-----|-----|
+| Task branch prefix | Hardcoded `"task/"` | `system.json → branch_prefixes.task` |
+| Module branch prefix | Hardcoded `"module/"` | `system.json → branch_prefixes.module` |
+| Config structure | Missing fields | `BranchPrefixConfig` added |
+
+### Remaining (47 issues)
+| Category | Count | Priority |
+|----------|-------|----------|
+| Timeouts | 15 | High |
+| Status strings | 20+ | Medium |
+| CLI args | 3 | Medium |
+| URLs | 5 | Low |
+| Limits | 4 | Medium |
+
+---
+
+## Core Rebuild Status
 
 ### What We're Keeping (All Working):
 - ✅ Config system (config.go) - Swappable, JSON-driven
@@ -43,32 +78,17 @@
 - 🔄 Test execution - Sandbox runner
 - 🔄 Self-improvement loop - Pattern detection, daily analysis
 
-### Next Steps:
-1. Implement state machine in `governor/internal/core/`
-2. Wire event handlers to use state machine
-3. Add checkpoint table to Supabase
-4. Wire test execution
-5. Wire self-improvement agent
-
 ---
 
-## Architecture Comparison
+## Configurable Limits (No Code Changes)
 
-### VibeFlow (Working Pattern)
-```
-task.state.json → ONE file, everything in it
-events.log.jsonl → ONE log, append only
-Dashboard reads ONE file
-Crash → Read file → Continue
-```
-
-### VibePilot Target (After Rebuild)
-```
-system_state table → ONE source of truth in Supabase
-event_log table → ONE log, append only
-Dashboard reads ONE source
-Crash → Read state → Resume from checkpoint
-```
+| Setting | Config Path | Current | Change To |
+|---------|-------------|---------|-----------|
+| opencode limit | system.json → concurrency.limits.opencode | 2 | 50 when more agents |
+| max per module | system.json → runtime.max_concurrent_per_module | 1 | 8 when ready |
+| max total | system.json → runtime.max_concurrent_total | 1 | 160 when ready |
+| task branch prefix | system.json → git.branch_prefixes.task | "task/" | Any prefix |
+| module branch prefix | system.json → git.branch_prefixes.module | "module/" | Any prefix |
 
 ---
 
@@ -78,111 +98,59 @@ Crash → Read state → Resume from checkpoint
 - ✅ Identified fragile revision flow
 - ✅ Designed state-based recovery system
 
-### Phase 1: Config (DONE)
-- ✅ Reduce processing timeout to 5 min (from 10)
-- ✅ Reduce recovery interval to 10s (from 30s)
-- ✅ Add state-based recovery config
-- ✅ Add revision tracking config (max_rounds, on_max_rounds)
-- ✅ Add performance targets
-- ✅ Add logging config for state transitions
+---
 
-### Phase 2: Database (DONE - Migrations Ready)
-- ✅ Migration 050: State tracking and revision history
-  - plans: revision_round, revision_history, latest_feedback
-  - tasks: retry_count, last_error, last_error_at
-  - state_transitions table
-  - performance_metrics table
-  - Helper functions for recording
-  
-- ✅ Migration 051: Fix task_packets relationship
+## Rebuild Plan (6-10 days)
 
-### Phase 3: Code Refactor (✅ DONE)
-- ✅ State tracking helpers (`governor/internal/db/state.go`)
-  - RecordStateTransition
-  - RecordPerformanceMetric  
-  - GetLatestState
-  - ClearProcessingAndRecordTransition
-- ✅ RPC allowlist updated
-- ✅ Event handlers updated with state tracking
-  - EventPlanCreated
-  - EventPRDReady
-- ✅ Full reset SQL created (`scripts/sql/full_reset.sql`)
-- ✅ Test PRD created (`docs/prd/test-autonomous-flow.md`)
+### Phase 1: Core State Machine (2-3 days)
+1. Create `governor/internal/core/` package
+2. Implement state.go with SystemState struct
+3. Add event sourcing (event_log table)
+4. Wire into main.go event handlers
+5. Keep all existing logic, route through state machine
 
-### Phase 4: Testing (NEXT)
-1. ⬜ Run `scripts/sql/full_reset.sql` in Supabase SQL Editor
-2. ⬜ Start governor with new architecture
-3. ⬜ Create fresh test PRD
-4. ⬜ Verify autonomous flow works end-to-end
-5. ⬜ Check state transitions are being recorded
-6. ⬜ Check performance metrics are being tracked
+### Phase 2: Checkpointing (1 day)
+1. Add checkpoint logic to task execution
+2. Save progress every 25%
+3. Recovery reads checkpoint
+4. Test: crash → resume
 
-### What This Fixes:
-- ❌ 10-minute timeout → ✅ 5-minute timeout + state-based recovery
-- ❌ Lost revision state → ✅ Tracked in database
-- ❌ Permanent error states → ✅ Resettable to draft
-- ❌ No performance visibility → ✅ Full metrics tracking
-- ❌ Fragile processing claims → ✅ Immediate clear on success/failure
+### Phase 3: Test Execution (1-2 days)
+1. Create sandboxed test runner
+2. Wire into EventTestResults
+3. Add test result parsing
+4. Test: task → tests → pass/fail
 
-### Next Actions:
-1. **Run full_reset.sql** in Supabase (clears all error states and processing claims)
-2. **Start governor** and watch logs
-3. **Test with new PRD** and verify full flow works
+### Phase 4: Self-Improvement (1-2 days)
+1. Wire daily analysis agent
+2. Add pattern detection
+3. Add improvement suggestions
+4. Wire to dashboard
+
+### Phase 5: Remove Hardcoding (1 day)
+1. Move all timeouts to config
+2. Move all limits to config
+3. Move all status strings to config
+4. Verify zero hardcoding
 
 ---
 
-## Session 42 Earlier (Prompt Packet Fixes)
-
-**Issues Found:**
-1. **Planner prompt too complex** (693 lines) - confusing for model
-2. **Prompt packets empty** - Dashboard expects `task.result.prompt_packet` but planner was outputting complex nested JSON
-3. **Parsing fragile** - Expected code blocks around prompt_packet, but format was inconsistent
-
-**Fixes Applied:**
-1. ✅ **Simplified planner prompt** (693 → 112 lines)
-   - Follows Vibeflow's clean task structure
-   - `task_id`, `title`, `context`, `files`, `acceptance_criteria`
-   - Self-contained `prompt_packet` (copy-paste ready)
-   - Clear `expected_output` format
-   - No complex nested examples
-   - Explicit JSON-only output requirement
-
-2. ✅ **Updated task parsing** in governor
-   - Supports both code block and plain text formats
-   - Falls back to raw content if no code blocks
-   - Handles prompt_packet and expected_output extraction
-
-**Still TODO:**
-- [ ] Apply migration 049 to Supabase (if not already applied)
-- [ ] Test with actual PRD to verify prompt packets are created correctly
-- [ ] Verify dashboard can display prompt packets from `task.result.prompt_packet`
-
----
-
-### DONE - Session 42 (Prompt Packet Quality)
-
-...
-
----
-
-# CURRENT ARCHITECTURE
-
-## What's Running
+## What's Running Now
 
 ```
 vibepilot-governor.service (Go binary)
 ├── Polls Supabase every 1s
-├── Max 8 concurrent per module, 160 total
-├── Dynamic routing via config (NO hardcoded destinations)
-├── Branch creation when Orchestrator assigns task
+├── Max 1 concurrent (configurable)
+├── Dynamic routing via config
+├── Branch creation on task assignment
 ├── Reads secrets from vault at runtime
-├── Startup recovery: finds and recovers orphaned sessions
-├── Usage tracking: multi-window rate limit enforcement
-├── Learning: model scoring RPC (ready to deploy)
+├── Startup recovery: finds orphaned sessions
+├── Usage tracking: rate limit enforcement
+├── Learning: model scoring RPC
 ├── Revision loop: max rounds configurable (default: 6)
-├── Council execution: 3 members, parallel or sequential
-├── Plan lifecycle: all states configurable via JSON
-└── Processing state: prevents duplicate event firing (migration 042)
+├── Council execution: 3 members, parallel
+├── Plan lifecycle: all states configurable
+└── Processing state: prevents duplicate events
 ```
 
 **Status:** `systemctl status vibepilot-governor`
