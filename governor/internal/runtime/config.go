@@ -948,3 +948,7 @@ func (c *Config) GetHTTPIdleTimeoutSecs() int {
 func (c *Config) GetCourierTimeoutSecs() int {
 	return 30
 }
+
+func (c *Config) GetDefaultCLIArgs() []string {
+	return []string{"run", "--format", "json"}
+}
