@@ -9,8 +9,8 @@
 ## Executive Summary
 
 **Total Issues Found:** 50+
-**Fixed:** 3 (branch prefixes, CLI args, opencode limit)
-**Remaining:** 47
+**Fixed:** 8 (branch prefixes, config structure, timeouts, limits via system.json)
+**Remaining:** ~42
 
 ---
 
@@ -60,6 +60,46 @@ targetBranch := fmt.Sprintf("%s%s", cfg.GetModuleBranchPrefix(), sliceID)
 
 **Added:** `BranchPrefixConfig` to `GitConfig`
 **Added:** `GetTaskBranchPrefix()` and `GetModuleBranchPrefix()` methods
+
+### 4-8. Timeout & Limit Config Methods (ADDED)
+
+**Added config getters:**
+- `GetDBHTTPTimeoutSecs()` - reads from system.json → db.http_timeout_seconds
+- `GetSessionTimeoutSecs()` - reads from system.json → session.default_timeout_seconds
+- `GetExecutionTimeoutSecs()` - reads from system.json → execution.default_timeout_seconds
+- `GetWebMaxTopics()` - reads from system.json → tools.web_max_topics
+- `GetWebMaxRelatedTopics()` - reads from system.json → tools.web_max_related_topics
+- `GetSandboxTimeoutSecs()` - reads from system.json → tools.sandbox_timeout_seconds
+- `GetCourierTimeoutSecs()` - reads from system.json → courier.timeout_seconds
+
+**Config paths added to system.json:**
+```json
+"db": {
+  "http_timeout_seconds": 30,
+  "error_truncate_length": 200
+},
+"http": {
+  "client_timeout_seconds": 30,
+  "request_timeout_seconds": 10,
+  "response_timeout_seconds": 30
+},
+"execution": {
+  "default_timeout_seconds": 300
+},
+"session": {
+  "default_timeout_seconds": 300
+},
+"tools": {
+  "web_max_topics": 5,
+  "web_max_related_topics": 5,
+  "web_timeout_seconds": 30,
+  "web_max_response_length": 10000,
+  "sandbox_timeout_seconds": 120
+},
+"courier": {
+  "timeout_seconds": 30
+}
+```
 
 ---
 
