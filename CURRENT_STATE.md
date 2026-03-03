@@ -1,26 +1,76 @@
 # VibePilot Current State
 
-**Required reading: SEVEN files**
-1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how, current state
-2. **`AUDIT_REPORT.md`** - FULL CODE AUDIT - What works, what doesn't, what's missing
-3. **`docs/vibepilot_process.md`** - COMPLETE process flow, all roles, failure handling, learning
-4. **`docs/learning_system.md`** - Learning system design, review flow, thresholds
-5. **`docs/SYSTEM_REFERENCE.md`** - What we have and how it works
-6. **`docs/SESSION_35_HANDOFF.md`** - Dynamic routing implementation details
-7. **`docs/core_philosophy.md`** - Strategic mindset and principles
-
-**Read all six → Know everything → Do anything**
+**Required reading:**
+1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how
+2. **`docs/CORE_REBUILD_ANALYSIS.md`** - What to salvage, what to rebuild
+3. **`docs/CORE_STATE_MACHINE_DESIGN.md`** - Core architecture design
+4. **`docs/SYSTEM_REFERENCE.md`** - What we have and how it works
+5. **`docs/core_philosophy.md`** - Strategic mindset
 
 ---
 
-**Last Updated:** 2026-03-02
-**Updated By:** GLM-5 - Session 42 (Phase 3 In Progress)
+**Last Updated:** 2026-03-03
+**Updated By:** GLM-5
 **Branch:** `main`
-**Status:** BUILDING - Implementing state-based recovery architecture
+**Status:** REBUILDING - Core state machine implementation
 
 ---
 
-## Architecture Improvements (Session 42)
+## Core Rebuild Status (2026-03-03)
+
+**Decision:** Rebuild core state machine, Keep existing infrastructure.
+
+### Documents Created This Session:
+- ✅ `docs/CORE_REBUILD_ANALYSIS.md` - Full salvage/rebuild audit
+- ✅ `docs/CORE_STATE_MACHINE_DESIGN.md` - Core architecture design
+
+### What We're Keeping (All Working):
+- ✅ Config system (config.go) - Swappable, JSON-driven
+- ✅ Routing (router.go) - Model scoring, destination selection
+- ✅ Decision parsing (decision.go) - Parses all outputs
+- ✅ gitree library - Branch, commit, merge operations
+- ✅ Vault security - Encrypted secrets
+- ✅ RPC allowlist - Security layer
+- ✅ All 55 migrations - Already applied
+- ✅ ROI calculator - In Supabase views
+- ✅ Dashboard feed - Reads from Supabase
+- ✅ Event handlers (logic) - All 12 handlers work
+
+### What We're Rebuilding:
+- 🔄 Core state machine - Single source of truth
+- 🔄 Event sourcing - Proper persistence
+- 🔄 Recovery logic - Checkpoint-based resume
+- 🔄 Test execution - Sandbox runner
+- 🔄 Self-improvement loop - Pattern detection, daily analysis
+
+### Next Steps:
+1. Implement state machine in `governor/internal/core/`
+2. Wire event handlers to use state machine
+3. Add checkpoint table to Supabase
+4. Wire test execution
+5. Wire self-improvement agent
+
+---
+
+## Architecture Comparison
+
+### VibeFlow (Working Pattern)
+```
+task.state.json → ONE file, everything in it
+events.log.jsonl → ONE log, append only
+Dashboard reads ONE file
+Crash → Read file → Continue
+```
+
+### VibePilot Target (After Rebuild)
+```
+system_state table → ONE source of truth in Supabase
+event_log table → ONE log, append only
+Dashboard reads ONE source
+Crash → Read state → Resume from checkpoint
+```
+
+---
 
 ### Analysis Complete
 - ✅ Full architecture analysis: `ARCHITECTURE_ANALYSIS.md`
@@ -548,3 +598,32 @@ Test PRD ready: `docs/prd/governor-startup-message.md`
 - Don't hardcode any defaults - everything in config files
 - Don't implement anything directly - all changes through task system
 - Don't hardcode revision rounds or council member counts - use config
+
+---
+
+## Rebuild Plan (6-10 days)
+
+### Phase 1: Core State Machine (2-3 days)
+1. Complete state.go implementation
+2. Create database schema for system_state
+3. Wire into main.go
+
+### Phase 2: Event Sourcing (1-2 days)
+1. Create event_log table
+2. Wire all state changes to emit events
+3. Add event replay capability
+
+### Phase 3: Checkpointing (1 day)
+1. Add checkpoint logic to task execution
+2. Save progress every 25%
+3. Recovery reads checkpoint
+
+### Phase 4: Test Execution (1-2 days)
+1. Create sandboxed test runner
+2. Wire into EventTestResults
+
+### Phase 5: Self-Improvement (1-2 days)
+1. Wire daily analysis agent
+2. Add pattern detection
+3. Wire to dashboard
+
