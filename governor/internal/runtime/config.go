@@ -23,7 +23,29 @@ type SystemConfig struct {
 	Defaults    map[string]interface{} `json:"defaults"`
 	Validation  ValidationConfig       `json:"validation"`
 	Logging     LoggingConfig          `json:"logging"`
+	Core        *CoreConfig            `json:"core,omitempty"`
 	PromptsDir  string                 `json:"prompts_dir"`
+}
+
+type CoreConfig struct {
+	CheckpointEnabled         bool `json:"checkpoint_enabled"`
+	CheckpointIntervalPercent int  `json:"checkpoint_interval_percent"`
+	StateSyncIntervalSeconds  int  `json:"state_sync_interval_seconds"`
+	RecoveryEnabled           bool `json:"recovery_enabled"`
+}
+
+func (c *CoreConfig) GetCheckpointIntervalPercent() int {
+	if c == nil || c.CheckpointIntervalPercent <= 0 {
+		return 25
+	}
+	return c.CheckpointIntervalPercent
+}
+
+func (c *CoreConfig) GetStateSyncIntervalSeconds() int {
+	if c == nil || c.StateSyncIntervalSeconds <= 0 {
+		return 60
+	}
+	return c.StateSyncIntervalSeconds
 }
 
 type ValidationConfig struct {
