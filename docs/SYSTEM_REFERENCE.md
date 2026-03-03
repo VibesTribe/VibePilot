@@ -2,8 +2,29 @@
 
 **Purpose:** Single source of truth for "what we have and how it works." Read this instead of exploring 35+ files.
 
-**Last Updated:** 2026-02-22
-**Updated By:** GLM-5 - Created for Go Iron Stack transition
+**Last Updated:** 2026-03-03
+**Updated By:** GLM-5 - Session 44
+
+---
+
+## 0. CORE ARCHITECTURE PRINCIPLE
+
+**VibePilot is 100% swappable, portable, and vendor-agnostic.**
+
+| Component | Can Swap To | How |
+|-----------|-------------|-----|
+| **Database** | Supabase → PostgreSQL → MySQL → SQLite → MongoDB | JSONB everywhere, no TEXT[]/UUID[] |
+| **Code Host** | GitHub → GitLab → Bitbucket | Git-based, no API lock-in |
+| **AI CLI** | OpenCode → Claude CLI → Gemini CLI → Anything | Config-driven destinations |
+| **Hosting** | GCP → AWS → Azure → Local | Single binary, config files |
+| **Models** | Any LLM with any provider | Routing config, model profiles |
+
+**Rules for all code:**
+1. **JSONB for arrays/objects** - Works everywhere, LLM-friendly
+2. **Config over code** - Change behavior = edit config, not code
+3. **No vendor-specific features** - TEXT[] is PostgreSQL-only → use JSONB
+4. **Pass slices directly to RPCs** - No pre-marshaling
+5. **All schema in `docs/supabase-schema/`** - GitHub is source of truth
 
 ---
 
@@ -36,6 +57,7 @@
 | `maintenance_commands` | Git command queue | command_type, payload, status, approved_by |
 | `council_reviews` | Multi-model reviews | plan_id, round, model_id, lens, vote |
 | `agent_messages` | Inter-agent comms | from_agent, to_agent, content |
+| `task_checkpoints` | Crash recovery | task_id, step, progress, output, files (JSONB) |
 
 ### Key RPC Functions
 
@@ -47,6 +69,29 @@
 | `check_dependencies_complete(task_id)` | Check if all deps are merged |
 | `update_model_stats(model_id, success, tokens)` | Update model performance |
 | `get_full_roi_report()` | Comprehensive ROI |
+| `save_checkpoint(task_id, step, progress, output, files)` | Save task checkpoint (JSONB) |
+| `load_checkpoint(task_id)` | Load checkpoint data |
+| `delete_checkpoint(task_id)` | Remove checkpoint after completion |
+| `find_tasks_with_checkpoints(statuses JSONB)` | Find tasks needing recovery |
+| `save_checkpoint(task_id, step, progress, output, files)` | Save task progress for recovery |
+| `load_checkpoint(task_id)` | Load checkpoint data |
+| `delete_checkpoint(task_id)` | Remove checkpoint after completion |
+| `find_tasks_with_checkpoints(statuses)` | Find recoverable tasks (JSONB param) |
+
+### Checkpoint Recovery Flow
+
+```
+Governor starts
+    ↓
+runCheckpointRecovery()
+    ↓
+find_tasks_with_checkpoints(["in_progress", "review", "testing"])
+    ↓
+For each task:
+  - execution step → reset to "available", delete checkpoint
+  - review step → set to "review" (picked up by supervisor)
+  - testing step → set to "testing" (picked up by tester)
+```
 
 ### Task States
 
@@ -65,38 +110,43 @@ pending → locked → available → in_progress → review → testing → appr
 
 ```
 vibepilot/
-├── core/
-│   ├── orchestrator.py      # Main orchestration loop (TO BE REPLACED)
-│   ├── memory.py            # Pluggable context storage
-│   └── telemetry.py         # OpenTelemetry + fallback
-├── runners/
-│   ├── base_runner.py       # Abstract contract (RUNNER_INTERFACE.md)
-│   └── contract_runners.py  # Kimi, DeepSeek, Gemini, Courier implementations
-├── agents/
-│   ├── supervisor.py        # Review queue, quality gate
-│   └── maintenance.py       # Git operations (ONLY agent with write)
-├── task_manager.py          # Supabase operations
-├── config/
-│   ├── models.json          # WHO provides intelligence
-│   ├── platforms.json       # WHERE to run (web platforms)
-│   ├── destinations.json    # WHERE to run (cli/api/web)
-│   ├── roles.json           # WHAT job to do
-│   ├── routing.json         # WHY this path chosen
-│   ├── skills.json          # Capabilities
-│   ├── tools.json           # Primitives
-│   └── agents.json          # Actor definitions
-├── config/prompts/          # Agent behavior definitions (PRESERVE)
-│   ├── vibes.md, orchestrator.md, researcher.md
-│   ├── consultant.md, planner.md, council.md
-│   ├── supervisor.md, courier.md, maintenance.md
-│   └── internal_cli.md, internal_api.md, tester_code.md
+├── governor/                  # ACTIVE - Go binary (everything)
+│   ├── cmd/governor/          # Main entry point + event handlers + routing
+│   ├── internal/
+│   │   ├── core/              # State machine, checkpointing, test runner, analyst
+│   │   ├── db/                # Supabase client + RPC allowlist (JSONB-based)
+│   │   ├── vault/             # Secret decryption
+│   │   ├── runtime/           # Events, sessions, router, usage_tracker, config
+│   │   ├── gitree/            # Git operations (branch, commit, merge, delete)
+│   │   ├── destinations/      # CLI/API runners
+│   │   └── tools/              # Tool registry
+│   └── config/                # JSON configs (routing.json, destinations.json, etc.)
+├── config/                    # Root config files
+│   ├── plan_lifecycle.json    # Plan states, revision rules, council rules
+│   ├── routing.json           # Routing strategies
+│   ├── destinations.json      # Execution destinations
+│   └── ...
+├── prompts/                   # Agent behavior definitions (.md)
 ├── docs/
-│   ├── prd_v1.4.md          # Full system specification (PRESERVE)
-│   ├── core_philosophy.md   # Strategic mindset (PRESERVE)
+│   ├── prd_v1.4.md            # Full system specification (PRESERVE)
+│   ├── core_philosophy.md     # Strategic mindset (PRESERVE)
 │   ├── UPDATE_CONSIDERATIONS.md  # Research findings (PRESERVE)
-│   └── supabase-schema/     # SQL migrations
-└── vault_manager.py         # Encrypted secrets in Supabase
+│   └── supabase-schema/       # SQL migrations (GitHub = source of truth)
+├── scripts/                   # Deploy scripts
+│   ├── e2e-checkpoint-test.sh # E2E test for checkpoint system
+│   ├── opencode-count.sh      # Count main opencode sessions
+│   └── ...
+└── legacy/                    # DEAD CODE - Python (kept for reference)
 ```
+
+### Core Package (`governor/internal/core/`)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `state.go` | 302 | System state machine with transitions and validation |
+| `checkpoint.go` | 143 | Checkpoint manager for crash recovery |
+| `test_runner.go` | 296 | Sandboxed test execution |
+| `analyst.go` | 123 | Pattern detection and self-improvement |
 
 ---
 
@@ -139,6 +189,45 @@ This is NOT an agent. It's infrastructure.
 - **Git operations are infrastructure**, not an agent
 - Maintenance agent handles VibePilot system updates
 - Courier has NO codebase access
+
+### Checkpoint Recovery System
+
+**Purpose:** Recover from crashes without losing progress
+
+**Table:** `task_checkpoints`
+```sql
+task_id UUID PRIMARY KEY
+step TEXT              -- execution, review, testing
+progress INT           -- 0-100
+output TEXT            -- partial output
+files JSONB            -- files created so far
+```
+
+**RPCs (JSONB-based for portability):**
+- `save_checkpoint(task_id, step, progress, output, files)` - Upsert checkpoint
+- `load_checkpoint(task_id)` - Get checkpoint data
+- `delete_checkpoint(task_id)` - Remove after completion
+- `find_tasks_with_checkpoints(statuses JSONB)` - Find tasks needing recovery
+
+**Recovery Logic:**
+1. Governor starts → `runCheckpointRecovery()`
+2. Find tasks with checkpoints in `in_progress`, `review`, or `testing`
+3. Recovery by step:
+   - `execution` → Reset to `available` (restart from beginning)
+   - `review` → Keep in `review` (pick up for review)
+   - `testing` → Keep in `testing` (pick up for testing)
+4. Delete checkpoint after recovery
+
+**Configuration:**
+```json
+{
+  "core": {
+    "checkpoint_enabled": true,
+    "checkpoint_interval_percent": 25,
+    "recovery_enabled": true
+  }
+}
+```
 
 ---
 
