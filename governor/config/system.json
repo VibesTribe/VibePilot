@@ -112,5 +112,11 @@
   "logging": {
     "max_output_length": 5000,
     "max_id_display": 8
+  },
+  "core": {
+    "checkpoint_enabled": true,
+    "checkpoint_interval_percent": 25,
+    "state_sync_interval_seconds": 60,
+    "recovery_enabled": true
   }
 }
