@@ -1,0 +1,41 @@
+package main
+
+type RecoveryConfig struct {
+	OrphanThresholdSeconds int
+	MaxTaskAttempts        int
+	ModelFailureThreshold  int
+}
+
+type TaskData struct {
+	TaskNumber       string
+	Title            string
+	Confidence       float64
+	Dependencies     []string
+	Category         string
+	RequiresCodebase bool
+	Type             string
+	PromptPacket     string
+	ExpectedOutput   string
+}
+
+type ValidationError struct {
+	TaskNumber string
+	Issue      string
+	Severity   string
+}
+
+func (e *ValidationError) Error() string {
+	return "task " + e.TaskNumber + ": " + e.Issue
+}
+
+type ValidationFailedError struct {
+	Errors []ValidationError
+}
+
+func (e *ValidationFailedError) Error() string {
+	var msgs []string
+	for _, err := range e.Errors {
+		msgs = append(msgs, err.Issue+" ("+err.TaskNumber+")")
+	}
+	return msgs[0]
+}

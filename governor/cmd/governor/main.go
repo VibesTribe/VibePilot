@@ -85,7 +85,7 @@ func main() {
 	})
 
 	sessionFactory := runtime.NewSessionFactory(cfg)
-	registerDestinations(sessionFactory, cfg, v)
+	registerConnectors(sessionFactory, cfg, v)
 
 	contextBuilder := runtime.NewContextBuilder(database)
 	sessionFactory.SetContextBuilder(contextBuilder)
@@ -165,67 +165,40 @@ func getEnvOrDefault(key, defaultVal string) string {
 	return defaultVal
 }
 
-type dbCheckpointAdapter struct {
-	db *db.DB
-}
-
-func (a *dbCheckpointAdapter) RPC(ctx context.Context, fn string, args map[string]any) (json.RawMessage, error) {
-	result, err := a.db.RPC(ctx, fn, args)
-	if err != nil {
-		return nil, err
-	}
-	return json.RawMessage(result), nil
-}
-
-func (a *dbCheckpointAdapter) Save(ctx context.Context, taskID string, checkpoint core.Checkpoint) error {
-	storage := core.NewDBCheckpointStorage(a)
-	return storage.Save(ctx, taskID, checkpoint)
-}
-
-func (a *dbCheckpointAdapter) Load(ctx context.Context, taskID string) (*core.Checkpoint, error) {
-	storage := core.NewDBCheckpointStorage(a)
-	return storage.Load(ctx, taskID)
-}
-
-func (a *dbCheckpointAdapter) Delete(ctx context.Context, taskID string) error {
-	storage := core.NewDBCheckpointStorage(a)
-	return storage.Delete(ctx, taskID)
-}
-
-func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault) {
-	destinationsCfg := cfg.Connectors
-	if destinationsCfg == nil {
-		log.Println("Warning: no destinations configured")
+func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault) {
+	connectorsCfg := cfg.Connectors
+	if connectorsCfg == nil {
+		log.Println("Warning: no connectors configured")
 		return
 	}
 
 	secretProvider := connectors.NewVaultAdapter(v)
 
-	for _, dest := range destinationsCfg.Connectors {
-		if dest.Status != "active" {
-			log.Printf("Skipping inactive destination: %s", dest.ID)
+	for _, conn := range connectorsCfg.Connectors {
+		if conn.Status != "active" {
+			log.Printf("Skipping inactive connector: %s", conn.ID)
 			continue
 		}
 
-		switch dest.Type {
+		switch conn.Type {
 		case "cli":
 			timeout := cfg.GetRunnerTimeoutSecs()
-			if dest.TimeoutSeconds > 0 {
-				timeout = dest.TimeoutSeconds
+			if conn.TimeoutSeconds > 0 {
+				timeout = conn.TimeoutSeconds
 			}
-			cliArgs := dest.CLIArgs
+			cliArgs := conn.CLIArgs
 			if len(cliArgs) == 0 {
 				cliArgs = cfg.GetDefaultCLIArgs()
 			}
-			runner := connectors.NewCLIRunnerWithArgs(dest.Command, cliArgs, timeout)
-			factory.RegisterConnector(dest.ID, runner)
-			log.Printf("Registered CLI destination: %s (%s)", dest.ID, dest.Command)
+			runner := connectors.NewCLIRunnerWithArgs(conn.Command, cliArgs, timeout)
+			factory.RegisterConnector(conn.ID, runner)
+			log.Printf("Registered CLI connector: %s (%s)", conn.ID, conn.Command)
 		case "api":
-			runner := connectors.NewAPIRunnerFromConfig(dest, secretProvider)
-			factory.RegisterConnector(dest.ID, runner)
-			log.Printf("Registered API destination: %s (%s)", dest.ID, dest.Endpoint)
+			runner := connectors.NewAPIRunnerFromConfig(conn, secretProvider)
+			factory.RegisterConnector(conn.ID, runner)
+			log.Printf("Registered API connector: %s (%s)", conn.ID, conn.Endpoint)
 		default:
-			log.Printf("Unknown destination type: %s for %s", dest.Type, dest.ID)
+			log.Printf("Unknown connector type: %s for %s", conn.Type, conn.ID)
 		}
 	}
 }
@@ -2289,12 +2262,6 @@ func extractCouncilReviews(plan map[string]any) []map[string]any {
 	}
 }
 
-type RecoveryConfig struct {
-	OrphanThresholdSeconds int
-	MaxTaskAttempts        int
-	ModelFailureThreshold  int
-}
-
 func getRecoveryConfig(cfg *runtime.Config) RecoveryConfig {
 	recovery := RecoveryConfig{
 		OrphanThresholdSeconds: 300,
@@ -2535,40 +2502,6 @@ func runCheckpointRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 	}
 
 	log.Printf("[CheckpointRecovery] Recovery complete - processed %d task(s)", len(tasks))
-}
-
-type TaskData struct {
-	TaskNumber       string
-	Title            string
-	Confidence       float64
-	Dependencies     []string
-	Category         string
-	RequiresCodebase bool
-	Type             string
-	PromptPacket     string
-	ExpectedOutput   string
-}
-
-type ValidationError struct {
-	TaskNumber string
-	Issue      string
-	Severity   string
-}
-
-func (e *ValidationError) Error() string {
-	return fmt.Sprintf("task %s: %s", e.TaskNumber, e.Issue)
-}
-
-type ValidationFailedError struct {
-	Errors []ValidationError
-}
-
-func (e *ValidationFailedError) Error() string {
-	var msgs []string
-	for _, err := range e.Errors {
-		msgs = append(msgs, fmt.Sprintf("%s (%s)", err.Issue, err.TaskNumber))
-	}
-	return strings.Join(msgs, "; ")
 }
 
 func validateTasks(tasks []TaskData, validationCfg *runtime.ValidationConfig) *ValidationFailedError {
