@@ -67,11 +67,27 @@
 ### Completed
 - ✅ Phase 1: State machine (`governor/internal/core/state.go`)
 - ✅ Phase 2: Checkpointing (`governor/internal/core/checkpoint.go`)
+- ✅ Phase 3: Test runner (`governor/internal/core/test_runner.go`)
+- ✅ Phase 4: Analyst (`governor/internal/core/analyst.go`)
+- ✅ DB Migration: `043_checkpoint.sql` (created, not deployed)
 
 ### Remaining
-- ⬜ Phase 3: Test execution (sandboxed test runner)
-- ⬜ Phase 4: Self-improvement (daily analysis agent)
-- ⬜ Phase 5: Final hardcoding cleanup
+- ⬜ Phase 5: Wire into main.go
+- ⬜ Phase 6: Deploy migration to Supabase
+- ⬜ Phase 7: Write tests
+
+- ⬜ Phase 8: End-to-end testing
+
+**Files created:**
+```
+governor/internal/core/state.go        (302 lines)
+governor/internal/core/checkpoint.go    (143 lines)
+governor/internal/core/test_runner.go   (296 lines)
+governor/internal/core/analyst.go       (123 lines)
+governor/supabase/migrations/043_checkpoint.sql (44 lines)
+```
+
+**Total: 908 lines of new core code**
 
 ---
 
