@@ -116,9 +116,11 @@ type EventsConfig struct {
 }
 
 type SandboxConfig struct {
-	DefaultTestCommand string `json:"default_test_command"`
-	TimeoutSeconds     int    `json:"timeout_seconds"`
-	TempDir            string `json:"temp_dir"`
+	DefaultTestCommand      string `json:"default_test_command"`
+	TimeoutSeconds          int    `json:"timeout_seconds"`
+	TempDir                 string `json:"temp_dir"`
+	LintTimeoutSeconds      int    `json:"lint_timeout_seconds"`
+	TypecheckTimeoutSeconds int    `json:"typecheck_timeout_seconds"`
 }
 
 type WebToolsConfig struct {
@@ -890,4 +892,59 @@ func loadJSON[T any](path string) (*T, error) {
 	}
 
 	return &result, nil
+}
+
+func (c *Config) GetRunnerTimeoutSecs() int {
+	return 300
+}
+
+func (c *Config) GetSessionTimeoutSecs() int {
+	if c.System == nil {
+		return 300
+	}
+	if c.System.Runtime.AgentTimeoutSeconds > 0 {
+		return c.System.Runtime.AgentTimeoutSeconds
+	}
+	return 300
+}
+
+func (c *Config) GetDBHTTPTimeoutSecs() int {
+	return 30
+}
+
+func (c *Config) GetDBErrorTruncateLen() int {
+	return 200
+}
+
+func (c *Config) GetSandboxTimeoutSecs() int {
+	if c.System == nil || c.System.Sandbox.TimeoutSeconds == 0 {
+		return 60
+	}
+	return c.System.Sandbox.TimeoutSeconds
+}
+
+func (c *Config) GetLintTimeoutSecs() int {
+	if c.System == nil || c.System.Sandbox.LintTimeoutSeconds == 0 {
+		return 60
+	}
+	return c.System.Sandbox.LintTimeoutSeconds
+}
+
+func (c *Config) GetTypecheckTimeoutSecs() int {
+	if c.System == nil || c.System.Sandbox.TypecheckTimeoutSeconds == 0 {
+		return 120
+	}
+	return c.System.Sandbox.TypecheckTimeoutSeconds
+}
+
+func (c *Config) GetHTTPClientTimeoutSecs() int {
+	return 30
+}
+
+func (c *Config) GetHTTPIdleTimeoutSecs() int {
+	return 30
+}
+
+func (c *Config) GetCourierTimeoutSecs() int {
+	return 30
 }
