@@ -1,29 +1,53 @@
 #!/bin/bash
 # Wrapper that enforces max 2 opencode sessions
+# Actively kills excess sessions when spawning new ones
 
 MAX_SESSIONS=2
 REAL_BINARY="/home/mjlockboxsocial/.opencode/bin/opencode-real"
 
-# Count current sessions (only main processes, not language server subprocesses)
-count=0
-for pid in $(pgrep opencode 2>/dev/null); do
-    exe=$(readlink /proc/$pid/exe 2>/dev/null)
-    if [ "$exe" = "$REAL_BINARY" ]; then
-        ppid=$(cat /proc/$pid/status 2>/dev/null | grep PPid | awk '{print $2}')
-        parent_exe=$(readlink /proc/$ppid/exe 2>/dev/null)
-        if [ "$parent_exe" != "$REAL_BINARY" ]; then
-            count=$((count + 1))
+# Get list of main opencode session PIDs (not language server children)
+get_main_pids() {
+    local pids=""
+    for pid in $(pgrep opencode 2>/dev/null); do
+        exe=$(readlink /proc/$pid/exe 2>/dev/null)
+        if [ "$exe" = "$REAL_BINARY" ]; then
+            ppid=$(cat /proc/$pid/status 2>/dev/null | grep PPid | awk '{print $2}')
+            parent_exe=$(readlink /proc/$ppid/exe 2>/dev/null)
+            # Only count if parent is NOT opencode (i.e., this is a main session, not subprocess)
+            if [ "$parent_exe" != "$REAL_BINARY" ]; then
+                pids="$pids $pid"
+            fi
         fi
-    fi
+    done
+    echo $pids
+}
+
+# Count and optionally kill excess sessions
+count=0
+pids=$(get_main_pids)
+for pid in $pids; do
+    count=$((count + 1))
 done
 
+# If at or above limit, kill oldest sessions to make room
 if [ "$count" -ge "$MAX_SESSIONS" ]; then
-    echo "ERROR: Maximum opencode sessions ($MAX_SESSIONS) reached."
-    echo "Active sessions: $count"
-    ps aux | grep '[o]pencode' | grep -v 'language-server' | awk '{printf "  PID %s - %s\n", $2, $9}'
+    echo "WARNING: $count opencode sessions running (max: $MAX_SESSIONS)"
+    echo "Active sessions:"
+    ps aux | grep '[o]pencode' | grep -v 'language-server'
     echo ""
-    echo "Kill excess sessions with: pkill -9 opencode"
-    exit 1
+    
+    # Kill oldest sessions (sorted by PID, lowest = oldest)
+    kill_count=$((count - MAX_SESSIONS + 1))
+    echo "Killing $kill_count oldest session(s) to make room..."
+    
+    for pid in $(echo $pids | tr ' ' '\n' | sort -n | head -$kill_count); do
+        if [ -n "$pid" ]; then
+            echo "  Killing PID $pid"
+            kill -9 $pid 2>/dev/null
+        fi
+    done
+    
+    sleep 1
 fi
 
 # Pass through to real binary with all args
