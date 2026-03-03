@@ -616,3 +616,46 @@ Test PRD ready: `docs/prd/governor-startup-message.md`
 2. Add pattern detection
 3. Wire to dashboard
 
+# VibePilot Current State
+
+**Required reading:**
+1. **THIS FILE** (`CURRENT_STATE.md`) - What, where, how
+2. **`docs/SYSTEM_REFERENCE.md`** - What we have and how it works
+3. **`docs/core_philosophy.md`** - Strategic mindset
+
+---
+
+**Last Updated:** 2026-03-03 16:56 UTC
+**Updated By:** GLM-5
+**Branch:** `main`
+**Status:** PRIORITY 1 COMPLETE - Database agnostic, checkpointing working
+
+---
+
+## Session Summary (2026-03-03 - Session 44)
+
+### What We Did:
+1. ✅ Fixed opencode-count.sh to only count main sessions
+2. ✅ Created migration 058 - Convert all TEXT[] to JSONB
+3. ✅ Fixed Go code - Remove json.Marshal() pre-encoding
+4. ✅ Updated AGENTS.md - Added core architecture principle
+5. ✅ Applied migration 058 to Supabase
+6. ✅ Verified checkpoint recovery working
+
+### Key Accomplishments:
+- **Database agnosticism**: All TEXT[] → JSONB for portability
+- **Checkpoint recovery**: Working on governor startup
+- **Consistent code**: Pass slices directly to RPCs
+- **Architecture documented**: AGENTS.md now has core principles at top
+
+### Files Changed:
+- `docs/supabase-schema/058_jsonb_parameters.sql` - Migration
+- `governor/cmd/governor/main.go` - Remove pre-marshaling
+- `AGENTS.md` - Core architecture principle
+
+### Next Steps:
+1. Priority 2: Write integration tests for checkpoint recovery
+2. Priority 3: End-to-end testing
+3. Monitor for any edge cases
+
+---
