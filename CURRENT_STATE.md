@@ -19,13 +19,22 @@
 ## Session Summary (2026-03-03)
 
 ### What We Did:
-1. ✅ Full architecture audit - identified gaps vs VibeFlow 2.0 requirements
-2. ✅ Hardcoding audit - found 50+ violations of "no hardcoding" rule
-3. ✅ Fixed branch prefixes - now configurable via system.json
-4. ✅ Fixed timeouts - all use config getters
-5. ✅ Fixed CLI args - uses `GetDefaultCLIArgs()`
-6. ✅ Created comprehensive documentation backup
-7. ✅ Started core rebuild - state machine + checkpointing
+1. ✅ Core config added to SystemConfig struct  
+2. ✅ Helper functions created (no stubs)
+3. ✅ EventTaskAvailable updated with checkpointing
+4. ✅ Migration created
+5. ✅ Committed and pushed to GitHub
+
+### Next Steps:
+1. Run migration 057 in Supabase (copy from `docs/supabase-schema/057_task_checkpoints.sql`)
+2. Test with a simple task flow
+3. Monitor checkpoint creation in logs
+
+### Files Changed:
+- `governor/config/system.json` - Core config
+- `governor/internal/runtime/config.go` - CoreConfig struct + getters
+- `governor/cmd/governor/main.go` - Helper functions
+- `docs/supabase-schema/057_task_checkpoints.sql` - New migration
 
 ### Documents Created:
 - ✅ `docs/CORE_REBUILD_ANALYSIS.md` - Full salvage/rebuild audit
