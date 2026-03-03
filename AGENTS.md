@@ -4,6 +4,30 @@
 
 ---
 
+## CORE ARCHITECTURE PRINCIPLE
+
+**VibePilot is designed to be 100% swappable, portable, and vendor-agnostic.**
+
+| Component | Can Be Swapped For | How |
+|-----------|-------------------|-----|
+| **Database** | Supabase → PostgreSQL → MySQL → SQLite → MongoDB | JSONB everywhere, no TEXT[] or UUID[] |
+| **Code Host** | GitHub → GitLab → Bitbucket | Git-based, no API lock-in |
+| **AI CLI** | OpenCode → Claude CLI → Gemini CLI → Anything | Config-driven destinations |
+| **Hosting** | GCP → AWS → Azure → Local | Single binary, config files |
+| **Models** | Any LLM with any provider | Routing config, model profiles |
+
+**Implications for ALL code:**
+
+1. **JSONB for all array/object data** - Works in any database, understood by any LLM
+2. **Config over code** - Behavior changes = config edit, not code change
+3. **No vendor-specific features** - TEXT[] is PostgreSQL-only → use JSONB
+4. **Pass slices directly to RPCs** - Go's JSON encoder handles it, no pre-marshaling
+5. **All schema changes in `docs/supabase-schema/`** - Human applies from GitHub (source of truth)
+
+**The test:** Can we swap [X] by changing config only? If no, refactor.
+
+---
+
 ## Quick Branch Reference
 
 | Branch | Use For | Who Can Push | Approval Needed |
@@ -22,6 +46,12 @@
 - The human only sees what's in GitHub
 - Migrations, code changes, configs - all must be committed AND pushed
 - After making changes: `git add . && git commit -m "message" && git push origin <branch>`
+
+**Supabase Schema Migrations:**
+- ALL schema changes go in `docs/supabase-schema/` on GitHub main
+- Human copies SQL from GitHub and applies in Supabase dashboard
+- GitHub is the source of truth - not local files, not Supabase directly
+- Migration files are numbered: `058_jsonb_parameters.sql`, etc.
 
 ---
 
