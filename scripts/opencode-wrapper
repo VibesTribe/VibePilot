@@ -1,0 +1,30 @@
+#!/bin/bash
+# Wrapper that enforces max 2 opencode sessions
+
+MAX_SESSIONS=2
+REAL_BINARY="/home/mjlockboxsocial/.opencode/bin/opencode-real"
+
+# Count current sessions (only main processes, not language server subprocesses)
+count=0
+for pid in $(pgrep opencode 2>/dev/null); do
+    exe=$(readlink /proc/$pid/exe 2>/dev/null)
+    if [ "$exe" = "$REAL_BINARY" ]; then
+        ppid=$(cat /proc/$pid/status 2>/dev/null | grep PPid | awk '{print $2}')
+        parent_exe=$(readlink /proc/$ppid/exe 2>/dev/null)
+        if [ "$parent_exe" != "$REAL_BINARY" ]; then
+            count=$((count + 1))
+        fi
+    fi
+done
+
+if [ "$count" -ge "$MAX_SESSIONS" ]; then
+    echo "ERROR: Maximum opencode sessions ($MAX_SESSIONS) reached."
+    echo "Active sessions: $count"
+    ps aux | grep '[o]pencode' | grep -v 'language-server' | awk '{printf "  PID %s - %s\n", $2, $9}'
+    echo ""
+    echo "Kill excess sessions with: pkill -9 opencode"
+    exit 1
+fi
+
+# Pass through to real binary with all args
+exec "$REAL_BINARY" "$@"
