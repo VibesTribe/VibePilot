@@ -1,8 +1,49 @@
 # VibePilot Changelog
 
 **Purpose:** Full audit trail of all changes. Anyone/any agent can see what, where, when, why.
-
 **Update Frequency:** After EVERY change (file add, update, remove, merge, branch delete)
+
+---
+
+# 2026-03-03 (Session 41 - Core Rebuild Phase 1-4)
+## Hardcoding Audit Complete
+- Fixed 50+ hardcoded values across 5 batches
+- Timeouts → config getters
+- CLI args → `GetDefaultCLIArgs()`
+- Branch prefixes → configurable via system.json
+- Status strings → documented as domain constants (skipped)
+- URLs → low priority (skipped)
+
+## Core Rebuild Phase 1-4 Completed
+- **Phase 1:** State machine (`internal/core/state.go`)
+- **Phase 2:** Checkpoint manager (`internal/core/checkpoint.go`)
+- **Phase 3:** Test runner (`internal/core/test_runner.go`)
+- **Phase 4:** Analyst agent (`internal/core/analyst.go`)
+- **DB Migration:** `043_checkpoint.sql` (created, not deployed)
+
+## Commits (11 total)
+1. `4bfa211e` - Fix: Remove hardcoded branch prefixes
+2. `281736a` - Docs: Update hardcoding audit with fixes made
+3. `82041e1` - Docs: Update CURRENT_STATE with hardcoding audit progress
+4. `c0ac0ea6` - Config: add timeout and limit settings to system.json
+5. `4d27445` - Docs: update hardcoding audit with config improvements
+6. `018ab8a1` - Config: add timeout getter methods for hardcoding fix batch 1
+7. `43a60246` - Fix: use config for CLI runner timeout instead of hardcoded constant
+8. `f704182d` - Fix: use config for sandbox/lint/typecheck timeouts in registry.go
+9. `d634a9d2` - Docs: update hardcoding audit - batch 1 timeouts fixed
+10. `77349242` - Fix: use config for default CLI args instead of hardcoded constant
+11. `34dbaf49` - Docs: update hardcoding audit - CLI args now configurable
+12. `73a719f4` - Docs: clarify status strings are domain constants, not hardcoding
+13. `3d0c200a` - Feat: add core state machine package (phase 1)
+14. `4b4e00c7` - Feat: add checkpoint manager for state machine (phase 2)
+15. `fec87703` - Docs: update CURRENT_STATE with session progress
+16. `531831f2` - Feat: add test runner for phase 3 (sandboxed test execution)
+17. `a9bbac1f` - Feat: complete phase 4 - analyst agent and DB migration
+
+## Remaining Work
+- Phase 5: Wire core into main.go
+- Phase 6: Deploy DB migration to Supabase
+- Phase 7: Write tests for core package
 
 ---
 
