@@ -17,7 +17,7 @@
     "protected_branches": ["main", "master", "research-considerations"],
     "default_timeout_seconds": 60,
     "default_merge_target": "main",
-    "branch_name_pattern": "^[a-zA-Z0-9_/-]+$",
+    "branch_name_pattern": "^[a-zA-Z0-9_/.-]+$",
     "remote_name": "origin",
     "branch_prefixes": {
       "task": "task/",
@@ -25,5 +25,92 @@
     },
     "id_truncate_length": 8
   },
-}
+  "db": {
+    "http_timeout_seconds": 30,
+    "error_truncate_length": 200
+  },
+  "http": {
+    "client_timeout_seconds": 30,
+    "request_timeout_seconds": 10,
+    "response_timeout_seconds": 30
+  },
+  "execution": {
+    "default_timeout_seconds": 300
+  },
+  "session": {
+    "default_timeout_seconds": 300
+  },
+  "tools": {
+    "web_max_topics": 5,
+    "web_max_related_topics": 5,
+    "web_timeout_seconds": 30,
+    "web_max_response_length": 10000,
+    "sandbox_timeout_seconds": 120
+  },
+  "courier": {
+    "timeout_seconds": 30
+  },
+  "runtime": {
+    "max_concurrent_per_module": 1,
+    "max_concurrent_total": 1,
+    "event_poll_interval_ms": 1000,
+    "agent_timeout_seconds": 300,
+    "max_tool_turns": 10,
+    "event_query_limit": 10
+  },
+  "concurrency": {
+    "limits": {
+      "opencode": 2
+    },
+    "default_limit": 3
+  },
+  "security": {
+    "leak_detection_enabled": true,
+    "http_allowlist": ["api.supabase.co", "api.github.com", "github.com"]
+  },
+  "events": {
+    "task_statuses_available": ["available"],
+    "task_statuses_review": ["review"],
+    "task_statuses_completed": ["testing", "approval"],
+    "plan_statuses_draft": ["draft"],
+    "plan_statuses_review": ["review"],
+    "plan_statuses_council": ["council_review"],
+    "plan_statuses_pending_human": ["pending_human"],
+    "plan_statuses_approved": ["approved"],
+    "maintenance_status": "pending",
+    "test_results_status": "pending_review"
+  },
+  "sandbox": {
+    "default_test_command": "npm test",
+    "timeout_seconds": 60
+  },
+  "web_tools": {
+    "search_url": "https://api.duckduckgo.com/",
+    "user_agent": "Mozilla/5.0 (compatible; VibePilot/2.0)",
+    "max_fetch_length": 10000,
+    "max_related_topics": 5,
+    "timeout_seconds": 30
+  },
+  "prd_watcher": {
+    "enabled": true,
+    "repo_path": "/home/mjlockboxsocial/vibepilot",
+    "branch": "main",
+    "directory": "docs/prd",
+    "interval_seconds": 5
+  },
+  "recovery": {
+    "processing_timeout_seconds": 300,
+    "processing_recovery_interval_seconds": 60,
+    "orphan_threshold_seconds": 300
+  },
+  "validation": {
+    "min_task_confidence": 0.95,
+    "require_prompt_packet": true,
+    "require_category": true,
+    "require_expected_output": true
+  },
+  "logging": {
+    "max_output_length": 5000,
+    "max_id_display": 8
+  }
 }
