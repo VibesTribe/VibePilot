@@ -27,11 +27,15 @@ type Dependencies struct {
 var sharedHTTPClient *http.Client
 
 func init() {
+	httpTimeout := 30
+	idleTimeout := 30
+	maxIdleConns := 10
+
 	sharedHTTPClient = &http.Client{
-		Timeout: DefaultHTTPTimeoutSecs * time.Second,
+		Timeout: time.Duration(httpTimeout) * time.Second,
 		Transport: &http.Transport{
-			MaxIdleConns:       DefaultMaxIdleConns,
-			IdleConnTimeout:    DefaultIdleConnTimeoutSecs * time.Second,
+			MaxIdleConns:       maxIdleConns,
+			IdleConnTimeout:    time.Duration(idleTimeout) * time.Second,
 			DisableCompression: false,
 		},
 	}
@@ -59,9 +63,15 @@ func RegisterAll(registry *runtime.ToolRegistry, deps *Dependencies) {
 		registry.Register("vault_get", NewVaultGetTool(deps.Vault))
 	}
 
-	sandboxTimeout := DefaultSandboxTimeoutSecs
-	if deps.Config != nil && deps.Config.GetSandboxConfig().TimeoutSeconds > 0 {
-		sandboxTimeout = deps.Config.GetSandboxConfig().TimeoutSeconds
+	sandboxTimeout := 60
+	lintTimeout := 60
+	typecheckTimeout := 120
+	if deps.Config != nil {
+		if deps.Config.GetSandboxConfig().TimeoutSeconds > 0 {
+			sandboxTimeout = deps.Config.GetSandboxConfig().TimeoutSeconds
+		}
+		lintTimeout = deps.Config.GetLintTimeoutSecs()
+		typecheckTimeout = deps.Config.GetTypecheckTimeoutSecs()
 	}
 
 	if deps.RepoPath != "" {
@@ -69,8 +79,8 @@ func RegisterAll(registry *runtime.ToolRegistry, deps *Dependencies) {
 		registry.Register("file_write", NewFileWriteTool(deps.RepoPath))
 		registry.Register("file_delete", NewFileDeleteTool(deps.RepoPath))
 		registry.Register("sandbox_test", NewSandboxTestTool(deps.RepoPath, sandboxTimeout))
-		registry.Register("run_lint", NewRunLintTool(deps.RepoPath))
-		registry.Register("run_typecheck", NewRunTypecheckTool(deps.RepoPath))
+		registry.Register("run_lint", NewRunLintToolWithTimeout(deps.RepoPath, lintTimeout))
+		registry.Register("run_typecheck", NewRunTypecheckToolWithTimeout(deps.RepoPath, typecheckTimeout))
 	}
 
 	var allowlist []string
