@@ -10,6 +10,7 @@
 -- record_planner_revision (migrations 042, 047)
 -- get_problem_solution (migration 024)
 -- find_tasks_with_checkpoints (migration 057)
+-- record_revision_feedback (migration 036)
 
 -- ============================================================================
 -- 1. record_planner_revision - Convert TEXT[] to JSONB
@@ -26,23 +27,22 @@ DECLARE
   v_rule_id UUID;
   v_concern TEXT;
   v_concerns_array TEXT[];
+  v_tasks_array TEXT[];
+  v_history_entry JSONB;
 BEGIN
-  -- Convert JSONB to TEXT[] for processing (internal use only)
-  SELECT ARRAY(SELECT jsonb_array_elements_text(p_concerns))
-  INTO v_concerns_array;
+  v_concerns_array := ARRAY(SELECT jsonb_array_elements_text(p_concerns));
+  v_tasks_array := ARRAY(SELECT jsonb_array_elements_text(p_tasks_needing_revision));
   
-  -- Append to plan's revision history
+  v_history_entry := jsonb_build_object(
+    'timestamp', NOW(),
+    'concerns', p_concerns,
+    'tasks_needing_revision', p_tasks_needing_revision
+  );
+  
   UPDATE plans 
-  SET revision_history = COALESCE(revision_history, '[]'::jsonb) || jsonb_build_array(
-    jsonb_build_object(
-      'timestamp', NOW(),
-      'concerns', p_concerns,
-      'tasks_needing_revision', p_tasks_needing_revision
-    )
-  )
+  SET revision_history = COALESCE(revision_history, '[]'::jsonb) || jsonb_build_array(v_history_entry)
   WHERE id = p_plan_id;
   
-  -- Create learned rules for each concern
   IF jsonb_array_length(p_concerns) > 0 THEN
     FOREACH v_concern IN ARRAY v_concerns_array
     LOOP
@@ -73,7 +73,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 COMMENT ON FUNCTION record_planner_revision(UUID, JSONB, JSONB) IS 
-'Record supervisor revision feedback. Uses JSONB for database agnosticism. Updates plan.revision_history and inserts into planner_learned_rules.';
+'Record supervisor revision feedback. Uses JSONB for database agnosticism.';
 
 -- ============================================================================
 -- 2. get_problem_solution - Convert TEXT[] to JSONB
@@ -156,7 +156,7 @@ COMMENT ON FUNCTION find_tasks_with_checkpoints(JSONB) IS
 -- 4. record_revision_feedback - Convert TEXT[] to JSONB
 -- ============================================================================
 
-DROP FUNCTION IF EXISTS record_revision_feedback(UUID, TEXT, JSONB, JSONB);
+DROP FUNCTION IF EXISTS record_revision_feedback(UUID, TEXT, JSONB, TEXT[]);
 
 CREATE OR REPLACE FUNCTION record_revision_feedback(
   p_plan_id UUID,
@@ -193,9 +193,3 @@ COMMENT ON FUNCTION record_revision_feedback(UUID, TEXT, JSONB, JSONB) IS
 -- ============================================================================
 
 SELECT 'Migration 058 complete - all TEXT[] converted to JSONB' AS status;
-
--- Verify RPCs use JSONB
-SELECT routine_name || ' uses JSONB: ' || 
-  CASE WHEN routine_definition LIKE '%JSONB%' THEN 'YES' ELSE 'NO' END AS verification
-FROM information_schema.routines 
-WHERE routine_name IN ('record_planner_revision', 'get_problem_solution', 'find_tasks_with_checkpoints', 'record_revision_feedback');
