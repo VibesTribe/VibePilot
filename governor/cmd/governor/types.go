@@ -9,11 +9,11 @@ type RecoveryConfig struct {
 type TaskData struct {
 	TaskNumber       string
 	Title            string
-	Confidence       float64
-	Dependencies     []string
-	Category         string
-	RequiresCodebase bool
 	Type             string
+	Confidence       float64
+	Category         string
+	Dependencies     []string
+	RequiresCodebase bool
 	PromptPacket     string
 	ExpectedOutput   string
 }
