@@ -8,140 +8,131 @@
 
 ---
 
-**Last Updated:** 2026-03-03 18:00 UTC
+**Last Updated:** 2026-03-03 20:22 UTC
 **Updated By:** GLM-5
 **Branch:** `main`
-**Status:** CODEBASE AUDIT COMPLETE - Security wired, maintenance needs refactor
+**Status:** ARCHITECTURE REFACTORING IN PROGRESS - main.go split started
 
 ---
 
-## Session Summary (2026-03-03 - Session 44)
+## Session Summary (2026-03-03 - Session 45)
 
 ### What We Did:
 
-**Priority 1 - Checkpoint System:**
-1. ✅ Created migration 058 - Convert all TEXT[] to JSONB
-2. ✅ Fixed Go code - Remove json.Marshal() pre-encoding
-3. ✅ Updated AGENTS.md - Core architecture principle at top
-4. ✅ Applied migration 058 to Supabase
-5. ✅ Verified checkpoint recovery working
+**Phase 1: Rollback Broken Refactoring:**
+1. ✅ Deleted all broken handler files from previous session
+2. ✅ Restored main.go to working state (2,834 lines)
+3. ✅ Verified all tests passing
 
-**Priority 2 - Integration Tests:**
-1. ✅ Wrote 12 comprehensive integration tests
-2. ✅ All tests passing
+**Phase 2: Package Rename (destinations → connectors):**
+1. ✅ Renamed `internal/destinations/` to `internal/connectors/`
+2. ✅ Renamed `DestinationConfig` → `ConnectorConfig`
+3. ✅ Renamed `DestinationRunner` → `ConnectorRunner`
+4. ✅ Updated all references across codebase
+5. ✅ Renamed `registerDestinations` → `registerConnectors`
 
-**Priority 3 - E2E Testing:**
-1. ✅ Created `scripts/e2e-checkpoint-test.sh` for AI agents
-
-**Codebase Audit:**
-1. ✅ Fixed bug in analyst.go:108 (format string mismatch)
-2. ✅ Wired in security.LeakDetector - scans task outputs for secrets
-3. ✅ Removed check_t001.go debug file
-4. ⚠️ Maintenance package needs type refactoring (uses pkg/types.Task, codebase uses map[string]any)
-5. ⬜ main.go split into modular handlers - NOT STARTED (next priority)
+**Phase 3: Handler Extraction (IN PROGRESS):**
+1. ✅ Created `types.go` (41 lines) - RecoveryConfig, TaskData, ValidationError types
+2. ✅ Created `adapters.go` (36 lines) - dbCheckpointAdapter
+3. ✅ Created `recovery.go` (255 lines) - All recovery functions
+4. ✅ Created `validation.go` (276 lines) - Task validation, plan parsing
+5. ⬜ Handler files (task, plan, council, etc.) - NOT STARTED
 
 ### Key Accomplishments:
-- **Database agnosticism**: All TEXT[] → JSONB
-- **Checkpoint recovery**: Working on governor startup
-- **Security**: Leak detection now active on all task outputs
-- **Tests**: 12 integration tests + e2e script
-- **Documentation**: SYSTEM_REFERENCE.md updated, CODEBASE_ANALYSIS_20260303.md created
+- **Architecture clarity**: Connectors = HOW to connect to models, Destinations = WHERE couriers go
+- **main.go reduction**: 2,834 → 2,261 lines (-573 lines, 20% reduction)
+- **Clean commits**: 4 atomic commits with clear messages
+- **Tests**: All passing after each change
 
 ### Files Changed This Session:
-- `docs/supabase-schema/058_jsonb_parameters.sql` - Migration (TEXT[] → JSONB)
-- `governor/cmd/governor/main.go` - Leak detector wired in, bug fixes
-- `governor/cmd/governor/main_test.go` - 12 integration tests
-- `governor/internal/core/analyst.go` - Fixed format string bug
-- `scripts/e2e-checkpoint-test.sh` - E2E test script
-- `AGENTS.md` - Core architecture principle
-- `docs/SYSTEM_REFERENCE.md` - Checkpoint system docs
-- `docs/CODEBASE_ANALYSIS_20260303.md` - Full audit report
-- **DELETED:** `governor/check_t001.go`
+- `governor/internal/destinations/` → `governor/internal/connectors/` (package renamed)
+- `governor/internal/runtime/config.go` - ConnectorConfig, GetConnector methods
+- `governor/internal/runtime/session.go` - ConnectorRunner, RegisterConnector
+- `governor/internal/runtime/router.go` - GetAvailableConnectors, GetConnectorCategory
+- `governor/cmd/governor/main.go` - Reduced from 2,834 to 2,261 lines
+- `governor/cmd/governor/types.go` - NEW (41 lines)
+- `governor/cmd/governor/adapters.go` - NEW (36 lines)
+- `governor/cmd/governor/recovery.go` - NEW (255 lines)
+- `governor/cmd/governor/validation.go` - NEW (276 lines)
+
+### Commits This Session:
+1. `refactor: rename destinations package to connectors` - Package rename
+2. `refactor: extract types.go and adapters.go from main.go` - First extraction
+3. `refactor: extract recovery.go from main.go` - Recovery functions
+4. `refactor: extract validation.go from main.go` - Validation functions
 
 ---
 
-## Codebase Audit Results
+## Architecture Clarification (This Session)
 
-### Current State
+### Connector vs Destination
+
+| Term | Definition | Example |
+|------|------------|---------|
+| **Connector** | HOW we connect to a model | CLI (opencode), API (OpenAI, Anthropic) |
+| **Destination** | WHERE couriers go (web AI platforms) | deepseek.com, chatgpt.com, claude.ai |
+
+**Internal agents** (planner, supervisor, task_runner, council):
+- Need: Model + Connector
+- No "destination" concept
+
+**Courier agents**:
+- Need: Model + Connector + Destination (web platform URL)
+- Destination is passed as parameter to courier connector
+
+---
+
+## Current Codebase State
 
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
 | **Total Go lines** | ~11,500 | 4,000-8,000 | ⚠️ Over target |
-| **Go files** | 36 | 20-30 | ⚠️ High |
-| **main.go lines** | 2,834 | <500 | ❌ Monolith |
-| **Dead code** | ~755 lines | 0 | ⚠️ Maintenance pkg |
+| **main.go lines** | 2,261 | <500 | ⚠️ In progress |
+| **Handler files** | 4 created | 10 planned | ⬜ 6 remaining |
 
-### Issues Found & Fixed
+### File Structure (Current)
 
-| Issue | Status | Notes |
-|-------|--------|-------|
-| Bug in analyst.go:108 | ✅ Fixed | Format string had 3 %s, only 2 args |
-| Security leak detection | ✅ Wired | LeakDetector scans all task outputs |
-| check_t001.go debug file | ✅ Removed | Was 42 lines of dead debug code |
+```
+cmd/governor/
+├── main.go           (2,261 lines) - Event handlers, wireup
+├── types.go          (41 lines)  - Shared types ✅
+├── adapters.go       (36 lines)  - DB adapters ✅
+├── recovery.go       (255 lines) - Recovery functions ✅
+├── validation.go     (276 lines) - Validation logic ✅
+└── main_test.go      (405 lines) - Integration tests
 
-### Outstanding Issues
+Total: 3,274 lines (was 2,834 monolithic)
+```
 
-| Issue | Priority | Notes |
-|-------|----------|-------|
-| main.go monolith (2,834 lines) | HIGH | Must split into event handler files |
-| Maintenance package type mismatch | MEDIUM | Uses pkg/types.Task, needs map[string]any |
+### Remaining Extractions
 
----
+| File | Est. Lines | Contains |
+|------|------------|----------|
+| `handlers_task.go` | ~350 | EventTaskAvailable, EventTaskReview, EventTaskCompleted |
+| `handlers_plan.go` | ~400 | EventPRDReady, EventPlanReview, EventRevisionNeeded, etc. |
+| `handlers_council.go` | ~250 | EventCouncilReview, EventCouncilDone |
+| `handlers_research.go` | ~200 | EventResearchReady, EventResearchCouncil |
+| `handlers_maint.go` | ~80 | EventMaintenanceCmd |
+| `handlers_testing.go` | ~100 | EventTestResults |
 
-## Security Leak Detection (NOW ACTIVE)
-
-**What it does:**
-- Scans ALL task runner output for leaked secrets
-- Detects: OpenAI keys, Anthropic keys, GitHub tokens, Supabase keys, AWS keys, generic secrets
-- Redacts with `[REDACTED:type]` before logging/committing
-- Logs when secrets detected: `[EventTaskAvailable] SECURITY: 1 leak(s) detected and redacted`
-
-**Location:** `internal/security/leak_detector.go` (69 lines)
-
-**Wired in:** `cmd/governor/main.go` line ~383
-
----
-
-## Maintenance Package (NOT WIRED)
-
-**Why not wired:**
-- Package uses `pkg/types.Task` struct
-- Entire Go codebase uses `map[string]any` for task data
-- Type mismatch makes integration impossible without refactoring
-
-**What it provides (valuable features):**
-- Risk classification (low/medium/high/critical)
-- Sandboxing for high-risk changes
-- Backup/rollback capability
-- Approval chains based on risk level
-- Config validation
-
-**Location:** `internal/maintenance/` (755 lines across 3 files)
-
-**TODO:** Refactor to use `map[string]any` instead of `pkg/types.Task`
+**Expected final main.go:** ~150 lines (entry point + wireup only)
 
 ---
 
 ## Next Priorities
 
-### HIGH PRIORITY - main.go Split
+### HIGH PRIORITY - Continue main.go Split
 
-**Current:** 2,834 lines in single file
-**Target:** <500 lines per file
+**Current:** 2,261 lines in main.go
+**Target:** <500 lines per file, main.go ~150 lines
 
-**Proposed structure:**
-```
-cmd/governor/
-├── main.go           (~100 lines - entry point, initialization)
-├── handlers/
-│   ├── task.go       (EventTaskAvailable, EventTaskCompleted)
-│   ├── plan.go       (EventPRDReady, EventPlanReview, etc.)
-│   ├── council.go    (EventCouncilReview, EventCouncilDone)
-│   ├── research.go   (EventResearchReady, EventResearchCouncil)
-│   ├── maintenance.go (EventMaintenanceCmd)
-│   └── recovery.go   (runCheckpointRecovery, runProcessingRecovery)
-└── validation.go     (task validation logic)
-```
+**Next files to create:**
+1. `handlers_task.go` - Extract task event handlers
+2. `handlers_plan.go` - Extract plan lifecycle handlers
+3. `handlers_council.go` - Extract council handlers
+4. `handlers_research.go` - Extract research handlers
+5. `handlers_maint.go` - Extract maintenance handler
+6. `handlers_testing.go` - Extract test results handler
 
 ### MEDIUM PRIORITY - Maintenance Package
 
@@ -203,7 +194,7 @@ vibepilot-governor.service (Go binary)
 ├── Event-driven task execution
 ├── Checkpoint recovery on startup
 ├── Security leak detection on task output
-├── 17 event handlers (in main.go - needs split)
+├── 17 event handlers (main.go - being extracted)
 └── 12 integration tests passing
 ```
 
@@ -230,13 +221,20 @@ vibepilot-governor.service (Go binary)
 
 ## Session History
 
+### Session 45 (2026-03-03)
+- Rolled back broken refactoring
+- Renamed destinations → connectors (architecture clarity)
+- Extracted types.go, adapters.go, recovery.go, validation.go
+- main.go: 2,834 → 2,261 lines (-573)
+- 4 clean atomic commits
+- All tests passing
+
 ### Session 44 (2026-03-03)
 - Database agnosticism (TEXT[] → JSONB)
 - Checkpoint recovery working
 - 12 integration tests
 - Security leak detection wired
 - Codebase audit complete
-- main.go split NOT STARTED (next priority)
 
 ### Session 43 (2026-03-03)
 - Core state machine wired
@@ -247,8 +245,9 @@ vibepilot-governor.service (Go binary)
 
 ## Important Notes for Next Session
 
-1. **Start with main.go split** - This is the highest priority
-2. **Maintenance package** - Needs type refactoring before wiring
+1. **Continue main.go split** - Extract handlers_task.go next
+2. **One file at a time** - Build and test after each extraction
 3. **Keep under 8k lines** - Currently ~11.5k, target 4-8k
 4. **Security is active** - LeakDetector scans all outputs
 5. **Tests are passing** - Run `go test ./cmd/governor/...` before changes
+6. **Clean commits** - Atomic commits after each file extraction
