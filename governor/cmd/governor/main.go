@@ -819,10 +819,9 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 						concerns = append(concerns, fmt.Sprintf("%s: %s", e.TaskNumber, e.Issue))
 						taskNumbers = append(taskNumbers, e.TaskNumber)
 					}
-					concernsJSON, _ := json.Marshal(concerns)
 					_, _ = database.RPC(ctx, "record_planner_revision", map[string]any{
 						"p_plan_id":                planID,
-						"p_concerns":               concernsJSON,
+						"p_concerns":               concerns,
 						"p_tasks_needing_revision": taskNumbers,
 					})
 					_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
@@ -929,10 +928,9 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 							concerns = append(concerns, fmt.Sprintf("%s: %s", e.TaskNumber, e.Issue))
 							taskNumbers = append(taskNumbers, e.TaskNumber)
 						}
-						concernsJSON, _ := json.Marshal(concerns)
 						_, _ = database.RPC(ctx, "record_planner_revision", map[string]any{
 							"p_plan_id":                planID,
-							"p_concerns":               concernsJSON,
+							"p_concerns":               concerns,
 							"p_tasks_needing_revision": taskNumbers,
 						})
 						_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
@@ -1399,12 +1397,11 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			newStatus = "blocked"
 		case "revision_needed":
 			newStatus = "revision_needed"
-			tasksJSON, _ := json.Marshal(tasksNeedingRevision)
 			_, feedbackErr := database.RPC(ctx, "record_revision_feedback", map[string]any{
 				"p_plan_id":                planID,
 				"p_source":                 "council",
 				"p_feedback":               map[string]any{"concerns": allConcerns},
-				"p_tasks_needing_revision": tasksJSON,
+				"p_tasks_needing_revision": tasksNeedingRevision,
 			})
 			if feedbackErr != nil {
 				log.Printf("[EventCouncilReview] Failed to record revision feedback: %v", feedbackErr)
