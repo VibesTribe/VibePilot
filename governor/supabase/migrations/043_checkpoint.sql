@@ -5,7 +5,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS checkpoints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE UNIQUE,
   step TEXT NOT NULL,
   progress INT NOT NULL,
   output TEXT,
@@ -15,11 +15,9 @@ CREATE TABLE IF NOT EXISTS checkpoints (
 );
 
 CREATE INDEX IF NOT EXISTS idx_checkpoints_task ON checkpoints(task_id);
-
 CREATE INDEX IF NOT EXISTS idx_checkpoints_timestamp ON checkpoints(timestamp);
 
--- Add checkpoint RPC functions
-
+-- Save or update a checkpoint for a task
 CREATE OR REPLACE FUNCTION save_checkpoint(
   p_task_id UUID,
   p_step TEXT,
@@ -29,9 +27,8 @@ CREATE OR REPLACE FUNCTION save_checkpoint(
   p_timestamp TIMESTAMPTZ
 ) RETURNS VOID AS $$
 BEGIN
-  INSERT INTO checkpoints (id, task_id, step, progress, output, files, timestamp, created_at)
+  INSERT INTO checkpoints (task_id, step, progress, output, files, timestamp, created_at)
   VALUES (
-    gen_random_uuid(),
     p_task_id,
     p_step,
     p_progress,
@@ -40,39 +37,40 @@ BEGIN
     p_timestamp,
     now()
   )
-  ON CONFLICT (id) DO UPDATE SET
-    step = p_step,
-    progress = p_progress,
-    output = p_output,
-    files = p_files,
-    timestamp = p_timestamp
-  WHERE id = p_task_id;
+  ON CONFLICT (task_id) DO UPDATE SET
+    step = EXCLUDED.step,
+    progress = EXCLUDED.progress,
+    output = EXCLUDED.output,
+    files = EXCLUDED.files,
+    timestamp = EXCLUDED.timestamp;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE Or REPLACE FUNCTION load_checkpoint(
+-- Load a checkpoint for a task
+CREATE OR REPLACE FUNCTION load_checkpoint(
   p_task_id UUID
 ) RETURNS JSONB AS $$
 DECLARE
   v_checkpoint JSONB;
 BEGIN
-  SELECT to_jsonb(v) AS v_checkpoint
-  FROM checkpoints
-  WHERE id = p_task_id;
+  SELECT to_jsonb(c) INTO v_checkpoint
+  FROM checkpoints c
+  WHERE c.task_id = p_task_id;
   
-  IF NOT found THEN
-    v_checkpoint := '{}';
-  end if;
+  IF v_checkpoint IS NULL THEN
+    RETURN '{}'::jsonb;
+  END IF;
   
   RETURN v_checkpoint;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-Create Or REPLACE FUNCTION delete_checkpoint(
+-- Delete a checkpoint for a task
+CREATE OR REPLACE FUNCTION delete_checkpoint(
   p_task_id UUID
-) RETURNS VOID AS $`
+) RETURNS VOID AS $$
 BEGIN
-  DELETE FROM checkpoints WHERE id = p_task_id;
+  DELETE FROM checkpoints WHERE task_id = p_task_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
