@@ -52,14 +52,20 @@ type VaultConfig struct {
 }
 
 type GitConfig struct {
-	Host               string   `json:"host"`
-	RepoEnv            string   `json:"repo_env"`
-	TokenEnv           string   `json:"token_env"`
-	ProtectedBranches  []string `json:"protected_branches"`
-	DefaultTimeoutSecs int      `json:"default_timeout_seconds"`
-	DefaultMergeTarget string   `json:"default_merge_target"`
-	BranchNamePattern  string   `json:"branch_name_pattern"`
-	RemoteName         string   `json:"remote_name"`
+	Host               string              `json:"host"`
+	RepoEnv            string              `json:"repo_env"`
+	TokenEnv           string              `json:"token_env"`
+	ProtectedBranches  []string            `json:"protected_branches"`
+	DefaultTimeoutSecs int                 `json:"default_timeout_seconds"`
+	DefaultMergeTarget string              `json:"default_merge_target"`
+	BranchNamePattern  string              `json:"branch_name_pattern"`
+	RemoteName         string              `json:"remote_name"`
+	BranchPrefixes     *BranchPrefixConfig `json:"branch_prefixes"`
+}
+
+type BranchPrefixConfig struct {
+	Task   string `json:"task"`
+	Module string `json:"module"`
 }
 
 type LoggingConfig struct {
@@ -606,6 +612,24 @@ func (c *Config) GetRemoteName() string {
 	return c.System.Git.RemoteName
 }
 
+func (c *Config) GetTaskBranchPrefix() string {
+	if c.System == nil || c.System.Git.BranchPrefixes == nil {
+		return "task/"
+	}
+	if c.System.Git.BranchPrefixes.Task == "" {
+		return "task/"
+	}
+	return c.System.Git.BranchPrefixes.Task
+}
+func (c *Config) GetModuleBranchPrefix() string {
+	if c.System == nil || c.System.Git.BranchPrefixes == nil {
+		return "module/"
+	}
+	if c.System.Git.BranchPrefixes.Module == "" {
+		return "module/"
+	}
+	return c.System.Git.BranchPrefixes.Module
+}
 func (c *Config) GetLoggingConfig() *LoggingConfig {
 	if c.System == nil {
 		return &LoggingConfig{
