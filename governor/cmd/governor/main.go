@@ -120,7 +120,7 @@ func main() {
 
 	go runProcessingRecovery(ctx, database, cfg)
 
-	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, destRouter, git)
+	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, destRouter, git, stateMachine, checkpointMgr)
 
 	if err := eventRouter.Start(ctx); err != nil {
 		log.Fatalf("Failed to start event router: %v", err)
@@ -221,7 +221,7 @@ func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, 
 	}
 }
 
-func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, destRouter *runtime.Router, git *gitree.Gitree) {
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, destRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager) {
 	eventsCfg := cfg.System.Events
 
 	selectDestination := func(agentID, taskID, taskType string) string {
