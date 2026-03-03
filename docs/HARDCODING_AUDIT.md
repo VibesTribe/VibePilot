@@ -117,10 +117,10 @@ targetBranch := fmt.Sprintf("%s%s", cfg.GetModuleBranchPrefix(), sliceID)
 
 ### High Priority
 
-| Issue | Location | Problem |
-|-------|----------|---------|
-| Default CLI args | runners.go:23 | Hardcoded `["run", "--format", "json"]` |
-| Default timeout values | 15+ files | Hardcoded 30s, 60s, 120s, 300s |
+| Issue | Location | Status |
+|-------|----------|--------|
+| ~~Default CLI args~~ | ~~runners.go:23~~ | ✅ Fixed - main.go uses `cfg.GetDefaultCLIArgs()` |
+| Default timeout values | 15+ files | ✅ Fixed - all use config getters |
 
 ### Medium Priority
 
@@ -155,9 +155,9 @@ targetBranch := fmt.Sprintf("%s%s", cfg.GetModuleBranchPrefix(), sliceID)
 
 ### Limits
 
-| File | Line | Hardcoded | Config Path |
-|------|------|-----------|--------------|
-| `runners.go` | 23 | `[]string{"run", "--format", "json"}` | system.json → cli.default_args |
+| File | Line | Hardcoded | Now Uses Config |
+|------|------|-----------|-----------------|
+| `main.go` | 174-176 | CLI args fallback | `cfg.GetDefaultCLIArgs()` |
 | `parallel.go` | 30 | `DefaultLimit: maxPerModule` | system.json → concurrency.default_limit |
 | `web_tools.go` | 90 | `5` | system.json → web.max_topics |
 | `web_tools.go` | 132 | `5` | system.json → web.max_related_topics |
