@@ -259,9 +259,13 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 
 		log.Printf("[EventTaskAvailable] Task %s packet loaded: prompt_len=%d category=%s", truncateID(taskID), len(taskPacket.Prompt), taskCategory)
 
-		branchName := fmt.Sprintf("task/%s", taskNumber)
+		taskPrefix := cfg.GetTaskBranchPrefix()
+		if taskPrefix == "" {
+			taskPrefix = "task/"
+		}
+		branchName := fmt.Sprintf("%s%s", taskPrefix, taskNumber)
 		if taskNumber == "" {
-			branchName = fmt.Sprintf("task/%s", truncateID(taskID))
+			branchName = fmt.Sprintf("%s%s", taskPrefix, truncateID(taskID))
 		}
 
 		if err := git.CreateBranch(ctx, branchName); err != nil {

@@ -18,112 +18,12 @@
     "default_timeout_seconds": 60,
     "default_merge_target": "main",
     "branch_name_pattern": "^[a-zA-Z0-9_/-]+$",
-    "remote_name": "origin"
-  },
-  "runtime": {
-    "max_concurrent_per_module": 1,
-    "max_concurrent_total": 1,
-    "event_poll_interval_ms": 1000,
-    "agent_timeout_seconds": 300,
-    "max_tool_turns": 10,
-    "event_query_limit": 10
-  },
-  "recovery": {
-    "heartbeat_interval_seconds": 30,
-    "orphan_threshold_seconds": 300,
-    "stuck_dependency_threshold_hours": 2,
-    "human_approval_timeout_days": 3,
-    "max_task_attempts": 3,
-    "model_failure_threshold": 3,
-    "usage_threshold_pct": 80,
-    "auto_bench_on_failures": true,
-    "auto_restore_after_cooldown": true,
-    "processing_timeout_seconds": 300,
-    "processing_recovery_interval_seconds": 10,
-    "clear_processing_on_success": true,
-    "clear_processing_on_failure": true,
-    "state_based_recovery": true,
-    "retry_on_error": true,
-    "escalate_after_max_retries": true
-  },
-  "defaults": {
-    "throttle_behavior": "slow_down",
-    "buffer_pct": 80,
-    "spacing_min_seconds": 1,
-    "cooldown_minutes": 30
-  },
-  "validation": {
-    "min_task_confidence": 0.95,
-    "require_prompt_packet": true,
-    "require_category": true,
-    "require_expected_output": true,
-    "max_revision_rounds": 6,
-    "on_max_rounds": "escalate",
-    "track_revision_history": true
-  },
-  "concurrency": {
-    "limits": {
-      "opencode": 2,
-      "kimi": 5,
-      "courier": 3,
-      "gemini-api": 10,
-      "deepseek-api": 5
+    "remote_name": "origin",
+    "branch_prefixes": {
+      "task": "task/",
+      "module": "module/"
     },
-    "default_limit": 3
+    "id_truncate_length": 8
   },
-  "security": {
-    "leak_detection_enabled": true,
-    "http_allowlist": [
-      "api.supabase.co",
-      "api.github.com",
-      "github.com",
-      "api.anthropic.com",
-      "api.openai.com",
-      "generativelanguage.googleapis.com",
-      "api.deepseek.com"
-    ]
-  },
-  "events": {
-    "task_statuses_available": ["available"],
-    "task_statuses_review": ["review"],
-    "task_statuses_completed": ["testing", "approval"],
-    "plan_statuses_draft": ["draft"],
-    "plan_statuses_review": ["review"],
-    "plan_statuses_council": ["council_review", "revision_needed"],
-    "plan_statuses_pending_human": ["pending_human"],
-    "plan_statuses_approved": ["approved"],
-    "maintenance_status": "pending",
-    "test_results_status": "pending_review"
-  },
-  "sandbox": {
-    "default_test_command": "npm test",
-    "timeout_seconds": 60,
-    "temp_dir": ""
-  },
-  "web_tools": {
-    "search_url": "https://api.duckduckgo.com/",
-    "user_agent": "Mozilla/5.0 (compatible; VibePilot/2.0)",
-    "max_fetch_length": 10000,
-    "max_related_topics": 5,
-    "timeout_seconds": 30
-  },
-  "prd_watcher": {
-    "enabled": true,
-    "repo_path": "/home/mjlockboxsocial/vibepilot",
-    "branch": "main",
-    "directory": "docs/prd",
-    "interval_seconds": 10
-  },
-  "logging": {
-    "max_output_length": 5000,
-    "max_id_display": 8,
-    "log_state_transitions": true,
-    "log_performance_metrics": true
-  },
-  "performance": {
-    "target_prd_to_plan_seconds": 30,
-    "target_plan_to_tasks_seconds": 10,
-    "target_task_start_seconds": 5,
-    "target_total_flow_seconds": 120
-  }
+}
 }
