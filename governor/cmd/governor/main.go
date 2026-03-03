@@ -171,7 +171,11 @@ func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, 
 			if dest.TimeoutSeconds > 0 {
 				timeout = dest.TimeoutSeconds
 			}
-			runner := destinations.NewCLIRunnerWithArgs(dest.Command, dest.CLIArgs, timeout)
+			cliArgs := dest.CLIArgs
+			if len(cliArgs) == 0 {
+				cliArgs = cfg.GetDefaultCLIArgs()
+			}
+			runner := destinations.NewCLIRunnerWithArgs(dest.Command, cliArgs, timeout)
 			factory.RegisterDestination(dest.ID, runner)
 			log.Printf("Registered CLI destination: %s (%s)", dest.ID, dest.Command)
 		case "api":
