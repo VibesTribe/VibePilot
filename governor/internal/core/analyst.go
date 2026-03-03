@@ -105,7 +105,7 @@ func (a *Analyst) generateImprovementSuggestions(patterns []Pattern) []Improveme
 		if pattern.Count >= 3 {
 			suggestions = append(suggestions, ImprovementSuggestion{
 				Type:        "config_change",
-				Description: fmt.Sprintf("High failure rate for %s (%d occurrences). Consider: %s", pattern.Type, pattern.Count),
+				Description: fmt.Sprintf("High failure rate for %s (%d occurrences). Review config and routing", pattern.Type, pattern.Count),
 				Priority:    1,
 				Status:      "pending",
 			})

@@ -21,6 +21,7 @@ import (
 	"github.com/vibepilot/governor/internal/destinations"
 	"github.com/vibepilot/governor/internal/gitree"
 	"github.com/vibepilot/governor/internal/runtime"
+	"github.com/vibepilot/governor/internal/security"
 	"github.com/vibepilot/governor/internal/tools"
 	"github.com/vibepilot/governor/internal/vault"
 )
@@ -66,6 +67,13 @@ func main() {
 	})
 
 	v := vault.New(database)
+
+	leakDetector := security.NewLeakDetector()
+
+	// TODO: Wire in maintenance package after type refactoring
+	// The maintenance package uses pkg/types.Task which doesn't match map[string]any
+	// used throughout the Go rewrite. Needs refactoring to use map[string]any.
+	// _ = maintenance.New(&maintenance.Config{...}, database, git)
 
 	toolRegistry := runtime.NewToolRegistry(cfg)
 	tools.RegisterAll(toolRegistry, &tools.Dependencies{
@@ -121,7 +129,7 @@ func main() {
 
 	go runProcessingRecovery(ctx, database, cfg)
 
-	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, destRouter, git, stateMachine, checkpointMgr)
+	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, destRouter, git, stateMachine, checkpointMgr, leakDetector)
 
 	if err := eventRouter.Start(ctx); err != nil {
 		log.Fatalf("Failed to start event router: %v", err)
@@ -222,7 +230,7 @@ func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, 
 	}
 }
 
-func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, destRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager) {
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, destRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector) {
 	eventsCfg := cfg.System.Events
 
 	selectDestination := func(agentID, taskID, taskType string) string {
@@ -377,8 +385,13 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 				return err
 			}
 
+			cleanOutput, leaks := leakDetector.Scan(result.Output)
+			if len(leaks) > 0 {
+				log.Printf("[EventTaskAvailable] SECURITY: %d leak(s) detected and redacted in task %s output", len(leaks), truncateID(taskID))
+			}
+
 			runnerOutput := map[string]any{
-				"raw_output": result.Output,
+				"raw_output": cleanOutput,
 				"model_id":   "unknown",
 				"task_id":    taskID,
 				"duration":   result.Duration.Seconds(),
