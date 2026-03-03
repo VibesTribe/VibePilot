@@ -170,13 +170,13 @@ type PRDWatcherSystemConfig struct {
 }
 
 type AgentConfig struct {
-	ID                 string   `json:"id"`
-	Name               string   `json:"name,omitempty"`
-	Prompt             string   `json:"prompt"`
-	Capabilities       []string `json:"capabilities,omitempty"`
-	Model              string   `json:"model,omitempty"`
-	DefaultDestination string   `json:"default_destination"`
-	Description        string   `json:"description,omitempty"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name,omitempty"`
+	Prompt           string   `json:"prompt"`
+	Capabilities     []string `json:"capabilities,omitempty"`
+	Model            string   `json:"model,omitempty"`
+	DefaultConnector string   `json:"default_connector"`
+	Description      string   `json:"description,omitempty"`
 }
 
 func (a *AgentConfig) HasCapability(capability string) bool {
@@ -218,7 +218,7 @@ type ToolsFile struct {
 	Tools map[string]ToolConfig `json:"tools"`
 }
 
-type DestinationConfig struct {
+type ConnectorConfig struct {
 	ID             string                 `json:"id"`
 	Name           string                 `json:"name"`
 	Type           string                 `json:"type"`
@@ -233,8 +233,8 @@ type DestinationConfig struct {
 	Extra          map[string]interface{} `json:"-"`
 }
 
-type DestinationsFile struct {
-	Destinations []DestinationConfig `json:"destinations"`
+type ConnectorsFile struct {
+	Connectors []ConnectorConfig `json:"destinations"`
 }
 
 type ModelConfig struct {
@@ -340,7 +340,7 @@ type Config struct {
 	System        *SystemConfig
 	Agents        *AgentsFile
 	Tools         *ToolsFile
-	Destinations  *DestinationsFile
+	Connectors    *ConnectorsFile
 	Models        *ModelsFile
 	Routing       *RoutingConfig
 	PlanLifecycle *PlanLifecycleConfig
@@ -348,7 +348,7 @@ type Config struct {
 	systemPath        string
 	agentsPath        string
 	toolsPath         string
-	destinationsPath  string
+	connectorsPath    string
 	modelsPath        string
 	routingPath       string
 	planLifecyclePath string
@@ -362,7 +362,7 @@ func LoadConfig(configDir string) (*Config, error) {
 		systemPath:        filepath.Join(configDir, "system.json"),
 		agentsPath:        filepath.Join(configDir, "agents.json"),
 		toolsPath:         filepath.Join(configDir, "tools.json"),
-		destinationsPath:  filepath.Join(configDir, "destinations.json"),
+		connectorsPath:    filepath.Join(configDir, "connectors.json"),
 		modelsPath:        filepath.Join(configDir, "models.json"),
 		routingPath:       filepath.Join(configDir, "routing.json"),
 		planLifecyclePath: filepath.Join(configDir, "plan_lifecycle.json"),
@@ -398,10 +398,10 @@ func (c *Config) Reload() error {
 		return fmt.Errorf("load tools.json: %w", err)
 	}
 
-	if dests, err := loadJSON[DestinationsFile](c.destinationsPath); err == nil {
-		c.Destinations = dests
+	if conns, err := loadJSON[ConnectorsFile](c.connectorsPath); err == nil {
+		c.Connectors = conns
 	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("load destinations.json: %w", err)
+		return fmt.Errorf("load connectors.json: %w", err)
 	}
 
 	if models, err := loadJSON[ModelsFile](c.modelsPath); err == nil {
@@ -526,16 +526,16 @@ func (c *Config) GetTool(name string) *ToolConfig {
 	return &tool
 }
 
-func (c *Config) GetDestination(id string) *DestinationConfig {
+func (c *Config) GetConnector(id string) *ConnectorConfig {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if c.Destinations == nil {
+	if c.Connectors == nil {
 		return nil
 	}
-	for i := range c.Destinations.Destinations {
-		if c.Destinations.Destinations[i].ID == id {
-			return &c.Destinations.Destinations[i]
+	for i := range c.Connectors.Connectors {
+		if c.Connectors.Connectors[i].ID == id {
+			return &c.Connectors.Connectors[i]
 		}
 	}
 	return nil
@@ -876,13 +876,13 @@ func (c *Config) GetStrategyPriority(strategyName string) []string {
 	return strategy.Priority
 }
 
-func (c *Config) GetDestinationCategory(destID string) string {
-	if c.Routing == nil || c.Destinations == nil {
+func (c *Config) GetConnectorCategory(connID string) string {
+	if c.Routing == nil || c.Connectors == nil {
 		return "internal"
 	}
 
-	dest := c.GetDestination(destID)
-	if dest == nil {
+	conn := c.GetConnector(connID)
+	if conn == nil {
 		return "internal"
 	}
 
@@ -893,9 +893,9 @@ func (c *Config) GetDestinationCategory(destID string) string {
 		var fieldValue string
 		switch checkField {
 		case "type":
-			fieldValue = dest.Type
+			fieldValue = conn.Type
 		case "status":
-			fieldValue = dest.Status
+			fieldValue = conn.Status
 		}
 
 		for _, v := range checkValues {
@@ -908,15 +908,15 @@ func (c *Config) GetDestinationCategory(destID string) string {
 	return "internal"
 }
 
-func (c *Config) GetDestinationsInCategory(category string) []DestinationConfig {
-	if c.Destinations == nil {
+func (c *Config) GetConnectorsInCategory(category string) []ConnectorConfig {
+	if c.Connectors == nil {
 		return nil
 	}
 
-	var result []DestinationConfig
-	for _, dest := range c.Destinations.Destinations {
-		if c.GetDestinationCategory(dest.ID) == category && dest.Status == "active" {
-			result = append(result, dest)
+	var result []ConnectorConfig
+	for _, conn := range c.Connectors.Connectors {
+		if c.GetConnectorCategory(conn.ID) == category && conn.Status == "active" {
+			result = append(result, conn)
 		}
 	}
 	return result

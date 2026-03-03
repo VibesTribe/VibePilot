@@ -1,4 +1,4 @@
-package destinations
+package connectors
 
 import (
 	"bufio"
@@ -161,25 +161,25 @@ func NewAPIRunner(cfg *APIRunnerConfig) *APIRunner {
 	}
 }
 
-func NewAPIRunnerFromConfig(dest runtime.DestinationConfig, secrets SecretProvider) *APIRunner {
+func NewAPIRunnerFromConfig(conn runtime.ConnectorConfig, secrets SecretProvider) *APIRunner {
 	model := ""
-	if len(dest.Models) > 0 {
-		model = dest.Models[0]
+	if len(conn.Models) > 0 {
+		model = conn.Models[0]
 	}
 
-	provider := dest.Provider
+	provider := conn.Provider
 	if provider == "" {
-		provider = detectProvider(dest.Endpoint)
+		provider = detectProvider(conn.Endpoint)
 	}
 
 	timeoutSecs := DefaultTimeoutSecs
-	if dest.TimeoutSeconds > 0 {
-		timeoutSecs = dest.TimeoutSeconds
+	if conn.TimeoutSeconds > 0 {
+		timeoutSecs = conn.TimeoutSeconds
 	}
 
 	return NewAPIRunner(&APIRunnerConfig{
-		Endpoint:       dest.Endpoint,
-		APIKeyRef:      dest.APIKeyRef,
+		Endpoint:       conn.Endpoint,
+		APIKeyRef:      conn.APIKeyRef,
 		Model:          model,
 		Provider:       provider,
 		TimeoutSeconds: timeoutSecs,

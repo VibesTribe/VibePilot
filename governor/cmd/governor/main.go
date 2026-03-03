@@ -16,9 +16,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vibepilot/governor/internal/connectors"
 	"github.com/vibepilot/governor/internal/core"
 	"github.com/vibepilot/governor/internal/db"
-	"github.com/vibepilot/governor/internal/destinations"
 	"github.com/vibepilot/governor/internal/gitree"
 	"github.com/vibepilot/governor/internal/runtime"
 	"github.com/vibepilot/governor/internal/security"
@@ -115,7 +115,7 @@ func main() {
 
 	watcher.SetConfig(cfg)
 
-	destRouter := runtime.NewRouter(cfg, database)
+	connRouter := runtime.NewRouter(cfg, database)
 	eventRouter := runtime.NewEventRouter(watcher)
 
 	prdWatcher := runtime.NewPRDWatcher(database, runtime.PRDWatcherConfig{
@@ -129,7 +129,7 @@ func main() {
 
 	go runProcessingRecovery(ctx, database, cfg)
 
-	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, destRouter, git, stateMachine, checkpointMgr, leakDetector)
+	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector)
 
 	if err := eventRouter.Start(ctx); err != nil {
 		log.Fatalf("Failed to start event router: %v", err)
@@ -193,15 +193,15 @@ func (a *dbCheckpointAdapter) Delete(ctx context.Context, taskID string) error {
 }
 
 func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault) {
-	destinationsCfg := cfg.Destinations
+	destinationsCfg := cfg.Connectors
 	if destinationsCfg == nil {
 		log.Println("Warning: no destinations configured")
 		return
 	}
 
-	secretProvider := destinations.NewVaultAdapter(v)
+	secretProvider := connectors.NewVaultAdapter(v)
 
-	for _, dest := range destinationsCfg.Destinations {
+	for _, dest := range destinationsCfg.Connectors {
 		if dest.Status != "active" {
 			log.Printf("Skipping inactive destination: %s", dest.ID)
 			continue
@@ -217,12 +217,12 @@ func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, 
 			if len(cliArgs) == 0 {
 				cliArgs = cfg.GetDefaultCLIArgs()
 			}
-			runner := destinations.NewCLIRunnerWithArgs(dest.Command, cliArgs, timeout)
-			factory.RegisterDestination(dest.ID, runner)
+			runner := connectors.NewCLIRunnerWithArgs(dest.Command, cliArgs, timeout)
+			factory.RegisterConnector(dest.ID, runner)
 			log.Printf("Registered CLI destination: %s (%s)", dest.ID, dest.Command)
 		case "api":
-			runner := destinations.NewAPIRunnerFromConfig(dest, secretProvider)
-			factory.RegisterDestination(dest.ID, runner)
+			runner := connectors.NewAPIRunnerFromConfig(dest, secretProvider)
+			factory.RegisterConnector(dest.ID, runner)
 			log.Printf("Registered API destination: %s (%s)", dest.ID, dest.Endpoint)
 		default:
 			log.Printf("Unknown destination type: %s for %s", dest.Type, dest.ID)
@@ -230,18 +230,18 @@ func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, 
 	}
 }
 
-func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, destRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector) {
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector) {
 	eventsCfg := cfg.System.Events
 
 	selectDestination := func(agentID, taskID, taskType string) string {
-		result, err := destRouter.SelectDestination(ctx, runtime.RoutingRequest{
+		result, err := connRouter.SelectDestination(ctx, runtime.RoutingRequest{
 			AgentID:  agentID,
 			TaskID:   taskID,
 			TaskType: taskType,
 		})
 		if err != nil || result == nil {
 			log.Printf("[Router] No destination available for agent %s, using fallback", agentID)
-			dests := destRouter.GetAvailableDestinations()
+			dests := connRouter.GetAvailableConnectors()
 			if len(dests) > 0 {
 				return dests[0]
 			}
@@ -1258,10 +1258,10 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		councilMode := "sequential_same_model_different_hats"
 		councilModels := []map[string]any{}
 
-		availableDests := destRouter.GetAvailableDestinations()
+		availableDests := connRouter.GetAvailableConnectors()
 		internalDests := 0
 		for _, d := range availableDests {
-			category := cfg.GetDestinationCategory(d)
+			category := cfg.GetConnectorCategory(d)
 			if category == "internal" {
 				internalDests++
 			}
@@ -1681,10 +1681,10 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		}
 
 		councilMode := "sequential_same_model"
-		availableDests := destRouter.GetAvailableDestinations()
+		availableDests := connRouter.GetAvailableConnectors()
 		internalDests := 0
 		for _, d := range availableDests {
-			category := cfg.GetDestinationCategory(d)
+			category := cfg.GetConnectorCategory(d)
 			if category == "internal" {
 				internalDests++
 			}
