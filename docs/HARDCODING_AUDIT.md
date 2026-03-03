@@ -124,11 +124,22 @@ targetBranch := fmt.Sprintf("%s%s", cfg.GetModuleBranchPrefix(), sliceID)
 
 ### Medium Priority
 
-| Issue | Location | Problem |
-|-------|----------|---------|
-| Status strings | main.go (10+ places) | Hardcoded "in_progress", "review", etc. |
-| HTTP timeouts | registry.go, web_tools.go | Hardcoded 30s |
-| Sandbox timeouts | sandbox_tools.go | Hardcoded 60s, 120s |
+| Issue | Location | Status |
+|-------|----------|--------|
+| ~~Status strings~~ | main.go (53 places) | ⏭️ Skipped - domain constants, not config (see below) |
+| HTTP timeouts | registry.go, web_tools.go | ✅ Fixed in Batch 1 |
+| Sandbox timeouts | sandbox_tools.go | ✅ Fixed in Batch 1 |
+
+**Note on Status Strings:**
+
+Status strings like `"draft"`, `"review"`, `"approved"` are **domain constants**, not runtime configuration. Changing them requires:
+- DB migration (plans.status, tasks.status columns)
+- RPC function updates (update_task_status, record_failure, etc.)
+- Event handler query updates
+- plan_lifecycle.json state machine updates
+- Risk of breaking in-flight records
+
+Making them "configurable" creates dangerous illusion. Better to document in `internal/constants/statuses.go` if desired, but not a hardcoding problem.
 
 ### Low Priority
 
