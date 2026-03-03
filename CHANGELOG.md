@@ -5,7 +5,79 @@
 
 ---
 
-# 2026-03-03 (Session 43 - Core Wiring Phase 5)
+# 2026-03-03 (Session 45 - Architecture Refactoring)
+
+## What We Did:
+
+### Phase 1: Rollback
+1. ✅ Deleted broken handler files from previous session
+2. ✅ Restored main.go to working state (2,834 lines)
+3. ✅ Verified all 12 tests passing
+
+### Phase 2: Package Rename (destinations → connectors)
+1. ✅ Renamed `internal/destinations/` to `internal/connectors/`
+2. ✅ Renamed `DestinationConfig` → `ConnectorConfig`
+3. ✅ Renamed `DestinationRunner` → `ConnectorRunner`
+4. ✅ Updated all imports and references across codebase
+5. ✅ Renamed `registerDestinations` → `registerConnectors`
+
+**Why:** Clarified architecture - connectors = HOW to connect to models, destinations = WHERE couriers go (web AI platforms)
+
+### Phase 3: Handler Extraction (IN PROGRESS)
+1. ✅ Created `types.go` (41 lines) - RecoveryConfig, TaskData, ValidationError types
+2. ✅ Created `adapters.go` (36 lines) - dbCheckpointAdapter
+3. ✅ Created `recovery.go` (255 lines) - All recovery functions
+4. ✅ Created `validation.go` (276 lines) - Task validation, plan parsing
+5. ⬜ Handler files (task, plan, council, etc.) - NOT STARTED (next session)
+
+## Commits (4 total):
+1. `79783e8e` - refactor: rename destinations package to connectors
+2. `2bbdbab6` - refactor: extract types.go and adapters.go from main.go
+3. `d2c71361` - refactor: extract recovery.go from main.go
+4. `3038c9b5` - refactor: extract validation.go from main.go
+
+## Files Changed:
+- `governor/internal/destinations/` → `governor/internal/connectors/` (package renamed)
+- `governor/internal/runtime/config.go` - ConnectorConfig, GetConnector methods
+- `governor/internal/runtime/session.go` - ConnectorRunner, RegisterConnector
+- `governor/internal/runtime/router.go` - GetAvailableConnectors, GetConnectorCategory
+- `governor/cmd/governor/main.go` - Reduced from 2,834 to 2,261 lines (-573)
+- `governor/cmd/governor/types.go` - NEW (41 lines)
+- `governor/cmd/governor/adapters.go` - NEW (36 lines)
+- `governor/cmd/governor/recovery.go` - NEW (255 lines)
+- `governor/cmd/governor/validation.go` - NEW (276 lines)
+
+## Metrics:
+- **main.go:** 2,834 → 2,261 lines (-573 lines, 20% reduction)
+- **Files created:** 4 new modular files
+- **Tests:** All 12 integration tests passing
+- **Commits:** 4 atomic, well-documented commits
+
+## Next Steps:
+1. Extract `handlers_task.go` (EventTaskAvailable, EventTaskReview, EventTaskCompleted)
+2. Extract `handlers_plan.go` (Plan lifecycle events)
+3. Extract `handlers_council.go` (Council events)
+4. Extract `handlers_research.go` (Research events)
+5. Extract `handlers_maint.go` (Maintenance commands)
+6. Extract `handlers_testing.go` (Test results)
+7. Final main.go should be ~150 lines (entry point only)
+
+## Architecture Clarification:
+
+| Term | Definition | Example |
+|------|------------|---------|
+| **Connector** | HOW we connect to a model | CLI (opencode), API (OpenAI, Anthropic) |
+| **Destination** | WHERE couriers go (web AI platforms) | deepseek.com, chatgpt.com, claude.ai |
+
+**Internal agents** (planner, supervisor, task_runner, council):
+- Need: Model + Connector (no "destination")
+
+**Courier agents**:
+- Need: Model + Connector + Destination (web platform URL passed as parameter)
+
+---
+
+# 2026-03-03 (Session 44 - Database Agnosticism & Security)
 
 ## What We Did:
 1. ✅ Core config structure added to SystemConfig
