@@ -12,17 +12,17 @@ const (
 	DefaultSessionTimeoutSecs = 300
 )
 
-type DestinationRunner interface {
+type ConnectorRunner interface {
 	Run(ctx context.Context, prompt string, timeout int) (output string, tokensIn, tokensOut int, err error)
 }
 
 type Session struct {
-	ID            string
-	AgentID       string
-	destination   DestinationRunner
-	destinationID string
-	prompt        string
-	timeout       time.Duration
+	ID          string
+	AgentID     string
+	connector   ConnectorRunner
+	connectorID string
+	prompt      string
+	timeout     time.Duration
 }
 
 type SessionOption func(*Session)
@@ -31,14 +31,14 @@ func WithTimeout(d time.Duration) SessionOption {
 	return func(s *Session) { s.timeout = d }
 }
 
-func NewSession(id, agentID string, dest DestinationRunner, destID, prompt string, opts ...SessionOption) *Session {
+func NewSession(id, agentID string, conn ConnectorRunner, connID, prompt string, opts ...SessionOption) *Session {
 	s := &Session{
-		ID:            id,
-		AgentID:       agentID,
-		destination:   dest,
-		destinationID: destID,
-		prompt:        prompt,
-		timeout:       time.Duration(DefaultSessionTimeoutSecs) * time.Second,
+		ID:          id,
+		AgentID:     agentID,
+		connector:   conn,
+		connectorID: connID,
+		prompt:      prompt,
+		timeout:     time.Duration(DefaultSessionTimeoutSecs) * time.Second,
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -47,12 +47,12 @@ func NewSession(id, agentID string, dest DestinationRunner, destID, prompt strin
 }
 
 type SessionResult struct {
-	Output        string        `json:"output"`
-	TokensIn      int           `json:"tokens_in"`
-	TokensOut     int           `json:"tokens_out"`
-	Duration      time.Duration `json:"duration"`
-	DestinationID string        `json:"destination_id"`
-	AgentID       string        `json:"agent_id"`
+	Output      string        `json:"output"`
+	TokensIn    int           `json:"tokens_in"`
+	TokensOut   int           `json:"tokens_out"`
+	Duration    time.Duration `json:"duration"`
+	ConnectorID string        `json:"connector_id"`
+	AgentID     string        `json:"agent_id"`
 }
 
 func (s *Session) Run(ctx context.Context, input map[string]any) (*SessionResult, error) {
@@ -72,31 +72,31 @@ func (s *Session) Run(ctx context.Context, input map[string]any) (*SessionResult
 		prompt.WriteString("\n")
 	}
 
-	output, tokensIn, tokensOut, err := s.destination.Run(ctx, prompt.String(), int(s.timeout.Seconds()))
+	output, tokensIn, tokensOut, err := s.connector.Run(ctx, prompt.String(), int(s.timeout.Seconds()))
 	if err != nil {
 		return nil, fmt.Errorf("session run failed: %w", err)
 	}
 
 	return &SessionResult{
-		Output:        output,
-		TokensIn:      tokensIn,
-		TokensOut:     tokensOut,
-		Duration:      time.Since(start),
-		DestinationID: s.destinationID,
-		AgentID:       s.AgentID,
+		Output:      output,
+		TokensIn:    tokensIn,
+		TokensOut:   tokensOut,
+		Duration:    time.Since(start),
+		ConnectorID: s.connectorID,
+		AgentID:     s.AgentID,
 	}, nil
 }
 
 type SessionFactory struct {
 	config         *Config
-	destinations   map[string]DestinationRunner
+	connectors     map[string]ConnectorRunner
 	contextBuilder *ContextBuilder
 }
 
 func NewSessionFactory(cfg *Config) *SessionFactory {
 	return &SessionFactory{
-		config:       cfg,
-		destinations: make(map[string]DestinationRunner),
+		config:     cfg,
+		connectors: make(map[string]ConnectorRunner),
 	}
 }
 
@@ -104,17 +104,17 @@ func (f *SessionFactory) SetContextBuilder(cb *ContextBuilder) {
 	f.contextBuilder = cb
 }
 
-func (f *SessionFactory) RegisterDestination(id string, runner DestinationRunner) {
-	f.destinations[id] = runner
+func (f *SessionFactory) RegisterConnector(id string, runner ConnectorRunner) {
+	f.connectors[id] = runner
 }
 
-func (f *SessionFactory) GetDestination(id string) (DestinationRunner, bool) {
-	runner, ok := f.destinations[id]
+func (f *SessionFactory) GetConnector(id string) (ConnectorRunner, bool) {
+	runner, ok := f.connectors[id]
 	return runner, ok
 }
 
-func (f *SessionFactory) GetDestinationConfig(id string) *DestinationConfig {
-	return f.config.GetDestination(id)
+func (f *SessionFactory) GetConnectorConfig(id string) *ConnectorConfig {
+	return f.config.GetConnector(id)
 }
 
 func (f *SessionFactory) Create(agentID string, opts ...SessionOption) (*Session, error) {
@@ -128,10 +128,10 @@ func (f *SessionFactory) Create(agentID string, opts ...SessionOption) (*Session
 		return nil, fmt.Errorf("load prompt: %w", err)
 	}
 
-	destID := agent.DefaultDestination
-	dest, ok := f.destinations[destID]
+	connID := agent.DefaultConnector
+	conn, ok := f.connectors[connID]
 	if !ok {
-		return nil, fmt.Errorf("destination %s not registered", destID)
+		return nil, fmt.Errorf("connector %s not registered", connID)
 	}
 
 	sessionID := fmt.Sprintf("%s-%d", agentID, time.Now().UnixNano())
@@ -141,7 +141,7 @@ func (f *SessionFactory) Create(agentID string, opts ...SessionOption) (*Session
 	}
 	cfgOpts = append(cfgOpts, opts...)
 
-	return NewSession(sessionID, agentID, dest, destID, prompt, cfgOpts...), nil
+	return NewSession(sessionID, agentID, conn, connID, prompt, cfgOpts...), nil
 }
 
 func (f *SessionFactory) CreateWithContext(ctx context.Context, agentID string, taskType string, opts ...SessionOption) (*Session, error) {
@@ -168,10 +168,10 @@ func (f *SessionFactory) CreateWithContext(ctx context.Context, agentID string, 
 		}
 	}
 
-	destID := agent.DefaultDestination
-	dest, ok := f.destinations[destID]
+	connID := agent.DefaultConnector
+	conn, ok := f.connectors[connID]
 	if !ok {
-		return nil, fmt.Errorf("destination %s not registered", destID)
+		return nil, fmt.Errorf("connector %s not registered", connID)
 	}
 
 	sessionID := fmt.Sprintf("%s-%d", agentID, time.Now().UnixNano())
@@ -181,5 +181,5 @@ func (f *SessionFactory) CreateWithContext(ctx context.Context, agentID string, 
 	}
 	cfgOpts = append(cfgOpts, opts...)
 
-	return NewSession(sessionID, agentID, dest, destID, prompt, cfgOpts...), nil
+	return NewSession(sessionID, agentID, conn, connID, prompt, cfgOpts...), nil
 }

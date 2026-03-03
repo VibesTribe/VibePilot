@@ -43,21 +43,21 @@ func (r *Router) SelectDestination(ctx context.Context, req RoutingRequest) (*Ro
 	log.Printf("[Router] Agent %s using strategy %s with priority %v", req.AgentID, strategy, priority)
 
 	for _, category := range priority {
-		dests := r.cfg.GetDestinationsInCategory(category)
-		if len(dests) == 0 {
-			log.Printf("[Router] No active destinations in category %s, trying next", category)
+		conns := r.cfg.GetConnectorsInCategory(category)
+		if len(conns) == 0 {
+			log.Printf("[Router] No active connectors in category %s, trying next", category)
 			continue
 		}
 
-		for _, dest := range dests {
-			if r.isDestinationAvailable(ctx, dest.ID) {
-				modelID := r.selectModelForDestination(ctx, dest.ID, req.TaskType)
+		for _, conn := range conns {
+			if r.isConnectorAvailable(ctx, conn.ID) {
+				modelID := r.selectModelForConnector(ctx, conn.ID, req.TaskType)
 
-				log.Printf("[Router] Selected destination %s (category: %s, model: %s)",
-					dest.ID, category, modelID)
+				log.Printf("[Router] Selected connector %s (category: %s, model: %s)",
+					conn.ID, category, modelID)
 
 				return &RoutingResult{
-					DestinationID: dest.ID,
+					DestinationID: conn.ID,
 					ModelID:       modelID,
 					Category:      category,
 					Strategy:      strategy,
@@ -67,29 +67,29 @@ func (r *Router) SelectDestination(ctx context.Context, req RoutingRequest) (*Ro
 		}
 	}
 
-	log.Printf("[Router] No available destination for agent %s task %s", req.AgentID, req.TaskID)
+	log.Printf("[Router] No available connector for agent %s task %s", req.AgentID, req.TaskID)
 	return nil, nil
 }
 
-func (r *Router) isDestinationAvailable(ctx context.Context, destID string) bool {
-	dest := r.cfg.GetDestination(destID)
-	if dest == nil {
+func (r *Router) isConnectorAvailable(ctx context.Context, connID string) bool {
+	conn := r.cfg.GetConnector(connID)
+	if conn == nil {
 		return false
 	}
 
-	if dest.Status != "active" {
+	if conn.Status != "active" {
 		return false
 	}
 
-	if dest.Type != "cli" && dest.Type != "api" {
-		log.Printf("[Router] Skipping non-executable destination type: %s for %s", dest.Type, destID)
+	if conn.Type != "cli" && conn.Type != "api" {
+		log.Printf("[Router] Skipping non-executable connector type: %s for %s", conn.Type, connID)
 		return false
 	}
 
 	return true
 }
 
-func (r *Router) selectModelForDestination(ctx context.Context, destID string, taskType string) string {
+func (r *Router) selectModelForConnector(ctx context.Context, connID string, taskType string) string {
 	if r.cfg.Models == nil {
 		return ""
 	}
@@ -98,8 +98,8 @@ func (r *Router) selectModelForDestination(ctx context.Context, destID string, t
 	var bestScore float64 = -1
 
 	for _, model := range r.cfg.Models.Models {
-		for _, accessDest := range model.AccessVia {
-			if accessDest == destID && model.Status == "active" {
+		for _, accessConn := range model.AccessVia {
+			if accessConn == connID && model.Status == "active" {
 				score := r.getModelScore(ctx, model.ID, taskType)
 				if score > bestScore {
 					bestScore = score
@@ -136,15 +136,15 @@ func (r *Router) getModelScore(ctx context.Context, modelID string, taskType str
 	return score
 }
 
-func (r *Router) GetAvailableDestinations() []string {
-	if r.cfg.Destinations == nil {
+func (r *Router) GetAvailableConnectors() []string {
+	if r.cfg.Connectors == nil {
 		return nil
 	}
 
 	var result []string
-	for _, dest := range r.cfg.Destinations.Destinations {
-		if dest.Status == "active" {
-			result = append(result, dest.ID)
+	for _, conn := range r.cfg.Connectors.Connectors {
+		if conn.Status == "active" {
+			result = append(result, conn.ID)
 		}
 	}
 	return result
