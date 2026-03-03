@@ -5,16 +5,25 @@
 
 ---
 
-# 2026-03-03 (Session 41 - Core Rebuild Phase 1-4)
-## Hardcoding Audit Complete
-- Fixed 50+ hardcoded values across 5 batches
-- Timeouts → config getters
-- CLI args → `GetDefaultCLIArgs()`
-- Branch prefixes → configurable via system.json
-- Status strings → documented as domain constants (skipped)
-- URLs → low priority (skipped)
+# 2026-03-03 (Session 43 - Core Wiring Phase 5)
 
-## Core Rebuild Phase 1-4 Completed
+## What We Did:
+1. ✅ Core config structure added to SystemConfig
+2. ✅ Helper functions created (no stubs, full implementations)
+3. ✅ EventTaskAvailable updated with checkpointing
+4. ✅ Migration 057 created (task_checkpoints table + RPCs)
+5. ✅ Committed and pushed to GitHub
+
+## Files Changed:
+- `governor/config/system.json` - Core config
+- `governor/internal/runtime/config.go` - CoreConfig struct + getters
+- `governor/cmd/governor/main.go` - Helper functions
+- `docs/supabase-schema/057_task_checkpoints.sql` - New migration
+
+## Next Steps:
+1. Run migration 057 in Supabase (copy from GitHub file below)
+2. Test with a simple task flow
+3. Monitor checkpoint creation in logs## Core Rebuild Phase 1-4 Completed
 - **Phase 1:** State machine (`internal/core/state.go`)
 - **Phase 2:** Checkpoint manager (`internal/core/checkpoint.go`)
 - **Phase 3:** Test runner (`internal/core/test_runner.go`)
