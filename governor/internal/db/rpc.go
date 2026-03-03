@@ -74,6 +74,12 @@ var defaultRPCAllowlist = map[string]bool{
 	"get_event_checkpoint":    true,
 	"update_event_checkpoint": true,
 
+	// Task checkpoints (migration 057)
+	"save_checkpoint":             true,
+	"load_checkpoint":             true,
+	"delete_checkpoint":           true,
+	"find_tasks_with_checkpoints": true,
+
 	// Heuristics
 	"get_heuristic":           true,
 	"upsert_heuristic":        true,
