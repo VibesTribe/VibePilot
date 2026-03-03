@@ -103,6 +103,7 @@ func main() {
 
 	recoveryCfg := getRecoveryConfig(cfg)
 	runStartupRecovery(ctx, database, recoveryCfg)
+	runCheckpointRecovery(ctx, database, cfg, checkpointMgr)
 
 	watcher.SetConfig(cfg)
 
@@ -336,6 +337,21 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			return
 		}
 
+		if cfg.GetCoreConfig().IsCheckpointEnabled() {
+			_, err := database.RPC(ctx, "save_checkpoint", map[string]any{
+				"p_task_id":  taskID,
+				"p_step":     "execution",
+				"p_progress": 0,
+				"p_output":   "",
+				"p_files":    []string{},
+			})
+			if err != nil {
+				log.Printf("[EventTaskAvailable] Warning: Failed to save initial checkpoint: %v", err)
+			} else {
+				log.Printf("[EventTaskAvailable] Checkpoint saved for task %s", truncateID(taskID))
+			}
+		}
+
 		err = pool.SubmitWithDestination(ctx, sliceID, destID, func() error {
 			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
 
@@ -390,6 +406,15 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			})
 			if err != nil {
 				log.Printf("[EventTaskAvailable] Failed to update status to review: %v", err)
+			}
+
+			if cfg.GetCoreConfig().IsCheckpointEnabled() {
+				_, delErr := database.RPC(ctx, "delete_checkpoint", map[string]any{
+					"p_task_id": taskID,
+				})
+				if delErr != nil {
+					log.Printf("[EventTaskAvailable] Warning: Failed to delete checkpoint: %v", delErr)
+				}
 			}
 
 			log.Printf("[EventTaskAvailable] Task %s output committed, status=review", truncateID(taskID))
@@ -2410,6 +2435,96 @@ func recoverStaleProcessing(ctx context.Context, database *db.DB, table string, 
 	}
 
 	log.Printf("[ProcessingRecovery] Recovered %d stale %s", len(staleItems), table)
+}
+
+func runCheckpointRecovery(ctx context.Context, database *db.DB, cfg *runtime.Config, checkpointMgr *core.CheckpointManager) {
+	coreCfg := cfg.GetCoreConfig()
+	if !coreCfg.IsRecoveryEnabled() {
+		log.Println("[CheckpointRecovery] Recovery disabled, skipping")
+		return
+	}
+
+	log.Println("[CheckpointRecovery] Checking for tasks with checkpoints...")
+
+	result, err := database.RPC(ctx, "find_tasks_with_checkpoints", map[string]any{
+		"p_statuses": []string{"in_progress", "review", "testing"},
+	})
+	if err != nil {
+		log.Printf("[CheckpointRecovery] Warning: Could not query checkpoints: %v", err)
+		return
+	}
+
+	var tasks []map[string]any
+	if err := json.Unmarshal(result, &tasks); err != nil {
+		log.Printf("[CheckpointRecovery] Warning: Could not parse checkpoint list: %v", err)
+		return
+	}
+
+	if len(tasks) == 0 {
+		log.Println("[CheckpointRecovery] No tasks with checkpoints found")
+		return
+	}
+
+	log.Printf("[CheckpointRecovery] Found %d task(s) with checkpoints", len(tasks))
+
+	for _, task := range tasks {
+		taskID, _ := task["task_id"].(string)
+		taskNumber, _ := task["task_number"].(string)
+		status, _ := task["status"].(string)
+		step, _ := task["step"].(string)
+		progress, _ := task["progress"].(float64)
+
+		log.Printf("[CheckpointRecovery] Task %s (status: %s, step: %s, progress: %d%%)",
+			taskNumber, status, step, int(progress))
+
+		switch step {
+		case "execution":
+			_, err := database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "available",
+			})
+			if err != nil {
+				log.Printf("[CheckpointRecovery] Failed to reset task %s: %v", taskNumber, err)
+			} else {
+				log.Printf("[CheckpointRecovery] Reset task %s to available for re-execution", taskNumber)
+				database.RPC(ctx, "delete_checkpoint", map[string]any{"p_task_id": taskID})
+			}
+
+		case "review":
+			_, err := database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "review",
+			})
+			if err != nil {
+				log.Printf("[CheckpointRecovery] Failed to set task %s to review: %v", taskNumber, err)
+			} else {
+				log.Printf("[CheckpointRecovery] Task %s will be picked up for review", taskNumber)
+			}
+
+		case "testing":
+			_, err := database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "testing",
+			})
+			if err != nil {
+				log.Printf("[CheckpointRecovery] Failed to set task %s to testing: %v", taskNumber, err)
+			} else {
+				log.Printf("[CheckpointRecovery] Task %s will be picked up for testing", taskNumber)
+			}
+
+		default:
+			log.Printf("[CheckpointRecovery] Unknown step '%s' for task %s, resetting to available", step, taskNumber)
+			_, err := database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "available",
+			})
+			if err == nil {
+				database.RPC(ctx, "delete_checkpoint", map[string]any{"p_task_id": taskID})
+			}
+		}
+	}
+
+	log.Printf("[CheckpointRecovery] Recovery complete - processed %d task(s)", len(tasks))
 }
 
 type TaskData struct {

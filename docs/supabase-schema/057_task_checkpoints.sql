@@ -108,6 +108,41 @@ COMMENT ON FUNCTION delete_checkpoint(UUID) IS
 'Delete checkpoint after task completion or merge.';
 
 -- ============================================================================
+-- 5. RPC: find_tasks_with_checkpoints
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION find_tasks_with_checkpoints(
+  p_statuses TEXT[] DEFAULT ARRAY['in_progress', 'review', 'testing']
+) RETURNS TABLE (
+  task_id UUID,
+  task_number TEXT,
+  title TEXT,
+  status TEXT,
+  step TEXT,
+  progress INT,
+  checkpoint_created_at TIMESTAMPTZ
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    t.id AS task_id,
+    t.task_number,
+    t.title,
+    t.status,
+    tc.step,
+    tc.progress,
+    tc.created_at AS checkpoint_created_at
+  FROM tasks t
+  INNER JOIN task_checkpoints tc ON t.id = tc.task_id
+  WHERE t.status = ANY(p_statuses)
+  ORDER BY tc.created_at ASC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+COMMENT ON FUNCTION find_tasks_with_checkpoints(TEXT[]) IS 
+'Find tasks that have checkpoints and are in specified statuses (default: in_progress, review, testing). Used for crash recovery.';
+
+-- ============================================================================
 -- VERIFICATION
 -- ============================================================================
 

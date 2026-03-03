@@ -48,6 +48,14 @@ func (c *CoreConfig) GetStateSyncIntervalSeconds() int {
 	return c.StateSyncIntervalSeconds
 }
 
+func (c *CoreConfig) IsCheckpointEnabled() bool {
+	return c != nil && c.CheckpointEnabled
+}
+
+func (c *CoreConfig) IsRecoveryEnabled() bool {
+	return c == nil || c.RecoveryEnabled
+}
+
 type ValidationConfig struct {
 	MinTaskConfidence     float64 `json:"min_task_confidence"`
 	RequirePromptPacket   bool    `json:"require_prompt_packet"`
@@ -781,6 +789,18 @@ func (c *Config) GetValidationConfig() *ValidationConfig {
 		}
 	}
 	return &c.System.Validation
+}
+
+func (c *Config) GetCoreConfig() *CoreConfig {
+	if c.System == nil || c.System.Core == nil {
+		return &CoreConfig{
+			CheckpointEnabled:         true,
+			CheckpointIntervalPercent: 25,
+			StateSyncIntervalSeconds:  60,
+			RecoveryEnabled:           true,
+		}
+	}
+	return c.System.Core
 }
 
 func (c *Config) GetProcessingTimeoutSeconds() int {
