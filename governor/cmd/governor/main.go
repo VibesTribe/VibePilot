@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vibepilot/governor/internal/core"
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/destinations"
 	"github.com/vibepilot/governor/internal/gitree"
@@ -48,6 +49,11 @@ func main() {
 	database := db.New(dbURL, dbKey)
 	defer database.Close()
 	log.Println("Connected to database")
+
+	stateMachine := core.NewStateMachine()
+	checkpointStorage := &dbCheckpointAdapter{db: database}
+	checkpointMgr := core.NewCheckpointManager(stateMachine, checkpointStorage)
+	log.Println("Core state machine initialized")
 
 	repoPath := getEnvOrDefault("REPO_PATH", ".")
 	protectedBranches := cfg.GetProtectedBranches()
@@ -148,6 +154,33 @@ func getEnvOrDefault(key, defaultVal string) string {
 		return val
 	}
 	return defaultVal
+}
+
+type dbCheckpointAdapter struct {
+	db *db.DB
+}
+
+func (a *dbCheckpointAdapter) RPC(ctx context.Context, fn string, args map[string]any) (json.RawMessage, error) {
+	result, err := a.db.RPC(ctx, fn, args)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(result), nil
+}
+
+func (a *dbCheckpointAdapter) Save(ctx context.Context, taskID string, checkpoint core.Checkpoint) error {
+	storage := core.NewDBCheckpointStorage(a)
+	return storage.Save(ctx, taskID, checkpoint)
+}
+
+func (a *dbCheckpointAdapter) Load(ctx context.Context, taskID string) (*core.Checkpoint, error) {
+	storage := core.NewDBCheckpointStorage(a)
+	return storage.Load(ctx, taskID)
+}
+
+func (a *dbCheckpointAdapter) Delete(ctx context.Context, taskID string) error {
+	storage := core.NewDBCheckpointStorage(a)
+	return storage.Delete(ctx, taskID)
 }
 
 func registerDestinations(factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault) {
