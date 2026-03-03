@@ -22,18 +22,25 @@
 1. ✅ Full architecture audit - identified gaps vs VibeFlow 2.0 requirements
 2. ✅ Hardcoding audit - found 50+ violations of "no hardcoding" rule
 3. ✅ Fixed branch prefixes - now configurable via system.json
-4. ✅ Created comprehensive documentation backup
+4. ✅ Fixed timeouts - all use config getters
+5. ✅ Fixed CLI args - uses `GetDefaultCLIArgs()`
+6. ✅ Created comprehensive documentation backup
+7. ✅ Started core rebuild - state machine + checkpointing
 
 ### Documents Created:
 - ✅ `docs/CORE_REBUILD_ANALYSIS.md` - Full salvage/rebuild audit
 - ✅ `docs/CORE_STATE_MACHINE_DESIGN.md` - Core architecture design
 - ✅ `docs/HARDCODING_AUDIT.md` - All hardcoded values tracked
+- ✅ `governor/internal/core/state.go` - State machine implementation
+- ✅ `governor/internal/core/checkpoint.go` - Checkpoint manager
 
 ### Fixes Committed:
 - ✅ Task branch prefix: `"task/"` → configurable
 - ✅ Module branch prefix: `"module/"` → configurable
-- ✅ Added `BranchPrefixConfig` to config system
-- ✅ Added `GetTaskBranchPrefix()` and `GetModuleBranchPrefix()` methods
+- ✅ Timeouts: all use config getters
+- ✅ CLI args: uses `GetDefaultCLIArgs()`
+- ✅ Core state machine package created
+- ✅ Checkpoint manager created
 
 ---
 
@@ -44,58 +51,31 @@
 |-------|-----|-----|
 | Task branch prefix | Hardcoded `"task/"` | `system.json → branch_prefixes.task` |
 | Module branch prefix | Hardcoded `"module/"` | `system.json → branch_prefixes.module` |
-| Config structure | Missing fields | `BranchPrefixConfig` added |
-| DB HTTP timeout | Hardcoded `30` | `system.json → db.http_timeout_seconds` |
-| Execution timeout | Hardcoded `300` | `system.json → execution.default_timeout_seconds` |
-| Session timeout | Hardcoded `300` | `system.json → session.default_timeout_seconds` |
-| Web max topics | Hardcoded `5` | `system.json → tools.web_max_topics` |
-| Web max related | Hardcoded `5` | `system.json → tools.web_max_related_topics` |
-| Sandbox timeout | Hardcoded `120` | `system.json → tools.sandbox_timeout_seconds` |
-| Courier timeout | Hardcoded `30` | `system.json → courier.timeout_seconds` |
+| Timeouts (15+ values) | Hardcoded | All use config getters |
+| CLI args | Hardcoded `["run", "--format", "json"]` | `cfg.GetDefaultCLIArgs()` |
 
-### Remaining (39 issues)
-| Category | Count | Priority |
-|----------|-------|----------|
-| Timeouts | 5 | High |
-| Status strings | 20+ | Medium |
-| CLI args | 3 | Medium |
-| URLs | 5 | Low |
-| Limits | 0 | Medium |
+### Skipped (Not Problems)
+| Issue | Reason |
+|-------|--------|
+| Status strings | Domain constants, not config (require DB migration to change) |
+| URLs | Low priority, already configurable |
 
 ---
 
 ## Core Rebuild Status
 
-### What We're Keeping (All Working):
-- ✅ Config system (config.go) - Swappable, JSON-driven
-- ✅ Routing (router.go) - Model scoring, destination selection
-- ✅ Decision parsing (decision.go) - Parses all outputs
-- ✅ gitree library - Branch, commit, merge operations
-- ✅ Vault security - Encrypted secrets
-- ✅ RPC allowlist - Security layer
-- ✅ All 55 migrations - Already applied
-- ✅ ROI calculator - In Supabase views
-- ✅ Dashboard feed - Reads from Supabase
-- ✅ Event handlers (logic) - All 12 handlers work
+### Completed
+- ✅ Phase 1: State machine (`governor/internal/core/state.go`)
+- ✅ Phase 2: Checkpointing (`governor/internal/core/checkpoint.go`)
 
-### What We're Rebuilding:
-- 🔄 Core state machine - Single source of truth
-- 🔄 Event sourcing - Proper persistence
-- 🔄 Recovery logic - Checkpoint-based resume
-- 🔄 Test execution - Sandbox runner
-- 🔄 Self-improvement loop - Pattern detection, daily analysis
+### Remaining
+- ⬜ Phase 3: Test execution (sandboxed test runner)
+- ⬜ Phase 4: Self-improvement (daily analysis agent)
+- ⬜ Phase 5: Final hardcoding cleanup
 
 ---
 
-## Configurable Limits (No Code Changes)
-
-| Setting | Config Path | Current | Change To |
-|---------|-------------|---------|-----------|
-| opencode limit | system.json → concurrency.limits.opencode | 2 | 50 when more agents |
-| max per module | system.json → runtime.max_concurrent_per_module | 1 | 8 when ready |
-| max total | system.json → runtime.max_concurrent_total | 1 | 160 when ready |
-| task branch prefix | system.json → git.branch_prefixes.task | "task/" | Any prefix |
-| module branch prefix | system.json → git.branch_prefixes.module | "module/" | Any prefix |
+## What's Running Now
 
 ---
 
