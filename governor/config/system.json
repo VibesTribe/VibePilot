@@ -59,7 +59,7 @@
   },
   "concurrency": {
     "limits": {
-      "opencode": 2
+      "kilo": 2
     },
     "default_limit": 3
   },
