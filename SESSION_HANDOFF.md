@@ -106,12 +106,14 @@ This document exists because 40%+ of context was wasted every session re-reading
 | **recovery.go** | ✅ Extracted | 255 lines |
 | **validation.go** | ✅ Extracted | 276 lines |
 | **helpers.go** | ✅ Extracted | 72 lines |
+| **handlers_task.go** | ✅ Extracted | 531 lines - EventTaskAvailable, EventTaskReview, EventTaskCompleted |
+| **handlers_plan.go** | ✅ Extracted | 576 lines - EventPRDReady, EventPlanReview, EventRevisionNeeded, etc. |
 
 ### What's In Progress
 
 | Component | Status | Next |
 |-----------|--------|------|
-| **main.go split** | ⬜ 50% | 2,261 lines, target <200 |
+| **main.go split** | ⬜ 75% | 1,179 lines (was 2,197), target <200 |
 | **Core wiring** | ⬜ Partial | StateMachine created but handlers use direct RPC |
 | **TestRunner wiring** | ⬜ Not started | Created but never invoked |
 | **Analyst wiring** | ⬜ Not started | Created but never scheduled |
@@ -176,13 +178,15 @@ Why you won't find keys:
 
 ```
 governor/cmd/governor/
-├── main.go           (2,261 lines) - Event handlers, wireup - SPLIT IN PROGRESS
-├── types.go          (41 lines)   - RecoveryConfig, TaskData, ValidationError ✅
-├── adapters.go       (36 lines)   - dbCheckpointAdapter ✅
-├── recovery.go       (255 lines)  - All recovery functions ✅
-├── validation.go     (276 lines)  - Task validation, plan parsing ✅
-├── helpers.go        (72 lines)   - truncateID, recordModelSuccess, etc. ✅
-└── main_test.go      (405 lines)  - Integration tests
+├── main.go              (1,179 lines) - Event handlers, wireup - SPLIT IN PROGRESS
+├── handlers_task.go     (531 lines)  - Task event handlers ✅ NEW
+├── handlers_plan.go     (576 lines)  - Plan event handlers ✅ NEW
+├── types.go             (41 lines)   - RecoveryConfig, TaskData, ValidationError ✅
+├── adapters.go          (36 lines)   - dbCheckpointAdapter ✅
+├── recovery.go          (255 lines)  - All recovery functions ✅
+├── validation.go        (276 lines)  - Task validation, plan parsing ✅
+├── helpers.go           (72 lines)   - truncateID, recordModelSuccess, etc. ✅
+└── main_test.go         (405 lines)  - Integration tests
 
 governor/internal/
 ├── core/             (857 lines)  - State machine, checkpoint, test_runner, analyst
@@ -200,52 +204,59 @@ governor/internal/
 
 ## EVENT HANDLERS (In main.go)
 
-17 handlers, grouped by extraction target:
+17 handlers total. Extraction status:
 
-| Handler | Lines | Extract To |
-|---------|-------|------------|
-| EventTaskAvailable | ~200 | handlers_task.go |
-| EventTaskReview | ~150 | handlers_task.go |
-| EventTaskCompleted | ~150 | handlers_task.go |
-| EventPRDReady | ~120 | handlers_plan.go |
-| EventPlanReview | ~150 | handlers_plan.go |
-| EventPlanCreated | ~70 | handlers_plan.go |
-| EventPlanApproved | ~15 | handlers_plan.go |
-| EventPlanBlocked | ~15 | handlers_plan.go |
-| EventPlanError | ~15 | handlers_plan.go |
-| EventRevisionNeeded | ~170 | handlers_plan.go |
-| EventCouncilReview | ~250 | handlers_council.go |
-| EventCouncilDone | ~200 | handlers_council.go |
-| EventResearchReady | ~160 | handlers_research.go |
-| EventResearchCouncil | ~160 | handlers_research.go |
-| EventMaintenanceCmd | ~60 | handlers_maint.go |
-| EventTestResults | ~160 | handlers_testing.go |
-| EventPRDIncomplete | ~30 | handlers_plan.go |
+| Handler | Lines | Status | File |
+|---------|-------|--------|------|
+| EventTaskAvailable | ~200 | ✅ Extracted | handlers_task.go |
+| EventTaskReview | ~150 | ✅ Extracted | handlers_task.go |
+| EventTaskCompleted | ~150 | ✅ Extracted | handlers_task.go |
+| EventPRDReady | ~120 | ✅ Extracted | handlers_plan.go |
+| EventPlanReview | ~150 | ✅ Extracted | handlers_plan.go |
+| EventPlanCreated | ~70 | ✅ Extracted | handlers_plan.go |
+| EventPlanApproved | ~15 | ✅ Extracted | handlers_plan.go |
+| EventPlanBlocked | ~15 | ✅ Extracted | handlers_plan.go |
+| EventPlanError | ~15 | ✅ Extracted | handlers_plan.go |
+| EventRevisionNeeded | ~170 | ✅ Extracted | handlers_plan.go |
+| EventPRDIncomplete | ~30 | ✅ Extracted | handlers_plan.go |
+| EventCouncilReview | ~250 | ⬜ In main.go | handlers_council.go |
+| EventCouncilDone | ~200 | ⬜ In main.go | handlers_council.go |
+| EventResearchReady | ~160 | ⬜ In main.go | handlers_research.go |
+| EventResearchCouncil | ~160 | ⬜ In main.go | handlers_research.go |
+| EventMaintenanceCmd | ~60 | ⬜ In main.go | handlers_maint.go |
+| EventTestResults | ~160 | ⬜ In main.go | handlers_testing.go |
+
+**Progress:** 11/17 handlers extracted (65%)
 
 ---
 
 ## REMAINING WORK
 
-### Phase 1: Continue main.go Split (NEXT)
+### Phase 1: Continue main.go Split (IN PROGRESS - 75% done)
 
 Extract handlers to files:
 
-1. **handlers_task.go** (~350 lines)
+1. **handlers_task.go** (531 lines) ✅ DONE
    - EventTaskAvailable, EventTaskReview, EventTaskCompleted
-   - Requires: database, factory, pool, cfg, git, leakDetector, checkpointMgr
 
-2. **handlers_plan.go** (~400 lines)
+2. **handlers_plan.go** (576 lines) ✅ DONE
    - EventPRDReady, EventPlanReview, EventPlanCreated, EventPlanApproved
    - EventPlanBlocked, EventPlanError, EventRevisionNeeded, EventPRDIncomplete
 
-3. **handlers_council.go** (~250 lines)
+3. **handlers_council.go** (~425 lines) ⬜ NEXT
    - EventCouncilReview, EventCouncilDone
+   - Both handlers still in main.go
 
-4. **handlers_research.go** (~200 lines)
+4. **handlers_research.go** (~310 lines) ⬜ TODO
    - EventResearchReady, EventResearchCouncil
 
-5. **handlers_maint.go** (~80 lines)
+5. **handlers_maint.go** (~55 lines) ⬜ TODO
    - EventMaintenanceCmd
+
+6. **handlers_testing.go** (~120 lines) ⬜ TODO
+   - EventTestResults
+
+**Target:** main.go < 200 lines (entry point + wireup only)
 
 6. **handlers_testing.go** (~100 lines)
    - EventTestResults
@@ -435,9 +446,9 @@ After this document, if you need more context:
 | 42-43 | Wire checkpointing | Migration 057, 058 |
 | 44 | Security wiring | Leak detector wired |
 | 45 | Architecture refactoring | destinations→connectors, extract types/adapters/recovery/validation/helpers |
-| 46 | This handoff doc | SESSION_HANDOFF.md created |
+| 46 | Handler extraction | SESSION_HANDOFF.md, handlers_task.go (531 lines), handlers_plan.go (576 lines), main.go: 2197→1179 |
 
 ---
 
-**Last Updated:** 2026-03-03 (Session 46)
-**Next Priority:** Extract handlers_task.go from main.go
+**Last Updated:** 2026-03-04 (Session 46)
+**Next Priority:** Extract handlers_council.go from main.go (~425 lines)
