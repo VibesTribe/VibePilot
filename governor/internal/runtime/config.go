@@ -24,7 +24,15 @@ type SystemConfig struct {
 	Validation  ValidationConfig       `json:"validation"`
 	Logging     LoggingConfig          `json:"logging"`
 	Core        *CoreConfig            `json:"core,omitempty"`
+	Webhooks    *WebhooksConfig        `json:"webhooks,omitempty"`
 	PromptsDir  string                 `json:"prompts_dir"`
+}
+
+type WebhooksConfig struct {
+	Enabled        bool   `json:"enabled"`
+	Port           int    `json:"port"`
+	Path           string `json:"path"`
+	SecretVaultKey string `json:"secret_vault_key"`
 }
 
 type CoreConfig struct {
@@ -801,6 +809,23 @@ func (c *Config) GetCoreConfig() *CoreConfig {
 		}
 	}
 	return c.System.Core
+}
+
+func (c *Config) GetWebhooksConfig() *WebhooksConfig {
+	if c.System == nil || c.System.Webhooks == nil {
+		return &WebhooksConfig{
+			Enabled:        false,
+			Port:           8080,
+			Path:           "/webhooks",
+			SecretVaultKey: "webhook_secret",
+		}
+	}
+	return c.System.Webhooks
+}
+
+func (c *Config) IsWebhooksEnabled() bool {
+	cfg := c.GetWebhooksConfig()
+	return cfg != nil && cfg.Enabled
 }
 
 func (c *Config) GetProcessingTimeoutSeconds() int {

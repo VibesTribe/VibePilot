@@ -16,6 +16,7 @@ import (
 	"github.com/vibepilot/governor/internal/security"
 	"github.com/vibepilot/governor/internal/tools"
 	"github.com/vibepilot/governor/internal/vault"
+	"github.com/vibepilot/governor/internal/webhooks"
 )
 
 var (
@@ -95,9 +96,6 @@ func main() {
 		log.Printf("Warning: Failed to load model profiles: %v", err)
 	}
 
-	pollInterval := time.Duration(cfg.System.Runtime.EventPollIntervalMs) * time.Millisecond
-	watcher := runtime.NewPollingWatcher(database, pollInterval)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -105,10 +103,25 @@ func main() {
 	runStartupRecovery(ctx, database, recoveryCfg)
 	runCheckpointRecovery(ctx, database, cfg, checkpointMgr)
 
-	watcher.SetConfig(cfg)
-
 	connRouter := runtime.NewRouter(cfg, database)
-	eventRouter := runtime.NewEventRouter(watcher)
+	eventRouter := runtime.NewEventRouter(nil)
+
+	var webhookSecret string
+	if cfg.IsWebhooksEnabled() {
+		webhookCfg := cfg.GetWebhooksConfig()
+		secret, err := v.GetSecret(ctx, webhookCfg.SecretVaultKey)
+		if err != nil {
+			log.Printf("Warning: Failed to get webhook secret from vault: %v", err)
+		} else {
+			webhookSecret = secret
+		}
+	}
+
+	webhookServer := webhooks.NewServer(&webhooks.Config{
+		Port:   cfg.GetWebhooksConfig().Port,
+		Path:   cfg.GetWebhooksConfig().Path,
+		Secret: webhookSecret,
+	}, eventRouter)
 
 	prdWatcher := runtime.NewPRDWatcher(database, runtime.PRDWatcherConfig{
 		Enabled:   cfg.System.PRDWatcher.Enabled,
@@ -123,12 +136,13 @@ func main() {
 
 	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector)
 
-	if err := eventRouter.Start(ctx); err != nil {
-		log.Fatalf("Failed to start event router: %v", err)
+	if err := webhookServer.Start(ctx); err != nil {
+		log.Fatalf("Failed to start webhook server: %v", err)
 	}
 
-	log.Printf("Governor started (poll: %v, max/module: %d, max total: %d, opencode limit: %d)",
-		pollInterval, cfg.System.Runtime.MaxConcurrentPerModule, cfg.System.Runtime.MaxConcurrentTotal, cfg.System.Concurrency.GetLimit("opencode"))
+	webhookCfg := cfg.GetWebhooksConfig()
+	log.Printf("Governor started (webhooks: port %d%s, max/module: %d, max total: %d, opencode limit: %d)",
+		webhookCfg.Port, webhookCfg.Path, cfg.System.Runtime.MaxConcurrentPerModule, cfg.System.Runtime.MaxConcurrentTotal, cfg.System.Concurrency.GetLimit("opencode"))
 	log.Println("Press Ctrl+C to stop")
 
 	sigCh := make(chan os.Signal, 1)
@@ -137,7 +151,7 @@ func main() {
 
 	log.Println("Shutting down...")
 	cancel()
-	watcher.Close()
+	webhookServer.Shutdown(ctx)
 	pool.Wait()
 
 	log.Println("Governor stopped")
