@@ -742,6 +742,48 @@ The Router intentionally skips `web` type connectors (see router.go:84-86). They
 | `sudo systemctl restart vibepilot-governor` | Restart service |
 | `~/vibepilot/scripts/e2e-checkpoint-test.sh` | E2E checkpoint test |
 
+### CLI Tools (OpenCode vs Kilo)
+
+| Command | OpenCode | Kilo |
+|---------|----------|------|
+| Interactive mode | `opencode` | `kilo` |
+| One-shot task | `opencode run "task"` | `kilo run "task"` |
+| Autonomous mode | Limited | `kilo run --auto "task"` |
+| Check auth | `opencode auth list` | `kilo auth list` |
+| List models | `opencode models` | `kilo models` |
+| RAM usage | ~700MB | ~350MB (50% less) |
+
+**Auth location:**
+- OpenCode: `~/.local/share/opencode/auth.json`
+- Kilo: `~/.local/share/kilo/auth.json` (same format)
+
+### GCE Maintenance
+
+**Check RAM usage:**
+```bash
+free -h
+ps aux --sort=-%mem | head -10
+```
+
+**Check disk usage:**
+```bash
+df -h
+du -sh ~/.local ~/.cache
+```
+
+**Clean up space (saves ~1.6GB):**
+```bash
+rm -rf ~/.local/share/opencode ~/.cache/go-build
+```
+
+**Current RAM hogs:**
+| Process | RAM | Notes |
+|---------|-----|-------|
+| opencode/kilo | 350-700MB | AI CLI session |
+| gopls | ~350MB | Go language server |
+| governor | ~35MB | VibePilot |
+| systemd-journald | ~100MB | Logging |
+
 ### File Locations Quick Reference
 
 | What | Where |
