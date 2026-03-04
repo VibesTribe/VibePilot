@@ -1,151 +1,109 @@
-
-## Session Summary (2026-03-04 - Session 47)
-**Status:** ARCHITECTURE REFACTORING COMPLETE ✅
+## Session Summary (2026-03-04 - Session 49)
+**Status:** CRITICAL BUG FIXED + COMPREHENSIVE DOCUMENTATION ✅
 
 ### What We Did:
 
-**Phase 1: Documentation**
-1. ✅ Read handoff documents (CURRENT_STATE.md, SYSTEM_REFERENCE.md, core_philosophy.md)
-2. ✅ Understood architecture goals and constraints
-3. ✅ Confirmed extraction approach from Session 46
+**Phase 1: Comprehensive Audit**
+1. ✅ Read all handoff documents (SESSION_33, 34, 35, 48)
+2. ✅ Traced the connector vs destination naming issue
+3. ✅ Found the bug introduced in commit 79783e8e
 
-**Phase 2: Complete Handler Extraction**
-1. ✅ Extracted all remaining handlers from main.go:
-   - handlers_council.go (469 lines) - EventCouncilDone, EventCouncilReview
-   - handlers_testing.go (157 lines) - EventTestResults
-   - handlers_maint.go (92 lines) - EventMaintenanceCmd
-   - handlers_research.go (397 lines) - EventResearchReady, EventResearchCouncil
-2. ✅ main.go reduced from 1,179 → 752 lines (44% reduction)
-3. ✅ Removed unused imports (errors, filepath, sync)
-4. ✅ All functionality preserved
-5. ✅ Clean atomic commits
-6. ✅ All tests passing (12/12)
+**Phase 2: Bug Fix**
+1. ✅ Identified: Code looks for `connectors.json`, file was named `destinations.json`
+2. ✅ Fixed: Renamed `destinations.json` → `connectors.json`
+3. ✅ Verified: Governor now loads connectors on startup
+4. ✅ Committed and pushed to main
 
-### Key Accomplishments:
-- **main.go reduction:** 1,179 → 752 lines (-44% reduction)
-- **Clean architecture:** All handlers extracted to separate files
-- **No stub code:** All functionality preserved
-- **Modular structure:** Each handler file is self-contained
-- **Tests passing:** All 12 integration tests passing
+**Phase 3: Documentation**
+1. ✅ Created `ARCHITECTURE.md` - Single source of truth
+2. ✅ Updated `AGENTS.md` - Points to ARCHITECTURE.md first
+3. ✅ Updated `061_webhook_secret.sql` - Removed non-existent column
+
+### Key Fixes:
+- **Connectors now load:** Governor can route tasks to AI models
+- **Documentation complete:** ARCHITECTURE.md explains everything in one place
 
 ### Files Changed This Session:
-- `governor/cmd/governor/main.go` - Reduced from 1,179 to 752 lines
-- `governor/cmd/governor/handlers_council.go` - NEW (469 lines)
-- `governor/cmd/governor/handlers_testing.go` - NEW (157 lines)
-- `governor/cmd/governor/handlers_maint.go` - NEW (92 lines)
-- `governor/cmd/governor/handlers_research.go` - NEW (397 lines)
+- `governor/config/destinations.json` → `governor/config/connectors.json` (renamed)
+- `docs/supabase-schema/061_webhook_secret.sql` (fixed)
+- `ARCHITECTURE.md` (NEW - comprehensive documentation)
+- `AGENTS.md` (updated - references ARCHITECTURE.md)
+- `CURRENT_STATE.md` (this file)
 
 ### Commits This Session:
-1. `5b3ff0a1` - refactor: extract all remaining handlers from main.go
+1. `ed1ae720` - fix: rename destinations.json to connectors.json, fix 061 migration
 
 ---
 
-## Architecture Status (Updated 2026-03-04 - Session 48)
+## Current System Status
 
-### Current Codebase Structure
+### What's Working ✅
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| **Webhooks** | ✅ Active | Replaced polling |
+| **GitHub webhooks** | ✅ Active | Detects PRD files |
+| **Supabase webhooks** | ✅ Configured | 5 tables monitored |
+| **Connectors** | ✅ Loading | opencode, deepseek-api active |
+| **Router** | ✅ Working | Selects connectors by strategy |
+| **Event handlers** | ✅ All wired | 17 handlers in 6 files |
+| **Checkpoint recovery** | ✅ Working | Resumes from crashes |
+| **Leak detection** | ✅ Active | Scans outputs |
+
+### What's NOT Verified ❓
+
+| Component | Status | Next Step |
+|-----------|--------|-----------|
+| **End-to-end flow** | ❓ Not tested | Create PRD, verify tasks created |
+| **Supabase webhook delivery** | ❓ Unknown | Check Supabase webhook logs |
+| **Task execution** | ❓ Unknown | Verify AI actually runs |
+
+### Infrastructure
+
+| Component | Status |
+|-----------|--------|
+| GCE Instance | ✅ Running |
+| Firewall (8080) | ✅ Open |
+| Governor Service | ✅ Active |
+| Supabase | ✅ Connected |
+| GitHub | ✅ Connected |
+
+---
+
+## Codebase Status
+
+### Current Metrics
 
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
-| **Total Go lines** | 12,830 | 4,000-8,000 | ⚠️ Over target |
+| **Total Go lines** | ~12,800 | 4,000-8,000 | ⚠️ Over target |
 | **cmd/governor/** | 4,072 | - | ✅ Modular |
-| **internal/** | 8,636 | - | Active + Planned |
-| **pkg/types/** | 122 | - | Legacy |
+| **internal/** | ~8,600 | - | Active + Planned |
+
+### Component Lines
+
+| Package | Lines | Status |
+|---------|-------|--------|
+| cmd/governor/ | 4,072 | Active |
+| internal/runtime/ | 3,545 | Active |
+| internal/connectors/ | 632 | Active |
+| internal/webhooks/ | 420 | Active |
+| internal/core/ | 857 | Active + Planned |
+| internal/db/ | 569 | Active |
+| internal/gitree/ | 379 | Active |
+| internal/vault/ | 337 | Active |
+| internal/security/ | 69 | Active |
+| internal/tools/ | 1,228 | Active |
 
 ---
 
-## Code Audit Summary (Session 47)
+## Known Issues
 
-### Component Status
-
-| Package | Lines | Status | Purpose |
-|---------|-------|--------|---------|
-| cmd/governor/ | 4,072 | ✅ Active | Event handlers, wireup |
-| internal/runtime/ | 3,545 | ✅ Active | Events, sessions, config |
-| internal/tools/ | 1,228 | ✅ Active | Tool registry |
-| internal/connectors/ | 632 | ✅ Active + Planned | CLI, API, Courier runners |
-| internal/core/ | 857 | ✅ Active + Planned | State machine, checkpoints |
-| internal/maintenance/ | 759 | Planned | Change management |
-| internal/db/ | 569 | ✅ Active | Supabase client |
-| internal/gitree/ | 379 | ✅ Active | Git operations |
-| internal/vault/ | 337 | ✅ Active | Secret decryption |
-| internal/security/ | 69 | ✅ Active | Leak detection |
-
-### Planned Components (NOT Dead Code)
-
-| Component | Lines | Status | Purpose |
-|-----------|-------|--------|---------|
-| CourierRunner | 239 | Planned | Web platform execution (10 platforms configured) |
-| TestRunner | 296 | Planned | State-tracked test execution |
-| Analyst | 116 | Planned | Pattern detection, daily analysis |
-| Maintenance | 759 | Needs Refactor | Change management (uses pkg/types.Task) |
-| Webhooks | 261 | ✅ Implemented | HTTP server for Supabase webhooks (replaces polling) |
-
-### Key Findings
-
-1. **No dead code** - All code has purpose
-2. **Planned functionality** - CourierRunner, Analyst, TestRunner ready to wire
-3. **Needs refactoring** - maintenance package uses `pkg/types.Task` instead of `map[string]any`
-4. **Config types** - Some loaded but not consumed (PlanLifecycleConfig sub-types)
-
-### Recommendation
-
-**Do not delete anything.** Architecture is sound with planned future functionality.
-
-| Category | Lines | Verdict |
-|----------|-------|--------|
-| Active code | ~9,500 | Wired and working |
-| Planned code | ~1,500 | Ready to wire when needed |
-| Needs refactor | ~1,200 | maintenance package |
-| Dead code | 0 | None found |
-
-### File Structure (Current)
-
-```
-cmd/governor/
-├── main.go              (752 lines)  - Entry point + wireup
-├── handlers_task.go     (531 lines)  - Task event handlers ✅
-├── handlers_plan.go     (576 lines)  - Plan event handlers ✅
-├── handlers_council.go  (469 lines)  - Council event handlers ✅ NEW
-├── handlers_testing.go  (157 lines)  - Test results handler ✅ NEW
-├── handlers_maint.go    (92 lines)   - Maintenance handler ✅ NEW
-├── handlers_research.go  (397 lines)  - Research handlers ✅ NEW
-├── types.go             (41 lines)   - Shared types
-├── adapters.go          (36 lines)   - DB adapters
-├── recovery.go           (255 lines)  - Recovery functions
-├── validation.go         (276 lines)  - Validation logic
-├── helpers.go            (72 lines)   - Shared helpers
-└── main_test.go         (405 lines)  - Integration tests
-
-Total: 3,371 lines
-```
-
-### Remaining Work
-
-| Task | Priority | Notes |
-|------|----------|-------|
-| main.go optimization | MEDIUM | Can extract more utilities if needed |
-| Documentation updates | LOW | Update as needed |
-
----
-
-## Architecture Principles (From AGENTS.md)
-
-**VibePilot is 100% swappable, portable, and vendor-agnostic:**
-
-| Component | Can Swap To | How |
-|-----------|-------------|-----|
-| **Database** | Supabase → PostgreSQL → MySQL → SQLite → MongoDB | JSONB everywhere |
-| **Code Host** | GitHub → GitLab → Bitbucket | Git-based |
-| **AI CLI** | OpenCode → Claude CLI → Gemini CLI → Anything | Config-driven |
-| **Hosting** | GCP → AWS → Azure → Local | Single binary |
-| **Models** | Any LLM with any provider | Routing config |
-
-**Rules:**
-1. JSONB for arrays/objects (no TEXT[], no UUID[])
-2. Config over code
-3. No vendor-specific features
-4. Pass slices directly to RPCs (no pre-marshaling)
-5. All schema in `docs/supabase-schema/`
+| Issue | Impact | Fix |
+|-------|--------|-----|
+| Codebase over target (12.8k vs 8k) | RAM usage | Can remove polling code (~500 lines) |
+| `web` type connectors show "Unknown" | Log noise | CourierRunner not wired yet (planned) |
+| E2E flow not verified | Unknown if working | Run diagnostic SQL |
 
 ---
 
@@ -156,7 +114,7 @@ Total: 3,371 lines
 | 057 | task_checkpoints.sql | ✅ Applied |
 | 058 | jsonb_parameters.sql | ✅ Applied |
 | 060 | rls_dashboard_safe.sql | ✅ Applied |
-| 061 | webhook_secret.sql | ✅ Applied |
+| 061 | webhook_secret.sql | ✅ Applied (fixed this session) |
 
 ---
 
@@ -166,123 +124,61 @@ Total: 3,371 lines
 |---------|--------|
 | `systemctl status vibepilot-governor` | Check if running |
 | `journalctl -u vibepilot-governor -f` | Live logs |
+| `journalctl -u vibepilot-governor -n 30 \| grep -i connector` | Check connector registration |
 | `cd ~/vibepilot/governor && go build -o governor ./cmd/governor` | Build |
 | `cd ~/vibepilot/governor && go test ./cmd/governor/...` | Run tests |
-| `~/vibepilot/scripts/e2e-checkpoint-test.sh` | E2E checkpoint test |
-| `~/vibepilot/scripts/opencode-count.sh` | Count opencode sessions |
+| `sudo systemctl restart vibepilot-governor` | Restart |
 
 ---
 
-## What's Running
+## Next Session Should
 
-```
-vibePilot-governor.service (Go binary)
-├── Polls Supabase every 1s
-├── Event-driven task execution
-├── Checkpoint recovery on startup
-├── Security leak detection on task output
-├── 17 event handlers (6 files)
-└── 12 integration tests passing
-```
+1. **Verify end-to-end flow:**
+   - Run `DIAGNOSTIC_WEBHOOK_CHECK.sql` in Supabase
+   - Check if plans exist, tasks created
+   - Verify Supabase webhook delivery
 
----
+2. **If working:**
+   - Consider removing polling code (PollingWatcher, PRDWatcher)
+   - Update docs to remove polling references
 
-## Tests
-
-**Integration Tests:** `governor/cmd/governor/main_test.go`
-- TestCheckpointRecovery_NoCheckpoints
-- TestCheckpointRecovery_ExecutionStep
-- TestCheckpointRecovery_ReviewStep
-- TestCheckpointRecovery_TestingStep
-- TestCheckpointRecovery_MultipleTasks
-- TestCheckpointRecovery_JSONBParameter
-- TestCheckpointRecovery_ProgressValues (5 subtests)
-- TestCheckpointRecovery_TaskNumberParsing (4 subtests)
-- TestCheckpointRecovery_StatusFilter (5 subtests)
-
-**E2E Test:** `scripts/e2e-checkpoint-test.sh`
-- Tests real Supabase RPCs
-- Verifies create/load/delete checkpoint lifecycle
+3. **If NOT working:**
+   - Debug webhook delivery
+   - Check RPC permissions
+   - Verify event routing
 
 ---
 
 ## Session History
 
+### Session 49 (2026-03-04) - THIS SESSION
+- Fixed connectors.json naming bug
+- Created comprehensive ARCHITECTURE.md
+- Updated AGENTS.md to reference ARCHITECTURE.md
+- Governor now loads connectors
+
+### Session 48 (2026-03-04)
+- Webhooks wired into main.go
+- GitHub webhook handler created
+- Polling removed
+
 ### Session 47 (2026-03-04)
 - Complete handler extraction
-- main.go reduced from 1,179 → 752 lines (44% reduction)
-- Created 4 new handler files
-- All tests passing
-- Clean atomic commits
-- Architecture refactoring complete
+- main.go: 1,179 → 752 lines
 
 ### Session 46 (2026-03-03)
-- Extracted handlers_task.go
-- main.go reduced from 2,197 → 1,713 lines
-- 1 clean commit
-- All tests passing
+- Extracted handlers_task.go, handlers_plan.go
+- main.go reduced
 
 ### Session 45 (2026-03-03)
-- Rolled back broken refactoring
-- Renamed destinations → connectors
+- Renamed destinations → connectors (but missed file rename!)
 - Extracted types.go, adapters.go, recovery.go, validation.go
-- main.go: 2,834 → 2,261 lines
-- 4 clean atomic commits
-- All tests passing
-
-### Session 44 (2026-03-03)
-- Database agnosticism (TEXT[] → JSONB)
-- Checkpoint recovery working
-- 12 integration tests
-- Security leak detection wired
-- Codebase audit complete
-
-### Session 43 (2026-03-03)
-- Core state machine wired
-- Checkpoint system created
-- Session limiter fixed
 
 ---
 
-## Webhooks Status (Session 48)
+## Files to Read Next Session
 
-**Status:** ✅ COMPLETE - Webhooks wired, polling removed
-
-**Manual Steps:**
-1. Get external IP: `curl -s ifconfig.me` → `34.45.124.117`
-2. Configure Supabase webhooks:
-   - Go to Database → Webhooks
-   - Create webhook:
-     - Name: `governor-events`
-     - URL: `http://<GCE-IP>:8080/webhooks`
-     - Tables: `tasks`, `plans`, `prd_files`, `research_suggestions`, `maintenance_commands`, `test_results`
-     - Events: INSERT, UPDATE
-3. Rebuild and restart governor:
-   ```bash
-   cd ~/vibepilot/governor && go build -o governor ./cmd/governor
-   sudo systemctl restart vibepilot-governor
-   ```
-4. Test with real tasks
-5. Monitor logs for issues
-
-6. Update CURRENT_STATE.md, CHANGELOG.md
-7. Push to GitHub
-
----## Webhooks Status (Session 48)
-
-### Infrastructure Ready
-- ✅ Webhook server implemented (`governor/internal/webhooks/server.go`)
-- ✅ Secret stored in vault (`webhook_secret`)
-- ✅ RLS security fixed (migration 060 applied)
-- ✅ Config added to system.json
-- ⚠️ **NOT YET WIRED** - Webhook server not integrated into main.go
-- ⚠️ **POLLING STILL ACTIVE** - Need to switch to next session
-
-### Next Steps for Webhooks
-1. **Wire webhook server** into main.go (alongside polling for hybrid mode)
-2. **GCE Firewall** - Open port 8080 for Supabase webhooks
-3. **Configure Supabase** - Create webhooks in Supabase dashboard
-4. **Test delivery** - Verify webhooks reach governor
-5. **Monitor** - Compare webhook vs polling latency
-6. **Remove polling** - Once webhooks prove stable
-
+1. `ARCHITECTURE.md` - Single source of truth (NEW!)
+2. `CURRENT_STATE.md` - This file
+3. `CHANGELOG.md` - Full history
+4. `SESSION_48_HANDOFF.md` - Webhook details

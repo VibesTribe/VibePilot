@@ -4,6 +4,43 @@
 
 ---
 
+## ⛔ STOP. READ THIS FIRST. ⛔
+
+### 1. Read ARCHITECTURE.md (MANDATORY)
+
+**Before ANY action, read `ARCHITECTURE.md` in full.**
+
+This document contains:
+- What VibePilot is
+- Core principles
+- Coding rules
+- Complete architecture
+- Full flow (PRD → task → completion)
+- All components and where files are
+- Configuration system
+- Security & vault
+- Webhooks
+- Quick reference
+
+**Why:** It takes 5 minutes to read and saves hours of confusion. Every session that skipped this wasted 60%+ of context re-learning the basics.
+
+### 2. Then Read Current State
+
+After ARCHITECTURE.md, read:
+1. `CURRENT_STATE.md` - What's done, what's in progress
+2. `CHANGELOG.md` - Recent changes
+3. `SESSION_HANDOFF.md` - If continuing from previous session
+
+### 3. Only Then Act
+
+Now you understand:
+- The system architecture
+- Current state
+- What needs doing
+- Where files are
+
+---
+
 ## CORE ARCHITECTURE PRINCIPLE
 
 **VibePilot is designed to be 100% swappable, portable, and vendor-agnostic.**
@@ -375,8 +412,41 @@ Closes #123 (if applicable)
 
 ---
 
-**Remember:**
+## Remember:
 - **When in doubt, ask the human**
 - **UI changes → feature branch, always**
 - **Research → research-considerations**
 - **Code fixes → main (if rollbackable)**
+
+---
+
+## After Every Session: Update Documentation
+
+**MANDATORY updates before ending a session:**
+
+| Document | When to Update | What to Update |
+|----------|----------------|----------------|
+| `ARCHITECTURE.md` | Architecture changed | Architecture, flow, components, config |
+| `CURRENT_STATE.md` | Always | What was done, what's next, files changed |
+| `CHANGELOG.md` | Always | Full audit trail (date, what, files, commits) |
+| `SESSION_HANDOFF.md` | Major work | Critical context for next session |
+
+**Commit documentation changes separately:**
+```bash
+git add ARCHITECTURE.md CURRENT_STATE.md CHANGELOG.md
+git commit -m "docs: update architecture, current state, changelog for session XX"
+git push origin main
+```
+
+---
+
+## Quick Links
+
+| Document | Purpose | Read When |
+|----------|---------|-----------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Single source of truth | **FIRST - every session** |
+| [CURRENT_STATE.md](CURRENT_STATE.md) | What's done, what's next | After ARCHITECTURE.md |
+| [CHANGELOG.md](CHANGELOG.md) | Full history | Need context on changes |
+| [SESSION_HANDOFF.md](SESSION_HANDOFF.md) | Session continuity | Continuing from previous |
+| [docs/core_philosophy.md](docs/core_philosophy.md) | Strategic mindset | Need to understand "why" |
+| [docs/supabase-schema/](docs/supabase-schema/) | Database schema | Making schema changes |
