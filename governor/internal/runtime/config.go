@@ -18,7 +18,6 @@ type SystemConfig struct {
 	Events      EventsConfig           `json:"events"`
 	Sandbox     SandboxConfig          `json:"sandbox"`
 	WebTools    WebToolsConfig         `json:"web_tools"`
-	PRDWatcher  PRDWatcherSystemConfig `json:"prd_watcher"`
 	Recovery    map[string]interface{} `json:"recovery"`
 	Defaults    map[string]interface{} `json:"defaults"`
 	Validation  ValidationConfig       `json:"validation"`
@@ -92,6 +91,7 @@ type VaultConfig struct {
 type GitConfig struct {
 	Host               string              `json:"host"`
 	RepoEnv            string              `json:"repo_env"`
+	RepoPath           string              `json:"repo_path"`
 	TokenEnv           string              `json:"token_env"`
 	ProtectedBranches  []string            `json:"protected_branches"`
 	DefaultTimeoutSecs int                 `json:"default_timeout_seconds"`
@@ -167,14 +167,6 @@ type WebToolsConfig struct {
 	MaxFetchLength   int    `json:"max_fetch_length"`
 	MaxRelatedTopics int    `json:"max_related_topics"`
 	TimeoutSeconds   int    `json:"timeout_seconds"`
-}
-
-type PRDWatcherSystemConfig struct {
-	Enabled         bool   `json:"enabled"`
-	RepoPath        string `json:"repo_path"`
-	Branch          string `json:"branch"`
-	Directory       string `json:"directory"`
-	IntervalSeconds int    `json:"interval_seconds"`
 }
 
 type AgentConfig struct {
@@ -608,13 +600,10 @@ func (c *Config) GetProtectedBranches() []string {
 }
 
 func (c *Config) GetRepoPath() string {
-	if c.System == nil {
+	if c.System == nil || c.System.Git.RepoPath == "" {
 		return "."
 	}
-	if c.System.PRDWatcher.RepoPath != "" {
-		return c.System.PRDWatcher.RepoPath
-	}
-	return "."
+	return c.System.Git.RepoPath
 }
 
 func (c *Config) GetGitTimeout() int {

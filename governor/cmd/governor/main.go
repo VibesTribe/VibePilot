@@ -123,7 +123,7 @@ func main() {
 		Secret: webhookSecret,
 	}, eventRouter)
 
-	githubHandler := webhooks.NewGitHubWebhookHandler(database, cfg.System.PRDWatcher.RepoPath)
+	githubHandler := webhooks.NewGitHubWebhookHandler(database, cfg.GetRepoPath())
 	webhookServer.SetGitHubHandler(githubHandler)
 
 	go runProcessingRecovery(ctx, database, cfg)

@@ -13,6 +13,7 @@
   "git": {
     "host": "github",
     "repo_env": "GITHUB_REPO",
+    "repo_path": "/home/mjlockboxsocial/vibepilot",
     "token_env": "GITHUB_TOKEN",
     "protected_branches": ["main", "master", "research-considerations"],
     "default_timeout_seconds": 60,
@@ -53,10 +54,8 @@
   "runtime": {
     "max_concurrent_per_module": 1,
     "max_concurrent_total": 1,
-    "event_poll_interval_ms": 3600000,
     "agent_timeout_seconds": 300,
-    "max_tool_turns": 10,
-    "event_query_limit": 10
+    "max_tool_turns": 10
   },
   "concurrency": {
     "limits": {
@@ -90,13 +89,6 @@
     "max_fetch_length": 10000,
     "max_related_topics": 5,
     "timeout_seconds": 30
-  },
-  "prd_watcher": {
-    "enabled": true,
-    "repo_path": "/home/mjlockboxsocial/vibepilot",
-    "branch": "main",
-    "directory": "docs/prd",
-    "interval_seconds": 5
   },
   "recovery": {
     "processing_timeout_seconds": 300,
