@@ -663,11 +663,11 @@ case table == "tasks":
 
 ### Code That Can Be Removed
 
-| Component | Lines | Why |
-|-----------|-------|-----|
-| PollingWatcher | ~400 | Replaced by Supabase webhooks |
-| PRDWatcher | 164 | Replaced by GitHub webhooks |
-| **Total** | ~564 | |
+| Component | Lines | Why | Status |
+|-----------|-------|-----|--------|
+| PollingWatcher | ~400 | Replaced by Supabase webhooks | ✅ REMOVED Session 49 |
+| PRDWatcher | 164 | Replaced by GitHub webhooks | ✅ REMOVED Session 49 |
+| **Total** | ~564 | | |
 
 ### Code That Looks Unused But ISN'T
 
