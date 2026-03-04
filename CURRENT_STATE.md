@@ -154,6 +154,7 @@ Total: 3,371 lines
 |---|------|--------|
 | 057 | task_checkpoints.sql | ✅ Applied |
 | 058 | jsonb_parameters.sql | ✅ Applied |
+| 060 | rls_dashboard_safe.sql | ✅ Applied |
 
 ---
 
