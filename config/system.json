@@ -26,10 +26,10 @@
   "runtime": {
     "max_concurrent_per_module": 8,
     "max_concurrent_total": 160,
-    "event_poll_interval_ms": 1000,
+    "event_poll_interval_ms": 5000,
     "agent_timeout_seconds": 300,
     "max_tool_turns": 10,
-    "notes": "Tune for performance. 8/module matches Kimi's parallel agent limit."
+    "notes": "Polling 5s to reduce Supabase egress. 1s was causing 8GB+ bandwidth."
   },
   
   "courier": {

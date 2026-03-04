@@ -218,8 +218,45 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 		return result.DestinationID
 	}
 
-	setupMaintenanceHandlers(ctx, router, factory, pool, database, cfg, connRouter)
-	setupTestingHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
+	// Webhook server setup
+	webhookServer := webhooks.NewWebhookServer(&webhooks.WebhookConfig{
+	 Port: 8080,
+        Path: "/webhooks",
+        Secret: os.Getenv("WEBHOOK_SECRET"),
+    }, database, factory, router)
+    
+    // Start webhook server in goroutine
+    go func() {
+        if err := webhookServer.Start(); err != nil {
+            log.Printf("Failed to start start webhook server: %v", err)
+            return
+        }
+        
+        // Register all event handlers
+        webhookServer.RegisterHandler(runtime.EventTaskAvailable, handlers.HandleTaskAvailable)
+        webhookServer.RegisterHandler(runtime.EventTaskReview, handlers.HandleTaskReview)
+        webhookServer.RegisterHandler(runtime.EventTaskCompleted, handlers.HandleTaskCompleted)
+        webhookServer.RegisterHandler(runtime.EventPlanReview, handlers.HandlePlanReview)
+        webhookServer.RegisterHandler(runtime.EventPlanCreated, handlers.HandlePlanCreated)
+        webhookServer.RegisterHandler(runtime.EventPlanApproved, handlers.HandlePlanApproved)
+        webhookServer.RegisterHandler(runtime.EventCouncilReview, handlers.HandleCouncilReview)
+        webhookServer.RegisterHandler(runtime.EventCouncilDone, handlers.HandleCouncilDone)
+        webhookServer.RegisterHandler(runtime.EventPRDReady, handlers.HandlePRDReady)
+        webhookServer.RegisterHandler(runtime.EventTestResults, handlers.HandleTestResults)
+        webhookServer.RegisterHandler(runtime.EventMaintenanceCmd, handlers.HandleMaintenanceCmd)
+        webhookServer.RegisterHandler(runtime.EventResearchReady, handlers.HandleResearchReady)
+        webhookServer.RegisterHandler(runtime.EventResearchCouncil, handlers.HandleResearchCouncil)
+        
+        // Start polling watcher as fallback (disabled by default)
+        pollInterval := time.Duration(cfg.System.Runtime.EventPollIntervalMs) * time.Millisecond
+        watcher := runtime.NewPollingWatcher(database, pollInterval)
+        watcher.Subscribe(ctx, func(event runtime.Event) {
+            router.Emit(ctx, event)
+        })
+        if err := nil {
+            log.Printf("Warning: Polling watcher failed to subscribe: %v", err)
+        }
+    }(ctx, cancel)
 }
             })
             log.Printf("[EventResearchCouncil] Research suggestion %s blocked by council", truncateID(suggestionID))
