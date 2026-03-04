@@ -5,6 +5,69 @@
 
 ---
 
+# 2026-03-04 (Session 49 - Critical Bug Fix + Documentation)
+
+## What We Did:
+
+### Phase 1: Comprehensive Audit
+1. ✅ Read all handoff documents (SESSION_33, 34, 35, 48, CURRENT_STATE, SYSTEM_REFERENCE)
+2. ✅ Traced connector vs destination naming through git history
+3. ✅ Found bug introduced in commit 79783e8e (rename destinations→connectors missed file)
+
+### Phase 2: Bug Fix
+1. ✅ Renamed `destinations.json` → `connectors.json`
+2. ✅ Rebuilt and restarted governor
+3. ✅ Verified connectors now load:
+   - `Registered CLI connector: opencode`
+   - `Registered API connector: deepseek-api`
+4. ✅ Committed and pushed to main
+
+### Phase 3: Documentation Overhaul
+1. ✅ Created `ARCHITECTURE.md` (comprehensive single source of truth)
+   - What VibePilot is
+   - Core principles
+   - Coding rules
+   - Complete architecture with diagrams
+   - Full flow (PRD → task → completion)
+   - All components & files
+   - Configuration system
+   - Security & vault
+   - Webhooks
+   - Quick reference
+
+2. ✅ Updated `AGENTS.md`
+   - Added mandatory ARCHITECTURE.md reading section
+   - Added quick links to key documents
+
+3. ✅ Fixed `docs/supabase-schema/061_webhook_secret.sql`
+   - Removed reference to non-existent `updated_at` column
+
+## The Bug:
+
+**Root Cause:** Commit 79783e8e renamed the package (`destinations` → `connectors`) and the code variable (`destinationsPath` → `connectorsPath`), but forgot to rename the actual file on disk.
+
+**Symptom:** `Warning: no connectors configured` on every startup
+
+**Fix:** Simple file rename `destinations.json` → `connectors.json`
+
+**Impact:** Governor couldn't route tasks to AI models. Now fixed.
+
+## Files Changed:
+- `governor/config/destinations.json` → `governor/config/connectors.json` (renamed)
+- `docs/supabase-schema/061_webhook_secret.sql` (fixed)
+- `ARCHITECTURE.md` (NEW)
+- `AGENTS.md` (updated)
+- `CURRENT_STATE.md` (updated)
+- `CHANGELOG.md` (updated)
+
+## Commits:
+1. `ed1ae72` - fix: rename destinations.json to connectors.json, fix 061 migration
+
+## Key Learning:
+The connectors.json file contains ALL connector types (cli, api, web). The Router filters by type field. Web type connectors are not directly executable - they're handled by CourierRunner which receives the destination URL as a parameter.
+
+---
+
 # 2026-03-04 (Session 47 - Complete Handler Extraction)
 
 ## What We Did:
