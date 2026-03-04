@@ -703,18 +703,21 @@ The Router intentionally skips `web` type connectors (see router.go:84-86). They
 
 ### Current Connector Status
 
-| ID | Type | Status |
-|----|------|--------|
-| opencode | cli | ✅ Active |
-| kimi | cli | Inactive |
-| deepseek-api | api | ✅ Active |
-| gemini-api | api | Inactive |
-| groq-api | api | Pending key |
-| openrouter-api | api | Emergency fallback |
-| chatgpt-web | web | Active (not directly executable) |
-| claude-web | web | Active (not directly executable) |
-| gemini-web | web | Active (not directly executable) |
-| + 5 more web | web | Various |
+| ID | Type | Status | RAM |
+|----|------|--------|-----|
+| opencode | cli | ✅ Active | ~700MB |
+| kilo | cli | Inactive | ~350MB (50% less) |
+| kimi | cli | Inactive | Unknown |
+| deepseek-api | api | ✅ Active | Minimal |
+| gemini-api | api | Inactive | Minimal |
+| groq-api | api | Pending key | Minimal |
+| openrouter-api | api | Emergency fallback | Minimal |
+| chatgpt-web | web | Active (not directly executable) | N/A |
+| claude-web | web | Active (not directly executable) | N/A |
+| gemini-web | web | Active (not directly executable) | N/A |
+| + 5 more web | web | Various | N/A |
+
+**For e2-micro (1GB RAM):** Consider switching from opencode to kilo for 50% RAM savings.
 
 ---
 

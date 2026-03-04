@@ -11,7 +11,19 @@
       "command": "opencode",
       "cli_args": ["run", "--format", "json"],
       "timeout_seconds": 300,
-      "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep"]
+      "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep"],
+      "notes": "Uses ~700MB RAM per session. Consider Kilo for lower memory footprint."
+    },
+    {
+      "id": "kilo",
+      "name": "Kilo CLI",
+      "type": "cli",
+      "status": "inactive",
+      "command": "kilo",
+      "cli_args": ["run"],
+      "timeout_seconds": 300,
+      "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep"],
+      "notes": "Fork of OpenCode with ~350MB RAM (50% less). Supports MCP, worktrees, autonomous mode."
     },
     {
       "id": "kimi",
