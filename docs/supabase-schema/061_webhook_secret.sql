@@ -9,8 +9,7 @@
 INSERT INTO secrets_vault (key_name, encrypted_value, created_at)
 VALUES ('webhook_secret', 'r7N7RGj4nTp2ND5KiL7/JtwOqLQivMeQDOFhAlCejpY2lg+kpd8mfMhv7CrPn/6VxIePy', NOW())
 ON CONFLICT (key_name) DO UPDATE
-SET encrypted_value = 'r7N7RGj4nTp2ND5KiL7/JtwOqLQivMeQDOFhAlCejpY2lg+kpd8mfMhv7CrPn/6VxIePy',
-    updated_at = NOW();
+SET encrypted_value = 'r7N7RGj4nTp2ND5KiL7/JtwOqLQivMeQDOFhAlCejpY2lg+kpd8mfMhv7CrPn/6VxIePy';
 -- INSTRUCTIONS FOR APPLYING
 -- =====================================================
 -- 1. Generate a new secret:
