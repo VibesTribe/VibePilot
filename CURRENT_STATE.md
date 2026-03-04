@@ -40,15 +40,15 @@
 
 ---
 
-## Architecture Status (Updated 2026-03-04)
+## Architecture Status (Updated 2026-03-04 - Session 48)
 
 ### Current Codebase Structure
 
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
-| **Total Go lines** | 12,569 | 4,000-8,000 | ⚠️ Over target |
+| **Total Go lines** | 12,830 | 4,000-8,000 | ⚠️ Over target |
 | **cmd/governor/** | 4,072 | - | ✅ Modular |
-| **internal/** | 8,375 | - | Active + Planned |
+| **internal/** | 8,636 | - | Active + Planned |
 | **pkg/types/** | 122 | - | Legacy |
 
 ---
@@ -78,6 +78,7 @@
 | TestRunner | 296 | Planned | State-tracked test execution |
 | Analyst | 116 | Planned | Pattern detection, daily analysis |
 | Maintenance | 759 | Needs Refactor | Change management (uses pkg/types.Task) |
+| Webhooks | 261 | ✅ Implemented | HTTP server for Supabase webhooks (replaces polling) |
 
 ### Key Findings
 
@@ -155,6 +156,7 @@ Total: 3,371 lines
 | 057 | task_checkpoints.sql | ✅ Applied |
 | 058 | jsonb_parameters.sql | ✅ Applied |
 | 060 | rls_dashboard_safe.sql | ✅ Applied |
+| 061 | webhook_secret.sql | ✅ Applied |
 
 ---
 
@@ -245,8 +247,28 @@ vibePilot-governor.service (Go binary)
 ## Important Notes for Next Session
 
 1. **Architecture refactoring complete** - All handlers extracted
-2. **main.go at752 lines** - Entry point + wireup
+2. **main.go at 752 lines** - Entry point + wireup
 3. **All tests passing** - Run `go test ./cmd/governor/...` before changes
 4. **Clean commits** - Atomic commits after each extraction
 5. **System stable** - Ready for production work
+6. **Webhooks infrastructure added** - HTTP server ready (not yet wired into main.go)
+7. **Security hardened** - RLS enabled, dashboard protected, webhook secret in vault
+
+## Webhooks Status (Session 48)
+
+### Infrastructure Ready
+- ✅ Webhook server implemented (`governor/internal/webhooks/server.go`)
+- ✅ Secret stored in vault (`webhook_secret`)
+- ✅ RLS security fixed (migration 060 applied)
+- ✅ Config added to system.json
+- ⚠️ **NOT YET WIRED** - Webhook server not integrated into main.go
+- ⚠️ **POLLING STILL ACTIVE** - Need to switch to next session
+
+### Next Steps for Webhooks
+1. **Wire webhook server** into main.go (alongside polling for hybrid mode)
+2. **GCE Firewall** - Open port 8080 for Supabase webhooks
+3. **Configure Supabase** - Create webhooks in Supabase dashboard
+4. **Test delivery** - Verify webhooks reach governor
+5. **Monitor** - Compare webhook vs polling latency
+6. **Remove polling** - Once webhooks prove stable
 
