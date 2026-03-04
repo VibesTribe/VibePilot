@@ -118,15 +118,16 @@
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
 | **Total Go lines** | ~11,000 | 4,000-8,000 | ⚠️ Over target |
-| **main.go lines** | 1,713 | <500 | ⚠️ In progress |
-| **Handler files** | 5 created | 10 planned | ⬜ 5 remaining |
+| **main.go lines** | 1,179 | <500 | ⚠️ In progress |
+| **Handler files** | 7 created | 10 planned | ⬜ 3 remaining |
 
 ### File Structure (Current)
 
 ```
 cmd/governor/
-├── main.go              (1,713 lines) - Event handlers, wireup - IN PROGRESS
+├── main.go              (1,179 lines) - Event handlers, wireup - IN PROGRESS
 ├── handlers_task.go     (531 lines)  - Task event handlers ✅ NEW
+├── handlers_plan.go     (576 lines)  - Plan event handlers ✅ NEW
 ├── types.go             (41 lines)   - Shared types ✅
 ├── adapters.go          (36 lines)   - DB adapters ✅
 ├── recovery.go          (255 lines)  - Recovery functions ✅
@@ -134,7 +135,7 @@ cmd/governor/
 ├── helpers.go           (72 lines)   - Shared helpers ✅
 └── main_test.go         (405 lines)  - Integration tests
 
-Total: 3,329 lines (was 2,834 monolithic, now modular)
+Total: 3,371 lines (was 2,834 monolithic, now modular)
 ```
 
 ### Remaining Extractions
@@ -142,11 +143,11 @@ Total: 3,329 lines (was 2,834 monolithic, now modular)
 | File | Est. Lines | Contains | Status |
 |------|------------|----------|--------|
 | `handlers_task.go` | ~530 | EventTaskAvailable, EventTaskReview, EventTaskCompleted | ✅ DONE |
-| `handlers_plan.go` | ~400 | EventPRDReady, EventPlanReview, EventRevisionNeeded, etc. | ⬜ Next |
-| `handlers_council.go` | ~250 | EventCouncilReview, EventCouncilDone | ⬜ |
-| `handlers_research.go` | ~200 | EventResearchReady, EventResearchCouncil | ⬜ |
-| `handlers_maint.go` | ~80 | EventMaintenanceCmd | ⬜ |
-| `handlers_testing.go` | ~100 | EventTestResults | ⬜ |
+| `handlers_plan.go` | ~575 | EventPRDReady, EventPlanReview, EventRevisionNeeded, etc. | ✅ DONE |
+| `handlers_council.go` | ~425 | EventCouncilReview, EventCouncilDone | ⬜ Next |
+| `handlers_research.go` | ~310 | EventResearchReady, EventResearchCouncil | ⬜ |
+| `handlers_maint.go` | ~55 | EventMaintenanceCmd | ⬜ |
+| `handlers_testing.go` | ~120 | EventTestResults | ⬜ |
 
 **Expected final main.go:** ~150 lines (entry point + wireup only)
 
