@@ -59,9 +59,9 @@
   },
   "concurrency": {
     "limits": {
-      "kilo": 2
+      "kilo": 1
     },
-    "default_limit": 3
+    "default_limit": 1
   },
   "security": {
     "leak_detection_enabled": true,
