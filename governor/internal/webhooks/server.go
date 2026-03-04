@@ -75,7 +75,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc(s.path, s.handleWebhook)
 
 	s.server = &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.port),
+		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
 		Handler: mux,
 	}
 
