@@ -21,6 +21,7 @@ type Server struct {
 	path     string
 	secret   string
 	router   *runtime.EventRouter
+	github   *GitHubWebhookHandler
 	server   *http.Server
 	handlers map[string]EventHandler
 }
@@ -58,6 +59,10 @@ func NewServer(cfg *Config, router *runtime.EventRouter) *Server {
 		router:   router,
 		handlers: make(map[string]EventHandler),
 	}
+}
+
+func (s *Server) SetGitHubHandler(handler *GitHubWebhookHandler) {
+	s.github = handler
 }
 
 func (s *Server) RegisterHandler(eventType string, handler EventHandler) {
@@ -115,6 +120,12 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
+	githubEventType := r.Header.Get("X-GitHub-Event")
+	if githubEventType != "" {
+		s.handleGitHubWebhook(w, r, body, githubEventType)
+		return
+	}
+
 	if s.secret != "" {
 		signature := r.Header.Get("X-Supabase-Signature")
 		if !s.verifySignature(body, signature) {
@@ -124,16 +135,16 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var payload Payload
-	if err := json.Unmarshal(body, &payload); err != nil {
+	var supabasePayload Payload
+	if err := json.Unmarshal(body, &supabasePayload); err != nil {
 		log.Printf("[Webhooks] Failed to parse payload: %v", err)
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
 
-	eventType := s.mapToEventType(&payload)
+	eventType := s.mapToEventType(&supabasePayload)
 	if eventType == "" {
-		log.Printf("[Webhooks] Unknown event for table %s, type %s", payload.Table, payload.Type)
+		log.Printf("[Webhooks] Unknown event for table %s, type %s", supabasePayload.Table, supabasePayload.Type)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -141,18 +152,18 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if handler, ok := s.handlers[eventType]; ok {
-		if err := handler(ctx, &payload); err != nil {
+		if err := handler(ctx, &supabasePayload); err != nil {
 			log.Printf("[Webhooks] Handler error for %s: %v", eventType, err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 	}
 
-	recordJSON, _ := json.Marshal(payload.Record)
+	recordJSON, _ := json.Marshal(supabasePayload.Record)
 	event := runtime.Event{
 		Type:      runtime.EventType(eventType),
-		ID:        extractID(payload.Record),
-		Table:     payload.Table,
+		ID:        extractID(supabasePayload.Record),
+		Table:     supabasePayload.Table,
 		Record:    recordJSON,
 		Timestamp: time.Now(),
 	}
@@ -161,7 +172,26 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		s.router.Route(event)
 	}
 
-	log.Printf("[Webhooks] Processed %s from %s", eventType, payload.Table)
+	log.Printf("[Webhooks] Processed %s from %s", eventType, supabasePayload.Table)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleGitHubWebhook(w http.ResponseWriter, r *http.Request, body []byte, eventType string) {
+	if s.github == nil {
+		log.Printf("[GitHub Webhooks] No handler configured for GitHub events")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	ctx := r.Context()
+
+	switch eventType {
+	case "push":
+		s.github.HandlePush(ctx, body)
+	default:
+		log.Printf("[GitHub Webhooks] Unhandled event type: %s", eventType)
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 

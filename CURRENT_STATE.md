@@ -244,17 +244,31 @@ vibePilot-governor.service (Go binary)
 
 ---
 
-## Important Notes for Next Session
-
-1. **Architecture refactoring complete** - All handlers extracted
-2. **main.go at 752 lines** - Entry point + wireup
-3. **All tests passing** - Run `go test ./cmd/governor/...` before changes
-4. **Clean commits** - Atomic commits after each extraction
-5. **System stable** - Ready for production work
-6. **Webhooks infrastructure added** - HTTP server ready (not yet wired into main.go)
-7. **Security hardened** - RLS enabled, dashboard protected, webhook secret in vault
-
 ## Webhooks Status (Session 48)
+
+**Status:** ✅ COMPLETE - Webhooks wired, polling removed
+
+**Manual Steps:**
+1. Get external IP: `curl -s ifconfig.me` → `34.45.124.117`
+2. Configure Supabase webhooks:
+   - Go to Database → Webhooks
+   - Create webhook:
+     - Name: `governor-events`
+     - URL: `http://<GCE-IP>:8080/webhooks`
+     - Tables: `tasks`, `plans`, `prd_files`, `research_suggestions`, `maintenance_commands`, `test_results`
+     - Events: INSERT, UPDATE
+3. Rebuild and restart governor:
+   ```bash
+   cd ~/vibepilot/governor && go build -o governor ./cmd/governor
+   sudo systemctl restart vibepilot-governor
+   ```
+4. Test with real tasks
+5. Monitor logs for issues
+
+6. Update CURRENT_STATE.md, CHANGELOG.md
+7. Push to GitHub
+
+---## Webhooks Status (Session 48)
 
 ### Infrastructure Ready
 - ✅ Webhook server implemented (`governor/internal/webhooks/server.go`)

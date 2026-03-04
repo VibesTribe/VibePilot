@@ -123,14 +123,8 @@ func main() {
 		Secret: webhookSecret,
 	}, eventRouter)
 
-	prdWatcher := runtime.NewPRDWatcher(database, runtime.PRDWatcherConfig{
-		Enabled:   cfg.System.PRDWatcher.Enabled,
-		RepoPath:  cfg.System.PRDWatcher.RepoPath,
-		Branch:    cfg.System.PRDWatcher.Branch,
-		Directory: cfg.System.PRDWatcher.Directory,
-		Interval:  time.Duration(cfg.System.PRDWatcher.IntervalSeconds) * time.Second,
-	})
-	go prdWatcher.Start(ctx)
+	githubHandler := webhooks.NewGitHubWebhookHandler(database, cfg.System.PRDWatcher.RepoPath)
+	webhookServer.SetGitHubHandler(githubHandler)
 
 	go runProcessingRecovery(ctx, database, cfg)
 
