@@ -20,10 +20,10 @@
       "type": "cli",
       "status": "active",
       "command": "kilo",
-      "cli_args": ["run"],
+      "cli_args": ["run", "-m", "zhipuai-coding-plan/glm-5"],
       "timeout_seconds": 300,
       "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep"],
-      "notes": "Fork of OpenCode with ~350MB RAM (50% less). Supports MCP, worktrees, autonomous mode."
+      "notes": "Fork of OpenCode with ~350MB RAM (50% less). Uses GLM-5 via Z.ai subscription."
     },
     {
       "id": "kimi",
