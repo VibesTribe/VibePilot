@@ -46,9 +46,56 @@
 
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
-| **Total Go lines** | ~11,000 | 4,000-8,000 | ⚠️ Over target |
-| **main.go lines** | 752 | <500 | ⚠️ In progress |
-| **Handler files** | 6 created | - | ✅ Complete |
+| **Total Go lines** | 12,569 | 4,000-8,000 | ⚠️ Over target |
+| **cmd/governor/** | 4,072 | - | ✅ Modular |
+| **internal/** | 8,375 | - | Active + Planned |
+| **pkg/types/** | 122 | - | Legacy |
+
+---
+
+## Code Audit Summary (Session 47)
+
+### Component Status
+
+| Package | Lines | Status | Purpose |
+|---------|-------|--------|---------|
+| cmd/governor/ | 4,072 | ✅ Active | Event handlers, wireup |
+| internal/runtime/ | 3,545 | ✅ Active | Events, sessions, config |
+| internal/tools/ | 1,228 | ✅ Active | Tool registry |
+| internal/connectors/ | 632 | ✅ Active + Planned | CLI, API, Courier runners |
+| internal/core/ | 857 | ✅ Active + Planned | State machine, checkpoints |
+| internal/maintenance/ | 759 | Planned | Change management |
+| internal/db/ | 569 | ✅ Active | Supabase client |
+| internal/gitree/ | 379 | ✅ Active | Git operations |
+| internal/vault/ | 337 | ✅ Active | Secret decryption |
+| internal/security/ | 69 | ✅ Active | Leak detection |
+
+### Planned Components (NOT Dead Code)
+
+| Component | Lines | Status | Purpose |
+|-----------|-------|--------|---------|
+| CourierRunner | 239 | Planned | Web platform execution (10 platforms configured) |
+| TestRunner | 296 | Planned | State-tracked test execution |
+| Analyst | 116 | Planned | Pattern detection, daily analysis |
+| Maintenance | 759 | Needs Refactor | Change management (uses pkg/types.Task) |
+
+### Key Findings
+
+1. **No dead code** - All code has purpose
+2. **Planned functionality** - CourierRunner, Analyst, TestRunner ready to wire
+3. **Needs refactoring** - maintenance package uses `pkg/types.Task` instead of `map[string]any`
+4. **Config types** - Some loaded but not consumed (PlanLifecycleConfig sub-types)
+
+### Recommendation
+
+**Do not delete anything.** Architecture is sound with planned future functionality.
+
+| Category | Lines | Verdict |
+|----------|-------|--------|
+| Active code | ~9,500 | Wired and working |
+| Planned code | ~1,500 | Ready to wire when needed |
+| Needs refactor | ~1,200 | maintenance package |
+| Dead code | 0 | None found |
 
 ### File Structure (Current)
 
