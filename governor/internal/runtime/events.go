@@ -602,6 +602,16 @@ func (r *EventRouter) Start(ctx context.Context) error {
 	})
 }
 
+func (r *EventRouter) Route(event Event) {
+	r.mu.RLock()
+	handlers := r.routes[event.Type]
+	r.mu.RUnlock()
+
+	for _, h := range handlers {
+		go h(event)
+	}
+}
+
 func hasCouncilReviews(plan map[string]any) bool {
 	reviews := plan["council_reviews"]
 	if reviews == nil {
