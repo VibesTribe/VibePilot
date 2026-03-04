@@ -196,13 +196,19 @@ CREATE VIEW public.roi_dashboard AS
 SELECT 
     p.id as project_id,
     p.name as project_name,
-    COUNT(t.id) as total_tasks,
-    SUM(CASE WHEN t.status = 'merged' THEN 1 ELSE 0 END) as completed_tasks,
-    AVG(tr.total_savings_usd) as avg_savings_per_task
+    p.status,
+    p.total_tasks,
+    p.completed_tasks,
+    ROUND(((p.completed_tasks::FLOAT / NULLIF(p.total_tasks, 0)) * 100)::numeric, 1) as completion_pct,
+    p.total_tokens_used,
+    ROUND(p.total_theoretical_cost::numeric, 2) as would_have_cost,
+    ROUND(p.total_actual_cost::numeric, 2) as actually_cost,
+    ROUND(p.total_savings::numeric, 2) as savings,
+    CASE WHEN p.total_actual_cost > 0 
+         THEN ROUND(((p.total_savings / p.total_actual_cost) * 100)::numeric, 1)
+         ELSE 0 END as roi_pct
 FROM public.projects p
-LEFT JOIN public.tasks t ON t.slice_id = ANY(p.slice_ids)
-LEFT JOIN public.task_runs tr ON tr.task_id = t.id
-GROUP BY p.id, p.name;
+ORDER BY p.updated_at DESC;
 
 -- =====================================================
 -- 6. VERIFICATION QUERIES
