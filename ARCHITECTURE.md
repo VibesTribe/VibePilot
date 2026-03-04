@@ -640,7 +640,85 @@ case table == "tasks":
 
 ---
 
-## 10. Quick Reference
+## 10. Audit Findings (Session 49)
+
+### What's Working vs Not Wired
+
+| Component | Status | Lines | Notes |
+|-----------|--------|-------|-------|
+| **Connectors** | ✅ Active | 632 | CLIRunner, APIRunner working |
+| **Router** | ✅ Active | 163 | Routes by strategy + category |
+| **Webhooks** | ✅ Active | 420 | GitHub + Supabase |
+| **Event Handlers** | ✅ Active | 4,072 | All 17 handlers wired |
+| **Checkpoint Recovery** | ✅ Active | 255 | Works on startup |
+| **Leak Detection** | ✅ Active | 69 | Scans all outputs |
+| **StateMachine** | ⚠️ Created, not used | 302 | Passed to handlers but they call RPCs directly |
+| **CheckpointManager** | ⚠️ Created, not used | 143 | Same - handlers use direct RPC |
+| **TestRunner** | ⚠️ Not wired | 296 | Created but never invoked |
+| **Analyst** | ⚠️ Not wired | 116 | Created but never scheduled |
+| **CourierRunner** | ⚠️ Not wired | 239 | Web platforms not yet automated |
+| **Maintenance** | ⚠️ Needs refactor | 759 | Uses pkg/types.Task, should use map[string]any |
+| **PollingWatcher** | ❌ Obsolete | ~400 | Replaced by webhooks, can delete |
+| **PRDWatcher** | ❌ Obsolete | 164 | Replaced by GitHub webhooks, can delete |
+
+### Code That Can Be Removed
+
+| Component | Lines | Why |
+|-----------|-------|-----|
+| PollingWatcher | ~400 | Replaced by Supabase webhooks |
+| PRDWatcher | 164 | Replaced by GitHub webhooks |
+| **Total** | ~564 | |
+
+### Code That Looks Unused But ISN'T
+
+| Component | Lines | Why It Exists |
+|-----------|-------|---------------|
+| core/state.go | 302 | Planned - cleaner state abstraction |
+| core/checkpoint.go | 143 | Planned - cleaner checkpoint API |
+| core/test_runner.go | 296 | Planned - automated testing |
+| core/analyst.go | 116 | Planned - daily self-improvement |
+| connectors/courier.go | 239 | Planned - web platform execution |
+| maintenance/*.go | 759 | Needs refactoring, not deletion |
+| pkg/types/types.go | 122 | Dependency of maintenance |
+
+**These are NOT dead code.** They are planned infrastructure awaiting wiring.
+
+### Supabase Gaps
+
+| Gap | Status | Impact |
+|-----|--------|--------|
+| `prd_files` table | Doesn't exist | Not needed - GitHub webhooks create plans directly |
+| 6th webhook | Not configured | Only 5 webhooks needed (no prd_files) |
+| E2E flow verified | ❓ Unknown | Need to run DIAGNOSTIC_WEBHOOK_CHECK.sql |
+
+### Connector Types
+
+| Type | Executable? | Handler | Status |
+|------|-------------|---------|--------|
+| `cli` | ✅ Yes | CLIRunner | Active |
+| `api` | ✅ Yes | APIRunner | Active |
+| `web` | ❌ No | CourierRunner | Not wired |
+
+The Router intentionally skips `web` type connectors (see router.go:84-86). They're for future browser automation.
+
+### Current Connector Status
+
+| ID | Type | Status |
+|----|------|--------|
+| opencode | cli | ✅ Active |
+| kimi | cli | Inactive |
+| deepseek-api | api | ✅ Active |
+| gemini-api | api | Inactive |
+| groq-api | api | Pending key |
+| openrouter-api | api | Emergency fallback |
+| chatgpt-web | web | Active (not directly executable) |
+| claude-web | web | Active (not directly executable) |
+| gemini-web | web | Active (not directly executable) |
+| + 5 more web | web | Various |
+
+---
+
+## 11. Quick Reference
 
 ### Key Files to Read (In Order)
 
