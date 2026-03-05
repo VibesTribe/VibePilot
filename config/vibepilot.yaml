@@ -23,6 +23,7 @@ models:
     status: active
     strengths: [reasoning, planning, review, governance]
     weaknesses: []
+    max_concurrent_tasks: 2  # Prevent resource exhaustion (GLM-5 built-in limit is 5)
     notes: "Primary model for Consultant, Planner, Council, Supervisor"
     
   kimi-k2.5:

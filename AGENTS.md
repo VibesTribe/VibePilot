@@ -41,6 +41,21 @@ Now you understand:
 
 ---
 
+## ⛔ ABSOLUTE RULES
+
+### ⛔ NO MULTIPLE CHOICE FORMS
+
+**Never use restrictive form-style multiple choice questions.**
+
+The user hates them. Previous sessions tried this. It was bad.
+
+**Do this instead:**
+- Ask open questions naturally in plain text
+- Present options in conversation, not as forms
+- Let the user respond in their own words
+
+---
+
 ## CORE ARCHITECTURE PRINCIPLE
 
 **VibePilot is designed to be 100% swappable, portable, and vendor-agnostic.**
