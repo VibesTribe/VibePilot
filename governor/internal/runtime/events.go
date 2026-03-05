@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"sync"
 	"time"
 )
@@ -95,8 +96,17 @@ func (r *EventRouter) Route(event Event) {
 	handlers := r.routes[event.Type]
 	r.mu.RUnlock()
 
+	log.Printf("[EventRouter] Routing event type=%s, handlers=%d", event.Type, len(handlers))
+
 	for _, h := range handlers {
-		go h(event)
+		go func(handler EventHandler, e Event) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[EventRouter] Handler panic: %v", r)
+				}
+			}()
+			handler(e)
+		}(h, event)
 	}
 }
 
