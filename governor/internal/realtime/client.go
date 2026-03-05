@@ -29,16 +29,18 @@ import (
 
 // Client connects to Supabase Realtime and listens for database changes.
 type Client struct {
-	url           string
-	apiKey        string
-	conn          *websocket.Conn
-	router        *runtime.EventRouter
-	subscriptions map[string]*Subscription
-	mu            sync.RWMutex
-	ctx           context.Context
-	cancel        context.CancelFunc
-	connected     bool
-	refCounter    int64
+	url             string
+	apiKey          string
+	conn            *websocket.Conn
+	router          *runtime.EventRouter
+	subscriptions   map[string]*Subscription
+	mu              sync.RWMutex
+	ctx             context.Context
+	cancel          context.CancelFunc
+	connected       bool
+	refCounter      int64
+	heartbeatTicker *time.Ticker
+	isReconnect     bool // Track if this is a reconnect
 }
 
 // Subscription represents a subscription to a table's changes.
@@ -85,17 +87,38 @@ type channelResponse struct {
 
 // ChangeEvent represents a database change event from Realtime.
 type ChangeEvent struct {
-	Columns []struct {
-		Name string `json:"name"`
-		Type string `json:"type"`
-	} `json:"columns"`
-	CommitTimestamp string                 `json:"commit_timestamp"`
-	EventType       string                 `json:"event_type"`
-	Schema          string                 `json:"schema"`
-	Table           string                 `json:"table"`
-	New             map[string]interface{} `json:"new"`
-	Old             map[string]interface{} `json:"old"`
-	Errors          interface{}            `json:"errors"`
+	// Supabase wraps the actual change in a "data" field
+	Data struct {
+		Table     string                 `json:"table"`
+		Type      string                 `json:"type"` // INSERT, UPDATE, DELETE
+		Schema    string                 `json:"schema"`
+		Record    map[string]interface{} `json:"record"`
+		OldRecord map[string]interface{} `json:"old_record"`
+		Columns   []struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+		} `json:"columns"`
+		CommitTimestamp string      `json:"commit_timestamp"`
+		Errors          interface{} `json:"errors"`
+	} `json:"data"`
+	// For backwards compatibility, also support direct fields
+	EventType string                 `json:"event_type"`
+	Table     string                 `json:"table"`
+	Schema    string                 `json:"schema"`
+	New       map[string]interface{} `json:"new"`
+	Old       map[string]interface{} `json:"old"`
+}
+
+// normalize extracts data from the nested structure into flat fields.
+func (ce *ChangeEvent) normalize() {
+	// If data is present, use it
+	if ce.Data.Table != "" {
+		ce.Table = ce.Data.Table
+		ce.EventType = ce.Data.Type
+		ce.Schema = ce.Data.Schema
+		ce.New = ce.Data.Record
+		ce.Old = ce.Data.OldRecord
+	}
 }
 
 // NewClient creates a new Realtime client.
@@ -145,8 +168,17 @@ func (c *Client) Connect() error {
 	c.conn = conn
 	c.connected = true
 
+	// Start heartbeat to keep connection alive
+	c.startHeartbeat()
+
 	// Start message handler
 	go c.readMessages()
+
+	// Only re-subscribe on reconnect (not first connect)
+	if c.isReconnect {
+		go c.resubscribeAll()
+	}
+	c.isReconnect = true // Mark that future connects are reconnects
 
 	log.Printf("[Realtime] Connected successfully")
 	return nil
@@ -224,6 +256,77 @@ func (c *Client) SubscribeToAllTables() error {
 	return nil
 }
 
+// startHeartbeat sends periodic heartbeat messages to keep the connection alive.
+func (c *Client) startHeartbeat() {
+	if c.heartbeatTicker != nil {
+		c.heartbeatTicker.Stop()
+	}
+	c.heartbeatTicker = time.NewTicker(30 * time.Second)
+
+	go func() {
+		for {
+			select {
+			case <-c.ctx.Done():
+				return
+			case <-c.heartbeatTicker.C:
+				if !c.IsConnected() {
+					continue
+				}
+				heartbeat := phoenixMessage{
+					Topic:   "phoenix",
+					Event:   "heartbeat",
+					Payload: json.RawMessage("{}"),
+					Ref:     c.nextRef(),
+				}
+				if err := c.sendMessage(heartbeat); err != nil {
+					log.Printf("[Realtime] Heartbeat failed: %v", err)
+				}
+			}
+		}
+	}()
+}
+
+// resubscribeAll re-subscribes to all channels after reconnect.
+func (c *Client) resubscribeAll() {
+	c.mu.RLock()
+	subs := make([]*Subscription, 0, len(c.subscriptions))
+	for _, sub := range c.subscriptions {
+		subs = append(subs, sub)
+	}
+	c.mu.RUnlock()
+
+	// Small delay to let connection stabilize
+	time.Sleep(500 * time.Millisecond)
+
+	for _, sub := range subs {
+		// Re-send join message
+		joinMsg := phoenixMessage{
+			Topic: sub.Channel,
+			Event: "phx_join",
+			Ref:   c.nextRef(),
+			Payload: mustMarshal(map[string]interface{}{
+				"config": map[string]interface{}{
+					"broadcast": map[string]interface{}{"ack": false, "self": false},
+					"presence":  map[string]interface{}{"key": ""},
+					"postgres_changes": []map[string]interface{}{
+						{
+							"event":  sub.Event,
+							"schema": sub.Schema,
+							"table":  sub.Table,
+						},
+					},
+				},
+			}),
+		}
+
+		if err := c.sendMessage(joinMsg); err != nil {
+			log.Printf("[Realtime] Re-subscribe failed for %s: %v", sub.Table, err)
+		} else {
+			log.Printf("[Realtime] Re-subscribed to table %s", sub.Table)
+		}
+	}
+}
+
 // readMessages continuously reads messages from the WebSocket.
 func (c *Client) readMessages() {
 	for {
@@ -287,6 +390,9 @@ func (c *Client) handlePostgresChange(msg phoenixMessage) {
 		log.Printf("[Realtime] Failed to parse change event: %v", err)
 		return
 	}
+
+	// Normalize nested data structure
+	change.normalize()
 
 	// Skip if no new record data
 	if change.New == nil {
@@ -388,6 +494,9 @@ func (c *Client) sendMessage(msg phoenixMessage) error {
 func (c *Client) handleDisconnect() {
 	c.mu.Lock()
 	c.connected = false
+	if c.heartbeatTicker != nil {
+		c.heartbeatTicker.Stop()
+	}
 	c.mu.Unlock()
 
 	// Attempt reconnection after delay
@@ -396,10 +505,8 @@ func (c *Client) handleDisconnect() {
 		log.Printf("[Realtime] Attempting reconnect...")
 		if err := c.Connect(); err != nil {
 			log.Printf("[Realtime] Reconnect failed: %v", err)
-		} else {
-			// Re-subscribe to all tables
-			c.SubscribeToAllTables()
 		}
+		// resubscribeAll() is called by Connect() when isReconnect is true
 	}()
 }
 
