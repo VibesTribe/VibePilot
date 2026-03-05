@@ -1,7 +1,9 @@
 # Test PRD: Webhook Flow Verification
 
-## Purpose
 Simple test to verify end-to-end webhook flow from GitHub → Supabase → Governor.
+
+## Purpose
+Verify webhooks are working end-to-end after GitHub push, Supabase inserts plan, Governor creates plan and Supabase webhook should fires back to Governor
 
 ## Requirements
 1. Create a simple "hello world" function in Go
