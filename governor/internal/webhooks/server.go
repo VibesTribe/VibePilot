@@ -127,9 +127,23 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.secret != "" {
+		authHeader := r.Header.Get("Authorization")
 		signature := r.Header.Get("X-Supabase-Signature")
-		if !s.verifySignature(body, signature) {
-			log.Printf("[Webhooks] Invalid signature")
+
+		if authHeader != "" {
+			if authHeader != s.secret && authHeader != "Bearer "+s.secret {
+				log.Printf("[Webhooks] Invalid Authorization header")
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+		} else if signature != "" {
+			if !s.verifySignature(body, signature) {
+				log.Printf("[Webhooks] Invalid signature")
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+		} else {
+			log.Printf("[Webhooks] Missing Authorization or X-Supabase-Signature header")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
