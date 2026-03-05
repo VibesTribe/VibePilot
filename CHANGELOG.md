@@ -5,6 +5,81 @@
 
 ---
 
+# 2026-03-05 (Session 51 - Database Cleanup + End-to-End Diagnostics)
+
+## What We Did:
+
+### Phase 1: Database Diagnostics
+1. ✅ Queried Supabase directly via REST API (not SQL editor)
+2. ✅ Found 11 plans in various states (draft, error, revision_needed)
+3. ✅ Found 1 stuck task (in_progress for 2.5 days, never executed)
+4. ✅ Identified root cause: Pool capacity exceeded, task never claimed
+
+### Phase 2: Cleanup
+1. ✅ Deleted all test PRD files from GitHub:
+   - clean-flow-test.md
+   - governor-heartbeat-log.md
+   - governor-log-timestamps.md
+   - governor-startup-message.md
+   - test-autonomous-flow.md
+   - test_webhook.md
+   - vibepilot-flow-test.md
+   - webhook_test_2.md
+2. ✅ Deleted 4 plans from Supabase database
+3. ✅ Deleted 1 stuck task from Supabase database
+4. ✅ Deleted legacy Python code (56 files, 14,753 lines)
+
+### Phase 3: Connector Configuration
+1. ✅ Set deepseek-api to inactive (out of credits)
+2. ✅ Set gemini-api to active (key exists in vault)
+3. ✅ Verified connectors.json has no duplicates (was already clean)
+
+## Commits:
+1. `8dd30f86` - cleanup: remove test PRDs and plans, tasks from database
+2. `c2fe23fd` - cleanup: remove test PRDs, fix connectors.json
+
+## Files Changed:
+- `docs/prd/*.md` (DELETED - all test PRDs)
+- `governor/config/connectors.json` (status updates)
+- `legacy/python/*` (DELETED - 56 files)
+
+## Key Learnings:
+- Can query Supabase directly via REST API with service key
+- Task stuck because pool capacity was 1, something else was running
+- Plans in draft/error were from old test PRDs that never got cleaned up
+- deepseek-api out of credits, gemini-api has key in vault
+
+## Next Steps:
+- Create fresh test PRD to verify end-to-end flow
+- Verify webhooks are actually delivering
+- Test task execution
+
+---
+
+# 2026-03-05 (Session 50 - Session Management + Infrastructure Hardening)
+
+## What We Did:
+
+### Phase 1: Session Management
+1. ✅ Created `kilo-wrapper` - Enforces max 2 kilo sessions
+2. ✅ Created `kilo-count.sh` - Shows running sessions with memory
+3. ✅ Created `governor-wrapper` - Ensures single governor instance
+4. ✅ Added aliases to ~/.bashrc for both wrappers
+
+### Phase 2: Configuration
+1. ✅ Added `max_concurrent_tasks: 2` to GLM-5 in vibepilot.yaml
+2. ✅ Created `config/kilo-session.json` - Session limits config
+3. ✅ Updated `start_session.sh` - Checks kilo sessions at startup
+
+### Phase 3: Documentation
+1. ✅ Added "NO MULTIPLE CHOICE FORMS" rule to AGENTS.md
+2. ✅ Created `docs/hetzner-migration.md` - Migration guide for Hetzner
+
+## Commits:
+1. `5d931afa` - session: kilo/governor wrappers, hetzner migration guide
+
+---
+
 # 2026-03-04 (Session 49 - Critical Bug Fix + Documentation)
 
 ## What We Did:
