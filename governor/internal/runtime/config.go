@@ -588,6 +588,27 @@ func (c *Config) GetDatabaseKey() string {
 	return os.Getenv(c.System.Database.KeyEnv)
 }
 
+// GetRealtimeURL returns the Supabase Realtime WebSocket URL.
+// It constructs this from the database URL by replacing the protocol.
+// Example: https://xyz.supabase.co -> wss://xyz.supabase.co/realtime/v1/websocket
+func (c *Config) GetRealtimeURL() string {
+	dbURL := c.GetDatabaseURL()
+	if dbURL == "" {
+		return ""
+	}
+
+	// Replace https:// with wss:// and add realtime path
+	// https://qtpdzsinvifkgpxyxlaz.supabase.co -> wss://qtpdzsinvifkgpxyxlaz.supabase.co/realtime/v1/websocket
+	realtimeURL := dbURL
+	if len(dbURL) > 8 && dbURL[:8] == "https://" {
+		realtimeURL = "wss://" + dbURL[8:] + "/realtime/v1/websocket"
+	} else if len(dbURL) > 7 && dbURL[:7] == "http://" {
+		realtimeURL = "ws://" + dbURL[7:] + "/realtime/v1/websocket"
+	}
+
+	return realtimeURL
+}
+
 func (c *Config) GetVaultKey() string {
 	return os.Getenv(c.System.Vault.KeyEnv)
 }
