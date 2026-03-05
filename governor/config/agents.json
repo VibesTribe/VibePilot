@@ -8,7 +8,7 @@
       "name": "Consultant",
       "prompt": "consultant.md",
       "capabilities": ["web_access", "file_access", "interactive"],
-      "default_destination": "opencode",
+      "default_connector": "kilo",
       "description": "Human entry point - transforms ideas into zero-ambiguity PRDs"
     },
     {
@@ -16,7 +16,7 @@
       "name": "Planner",
       "prompt": "planner.md",
       "capabilities": ["file_access"],
-      "default_destination": "opencode",
+      "default_connector": "kilo",
       "description": "Breaks PRD into atomic tasks with prompt packets"
     },
     {
@@ -24,7 +24,7 @@
       "name": "Supervisor",
       "prompt": "supervisor.md",
       "capabilities": ["file_access"],
-      "default_destination": "opencode",
+      "default_connector": "kilo",
       "description": "Quality control - approves/rejects, decides simple vs complex"
     },
     {
@@ -32,7 +32,7 @@
       "name": "Council",
       "prompt": "council.md",
       "capabilities": ["file_access", "web_access"],
-      "default_destination": "opencode",
+      "default_connector": "kilo",
       "description": "Deep review for complex decisions - 3 lenses, consensus"
     },
     {
@@ -40,7 +40,7 @@
       "name": "Vibes",
       "prompt": "orchestrator.md",
       "capabilities": [],
-      "default_destination": "opencode",
+      "default_connector": "kilo",
       "description": "Human interface (Vibes) - dispatches tasks, tracks ROI, answers questions"
     },
     {
@@ -48,7 +48,7 @@
       "name": "Maintenance",
       "prompt": "maintenance.md",
       "capabilities": ["git_access", "file_access", "sandbox_execution"],
-      "default_destination": "opencode",
+      "default_connector": "kilo",
       "description": "Code changes - ONLY agent with write access to repo"
     },
     {
@@ -56,7 +56,7 @@
       "name": "System Researcher",
       "prompt": "system_researcher.md",
       "capabilities": ["web_access"],
-      "default_destination": "opencode",
+      "default_connector": "kilo",
       "description": "Daily research for system improvements"
     },
     {
@@ -64,7 +64,7 @@
       "name": "Tester",
       "prompt": "testers.md",
       "capabilities": ["file_access", "sandbox_execution"],
-      "default_destination": "opencode",
+      "default_connector": "kilo",
       "description": "Code validation - runs tests, lint, typecheck"
     },
     {
@@ -72,7 +72,7 @@
       "name": "Watcher",
       "prompt": "watcher.md",
       "capabilities": [],
-      "default_destination": "opencode",
+      "default_connector": "kilo",
       "description": "Safety net - monitors for failures, escalates issues"
     },
     {
@@ -80,7 +80,7 @@
       "name": "Task Runner",
       "prompt": "task_runner.md",
       "capabilities": ["file_access"],
-      "default_destination": "opencode",
+      "default_connector": "kilo",
       "description": "Executes individual tasks - receives packet, produces code"
     }
   ]
