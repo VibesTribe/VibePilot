@@ -1,37 +1,44 @@
-## Session Summary (2026-03-04 - Session 49)
-**Status:** CRITICAL BUG FIXED + COMPREHENSIVE DOCUMENTATION ✅
+## Session Summary (2026-03-05 - Session 50)
+**Status:** SESSION MANAGEMENT + INFRASTRUCTURE HARDENING ✅
 
 ### What We Did:
 
-**Phase 1: Comprehensive Audit**
-1. ✅ Read all handoff documents (SESSION_33, 34, 35, 48)
-2. ✅ Traced the connector vs destination naming issue
-3. ✅ Found the bug introduced in commit 79783e8e
+**Phase 1: Session Management**
+1. ✅ Created `kilo-wrapper` - Enforces max 2 kilo sessions (configurable)
+2. ✅ Created `kilo-count.sh` - Shows running sessions with memory
+3. ✅ Created `governor-wrapper` - Ensures single governor instance
+4. ✅ Added aliases to ~/.bashrc for both wrappers
 
-**Phase 2: Bug Fix**
-1. ✅ Identified: Code looks for `connectors.json`, file was named `destinations.json`
-2. ✅ Fixed: Renamed `destinations.json` → `connectors.json`
-3. ✅ Verified: Governor now loads connectors on startup
-4. ✅ Committed and pushed to main
+**Phase 2: Configuration**
+1. ✅ Added `max_concurrent_tasks: 2` to GLM-5 in vibepilot.yaml
+2. ✅ Created `config/kilo-session.json` - Session limits config
+3. ✅ Updated `start_session.sh` - Checks kilo sessions at startup
 
 **Phase 3: Documentation**
-1. ✅ Created `ARCHITECTURE.md` - Single source of truth
-2. ✅ Updated `AGENTS.md` - Points to ARCHITECTURE.md first
-3. ✅ Updated `061_webhook_secret.sql` - Removed non-existent column
+1. ✅ Added "NO MULTIPLE CHOICE FORMS" rule to AGENTS.md
+2. ✅ Created `docs/hetzner-migration.md` - Migration guide for Hetzner
 
-### Key Fixes:
-- **Connectors now load:** Governor can route tasks to AI models
-- **Documentation complete:** ARCHITECTURE.md explains everything in one place
+**Phase 4: Cleanup**
+1. ✅ Killed duplicate governor process (was running 2 instances)
+2. ✅ Verified memory usage (1.3GB / 7.8GB)
+
+### Key Improvements:
+- **Session limits enforced:** Max 2 kilo sessions, max 2 concurrent tasks for GLM-5
+- **No duplicate governors:** Wrapper ensures single instance
+- **Better guardrails:** AGENTS.md now explicitly forbids multiple choice forms
 
 ### Files Changed This Session:
-- `governor/config/destinations.json` → `governor/config/connectors.json` (renamed)
-- `docs/supabase-schema/061_webhook_secret.sql` (fixed)
-- `ARCHITECTURE.md` (NEW - comprehensive documentation)
-- `AGENTS.md` (updated - references ARCHITECTURE.md)
-- `CURRENT_STATE.md` (this file)
+- `scripts/kilo-wrapper` (NEW)
+- `scripts/kilo-count.sh` (NEW)
+- `scripts/governor-wrapper` (NEW)
+- `config/kilo-session.json` (NEW)
+- `config/vibepilot.yaml` (added max_concurrent_tasks)
+- `start_session.sh` (added session check)
+- `AGENTS.md` (added no multiple choice rule)
+- `docs/hetzner-migration.md` (NEW)
 
 ### Commits This Session:
-1. `ed1ae720` - fix: rename destinations.json to connectors.json, fix 061 migration
+1. `5d931afa` - session: kilo/governor wrappers, hetzner migration guide
 
 ---
 
@@ -147,11 +154,22 @@
    - Check RPC permissions
    - Verify event routing
 
+4. **Consider Hetzner migration:**
+   - Guide created at `docs/hetzner-migration.md`
+   - 2GB RAM for ~$3.50/month vs GCP e2-micro
+
 ---
 
 ## Session History
 
-### Session 49 (2026-03-04) - THIS SESSION
+### Session 50 (2026-03-05) - THIS SESSION
+- Created kilo-wrapper and governor-wrapper for session management
+- Added max_concurrent_tasks: 2 to GLM-5 config
+- Created Hetzner migration guide
+- Added "NO MULTIPLE CHOICE FORMS" rule to AGENTS.md
+- Killed duplicate governor process
+
+### Session 49 (2026-03-04)
 - Fixed connectors.json naming bug
 - Created comprehensive ARCHITECTURE.md
 - Updated AGENTS.md to reference ARCHITECTURE.md
