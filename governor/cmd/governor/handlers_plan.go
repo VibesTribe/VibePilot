@@ -42,14 +42,17 @@ func setupPlanHandlers(
 	}
 
 	router.On(runtime.EventPlanCreated, func(event runtime.Event) {
+		log.Printf("[EventPlanCreated] Handler invoked for event ID=%s", event.ID)
 		startTime := time.Now()
 		var plan map[string]any
 		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			log.Printf("[EventPlanCreated] Failed to unmarshal plan: %v", err)
 			return
 		}
 
 		planID, _ := plan["id"].(string)
 		currentStatus, _ := plan["status"].(string)
+		log.Printf("[EventPlanCreated] Processing plan %s, status=%s", truncateID(planID), currentStatus)
 
 		processingBy := fmt.Sprintf("plan_created:%d", time.Now().UnixNano())
 		claimed, claimErr := database.RPC(ctx, "set_processing", map[string]any{
@@ -58,7 +61,7 @@ func setupPlanHandlers(
 			"p_processing_by": processingBy,
 		})
 		if claimErr != nil || claimed == nil {
-			log.Printf("[EventPlanCreated] Plan %s already being processed", truncateID(planID))
+			log.Printf("[EventPlanCreated] Plan %s claim failed: %v", truncateID(planID), claimErr)
 			return
 		}
 		var claimSuccess bool
@@ -66,8 +69,10 @@ func setupPlanHandlers(
 			log.Printf("[EventPlanCreated] Plan %s already being processed", truncateID(planID))
 			return
 		}
+		log.Printf("[EventPlanCreated] Plan %s claimed successfully", truncateID(planID))
 
 		destID := selectDestination("supervisor", planID, "plan_review")
+		log.Printf("[EventPlanCreated] Selected destination: %s", destID)
 		if destID == "" {
 			log.Printf("[EventPlanCreated] No destination available for plan %s", truncateID(planID))
 			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "no_destination")
@@ -76,9 +81,11 @@ func setupPlanHandlers(
 
 		session, err := factory.Create("supervisor")
 		if err != nil {
+			log.Printf("[EventPlanCreated] Failed to create session: %v", err)
 			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "session_creation_failed")
 			return
 		}
+		log.Printf("[EventPlanCreated] Session created, submitting to pool...")
 
 		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
 			defer database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "review", "plan_review_started")
@@ -97,6 +104,7 @@ func setupPlanHandlers(
 			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "pool_submit_failed")
 			log.Printf("[EventPlanCreated] Failed to submit to pool: %v", err)
 		}
+		log.Printf("[EventPlanCreated] Submitted to pool successfully")
 	})
 
 	router.On(runtime.EventRevisionNeeded, func(event runtime.Event) {
