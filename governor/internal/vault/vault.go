@@ -114,7 +114,7 @@ func (v *Vault) loadVaultKey() []byte {
 		log.Printf("Vault: WARNING - VAULT_KEY not set, decryption will fail")
 		return nil
 	}
-	return deriveKey(key, getMachineSalt())
+	return []byte(key)
 }
 
 func getMachineSalt() []byte {
