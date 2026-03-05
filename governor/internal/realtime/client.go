@@ -403,13 +403,22 @@ func (c *Client) handlePostgresChange(msg phoenixMessage) {
 
 	// Route through the existing event router
 	if c.router != nil {
+		eventType := c.mapToEventType(&change)
+		log.Printf("[Realtime] Mapped %s on %s to event type: %s", change.EventType, change.Table, eventType)
+
+		if eventType == "" {
+			log.Printf("[Realtime] No event type mapped, skipping")
+			return
+		}
+
 		event := runtime.Event{
-			Type:      runtime.EventType(c.mapToEventType(&change)),
+			Type:      runtime.EventType(eventType),
 			ID:        extractID(change.New),
 			Table:     change.Table,
 			Record:    mustMarshal(change.New),
 			Timestamp: time.Now(),
 		}
+		log.Printf("[Realtime] Routing event: Type=%s, ID=%s, Table=%s", event.Type, event.ID, event.Table)
 		c.router.Route(event)
 	}
 
