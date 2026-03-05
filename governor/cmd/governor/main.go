@@ -12,6 +12,7 @@ import (
 	"github.com/vibepilot/governor/internal/core"
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/gitree"
+	"github.com/vibepilot/governor/internal/realtime"
 	"github.com/vibepilot/governor/internal/runtime"
 	"github.com/vibepilot/governor/internal/security"
 	"github.com/vibepilot/governor/internal/tools"
@@ -106,6 +107,23 @@ func main() {
 	connRouter := runtime.NewRouter(cfg, database)
 	eventRouter := runtime.NewEventRouter(nil)
 
+	// Initialize Realtime client (replaces broken pg_net webhooks)
+	var realtimeClient *realtime.Client
+	if realtimeURL := cfg.GetRealtimeURL(); realtimeURL != "" {
+		realtimeClient = realtime.NewClient(&realtime.Config{
+			URL:    realtimeURL,
+			APIKey: dbKey, // Use service key for full access
+		}, eventRouter)
+
+		if err := realtimeClient.Connect(); err != nil {
+			log.Printf("Warning: Failed to connect to Realtime: %v (will retry)", err)
+		} else {
+			if err := realtimeClient.SubscribeToAllTables(); err != nil {
+				log.Printf("Warning: Failed to subscribe to tables: %v", err)
+			}
+		}
+	}
+
 	var webhookSecret string
 	if cfg.IsWebhooksEnabled() {
 		webhookCfg := cfg.GetWebhooksConfig()
@@ -146,6 +164,9 @@ func main() {
 	log.Println("Shutting down...")
 	cancel()
 	webhookServer.Shutdown(ctx)
+	if realtimeClient != nil {
+		realtimeClient.Close()
+	}
 	pool.Wait()
 
 	log.Println("Governor stopped")
