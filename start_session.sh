@@ -19,6 +19,11 @@ echo ""
 
 cd "$SCRIPT_DIR"
 
+# 0. Check running kilo sessions
+echo "🔍 Checking kilo sessions..."
+"$SCRIPT_DIR/scripts/kilo-count.sh" 2>/dev/null
+echo ""
+
 if [ -d "venv" ]; then
     source venv/bin/activate
 fi

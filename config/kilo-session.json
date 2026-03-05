@@ -1,0 +1,7 @@
+{
+  "max_sessions": 2,
+  "max_concurrent_tasks_per_session": 2,
+  "notes": "Max concurrent kilo sessions. Increase when resource issues resolved.",
+  "memory_per_session_mb": 600,
+  "reason": "GLM-5 has 5 concurrent task limit per session. Multiple sessions = memory exhaustion and API rate limits. Restricted to 2 tasks for safety."
+}

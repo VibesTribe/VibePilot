@@ -1,0 +1,67 @@
+#!/bin/bash
+# Wrapper that enforces max kilo sessions (configurable)
+# Run at session start to kill old sessions and ensure limit
+# 
+# Config: ~/vibepilot/config/kilo-session.json
+# Default: max 2 sessions
+
+CONFIG_FILE="$HOME/vibepilot/config/kilo-session.json"
+REAL_BINARY="/usr/lib/node_modules/@kilocode/cli/bin/.kilo"
+
+# Default values
+MAX_SESSIONS=2
+
+# Load config if exists
+if [ -f "$CONFIG_FILE" ]; then
+    max=$(grep -o '"max_sessions"[[:space:]]*:[[:space:]]*[0-9]*' "$CONFIG_FILE" | grep -o '[0-9]*')
+    if [ -n "$max" ] && [ "$max" -gt 0 ]; then
+        MAX_SESSIONS=$max
+    fi
+fi
+
+get_main_pids() {
+    local pids=""
+    for pid in $(pgrep -f "\.kilo" 2>/dev/null); do
+        exe=$(readlink /proc/$pid/exe 2>/dev/null)
+        if [[ "$exe" == *"node"* ]]; then
+            cmdline=$(tr '\0' ' ' < /proc/$pid/cmdline 2>/dev/null)
+            if [[ "$cmdline" == *".kilo"* ]]; then
+                ppid=$(grep PPid /proc/$pid/status 2>/dev/null | awk '{print $2}')
+                parent_cmdline=$(tr '\0' ' ' < /proc/$ppid/cmdline 2>/dev/null)
+                if [[ "$parent_cmdline" != *".kilo"* ]]; then
+                    pids="$pids $pid"
+                fi
+            fi
+        fi
+    done
+    echo $pids
+}
+
+count=0
+pids=$(get_main_pids)
+for pid in $pids; do
+    count=$((count + 1))
+done
+
+if [ "$count" -ge "$MAX_SESSIONS" ]; then
+    echo "⚠️  $count kilo sessions running (max: $MAX_SESSIONS)"
+    echo "Active sessions:"
+    ps aux | grep -E '\.kilo|kilo' | grep -v grep | grep -v wrapper | head -5
+    echo ""
+    
+    kill_count=$((count - MAX_SESSIONS + 1))
+    echo "Killing $kill_count oldest session(s)..."
+    
+    for pid in $(echo $pids | tr ' ' '\n' | sort -n | head -$kill_count); do
+        if [ -n "$pid" ]; then
+            mem=$(ps -p $pid -o rss= 2>/dev/null | awk '{printf "%.0f MB", $1/1024}')
+            echo "  Killing PID $pid ($mem)"
+            kill -9 $pid 2>/dev/null
+        fi
+    done
+    
+    sleep 1
+    echo ""
+fi
+
+exec "$REAL_BINARY" "$@"
