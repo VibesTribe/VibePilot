@@ -30,6 +30,7 @@ type CLIRunner struct {
 	command string
 	cliArgs []string
 	timeout time.Duration
+	workDir string
 }
 
 func NewCLIRunner(command string, timeoutSecs int) *CLIRunner {
@@ -50,6 +51,12 @@ func NewCLIRunnerWithArgs(command string, cliArgs []string, timeoutSecs int) *CL
 	}
 }
 
+func NewCLIRunnerWithWorkDir(command string, cliArgs []string, timeoutSecs int, workDir string) *CLIRunner {
+	r := NewCLIRunnerWithArgs(command, cliArgs, timeoutSecs)
+	r.workDir = workDir
+	return r
+}
+
 func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string, int, int, error) {
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -63,6 +70,10 @@ func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 
 	args := append(r.cliArgs, prompt)
 	cmd := exec.CommandContext(ctx, r.command, args...)
+
+	if r.workDir != "" {
+		cmd.Dir = r.workDir
+	}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
