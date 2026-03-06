@@ -88,7 +88,7 @@ func setupPlanHandlers(
 		log.Printf("[EventPlanCreated] Session created, submitting to pool...")
 
 		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
-			defer database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "review", "plan_review_started")
+			defer database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "review", "plan_created")
 
 			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "plan_created"})
 			if err != nil {
@@ -96,8 +96,43 @@ func setupPlanHandlers(
 				return err
 			}
 
+			plannerOutput, parseErr := runtime.ParsePlannerOutput(result.Output)
+			if parseErr != nil {
+				log.Printf("[EventPlanCreated] Failed to parse planner output: %v", parseErr)
+				database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), false, map[string]any{"error": parseErr.Error()})
+				return nil
+			}
+
+			log.Printf("[EventPlanCreated] Plan %s created, status: %s, tasks: %d", truncateID(planID), plannerOutput.Status, plannerOutput.TotalTasks)
+
+			if plannerOutput.PlanPath != "" && plannerOutput.PlanContent != "" {
+				files := []interface{}{
+					map[string]interface{}{"path": plannerOutput.PlanPath, "content": plannerOutput.PlanContent},
+				}
+				output := map[string]interface{}{"files": files}
+				if commitErr := git.CommitOutput(ctx, "main", output); commitErr != nil {
+					log.Printf("[EventPlanCreated] Failed to commit plan to GitHub: %v", commitErr)
+				} else {
+					log.Printf("[EventPlanCreated] Plan file committed: %s", plannerOutput.PlanPath)
+				}
+			}
+
+			newStatus := plannerOutput.Status
+			if newStatus == "" {
+				newStatus = "review"
+			}
+
+			_, updateErr := database.RPC(ctx, "update_plan_status", map[string]any{
+				"p_plan_id":      planID,
+				"p_status":       newStatus,
+				"p_plan_path":    plannerOutput.PlanPath,
+				"p_review_notes": map[string]any{"plan_content": plannerOutput.PlanContent, "total_tasks": plannerOutput.TotalTasks},
+			})
+			if updateErr != nil {
+				log.Printf("[EventPlanCreated] Failed to update plan status: %v", updateErr)
+			}
+
 			database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), true, nil)
-			log.Printf("[EventPlanCreated] Plan %s triaged via %s: %s", truncateID(planID), destID, truncateOutput(result.Output))
 			return nil
 		})
 		if err != nil {
