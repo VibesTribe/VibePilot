@@ -6,30 +6,27 @@
 
 ## ⛔ STOP. READ THIS FIRST. ⛔
 
-### 1. Read ARCHITECTURE.md (MANDATORY)
+### 1. Read VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md (MANDATORY)
 
-**Before ANY action, read `ARCHITECTURE.md` in full.**
+**Before ANY action, read `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` in full.**
 
 This document contains:
-- What VibePilot is
-- Core principles
-- Coding rules
-- Complete architecture
-- Full flow (PRD → task → completion)
-- All components and where files are
-- Configuration system
-- Security & vault
-- Webhooks
-- Quick reference
+- What VibePilot is and why it exists
+- Core principles (no hardcoding, no Type 1 errors, no multiple choice forms)
+- How the vault works (credentials access)
+- Coding rules (JSONB everywhere, no vendor lock-in)
+- How the dashboard works (READ-ONLY - fix Go code, not dashboard)
+- Complete flow (PRD → task → completion)
+- What is where (file locations)
+- Common tasks quick reference
 
 **Why:** It takes 5 minutes to read and saves hours of confusion. Every session that skipped this wasted 60%+ of context re-learning the basics.
 
 ### 2. Then Read Current State
 
-After ARCHITECTURE.md, read:
-1. `CURRENT_STATE.md` - What's done, what's in progress
+After VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md, read:
+1. `CURRENT_STATE.md` - What's done, what's in progress, what's next
 2. `CHANGELOG.md` - Recent changes
-3. `SESSION_HANDOFF.md` - If continuing from previous session
 
 ### 3. Only Then Act
 
@@ -459,9 +456,8 @@ git push origin main
 
 | Document | Purpose | Read When |
 |----------|---------|-----------|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Single source of truth | **FIRST - every session** |
-| [CURRENT_STATE.md](CURRENT_STATE.md) | What's done, what's next | After ARCHITECTURE.md |
+| [VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md](VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md) | Everything you need | **FIRST - every session** |
+| [CURRENT_STATE.md](CURRENT_STATE.md) | What's done, what's next | After VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md |
 | [CHANGELOG.md](CHANGELOG.md) | Full history | Need context on changes |
-| [SESSION_HANDOFF.md](SESSION_HANDOFF.md) | Session continuity | Continuing from previous |
 | [docs/core_philosophy.md](docs/core_philosophy.md) | Strategic mindset | Need to understand "why" |
 | [docs/supabase-schema/](docs/supabase-schema/) | Database schema | Making schema changes |
