@@ -78,6 +78,7 @@ This fixes the foundation before touching handlers.
 | [`docs/DATA_FLOW_MAPPING.md`](docs/DATA_FLOW_MAPPING.md) | Dashboard → Supabase → Go mapping |
 | [`docs/HOW_DASHBOARD_WORKS.md`](docs/HOW_DASHBOARD_WORKS.md) | Dashboard data flow |
 | [`docs/SUPABASE_ACTUAL_STATE.md`](docs/SUPABASE_ACTUAL_STATE.md) | Current Supabase schema state |
+| [`CHANGELOG.md`](CHANGELOG.md) | Full change history |
 
 ---
 

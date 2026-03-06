@@ -6,7 +6,7 @@
 
 ## ⛔ STOP. READ THIS FIRST. ⛔
 
-### The 3 Files You MUST Read (In Order)
+### The 2 Files You MUST Read (In Order)
 
 **1.** [VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md](VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md)
    - What VibePilot is and why it exists
@@ -20,10 +20,7 @@
    - What's done
    - What's broken
    - What's next
-
-**3.** [CHANGELOG.md](CHANGELOG.md)
-   - Recent changes
-   - Full audit trail
+   - Link to CHANGELOG.md for history
 
 ### Only Then Act
 
@@ -451,10 +448,15 @@ git push origin main
 
 ## Quick Links
 
+**Required Reading (Every Session):**
+| Document | Purpose |
+|----------|---------|
+| [VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md](VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md) | Everything you need |
+| [CURRENT_STATE.md](CURRENT_STATE.md) | What's done, what's next |
+
+**Reference When Needed:**
 | Document | Purpose | Read When |
 |----------|---------|-----------|
-| [VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md](VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md) | Everything you need | **FIRST - every session** |
-| [CURRENT_STATE.md](CURRENT_STATE.md) | What's done, what's next | After VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md |
 | [CHANGELOG.md](CHANGELOG.md) | Full history | Need context on changes |
 | [docs/HOW_DASHBOARD_WORKS.md](docs/HOW_DASHBOARD_WORKS.md) | Dashboard data flow | Fixing dashboard issues |
 | [docs/DATA_FLOW_MAPPING.md](docs/DATA_FLOW_MAPPING.md) | Dashboard → Supabase → Go mapping | Understanding data flow |
