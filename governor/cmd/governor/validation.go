@@ -169,6 +169,30 @@ func parseTasksFromPlanMarkdown(content string) ([]TaskData, error) {
 	return tasks, nil
 }
 
+func findMatchingCodeBlockEnd(content string) int {
+	depth := 1
+	i := 0
+	for i < len(content) {
+		if strings.HasPrefix(content[i:], "```") {
+			if i > 0 && content[i-1] == '\n' {
+				depth++
+			}
+			i += 3
+			continue
+		}
+		if strings.HasPrefix(content[i:], "\n```") {
+			depth--
+			if depth == 0 {
+				return i
+			}
+			i += 4
+			continue
+		}
+		i++
+	}
+	return -1
+}
+
 func parseTaskSection(section string) (TaskData, error) {
 	var task TaskData
 	task.Type = "feature"
@@ -231,7 +255,7 @@ func parseTaskSection(section string) (TaskData, error) {
 			} else if strings.HasPrefix(ppContent, "\n") {
 				ppContent = ppContent[1:]
 			}
-			ppEnd := strings.Index(ppContent, "\n```")
+			ppEnd := findMatchingCodeBlockEnd(ppContent)
 			if ppEnd != -1 {
 				task.PromptPacket = strings.TrimSpace(ppContent[:ppEnd])
 			}
@@ -258,7 +282,7 @@ func parseTaskSection(section string) (TaskData, error) {
 			} else if strings.HasPrefix(eoContent, "\n") {
 				eoContent = eoContent[1:]
 			}
-			eoEnd := strings.Index(eoContent, "\n```")
+			eoEnd := findMatchingCodeBlockEnd(eoContent)
 			if eoEnd != -1 {
 				task.ExpectedOutput = strings.TrimSpace(eoContent[:eoEnd])
 			}
