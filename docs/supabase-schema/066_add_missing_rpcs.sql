@@ -1,14 +1,18 @@
--- VibePilot Migration 066: Update RPCs for Full Functionality
--- Run this in Supabase SQL Editor
+-- VibePilot Migration 066: Fix RPC Signatures
 -- 
--- This REPLACES existing functions with enhanced versions
+-- PROBLEM: Existing functions have different signatures than Go code expects
+-- SOLUTION: Drop old functions with exact signatures, create new ones
+--
+-- Run in Supabase SQL Editor
 
--- Drop existing functions first (to avoid "not unique" error)
+-- ============================================================================
+-- 1. update_task_assignment
+-- EXISTS: (UUID, TEXT, TEXT) RETURNS VOID
+-- NEEDS:  (UUID, TEXT, TEXT, TEXT, TEXT) RETURNS JSONB
+-- ============================================================================
+
 DROP FUNCTION IF EXISTS update_task_assignment(UUID, TEXT, TEXT);
-DROP FUNCTION IF EXISTS record_model_success(TEXT, TEXT, DECIMAL);
-DROP FUNCTION IF EXISTS record_model_failure(TEXT, TEXT);
 
--- 1. update_task_assignment (with routing_flag)
 CREATE OR REPLACE FUNCTION update_task_assignment(
   p_task_id UUID,
   p_status TEXT,
@@ -37,7 +41,67 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 2. create_task_run (NEW - for task_runs table)
+-- ============================================================================
+-- 2. record_model_success
+-- EXISTS: (TEXT, TEXT, FLOAT) RETURNS VOID
+-- NEEDS:  (TEXT, TEXT, DECIMAL, INT) RETURNS VOID
+-- ============================================================================
+
+DROP FUNCTION IF EXISTS record_model_success(TEXT, TEXT, FLOAT);
+
+CREATE OR REPLACE FUNCTION record_model_success(
+  p_model_id TEXT,
+  p_task_type TEXT DEFAULT NULL,
+  p_duration_seconds DECIMAL DEFAULT NULL,
+  p_tokens_used INT DEFAULT 0
+) RETURNS VOID AS $$
+BEGIN
+  UPDATE models
+  SET 
+    tasks_completed = COALESCE(tasks_completed, 0) + 1,
+    tokens_used = COALESCE(tokens_used, 0) + p_tokens_used,
+    success_rate = CASE 
+      WHEN COALESCE(tasks_completed, 0) + COALESCE(tasks_failed, 0) + 1 > 0 
+      THEN (COALESCE(tasks_completed, 0) + 1)::DECIMAL / (COALESCE(tasks_completed, 0) + COALESCE(tasks_failed, 0) + 1)
+      ELSE 1.0
+    END,
+    updated_at = NOW()
+  WHERE id = p_model_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- 3. record_model_failure
+-- EXISTS: (TEXT, TEXT, UUID) RETURNS JSONB  (params: model_id, failure_type, task_id)
+-- NEEDS:  (TEXT, UUID, TEXT, TEXT) RETURNS VOID (params: model_id, task_id, failure_type, failure_category)
+-- ============================================================================
+
+DROP FUNCTION IF EXISTS record_model_failure(TEXT, TEXT, UUID);
+
+CREATE OR REPLACE FUNCTION record_model_failure(
+  p_model_id TEXT,
+  p_task_id UUID DEFAULT NULL,
+  p_failure_type TEXT DEFAULT NULL,
+  p_failure_category TEXT DEFAULT NULL
+) RETURNS VOID AS $$
+BEGIN
+  UPDATE models
+  SET 
+    tasks_failed = COALESCE(tasks_failed, 0) + 1,
+    success_rate = CASE 
+      WHEN COALESCE(tasks_completed, 0) + COALESCE(tasks_failed, 0) + 1 > 0 
+      THEN COALESCE(tasks_completed, 0)::DECIMAL / (COALESCE(tasks_completed, 0) + COALESCE(tasks_failed, 0) + 1)
+      ELSE 0.0
+    END,
+    updated_at = NOW()
+  WHERE id = p_model_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- 4. create_task_run (NEW - doesn't exist yet)
+-- ============================================================================
+
 CREATE OR REPLACE FUNCTION create_task_run(
   p_task_id UUID,
   p_model_id TEXT DEFAULT NULL,
@@ -77,50 +141,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 3. record_model_success (enhanced with tokens_used)
-CREATE OR REPLACE FUNCTION record_model_success(
-  p_model_id TEXT,
-  p_task_type TEXT DEFAULT NULL,
-  p_duration_seconds DECIMAL DEFAULT NULL,
-  p_tokens_used INT DEFAULT 0
-) RETURNS VOID AS $$
-BEGIN
-  UPDATE models
-  SET 
-    tasks_completed = COALESCE(tasks_completed, 0) + 1,
-    tokens_used = COALESCE(tokens_used, 0) + p_tokens_used,
-    success_rate = CASE 
-      WHEN COALESCE(tasks_completed, 0) + COALESCE(tasks_failed, 0) + 1 > 0 
-      THEN (COALESCE(tasks_completed, 0) + 1)::DECIMAL / (COALESCE(tasks_completed, 0) + COALESCE(tasks_failed, 0) + 1)
-      ELSE 1.0
-    END,
-    updated_at = NOW()
-  WHERE id = p_model_id;
-END;
-$$ LANGUAGE plpgsql;
+-- ============================================================================
+-- 5. calculate_run_costs (NEW - doesn't exist yet)
+-- ============================================================================
 
--- 4. record_model_failure (enhanced with task_id and category)
-CREATE OR REPLACE FUNCTION record_model_failure(
-  p_model_id TEXT,
-  p_task_id UUID DEFAULT NULL,
-  p_failure_type TEXT DEFAULT NULL,
-  p_failure_category TEXT DEFAULT NULL
-) RETURNS VOID AS $$
-BEGIN
-  UPDATE models
-  SET 
-    tasks_failed = COALESCE(tasks_failed, 0) + 1,
-    success_rate = CASE 
-      WHEN COALESCE(tasks_completed, 0) + COALESCE(tasks_failed, 0) + 1 > 0 
-      THEN COALESCE(tasks_completed, 0)::DECIMAL / (COALESCE(tasks_completed, 0) + COALESCE(tasks_failed, 0) + 1)
-      ELSE 0.0
-    END,
-    updated_at = NOW()
-  WHERE id = p_model_id;
-END;
-$$ LANGUAGE plpgsql;
-
--- 5. calculate_run_costs (NEW - for ROI)
 CREATE OR REPLACE FUNCTION calculate_run_costs(
   p_model_id TEXT,
   p_tokens_in INT,
@@ -158,11 +182,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Grant permissions
+-- ============================================================================
+-- GRANTS
+-- ============================================================================
+
 GRANT EXECUTE ON FUNCTION update_task_assignment TO service_role;
-GRANT EXECUTE ON FUNCTION create_task_run TO service_role;
 GRANT EXECUTE ON FUNCTION record_model_success TO service_role;
 GRANT EXECUTE ON FUNCTION record_model_failure TO service_role;
+GRANT EXECUTE ON FUNCTION create_task_run TO service_role;
 GRANT EXECUTE ON FUNCTION calculate_run_costs TO service_role;
 
 SELECT 'Migration 066 complete' AS status;
