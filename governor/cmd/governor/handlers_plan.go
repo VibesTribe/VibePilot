@@ -96,6 +96,10 @@ func setupPlanHandlers(
 				return err
 			}
 
+			log.Printf("[EventPlanCreated] Raw planner output: %s", truncateOutput(result.Output))
+
+			log.Printf("[EventPlanCreated] Raw output (first 500 chars): %s", truncateOutput(result.Output))
+
 			plannerOutput, parseErr := runtime.ParsePlannerOutput(result.Output)
 			if parseErr != nil {
 				log.Printf("[EventPlanCreated] Failed to parse planner output: %v", parseErr)
