@@ -43,6 +43,19 @@ func setupTaskHandlers(
 		return result
 	}
 
+	deriveRoutingFlag := func(connectorType string) string {
+		switch connectorType {
+		case "cli", "api":
+			return "internal"
+		case "mcp":
+			return "mcp"
+		case "web":
+			return "web"
+		default:
+			return "internal"
+		}
+	}
+
 	router.On(runtime.EventTaskAvailable, func(event runtime.Event) {
 		var task map[string]any
 		if err := json.Unmarshal(event.Record, &task); err != nil {
@@ -134,16 +147,19 @@ func setupTaskHandlers(
 		if connConfig != nil && connConfig.Type != "" {
 			connectorType = connConfig.Type
 		}
+		routingFlag := deriveRoutingFlag(connectorType)
 
 		_, err = database.RPC(ctx, "update_task_assignment", map[string]any{
-			"p_task_id":     taskID,
-			"p_status":      "in_progress",
-			"p_assigned_to": modelID,
+			"p_task_id":             taskID,
+			"p_status":              "in_progress",
+			"p_assigned_to":         modelID,
+			"p_routing_flag":        routingFlag,
+			"p_routing_flag_reason": fmt.Sprintf("Routed via %s connector", connectorType),
 		})
 		if err != nil {
 			log.Printf("[EventTaskAvailable] Failed to update status to in_progress: %v", err)
 		} else {
-			log.Printf("[EventTaskAvailable] Task %s assigned to model %s via %s", truncateID(taskID), modelID, destID)
+			log.Printf("[EventTaskAvailable] Task %s assigned to model %s via %s (routing=%s)", truncateID(taskID), modelID, destID, routingFlag)
 		}
 
 		session, err := factory.CreateWithContext(ctx, "task_runner", taskCategory)
@@ -191,6 +207,12 @@ func setupTaskHandlers(
 			})
 			if err != nil {
 				log.Printf("[EventTaskAvailable] Task runner failed for %s: %v", truncateID(taskID), err)
+				database.RPC(ctx, "record_model_failure", map[string]any{
+					"p_model_id":         modelID,
+					"p_task_id":          taskID,
+					"p_failure_type":     "execution_error",
+					"p_failure_category": "execution",
+				})
 				return err
 			}
 
@@ -202,12 +224,29 @@ func setupTaskHandlers(
 			tokensIn := result.TokensIn
 			tokensOut := result.TokensOut
 			totalTokens := tokensIn + tokensOut
+			duration := time.Since(runStartTime)
+
+			costsJSON, _ := database.RPC(ctx, "calculate_run_costs", map[string]any{
+				"p_model_id":         modelID,
+				"p_tokens_in":        tokensIn,
+				"p_tokens_out":       tokensOut,
+				"p_courier_cost_usd": 0,
+			})
+
+			var costs struct {
+				TheoreticalCostUsd float64 `json:"theoretical_cost_usd"`
+				ActualCostUsd      float64 `json:"actual_cost_usd"`
+				SavingsUsd         float64 `json:"savings_usd"`
+			}
+			if costsJSON != nil {
+				json.Unmarshal(costsJSON, &costs)
+			}
 
 			runnerOutput := map[string]any{
 				"raw_output": cleanOutput,
 				"model_id":   modelID,
 				"task_id":    taskID,
-				"duration":   result.Duration.Seconds(),
+				"duration":   duration.Seconds(),
 				"tokens_in":  tokensIn,
 				"tokens_out": tokensOut,
 			}
@@ -222,36 +261,55 @@ func setupTaskHandlers(
 				runnerOutput["status"] = taskOutput.Status
 			}
 
-			if err := git.CommitOutput(ctx, branchName, runnerOutput); err != nil {
-				log.Printf("[EventTaskAvailable] Failed to commit output to %s: %v", branchName, err)
+			commitErr := git.CommitOutput(ctx, branchName, runnerOutput)
+			if commitErr != nil {
+				log.Printf("[EventTaskAvailable] Failed to commit output to %s: %v", branchName, commitErr)
 			} else {
 				log.Printf("[EventTaskAvailable] Committed output to %s", branchName)
 			}
 
-			_, err = database.Insert(ctx, "task_runs", map[string]any{
-				"task_id":      taskID,
-				"model_id":     modelID,
-				"courier":      destID,
-				"platform":     connectorType,
-				"tokens_in":    tokensIn,
-				"tokens_out":   tokensOut,
-				"tokens_used":  totalTokens,
-				"status":       "success",
-				"started_at":   runStartTime,
-				"completed_at": time.Now(),
+			_, err = database.RPC(ctx, "create_task_run", map[string]any{
+				"p_task_id":                       taskID,
+				"p_model_id":                      modelID,
+				"p_courier":                       destID,
+				"p_platform":                      connectorType,
+				"p_status":                        "success",
+				"p_tokens_in":                     tokensIn,
+				"p_tokens_out":                    tokensOut,
+				"p_tokens_used":                   totalTokens,
+				"p_courier_model_id":              nil,
+				"p_courier_tokens":                0,
+				"p_courier_cost_usd":              0,
+				"p_platform_theoretical_cost_usd": costs.TheoreticalCostUsd,
+				"p_total_actual_cost_usd":         costs.ActualCostUsd,
+				"p_total_savings_usd":             costs.SavingsUsd,
+				"p_started_at":                    runStartTime,
+				"p_completed_at":                  time.Now(),
 			})
 			if err != nil {
 				log.Printf("[EventTaskAvailable] Warning: Failed to create task_run record: %v", err)
 			} else {
-				log.Printf("[EventTaskAvailable] Created task_run record for task %s: model=%s, tokens=%d", truncateID(taskID), modelID, totalTokens)
+				log.Printf("[EventTaskAvailable] Created task_run record for task %s: model=%s, tokens=%d, savings=$%.4f", truncateID(taskID), modelID, totalTokens, costs.SavingsUsd)
+			}
+
+			database.RPC(ctx, "record_model_success", map[string]any{
+				"p_model_id":         modelID,
+				"p_task_type":        taskCategory,
+				"p_duration_seconds": duration.Seconds(),
+				"p_tokens_used":      totalTokens,
+			})
+
+			newStatus := "review"
+			if commitErr != nil {
+				newStatus = "error"
 			}
 
 			_, err = database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
-				"p_status":  "review",
+				"p_status":  newStatus,
 			})
 			if err != nil {
-				log.Printf("[EventTaskAvailable] Failed to update status to review: %v", err)
+				log.Printf("[EventTaskAvailable] Failed to update status to %s: %v", newStatus, err)
 			}
 
 			if cfg.GetCoreConfig().IsCheckpointEnabled() {
@@ -263,7 +321,7 @@ func setupTaskHandlers(
 				}
 			}
 
-			log.Printf("[EventTaskAvailable] Task %s output committed, status=review", truncateID(taskID))
+			log.Printf("[EventTaskAvailable] Task %s output committed, status=%s", truncateID(taskID), newStatus)
 			return nil
 		})
 		if err != nil {
@@ -359,6 +417,13 @@ func setupTaskHandlers(
 						log.Printf("[EventTaskReview] Failed to record failure: %v", err)
 					}
 				}
+
+				database.RPC(ctx, "record_model_failure", map[string]any{
+					"p_model_id":         modelID,
+					"p_task_id":          taskID,
+					"p_failure_type":     "supervisor_reject",
+					"p_failure_category": "quality",
+				})
 
 				switch decision.NextAction {
 				case "return_to_runner":
@@ -543,6 +608,13 @@ func setupTaskHandlers(
 					log.Printf("[EventTaskCompleted] Failed to record failure: %v", err)
 				}
 			}
+
+			database.RPC(ctx, "record_model_failure", map[string]any{
+				"p_model_id":         modelID,
+				"p_task_id":          taskID,
+				"p_failure_type":     decision.NextAction,
+				"p_failure_category": "quality",
+			})
 
 			switch decision.NextAction {
 			case "return_to_runner":
