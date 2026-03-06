@@ -112,6 +112,8 @@ Each task must have:
 
 ## Prompt Packet Template
 
+The prompt packet should contain ONLY the instructions for the task. Expected Output goes in the separate section.
+
 ```markdown
 # TASK: [task_id] - [title]
 
@@ -124,14 +126,6 @@ Each task must have:
 ## Files
 - `path/to/file.py` - [purpose]
 - `path/to/test.py` - [tests]
-
-## Expected Output
-```json
-{
-  "task_id": "[task_id]",
-  "files_created": ["path/to/file.py"],
-  "tests_written": ["path/to/test.py"]
-}
 ```
 
 ---
@@ -173,8 +167,9 @@ Add a log message after "Governor started" that says "System ready for autonomou
 
 ## Files
 - `governor/cmd/governor/main.go` - Add the log message
+```
 
-## Expected Output
+#### Expected Output
 ```json
 {
   "task_id": "T001",
