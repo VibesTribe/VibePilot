@@ -97,10 +97,24 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 
 	createdCount := 0
 	for _, task := range tasks {
-		// Routing is decided dynamically at execution time
-		// Router considers: dependencies, category, available resources, learned preferences
-		routingFlag := "auto"
-		routingReason := fmt.Sprintf("category=%s, deps=%d", task.Category, len(task.Dependencies))
+		// Initial routing flag based on task characteristics
+		// Router can override at execution time based on available resources
+		var routingFlag string
+		var routingReason string
+
+		switch task.Category {
+		case "coding", "testing", "refactor":
+			routingFlag = "internal"
+			routingReason = fmt.Sprintf("category=%s requires codebase access", task.Category)
+		default:
+			if len(task.Dependencies) > 0 {
+				routingFlag = "internal"
+				routingReason = fmt.Sprintf("category=%s has %d dependencies, may need context", task.Category, len(task.Dependencies))
+			} else {
+				routingFlag = "web"
+				routingReason = fmt.Sprintf("category=%s no dependencies, can use any available resource", task.Category)
+			}
+		}
 
 		// Determine status based on dependencies
 		status := "available"
