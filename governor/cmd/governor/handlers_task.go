@@ -26,7 +26,7 @@ func setupTaskHandlers(
 	checkpointMgr *core.CheckpointManager,
 	leakDetector *security.LeakDetector,
 ) {
-	selectDestination := func(agentID, taskID, taskType string) string {
+	selectRouting := func(agentID, taskID, taskType string) *runtime.RoutingResult {
 		result, err := connRouter.SelectDestination(ctx, runtime.RoutingRequest{
 			AgentID:  agentID,
 			TaskID:   taskID,
@@ -36,11 +36,11 @@ func setupTaskHandlers(
 			log.Printf("[Router] No destination available for agent %s, using fallback", agentID)
 			dests := connRouter.GetAvailableConnectors()
 			if len(dests) > 0 {
-				return dests[0]
+				return &runtime.RoutingResult{DestinationID: dests[0]}
 			}
-			return ""
+			return nil
 		}
-		return result.DestinationID
+		return result
 	}
 
 	router.On(runtime.EventTaskAvailable, func(event runtime.Event) {
@@ -113,22 +113,37 @@ func setupTaskHandlers(
 			log.Printf("[EventTaskAvailable] Created branch %s for task %s", branchName, truncateID(taskID))
 		}
 
-		_, err = database.RPC(ctx, "update_task_status", map[string]any{
-			"p_task_id": taskID,
-			"p_status":  "in_progress",
-		})
-		if err != nil {
-			log.Printf("[EventTaskAvailable] Failed to update status to in_progress: %v", err)
+		routingResult := selectRouting("task_runner", taskID, taskCategory)
+		if routingResult == nil {
+			routingResult = selectRouting("task_runner", taskID, taskType)
 		}
-
-		destID := selectDestination("task_runner", taskID, taskCategory)
-		if destID == "" {
-			destID = selectDestination("task_runner", taskID, taskType)
-		}
-		if destID == "" {
+		if routingResult == nil {
 			log.Printf("[EventTaskAvailable] No destination available for task %s (category=%s, type=%s)", truncateID(taskID), taskCategory, taskType)
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
 			return
+		}
+
+		destID := routingResult.DestinationID
+		modelID := routingResult.ModelID
+		if modelID == "" {
+			modelID = "unknown"
+		}
+
+		connConfig := cfg.GetConnector(destID)
+		connectorType := "cli"
+		if connConfig != nil && connConfig.Type != "" {
+			connectorType = connConfig.Type
+		}
+
+		_, err = database.RPC(ctx, "update_task_assignment", map[string]any{
+			"p_task_id":     taskID,
+			"p_status":      "in_progress",
+			"p_assigned_to": modelID,
+		})
+		if err != nil {
+			log.Printf("[EventTaskAvailable] Failed to update status to in_progress: %v", err)
+		} else {
+			log.Printf("[EventTaskAvailable] Task %s assigned to model %s via %s", truncateID(taskID), modelID, destID)
 		}
 
 		session, err := factory.CreateWithContext(ctx, "task_runner", taskCategory)
@@ -153,6 +168,7 @@ func setupTaskHandlers(
 			}
 		}
 
+		runStartTime := time.Now()
 		err = pool.SubmitWithDestination(ctx, sliceID, destID, func() error {
 			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
 
@@ -183,11 +199,17 @@ func setupTaskHandlers(
 				log.Printf("[EventTaskAvailable] SECURITY: %d leak(s) detected and redacted in task %s output", len(leaks), truncateID(taskID))
 			}
 
+			tokensIn := result.TokensIn
+			tokensOut := result.TokensOut
+			totalTokens := tokensIn + tokensOut
+
 			runnerOutput := map[string]any{
 				"raw_output": cleanOutput,
-				"model_id":   "unknown",
+				"model_id":   modelID,
 				"task_id":    taskID,
 				"duration":   result.Duration.Seconds(),
+				"tokens_in":  tokensIn,
+				"tokens_out": tokensOut,
 			}
 
 			taskOutput, parseErr := runtime.ParseTaskRunnerOutput(result.Output)
@@ -204,6 +226,24 @@ func setupTaskHandlers(
 				log.Printf("[EventTaskAvailable] Failed to commit output to %s: %v", branchName, err)
 			} else {
 				log.Printf("[EventTaskAvailable] Committed output to %s", branchName)
+			}
+
+			_, err = database.Insert(ctx, "task_runs", map[string]any{
+				"task_id":      taskID,
+				"model_id":     modelID,
+				"courier":      destID,
+				"platform":     connectorType,
+				"tokens_in":    tokensIn,
+				"tokens_out":   tokensOut,
+				"tokens_used":  totalTokens,
+				"status":       "success",
+				"started_at":   runStartTime,
+				"completed_at": time.Now(),
+			})
+			if err != nil {
+				log.Printf("[EventTaskAvailable] Warning: Failed to create task_run record: %v", err)
+			} else {
+				log.Printf("[EventTaskAvailable] Created task_run record for task %s: model=%s, tokens=%d", truncateID(taskID), modelID, totalTokens)
 			}
 
 			_, err = database.RPC(ctx, "update_task_status", map[string]any{
@@ -262,12 +302,13 @@ func setupTaskHandlers(
 			return
 		}
 
-		destID := selectDestination("supervisor", taskID, taskType)
-		if destID == "" {
+		routingResult := selectRouting("supervisor", taskID, taskType)
+		if routingResult == nil {
 			log.Printf("[EventTaskReview] No destination available for task %s", truncateID(taskID))
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
 			return
 		}
+		destID := routingResult.DestinationID
 
 		session, err := factory.CreateWithContext(ctx, "supervisor", taskType)
 		if err != nil {
@@ -402,8 +443,8 @@ func setupTaskHandlers(
 			branchName = fmt.Sprintf("task/%s", truncateID(taskID))
 		}
 
-		destID := selectDestination("supervisor", taskID, taskType)
-		if destID == "" {
+		routingResult := selectRouting("supervisor", taskID, taskType)
+		if routingResult == nil {
 			log.Printf("[EventTaskCompleted] No destination available for task %s", truncateID(taskID))
 			recordModelFailure(ctx, database, modelID, taskID, "no_destination")
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
@@ -412,6 +453,7 @@ func setupTaskHandlers(
 
 		session, err := factory.CreateWithContext(ctx, "supervisor", taskType)
 		if err != nil {
+			log.Printf("[EventTaskCompleted] Failed to create supervisor session: %v", err)
 			recordModelFailure(ctx, database, modelID, taskID, "session_create_failed")
 			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "tasks", "p_id": taskID})
 			return
@@ -453,6 +495,7 @@ func setupTaskHandlers(
 			"tokens_out": result.TokensOut,
 			"decision":   decision.Decision,
 		}
+
 		if err := git.CommitOutput(ctx, branchName, output); err != nil {
 			log.Printf("[EventTaskCompleted] Failed to commit output to %s: %v", branchName, err)
 		} else {

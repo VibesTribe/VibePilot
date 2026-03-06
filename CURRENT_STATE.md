@@ -20,7 +20,7 @@ Dashboard showing zeros because Go code wasn't writing:
 5. ✅ Added logging for model assignment
 
 **Migration Created:**
-- `docs/supabase-schema/042_update_task_assignment.sql` - new RPC
+- `docs/supabase-schema/064_update_task_assignment.sql` - new RPC (renumbered from 042, fixed syntax)
 
 ### Commits This Session:
 1. `742b50e4` - docs: update task assignment RPC with model tracking
@@ -36,7 +36,7 @@ Dashboard showing zeros because Go code wasn't writing:
 ### 1. Apply Migration in Supabase
 ```sql
 -- Run in Supabase SQL Editor:
--- Contents of docs/supabase-schema/042_update_task_assignment.sql
+-- Contents of docs/supabase-schema/064_update_task_assignment.sql
 ```
 
 ### 2. Rebuild & Deploy Governor
