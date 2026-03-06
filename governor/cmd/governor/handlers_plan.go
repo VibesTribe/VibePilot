@@ -71,7 +71,7 @@ func setupPlanHandlers(
 		}
 		log.Printf("[EventPlanCreated] Plan %s claimed successfully", truncateID(planID))
 
-		destID := selectDestination("supervisor", planID, "plan_review")
+		destID := selectDestination("planner", planID, "plan_creation")
 		log.Printf("[EventPlanCreated] Selected destination: %s", destID)
 		if destID == "" {
 			log.Printf("[EventPlanCreated] No destination available for plan %s", truncateID(planID))
@@ -79,7 +79,7 @@ func setupPlanHandlers(
 			return
 		}
 
-		session, err := factory.Create("supervisor")
+		session, err := factory.Create("planner")
 		if err != nil {
 			log.Printf("[EventPlanCreated] Failed to create session: %v", err)
 			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "session_creation_failed")
