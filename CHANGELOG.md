@@ -46,7 +46,7 @@ Dashboard showing zeros for all metrics because Go code wasn't writing:
 ## Migration Required:
 **Must apply in Supabase SQL Editor:**
 ```sql
--- See: docs/supabase-schema/042_update_task_assignment.sql
+-- See: docs/supabase-schema/064_update_task_assignment.sql
 CREATE OR REPLACE FUNCTION update_task_assignment(
   p_task_id UUID,
   p_status TEXT,
