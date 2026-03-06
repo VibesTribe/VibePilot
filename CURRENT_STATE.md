@@ -1,61 +1,84 @@
-## Session Summary (2026-03-06 - Session 53)
-**Status:** ROUTING & TRACKING FIXES READY TO DEPLOY 🔧
+## Session Summary (2026-03-06 - Session 54)
+**Status:** DOCUMENTATION & MODEL ASSIGNMENT READY FOR TESTING 📚🔧
 
-### Problem Identified:
-Dashboard showing zeros because Go code wasn't writing:
-1. `tasks.assigned_to` - which model is working on task
-2. `task_runs` records - token tracking per execution
-3. Model ID hardcoded as "unknown" instead of actual model
+### What We Accomplished:
 
-### What We Fixed:
+**1. Documentation (MAJOR):**
+- ✅ Created `HOW_DASHBOARD_WORKS.md` - Complete guide to dashboard data flow
+- ✅ Created `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` - Comprehensive agent guide
+- ✅ Documented vault access methods (saves 30% context window)
+- ✅ Documented dashboard as READ-ONLY (fix Go code, not dashboard)
+- ✅ Documented Supabase Live (no webhooks)
 
-**handlers_task.go:**
-1. ✅ Changed `selectDestination()` → `selectRouting()` returning `*RoutingResult` with both connector ID AND model ID
-2. ✅ Added `update_task_assignment` RPC call to set status AND `assigned_to` atomically
-3. ✅ Added `task_runs` record creation after execution with:
-   - `task_id`, `model_id`, `courier`, `platform`
-   - `tokens_in`, `tokens_out`, `tokens_used`
-   - `started_at`, `completed_at`
-4. ✅ Uses actual model ID from routing result instead of "unknown"
-5. ✅ Added logging for model assignment
+**2. Model Assignment & Token Tracking:**
+- ✅ Fixed migration 064 (renumbered from 042, fixed syntax error)
+- ✅ Applied migration 064 to Supabase
+- ✅ Updated `selectDestination()` to return `*RoutingResult` with ModelID
+- ✅ Updated all handlers to use new return type
+- ✅ Added `update_task_assignment` RPC to set status AND assigned_to
+- ✅ Added glm-5 to kilo connector access_via in models.json
+- ✅ Rebuilt and deployed governor
 
-**Migration Created:**
-- `docs/supabase-schema/064_update_task_assignment.sql` - new RPC (renumbered from 042, fixed syntax)
+**3. Cleanup:**
+- ✅ Cleaned up all test PRDs and plans from GitHub
+- ✅ Cleaned up all test data from Supabase (tasks, task_runs, plans)
+- ✅ Created fresh test PRD for validation
+
+### Key Insights from Dashboard Analysis:
+
+**Dashboard is READ-ONLY:**
+- Displays what VibePilot has already done
+- Does NOT make decisions or route tasks
+- If something doesn't display correctly, fix the Go code
+
+**Critical Fields Dashboard Expects:**
+- `tasks.assigned_to` (text) - Model ID (e.g., "glm-5")
+- `task_runs.model_id` (text) - Which model executed
+- `task_runs.tokens_in`, `tokens_out` (int) - Token counts
+- `task_runs.total_savings_usd` (decimal) - ROI calculation
 
 ### Commits This Session:
-1. `742b50e4` - docs: update task assignment RPC with model tracking
+1. `4e875ac0` - docs: add comprehensive HOW_DASHBOARD_WORKS.md
+2. `a0b9f93c` - fix: implement model assignment and token tracking
+3. `36e428b2` - docs: add VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md
 
 ### Files Changed:
-- `governor/cmd/governor/handlers_task.go` (routing, assignment, task_runs)
-- `docs/supabase-schema/042_update_task_assignment.sql` (new RPC)
+- `docs/HOW_DASHBOARD_WORKS.md` (NEW)
+- `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` (NEW)
+- `governor/cmd/governor/handlers_task.go` (model assignment)
+- `governor/config/models.json` (added kilo to glm-5)
+- `docs/supabase-schema/064_update_task_assignment.sql` (renumbered, fixed)
+- `docs/prd/test-final-model-assignment.md` (NEW test PRD)
 
 ---
 
 ## Next Session MUST Do:
 
-### 1. Apply Migration in Supabase
-```sql
--- Run in Supabase SQL Editor:
--- Contents of docs/supabase-schema/064_update_task_assignment.sql
-```
-
-### 2. Rebuild & Deploy Governor
+### 1. Test End-to-End Flow
 ```bash
-cd ~/vibepilot/governor && go build -o governor ./cmd/governor
-sudo systemctl restart governor
+# PRD is already pushed, should trigger flow
+# Monitor logs:
+journalctl -u governor -f
+
+# Check dashboard for:
+# - Model assignment in task cards
+# - Token counts in task details
+# - ROI savings in header
 ```
 
-### 3. Test End-to-End Flow
-- Push a PRD
-- Verify dashboard shows:
-  - `assigned_to` = model ID (e.g., "glm-5")
-  - Task in progress with model info
-  - Token tracking in ROI
+### 2. Verify Dashboard Shows:
+- [ ] Task status pills (Complete/Active/Pending/Review)
+- [ ] Model ID in task cards (assigned_to field)
+- [ ] Token counts (tokens_in, tokens_out)
+- [ ] ROI savings (total_savings_usd)
+- [ ] Slice groupings (slice_id)
+- [ ] Agent hangar with model status
 
-### 4. Verify Dashboard
-- Model assignment visible
-- Token counts showing
-- ROI calculation working
+### 3. If Dashboard Still Shows Zeros:
+Check these Go code locations:
+- `handlers_task.go:131-140` - update_task_assignment RPC call
+- `handlers_task.go:156-220` - task_runs record creation
+- `router.go:39-72` - SelectDestination returning ModelID
 
 ---
 
@@ -72,11 +95,18 @@ sudo systemctl restart governor
 
 ## Session History
 
-### Session 53 (2026-03-06 late) - THIS SESSION
+### Session 54 (2026-03-06 late) - THIS SESSION
+- Created comprehensive documentation
+- Fixed model assignment and token tracking
+- Analyzed dashboard data flow
+- Documented vault access methods
+- Cleaned up test data
+
+### Session 53 (2026-03-06)
 - Identified dashboard gap (no assigned_to, no task_runs)
 - Fixed routing to return model ID
 - Added task_runs creation with token tracking
-- Created migration 042
+- Created migration 042 (later renumbered to 064)
 
 ### Session 52 (2026-03-06)
 - Fixed full e2e flow
