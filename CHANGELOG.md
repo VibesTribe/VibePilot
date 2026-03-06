@@ -5,6 +5,74 @@
 
 ---
 
+# 2026-03-06 (Session 52 - End-to-End Flow Fixes)
+
+## What We Did:
+
+### Phase 1: Infrastructure Fixes
+1. ✅ Fixed governor restart loop (orphan process PID 575980 holding port 8080)
+2. ✅ Fixed `default_destination` → `default_connector` naming bug in agents.json
+3. ✅ Added `REPO_PATH=/home/mjlockboxsocial/vibepilot` to governor.service
+
+### Phase 2: EventPlanCreated Flow Fixes
+1. ✅ Changed EventPlanCreated to use planner (was incorrectly using supervisor)
+2. ✅ Added planner output processing (parse JSON, commit plan file, update DB)
+3. ✅ Added direct supervisor invocation after planner completes
+4. ✅ Processed supervisor decision:
+   - `approved` → create tasks, update status to "approved"
+   - `needs_revision` → record feedback, update status to "revision_needed"
+   - `council_review` → update status to "council_review"
+
+### Phase 3: Plan Parsing Fix
+1. ✅ Fixed nested code block parsing in Expected Output section
+2. ✅ Added `findMatchingCodeBlockEnd()` to handle ``` inside code blocks
+3. ✅ Tasks now parse correctly from plan markdown
+
+### Phase 4: CLI Runner Fix
+1. ✅ Added `workDir` field to CLIRunner
+2. ✅ Added `NewCLIRunnerWithWorkDir()` constructor
+3. ✅ Set working directory to REPO_PATH so kilo can read PRD files
+
+### Phase 5: Testing
+1. ✅ Verified full flow: PRD → Webhook → Plan → Planner → Supervisor → Tasks
+2. ✅ Tasks created in database with status "available"
+3. ❌ EventTaskAvailable not firing (status field extraction issue)
+
+## Commits:
+1. `d7430b2f` - fix: rename default_destination to default_connector in agents.json
+2. `1c48cb4c` - fix: EventPlanCreated should use planner, not supervisor
+3. `ca863863` - fix: EventPlanCreated now processes planner output properly
+4. `995886e9` - feat: process supervisor decision and create tasks on approval
+5. `f77fb7d9` - fix: handle nested code blocks in plan parsing
+6. `14479838` - fix: set CLI runner working directory to repo path
+7. `8ff3e5a2` - debug: add logging for task status extraction
+
+## Files Changed:
+- `governor/config/agents.json` (default_connector fix)
+- `governor/cmd/governor/handlers_plan.go` (planner/supervisor flow, task creation)
+- `governor/cmd/governor/validation.go` (nested code block parsing)
+- `governor/cmd/governor/main.go` (registerConnectors repoPath param)
+- `governor/internal/connectors/runners.go` (CLIRunner workDir)
+- `governor/internal/realtime/client.go` (debug logging)
+- `/etc/systemd/system/governor.service` (REPO_PATH env)
+
+## Key Learnings:
+- Planner needs to read PRD from repo root, not governor working directory
+- Plan markdown can have nested code blocks (``` inside ```)
+- Realtime subscriptions are INSERT-only by design (avoid UPDATE thundering herd)
+- Direct supervisor invocation after planner avoids needing UPDATE subscriptions
+
+## Remaining Issue:
+- EventTaskAvailable not firing because status field not extracted from Realtime change event
+- Debug logging added to investigate: `log.Printf("[Realtime] Task change: status=%q, ok=%v, action=%s", ...)`
+
+## Next Steps:
+- Fix status field extraction in mapToEventType
+- Verify task execution flow
+- Clean up test PRDs and debug logging
+
+---
+
 # 2026-03-05 (Session 51 - Database Cleanup + End-to-End Diagnostics)
 
 ## What We Did:
