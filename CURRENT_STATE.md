@@ -1,91 +1,84 @@
-## Session Summary (2026-03-06 - Session 52)
-**Status:** END-TO-END FLOW FULLY WORKING ✅
+## Session Summary (2026-03-06 - Session 53)
+**Status:** ROUTING & TRACKING FIXES READY TO DEPLOY 🔧
 
-### What We Did:
+### Problem Identified:
+Dashboard showing zeros because Go code wasn't writing:
+1. `tasks.assigned_to` - which model is working on task
+2. `task_runs` records - token tracking per execution
+3. Model ID hardcoded as "unknown" instead of actual model
 
-**Phase 1: Infrastructure Fixes**
-1. ✅ Fixed governor restart loop (orphan process holding port 8080)
-2. ✅ Fixed `default_destination` → `default_connector` naming bug in agents.json
-3. ✅ Added REPO_PATH env var to governor service
+### What We Fixed:
 
-**Phase 2: Flow Fixes**
-1. ✅ Fixed `EventPlanCreated` using supervisor instead of planner
-2. ✅ Fixed `EventPlanCreated` not processing planner output
-3. ✅ Added direct supervisor invocation after planner completes
-4. ✅ Fixed nested code block parsing in plan markdown
-5. ✅ Fixed CLI runner working directory to repo path
-6. ✅ Fixed task status based on dependencies (available vs pending)
-7. ✅ Added debug logging for realtime status field extraction
+**handlers_task.go:**
+1. ✅ Changed `selectDestination()` → `selectRouting()` returning `*RoutingResult` with both connector ID AND model ID
+2. ✅ Added `update_task_assignment` RPC call to set status AND `assigned_to` atomically
+3. ✅ Added `task_runs` record creation after execution with:
+   - `task_id`, `model_id`, `courier`, `platform`
+   - `tokens_in`, `tokens_out`, `tokens_used`
+   - `started_at`, `completed_at`
+4. ✅ Uses actual model ID from routing result instead of "unknown"
+5. ✅ Added logging for model assignment
 
-**Phase 3: FULL E2E FLOW VERIFIED** ✅
-```
-PRD Push → GitHub Webhook → Plan Created → Planner Runs → 
-Supervisor Reviews → Tasks Created → EventTaskAvailable Fires → 
-Kilo Executes → Branch Pushed
-```
+**Migration Created:**
+- `docs/supabase-schema/042_update_task_assignment.sql` - new RPC
 
-### Commits:
-1. `d7430b2f` - fix: rename default_destination to default_connector
-2. `1c48cb4c` - fix: EventPlanCreated uses planner not supervisor
-3. `ca863863` - fix: EventPlanCreated processes planner output
-4. `995886e9` - feat: process supervisor decision and create tasks on approval
-5. `f77fb7d9` - fix: handle nested code blocks in plan parsing
-6. `14479838` - fix: set CLI runner working directory to repo path
-7. `8ff3e5a2` - debug: add logging for task status extraction
-8. Plus dependency status fix
+### Commits This Session:
+1. `742b50e4` - docs: update task assignment RPC with model tracking
 
-### Verified Flow:
-
-| Step | Status | Evidence |
-|------|--------|----------|
-| PRD pushed to GitHub | ✅ | `test-add-flow.md` pushed |
-| GitHub webhook received | ✅ | `[GitHub Webhooks] New PRD detected` |
-| Plan created in DB | ✅ | `Created plan for PRD` |
-| Planner runs | ✅ | `[EventPlanCreated] Raw planner output` |
-| Plan file committed | ✅ | `Plan file committed: docs/plans/test-add-flow-plan.md` |
-| Supervisor reviews | ✅ | `Supervisor decision: approved, complexity: simple` |
-| Tasks created | ✅ | `Created task T001: Create Add Function with Tests` |
-| EventTaskAvailable fires | ✅ | `[EventTaskAvailable] Task e10d7b7b packet loaded` |
-| Task assigned to kilo | ✅ | `[Router] Selected connector kilo` |
-| Task executed | ✅ | ~1.5 min execution time |
-| Branch pushed | ✅ | `task/T001` branch exists on origin |
-
-### Files Changed This Session:
-- `governor/config/agents.json` (default_connector fix)
-- `governor/cmd/governor/handlers_plan.go` (planner/supervisor flow, task creation)
-- `governor/cmd/governor/validation.go` (nested code blocks, dependency status)
-- `governor/cmd/governor/main.go` (registerConnectors repoPath param)
-- `governor/internal/connectors/runners.go` (CLIRunner workDir)
-- `governor/internal/realtime/client.go` (debug logging)
-- `/etc/systemd/system/governor.service` (REPO_PATH env)
-
-### Known Issues:
-1. Kilo creates too many files (entire repo structure) - prompt issue, not wiring
-2. Debug logging should be removed once stable
+### Files Changed:
+- `governor/cmd/governor/handlers_task.go` (routing, assignment, task_runs)
+- `docs/supabase-schema/042_update_task_assignment.sql` (new RPC)
 
 ---
 
-## Next Session Should
+## Next Session MUST Do:
 
-1. **Clean up:**
-   - Remove test PRDs and plans
-   - Remove debug logging from realtime client
-   - Delete task/T001 branch
+### 1. Apply Migration in Supabase
+```sql
+-- Run in Supabase SQL Editor:
+-- Contents of docs/supabase-schema/042_update_task_assignment.sql
+```
 
-2. **Improve task runner prompt:**
-   - Be more specific about only creating requested files
-   - Don't recreate existing files
+### 2. Rebuild & Deploy Governor
+```bash
+cd ~/vibepilot/governor && go build -o governor ./cmd/governor
+sudo systemctl restart governor
+```
 
-3. **Test more complex scenarios:**
-   - Tasks with dependencies
-   - Multi-task plans
-   - Council review flow
+### 3. Test End-to-End Flow
+- Push a PRD
+- Verify dashboard shows:
+  - `assigned_to` = model ID (e.g., "glm-5")
+  - Task in progress with model info
+  - Token tracking in ROI
+
+### 4. Verify Dashboard
+- Model assignment visible
+- Token counts showing
+- ROI calculation working
+
+---
+
+## Architecture Gaps Still To Address:
+
+| Gap | Status | Priority |
+|-----|--------|----------|
+| Rate limit checking before routing | Not implemented | High |
+| Token estimation for web platforms | Not implemented | Medium |
+| Model capacity tracking | Not implemented | Medium |
+| Auto-pause at 80% limits | Not implemented | Medium |
 
 ---
 
 ## Session History
 
-### Session 52 (2026-03-06) - THIS SESSION
+### Session 53 (2026-03-06 late) - THIS SESSION
+- Identified dashboard gap (no assigned_to, no task_runs)
+- Fixed routing to return model ID
+- Added task_runs creation with token tracking
+- Created migration 042
+
+### Session 52 (2026-03-06)
 - Fixed full e2e flow
 - Verified: PRD → Plan → Tasks → Execution → Branch Push
 - All wiring correct and working
