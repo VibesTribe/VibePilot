@@ -16,3 +16,4 @@ Create a division function for the calculator module.
 ## Technical Notes
 - Place in `internal/calc/divide.go`
 - Tests in `internal/calc/divide_test.go`
+
