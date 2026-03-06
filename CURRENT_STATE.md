@@ -1,5 +1,5 @@
 ## Session Summary (2026-03-06 - Session 52)
-**Status:** END-TO-END FLOW 90% WORKING - TASKS CREATED BUT NOT EXECUTING
+**Status:** END-TO-END FLOW FULLY WORKING ✅
 
 ### What We Did:
 
@@ -12,13 +12,17 @@
 1. ✅ Fixed `EventPlanCreated` using supervisor instead of planner
 2. ✅ Fixed `EventPlanCreated` not processing planner output
 3. ✅ Added direct supervisor invocation after planner completes
-4. ✅ Fixed nested code block parsing in plan markdown (findMatchingCodeBlockEnd)
+4. ✅ Fixed nested code block parsing in plan markdown
 5. ✅ Fixed CLI runner working directory to repo path
+6. ✅ Fixed task status based on dependencies (available vs pending)
+7. ✅ Added debug logging for realtime status field extraction
 
-**Phase 3: Testing**
-1. ✅ Verified full flow: PRD → Webhook → Plan → Planner → Supervisor → Tasks Created
-2. ✅ Tasks appear in database with status "available"
-3. ❌ EventTaskAvailable NOT firing (status field extraction issue)
+**Phase 3: FULL E2E FLOW VERIFIED** ✅
+```
+PRD Push → GitHub Webhook → Plan Created → Planner Runs → 
+Supervisor Reviews → Tasks Created → EventTaskAvailable Fires → 
+Kilo Executes → Branch Pushed
+```
 
 ### Commits:
 1. `d7430b2f` - fix: rename default_destination to default_connector
@@ -28,70 +32,63 @@
 5. `f77fb7d9` - fix: handle nested code blocks in plan parsing
 6. `14479838` - fix: set CLI runner working directory to repo path
 7. `8ff3e5a2` - debug: add logging for task status extraction
+8. Plus dependency status fix
 
-### Current Flow Status:
+### Verified Flow:
 
-| Step | Status | Notes |
-|------|--------|-------|
-| PRD pushed to GitHub | ✅ | Webhook fires |
-| GitHub webhook received | ✅ | Plan created in DB |
-| Realtime INSERT detected | ✅ | EventPlanCreated fires |
-| Planner runs | ✅ | Creates plan file, commits to GitHub |
-| Supervisor reviews | ✅ | Returns decision (approved/needs_revision) |
-| Tasks created in DB | ✅ | Status = "available" |
-| EventTaskAvailable fires | ❌ | Status field extraction failing |
-| Task assigned to agent | ❌ | Event not firing |
-| Task executed | ❌ | Never reached |
-
-### Root Cause of Current Issue:
-
-The Realtime client receives the task INSERT but `mapToEventType` returns empty string:
-```
-[Realtime] Mapped INSERT on tasks to event type:
-[Realtime] No event type mapped, skipping
-```
-
-The status field is not being extracted properly from the change event. Added debug logging to investigate.
+| Step | Status | Evidence |
+|------|--------|----------|
+| PRD pushed to GitHub | ✅ | `test-add-flow.md` pushed |
+| GitHub webhook received | ✅ | `[GitHub Webhooks] New PRD detected` |
+| Plan created in DB | ✅ | `Created plan for PRD` |
+| Planner runs | ✅ | `[EventPlanCreated] Raw planner output` |
+| Plan file committed | ✅ | `Plan file committed: docs/plans/test-add-flow-plan.md` |
+| Supervisor reviews | ✅ | `Supervisor decision: approved, complexity: simple` |
+| Tasks created | ✅ | `Created task T001: Create Add Function with Tests` |
+| EventTaskAvailable fires | ✅ | `[EventTaskAvailable] Task e10d7b7b packet loaded` |
+| Task assigned to kilo | ✅ | `[Router] Selected connector kilo` |
+| Task executed | ✅ | ~1.5 min execution time |
+| Branch pushed | ✅ | `task/T001` branch exists on origin |
 
 ### Files Changed This Session:
-- `governor/config/agents.json` (default_destination → default_connector)
-- `governor/cmd/governor/handlers_plan.go` (planner/supervisor flow)
-- `governor/cmd/governor/validation.go` (nested code block parsing)
-- `governor/cmd/governor/main.go` (CLI runner workDir)
-- `governor/internal/connectors/runners.go` (NewCLIRunnerWithWorkDir)
+- `governor/config/agents.json` (default_connector fix)
+- `governor/cmd/governor/handlers_plan.go` (planner/supervisor flow, task creation)
+- `governor/cmd/governor/validation.go` (nested code blocks, dependency status)
+- `governor/cmd/governor/main.go` (registerConnectors repoPath param)
+- `governor/internal/connectors/runners.go` (CLIRunner workDir)
 - `governor/internal/realtime/client.go` (debug logging)
 - `/etc/systemd/system/governor.service` (REPO_PATH env)
+
+### Known Issues:
+1. Kilo creates too many files (entire repo structure) - prompt issue, not wiring
+2. Debug logging should be removed once stable
 
 ---
 
 ## Next Session Should
 
-1. **Fix EventTaskAvailable firing:**
-   - Check debug logs for status field extraction
-   - May need to check change.New["status"] type (could be interface{} not string)
-   - Fix the mapToEventType function
-
-2. **Once tasks fire:**
-   - Verify task routing (internal vs courier)
-   - Verify task execution
-   - Verify output commit to task branch
-
-3. **Clean up:**
+1. **Clean up:**
    - Remove test PRDs and plans
-   - Remove debug logging
+   - Remove debug logging from realtime client
+   - Delete task/T001 branch
+
+2. **Improve task runner prompt:**
+   - Be more specific about only creating requested files
+   - Don't recreate existing files
+
+3. **Test more complex scenarios:**
+   - Tasks with dependencies
+   - Multi-task plans
+   - Council review flow
 
 ---
 
 ## Session History
 
 ### Session 52 (2026-03-06) - THIS SESSION
-- Fixed governor restart loop
-- Fixed agents.json naming bug
-- Fixed EventPlanCreated flow (planner → supervisor → tasks)
-- Fixed nested code block parsing
-- Fixed CLI runner working directory
-- Verified tasks created in database
-- Identified EventTaskAvailable not firing
+- Fixed full e2e flow
+- Verified: PRD → Plan → Tasks → Execution → Branch Push
+- All wiring correct and working
 
 ### Session 51 (2026-03-05)
 - Database cleanup
