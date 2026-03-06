@@ -1,84 +1,141 @@
 ## Session Summary (2026-03-06 - Session 54)
-**Status:** DOCUMENTATION & MODEL ASSIGNMENT READY FOR TESTING 📚🔧
+**Status:** DASHBOARD & TRACKING FIXES DEPLOYED 📚✅
 
 ### What We Accomplished:
 
 **1. Documentation (MAJOR):**
 - ✅ Created `HOW_DASHBOARD_WORKS.md` - Complete guide to dashboard data flow
-- ✅ Created `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` - Comprehensive agent guide
+- ✅ Created `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` - Master guide with corrected flow
 - ✅ Documented vault access methods (saves 30% context window)
 - ✅ Documented dashboard as READ-ONLY (fix Go code, not dashboard)
-- ✅ Documented Supabase Live (no webhooks)
 
-**2. Model Assignment & Token Tracking:**
-- ✅ Fixed migration 064 (renumbered from 042, fixed syntax error)
-- ✅ Applied migration 064 to Supabase
-- ✅ Updated `selectDestination()` to return `*RoutingResult` with ModelID
-- ✅ Updated all handlers to use new return type
-- ✅ Added `update_task_assignment` RPC to set status AND assigned_to
-- ✅ Added glm-5 to kilo connector access_via in models.json
-- ✅ Rebuilt and deployed governor
+**2. Dashboard Status Mapping (vibeflow repo):**
+- ✅ Added "pending" to TaskStatus type
+- ✅ Fixed statusMap to correctly map:
+  - `pending`/`available` → `"pending"` (not "assigned")
+  - `review` → `"supervisor_review"` (🚩 flag icon)
+- ✅ Removed confusing "assigned" default
 
-**3. Cleanup:**
+**3. Routing Flag (vibepilot repo):**
+- ✅ Changed default from `"web"` to `"internal"` for coding tasks
+- ✅ Coding tasks require codebase access, so should be internal by default
+
+**4. Task Runs Tracking (NEW):**
+- ✅ Added task_runs record creation after task execution
+- ✅ Tracks: model_id, tokens_in, tokens_out, duration
+- ✅ Added create_task_run RPC (migration 065)
+- ✅ Added to RPC allowlist
+
+**5. Cleanup:**
 - ✅ Cleaned up all test PRDs and plans from GitHub
 - ✅ Cleaned up all test data from Supabase (tasks, task_runs, plans)
-- ✅ Created fresh test PRD for validation
-
-### Key Insights from Dashboard Analysis:
-
-**Dashboard is READ-ONLY:**
-- Displays what VibePilot has already done
-- Does NOT make decisions or route tasks
-- If something doesn't display correctly, fix the Go code
-
-**Critical Fields Dashboard Expects:**
-- `tasks.assigned_to` (text) - Model ID (e.g., "glm-5")
-- `task_runs.model_id` (text) - Which model executed
-- `task_runs.tokens_in`, `tokens_out` (int) - Token counts
-- `task_runs.total_savings_usd` (decimal) - ROI calculation
 
 ### Commits This Session:
 1. `4e875ac0` - docs: add comprehensive HOW_DASHBOARD_WORKS.md
 2. `a0b9f93c` - fix: implement model assignment and token tracking
-3. `36e428b2` - docs: add VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md
+3. `82e5dc54` - docs: update CURRENT_STATE.md for session 54
+4. `7fd1f43b` - docs: add VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md with corrected flow
+5. `9e867e66` - fix: add pending status and correct VibePilot status mapping (vibeflow)
+6. `693f24cc` - fix: default routing_flag to internal for coding tasks
+7. `d6481bc8` - feat: add task_runs record creation for token tracking
 
 ### Files Changed:
 - `docs/HOW_DASHBOARD_WORKS.md` (NEW)
 - `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` (NEW)
-- `governor/cmd/governor/handlers_task.go` (model assignment)
+- `governor/cmd/governor/handlers_task.go` (model assignment, task_runs)
+- `governor/cmd/governor/validation.go` (routing_flag default)
 - `governor/config/models.json` (added kilo to glm-5)
-- `docs/supabase-schema/064_update_task_assignment.sql` (renumbered, fixed)
-- `docs/prd/test-final-model-assignment.md` (NEW test PRD)
+- `governor/internal/db/rpc.go` (added create_task_run)
+- `docs/supabase-schema/065_create_task_run.sql` (NEW)
+- `vibeflow/src/core/types.ts` (added pending status)
+- `vibeflow/apps/dashboard/lib/vibepilotAdapter.ts` (fixed statusMap)
+
+---
+
+## Current Issues:
+
+### 1. Migration 065 Needs to Be Applied
+**File:** `docs/supabase-schema/065_create_task_run.sql`
+**Action:** Run in Supabase SQL Editor
+
+```sql
+-- VibePilot Migration 065: Add create_task_run RPC
+CREATE OR REPLACE FUNCTION create_task_run(
+  p_task_id UUID,
+  p_courier TEXT,
+  p_platform TEXT,
+  p_model_id TEXT,
+  p_status TEXT,
+  p_tokens_used INT,
+  p_tokens_in INT,
+  p_tokens_out INT,
+  p_started_at TIMESTAMPTZ,
+  p_completed_at TIMESTAMPTZ
+)
+RETURNS UUID AS $$
+-- See full SQL in docs/supabase-schema/065_create_task_run.sql
+$$ LANGUAGE plpgsql;
+```
+
+### 2. Current Task T001 Stuck in Review
+**Status:** Task executed but status set to "review" even though commit failed
+**Root Cause:** Code sets status to "review" regardless of commit success
+**Fix Needed:** Only set to "review" if commit succeeds, otherwise set to "failed"
+
+### 3. Token Tracking Not Working Yet
+**Problem:** opencode and kilo provide token counts but we're not capturing them
+**Impact:** Dashboard shows 0 tokens, ROI calculator can't work
+**Fix Needed:** Extract tokens from CLI runner output and pass to SessionResult
+
+### 4. ROI Calculator Needs Model Costs
+**Problem:** ROI calculation requires API costs for models
+**Example:** glm-5 
+  - Subscription: $45 USD for 3 months (50% discount from $90)
+  - Need: API cost per 1k tokens (input/output)
+**Fix Needed:** 
+  - Add cost_input_per_1k_usd and cost_output_per_1k_usd to models table
+  - Populate with actual API costs
+  - Calculate theoretical cost vs actual subscription cost
 
 ---
 
 ## Next Session MUST Do:
 
-### 1. Test End-to-End Flow
+### 1. Apply Migration 065 in Supabase
 ```bash
-# PRD is already pushed, should trigger flow
-# Monitor logs:
-journalctl -u governor -f
-
-# Check dashboard for:
-# - Model assignment in task cards
-# - Token counts in task details
-# - ROI savings in header
+# Copy SQL from docs/supabase-schema/065_create_task_run.sql
+# Run in Supabase SQL Editor
 ```
 
-### 2. Verify Dashboard Shows:
-- [ ] Task status pills (Complete/Active/Pending/Review)
-- [ ] Model ID in task cards (assigned_to field)
-- [ ] Token counts (tokens_in, tokens_out)
-- [ ] ROI savings (total_savings_usd)
-- [ ] Slice groupings (slice_id)
-- [ ] Agent hangar with model status
+### 2. Fix Token Tracking in CLI Runner
+**File:** `governor/internal/connectors/runners.go`
+**Action:** Extract tokens from opencode/kilo output and populate SessionResult
 
-### 3. If Dashboard Still Shows Zeros:
-Check these Go code locations:
-- `handlers_task.go:131-140` - update_task_assignment RPC call
-- `handlers_task.go:156-220` - task_runs record creation
-- `router.go:39-72` - SelectDestination returning ModelID
+### 3. Add Model API Costs
+**Files:**
+- `governor/config/models.json` - Add cost fields
+- Update models table with actual API costs
+
+**Example for glm-5:**
+```json
+{
+  "id": "glm-5",
+  "cost_input_per_1k_usd": 0.001,
+  "cost_output_per_1k_usd": 0.002,
+  "subscription_cost_usd": 45.00,
+  "subscription_duration_months": 3
+}
+```
+
+### 4. Test End-to-End Flow
+- Create new test PRD
+- Verify task_runs record created
+- Verify dashboard shows token counts
+- Verify ROI calculation works
+
+### 5. Fix Status Setting Logic
+**File:** `governor/cmd/governor/handlers_task.go`
+**Action:** Only set status to "review" if commit succeeds
 
 ---
 
@@ -86,32 +143,47 @@ Check these Go code locations:
 
 | Gap | Status | Priority |
 |-----|--------|----------|
-| Rate limit checking before routing | Not implemented | High |
+| Token extraction from CLI runners | Not implemented | HIGH |
+| Model API cost tracking | Not implemented | HIGH |
+| ROI calculation with subscription vs API | Not implemented | HIGH |
+| Rate limit checking before routing | Not implemented | Medium |
 | Token estimation for web platforms | Not implemented | Medium |
 | Model capacity tracking | Not implemented | Medium |
 | Auto-pause at 80% limits | Not implemented | Medium |
 
 ---
 
+## Key Learnings This Session:
+
+1. **Dashboard is READ-ONLY** - Always fix Go code, never dashboard
+2. **Status "review"** means supervisor is reviewing task output
+3. **Status "pending"** means task not yet started (waiting for dependencies or resources)
+4. **Status "in_progress"** means actively being worked on by agent/model
+5. **routing_flag "internal"** for coding tasks (need codebase access)
+6. **task_runs table** is critical for token tracking and ROI
+7. **Token tracking** must extract from CLI runner output (opencode/kilo provide it)
+8. **ROI needs** both token counts AND API costs per model
+
+---
+
 ## Session History
 
-### Session 54 (2026-03-06 late) - THIS SESSION
+### Session 54 (2026-03-06) - THIS SESSION
 - Created comprehensive documentation
-- Fixed model assignment and token tracking
-- Analyzed dashboard data flow
-- Documented vault access methods
-- Cleaned up test data
+- Fixed dashboard status mapping
+- Fixed routing_flag default
+- Added task_runs record creation
+- Identified token tracking gap
+- Identified ROI calculation gap
 
 ### Session 53 (2026-03-06)
 - Identified dashboard gap (no assigned_to, no task_runs)
 - Fixed routing to return model ID
-- Added task_runs creation with token tracking
-- Created migration 042 (later renumbered to 064)
+- Created migration 064
 
 ### Session 52 (2026-03-06)
 - Fixed full e2e flow
 - Verified: PRD → Plan → Tasks → Execution → Branch Push
-- All wiring correct and working
 
 ### Session 51 (2026-03-05)
 - Database cleanup
