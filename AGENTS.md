@@ -459,5 +459,7 @@ git push origin main
 | [VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md](VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md) | Everything you need | **FIRST - every session** |
 | [CURRENT_STATE.md](CURRENT_STATE.md) | What's done, what's next | After VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md |
 | [CHANGELOG.md](CHANGELOG.md) | Full history | Need context on changes |
+| [docs/HOW_DASHBOARD_WORKS.md](docs/HOW_DASHBOARD_WORKS.md) | Dashboard data flow | Fixing dashboard issues |
+| [docs/DATA_FLOW_MAPPING.md](docs/DATA_FLOW_MAPPING.md) | Dashboard → Supabase → Go mapping | Understanding data flow |
 | [docs/core_philosophy.md](docs/core_philosophy.md) | Strategic mindset | Need to understand "why" |
 | [docs/supabase-schema/](docs/supabase-schema/) | Database schema | Making schema changes |
