@@ -54,88 +54,69 @@
 
 ## Current Issues:
 
-### 1. Migration 065 Needs to Be Applied
-**File:** `docs/supabase-schema/065_create_task_run.sql`
-**Action:** Run in Supabase SQL Editor
+### 1. task_runs Records Not Being Created (CRITICAL)
+**Problem:** Go code doesn't create task_runs records after task execution
+**Impact:** Dashboard shows 0 tokens, no ROI data, no execution history
+**Files to Fix:**
+- `governor/cmd/governor/handlers_task.go` - Create task_runs record after execution
+- `governor/internal/connectors/runners.go` - Extract tokens from CLI output
 
-```sql
--- VibePilot Migration 065: Add create_task_run RPC
-CREATE OR REPLACE FUNCTION create_task_run(
-  p_task_id UUID,
-  p_courier TEXT,
-  p_platform TEXT,
-  p_model_id TEXT,
-  p_status TEXT,
-  p_tokens_used INT,
-  p_tokens_in INT,
-  p_tokens_out INT,
-  p_started_at TIMESTAMPTZ,
-  p_completed_at TIMESTAMPTZ
-)
-RETURNS UUID AS $$
--- See full SQL in docs/supabase-schema/065_create_task_run.sql
-$$ LANGUAGE plpgsql;
-```
+**Dashboard reads from:** `task_runs` table (tokens_in, tokens_out, costs)
+**See:** `docs/DATA_FLOW_MAPPING.md` for full mapping
 
-### 2. Current Task T001 Stuck in Review
-**Status:** Task executed but status set to "review" even though commit failed
-**Root Cause:** Code sets status to "review" regardless of commit success
-**Fix Needed:** Only set to "review" if commit succeeds, otherwise set to "failed"
+### 2. Token Extraction Not Working (CRITICAL)
+**Problem:** opencode/kilo output contains token counts but we're not extracting them
+**Impact:** task_runs.tokens_* always 0
+**File:** `governor/internal/connectors/runners.go`
+**Action:** Parse CLI output for "Tokens: X in, Y out" pattern
 
-### 3. Token Tracking Not Working Yet
-**Problem:** opencode and kilo provide token counts but we're not capturing them
-**Impact:** Dashboard shows 0 tokens, ROI calculator can't work
-**Fix Needed:** Extract tokens from CLI runner output and pass to SessionResult
+### 3. Status Logic After Execution (HIGH)
+**Problem:** Status set to "review" even if commit fails
+**File:** `governor/cmd/governor/handlers_task.go`
+**Fix:** Only set "review" if commit succeeds, otherwise "failed" or "available"
 
-### 4. ROI Calculator Needs Model Costs
-**Problem:** ROI calculation requires API costs for models
-**Example:** glm-5 
-  - Subscription: $45 USD for 3 months (50% discount from $90)
-  - Need: API cost per 1k tokens (input/output)
-**Fix Needed:** 
-  - Add cost_input_per_1k_usd and cost_output_per_1k_usd to models table
-  - Populate with actual API costs
-  - Calculate theoretical cost vs actual subscription cost
+### 4. assigned_to Field (MEDIUM)
+**Problem:** May not be writing model ID to tasks.assigned_to
+**Impact:** Dashboard shows "Unassigned" for tasks
+**File:** `governor/cmd/governor/handlers_task.go` - EventTaskAvailable
 
 ---
 
-## Next Session MUST Do:
+## Documentation Now Available:
 
-### 1. Apply Migration 065 in Supabase
-```bash
-# Copy SQL from docs/supabase-schema/065_create_task_run.sql
-# Run in Supabase SQL Editor
-```
+| Doc | Purpose |
+|-----|---------|
+| `docs/HOW_DASHBOARD_WORKS.md` | Full dashboard data flow explanation |
+| `docs/DATA_FLOW_MAPPING.md` | Dashboard → Supabase → Go code mapping |
+| `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` | Everything you need to start |
 
-### 2. Fix Token Tracking in CLI Runner
-**File:** `governor/internal/connectors/runners.go`
-**Action:** Extract tokens from opencode/kilo output and populate SessionResult
+---
 
-### 3. Add Model API Costs
+## Next Steps (In Order):
+
+### 1. Read Current Go Code
 **Files:**
-- `governor/config/models.json` - Add cost fields
-- Update models table with actual API costs
+- `governor/cmd/governor/handlers_task.go` - Understand current task handling
+- `governor/internal/connectors/runners.go` - Understand CLI output parsing
 
-**Example for glm-5:**
-```json
-{
-  "id": "glm-5",
-  "cost_input_per_1k_usd": 0.001,
-  "cost_output_per_1k_usd": 0.002,
-  "subscription_cost_usd": 45.00,
-  "subscription_duration_months": 3
-}
-```
+### 2. Fix Token Extraction
+**File:** `governor/internal/connectors/runners.go`
+**Action:** Parse CLI output, populate SessionResult with tokens
 
-### 4. Test End-to-End Flow
-- Create new test PRD
-- Verify task_runs record created
-- Verify dashboard shows token counts
-- Verify ROI calculation works
-
-### 5. Fix Status Setting Logic
+### 3. Create task_runs Record
 **File:** `governor/cmd/governor/handlers_task.go`
-**Action:** Only set status to "review" if commit succeeds
+**Action:** After task execution, insert into task_runs table
+**Note:** May not need new migration - can use direct INSERT via existing Supabase client
+
+### 4. Fix Status Logic
+**File:** `governor/cmd/governor/handlers_task.go`
+**Action:** Only set "review" on commit success
+
+### 5. Test End-to-End
+- Create test PRD
+- Verify task_runs record created
+- Verify dashboard shows tokens
+- Verify ROI calculation works
 
 ---
 
