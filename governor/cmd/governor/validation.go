@@ -102,12 +102,19 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 			routingFlag = "internal"
 		}
 
+		// Determine status based on dependencies
+		status := "available"
+		if len(task.Dependencies) > 0 {
+			// Task has dependencies - starts as pending until deps complete
+			status = "pending"
+		}
+
 		taskID, err := database.RPC(ctx, "create_task_with_packet", map[string]any{
 			"p_plan_id":             planID,
 			"p_task_number":         task.TaskNumber,
 			"p_title":               task.Title,
 			"p_type":                task.Type,
-			"p_status":              "pending",
+			"p_status":              status,
 			"p_priority":            5,
 			"p_confidence":          task.Confidence,
 			"p_category":            task.Category,
