@@ -432,7 +432,8 @@ func (c *Client) mapToEventType(change *ChangeEvent) string {
 
 	switch {
 	case table == "tasks":
-		status, _ := change.New["status"].(string)
+		status, ok := change.New["status"].(string)
+		log.Printf("[Realtime] Task change: status=%q, ok=%v, action=%s", status, ok, action)
 		switch {
 		case status == "available" && action == "INSERT":
 			return string(runtime.EventTaskAvailable)
