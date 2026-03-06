@@ -203,6 +203,27 @@ record_model_success(p_model_id, p_task_type, p_duration_seconds, p_tokens_used)
 
 record_model_failure(p_model_id, p_task_id, p_failure_type, p_failure_category) RETURNS VOID
 
+-- Learning: Heuristics
+get_heuristic(p_task_type, p_condition) RETURNS JSONB
+
+upsert_heuristic(p_task_type, p_condition, p_preferred_model, p_action, p_confidence, p_source) RETURNS UUID
+
+record_heuristic_result(p_heuristic_id, p_success) RETURNS VOID
+
+-- Learning: Planner Rules
+create_planner_rule(p_pattern, p_rule_type, p_action, p_confidence) RETURNS UUID
+
+get_planner_rules(p_rule_type) RETURNS TABLE(...)
+
+record_planner_rule_applied(p_rule_id, p_plan_id, p_success) RETURNS VOID
+
+-- Learning: Supervisor Rules
+create_supervisor_rule(p_pattern, p_rule_type, p_action, p_confidence) RETURNS UUID
+
+get_supervisor_rules(p_rule_type) RETURNS TABLE(...)
+
+record_supervisor_rule(p_task_id, p_rule_id, p_triggered_by, p_outcome) RETURNS VOID
+
 -- Processing
 set_processing(p_table, p_id, p_processing_by) RETURNS BOOLEAN
 clear_processing(p_table, p_id) RETURNS VOID
@@ -502,7 +523,191 @@ On failure, set status="available" to allow retry (up to max_attempts).
 
 ---
 
-## Part 8: File Structure (After Rewrite)
+## Part 8: Learning System (Self-Improvement)
+
+### Overview
+
+VibePilot learns from EVERY task. It improves at every level:
+- **Model selection** → Which model for which task type
+- **Planner rules** → How to break down PRDs better
+- **Supervisor rules** → What to check for quality
+- **Routing preferences** → When to use internal vs web
+- **Failure patterns** → What to avoid
+
+### Learning Tables
+
+```sql
+-- Model performance tracking
+models (
+  tasks_completed INT,
+  tasks_failed INT,
+  success_rate DECIMAL(5,4),
+  learned JSONB  -- {"best_for": ["coding"], "avoid_for": ["research"]}
+)
+
+-- Heuristics (discovered routing optimizations)
+learned_heuristics (
+  task_type TEXT,
+  condition JSONB,      -- {"language": "python", "complexity": "high"}
+  preferred_model TEXT,
+  action JSONB,         -- {"timeout_adjustment": 60}
+  confidence FLOAT,
+  application_count INT,
+  success_count INT,
+  success_rate FLOAT
+)
+
+-- Planner rules (how to plan better)
+planner_rules (
+  pattern TEXT,         -- "multi-file feature"
+  rule_type TEXT,       -- "task_breakdown"
+  action JSONB,         -- {"split_threshold": 3}
+  confidence FLOAT,
+  application_count INT,
+  success_count INT
+)
+
+-- Supervisor rules (what to check)
+supervisor_rules (
+  pattern TEXT,         -- "missing_error_handling"
+  rule_type TEXT,       -- "quality_check"
+  action JSONB,         -- {"require": "error_test"}
+  confidence FLOAT,
+  triggered_count INT,
+  prevented_failures INT
+)
+
+-- Failure records (what went wrong)
+failure_records (
+  task_id UUID,
+  failure_type TEXT,    -- "timeout", "rate_limited", "quality_rejected"
+  failure_category TEXT, -- "model_issue", "platform_issue", "quality_issue"
+  failure_details JSONB,
+  model_id TEXT,
+  platform TEXT
+)
+```
+
+### When Learning Happens
+
+| Event | Learning Action | RPC Called |
+|-------|-----------------|------------|
+| Task passes supervisor | Record model success | `record_model_success()` |
+| Task fails execution | Record model failure | `record_model_failure()` |
+| Task fails supervisor | Create/update supervisor rule | `record_supervisor_rule()` |
+| Plan needs revision | Create/update planner rule | `record_planner_rule()` |
+| Heuristic applied | Track success/failure | `record_heuristic_result()` |
+| Routing decision made | Update model success_rate | (automatic via triggers) |
+
+### Learning Flow
+
+```
+TASK COMPLETES
+    ↓
+Was it successful?
+    ├─ YES → record_model_success()
+    │         ├─ Increment tasks_completed
+    │         ├─ Update success_rate
+    │         └─ Update learned.best_for
+    │
+    └─ NO → record_model_failure()
+              ├─ Increment tasks_failed
+              ├─ Update success_rate
+              ├─ Create failure_record
+              └─ Analyze pattern
+                   └─ If pattern repeats:
+                        ├─ Create learned_heuristic
+                        ├─ Create supervisor_rule
+                        └─ Update routing preferences
+```
+
+### How Router Uses Learning
+
+```go
+func (r *Router) selectModelForDestination(destID, taskType) string {
+    // 1. Check learned heuristics first
+    heuristic := get_heuristic(taskType, currentConditions)
+    if heuristic != nil && heuristic.confidence > 0.8 {
+        return heuristic.preferred_model
+    }
+    
+    // 2. Fall back to success_rate
+    models := get_models_via_destination(destID)
+    sort_by(models, func(m) { 
+        return m.success_rate_for_task_type(taskType)
+    })
+    
+    return models[0].id
+}
+```
+
+### How Supervisor Uses Learning
+
+```go
+func (s *Supervisor) reviewTask(task, output) Decision {
+    // 1. Get all active rules
+    rules := get_supervisor_rules("quality_check")
+    
+    // 2. Check each rule
+    for _, rule := range rules {
+        if matchesPattern(output, rule.pattern) {
+            record_supervisor_rule_applied(rule.id, task.id)
+            if !checkCondition(output, rule.action) {
+                return Decision{
+                    Decision: "fail",
+                    Issues: [{rule.pattern, rule.action.require}],
+                }
+            }
+        }
+    }
+    
+    // 3. Standard checks
+    // ...
+}
+```
+
+### How Planner Uses Learning
+
+```go
+func (p *Planner) createPlan(prd) Plan {
+    // 1. Get planner rules
+    rules := get_planner_rules("task_breakdown")
+    
+    // 2. Apply rules to task creation
+    for _, rule := range rules {
+        if matchesPattern(prd, rule.pattern) {
+            applyRule(tasks, rule.action)
+            record_planner_rule_applied(rule.id, plan.id)
+        }
+    }
+    
+    // 3. Standard planning
+    // ...
+}
+```
+
+### Learning Principles
+
+1. **Every outcome is recorded** - No task completes without learning
+2. **Patterns become rules** - If something fails 3x, create a rule
+3. **Confidence grows with repetition** - More applications = higher confidence
+4. **Rules expire** - Re-learn if rule is stale (> 7 days)
+5. **Human can override** - Rules have source: 'llm_analysis' | 'human'
+
+### What Gets Learned
+
+| Level | What's Learned | Example |
+|-------|----------------|---------|
+| **Model** | Which model for which task | "glm-5 best for Go coding" |
+| **Routing** | When to use internal vs web | "Tasks with deps → internal" |
+| **Planner** | How to break down tasks | "Multi-file → split by file" |
+| **Supervisor** | What to check for quality | "Require error tests for I/O" |
+| **Timeouts** | How long tasks take | "Python tests need 120s" |
+| **Costs** | Actual vs theoretical | "Subscription saves $X" |
+
+---
+
+## Part 9: File Structure (After Rewrite)
 
 ```
 cmd/governor/
@@ -528,7 +733,7 @@ internal/runtime/
 
 ---
 
-## Part 9: Testing Plan
+## Part 10: Testing Plan
 
 ### Test 1: Hello World
 
@@ -559,7 +764,7 @@ internal/runtime/
 
 ---
 
-## Part 10: Success Criteria
+## Part 11: Success Criteria
 
 **After rewrite, ALL of these must work:**
 
@@ -578,7 +783,7 @@ internal/runtime/
 
 ---
 
-## Part 11: Rewrite Order
+## Part 12: Rewrite Order
 
 ### Session 1 (This Session - If Time Permits)
 
@@ -605,7 +810,7 @@ internal/runtime/
 
 ---
 
-## Part 12: Questions Before Starting
+## Part 13: Questions Before Starting
 
 1. **Start with validation.go + router.go** (foundation) OR
 2. **Start with handlers_task.go** (biggest impact)?
