@@ -1,5 +1,12 @@
--- VibePilot Migration 066: Add Missing RPCs
+-- VibePilot Migration 066: Update RPCs for Full Functionality
 -- Run this in Supabase SQL Editor
+-- 
+-- This REPLACES existing functions with enhanced versions
+
+-- Drop existing functions first (to avoid "not unique" error)
+DROP FUNCTION IF EXISTS update_task_assignment(UUID, TEXT, TEXT);
+DROP FUNCTION IF EXISTS record_model_success(TEXT, TEXT, DECIMAL);
+DROP FUNCTION IF EXISTS record_model_failure(TEXT, TEXT);
 
 -- 1. update_task_assignment (with routing_flag)
 CREATE OR REPLACE FUNCTION update_task_assignment(
@@ -30,7 +37,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 2. create_task_run
+-- 2. create_task_run (NEW - for task_runs table)
 CREATE OR REPLACE FUNCTION create_task_run(
   p_task_id UUID,
   p_model_id TEXT DEFAULT NULL,
@@ -70,7 +77,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 3. record_model_success
+-- 3. record_model_success (enhanced with tokens_used)
 CREATE OR REPLACE FUNCTION record_model_success(
   p_model_id TEXT,
   p_task_type TEXT DEFAULT NULL,
@@ -92,7 +99,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 4. record_model_failure
+-- 4. record_model_failure (enhanced with task_id and category)
 CREATE OR REPLACE FUNCTION record_model_failure(
   p_model_id TEXT,
   p_task_id UUID DEFAULT NULL,
@@ -113,7 +120,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 5. calculate_run_costs
+-- 5. calculate_run_costs (NEW - for ROI)
 CREATE OR REPLACE FUNCTION calculate_run_costs(
   p_model_id TEXT,
   p_tokens_in INT,
