@@ -153,7 +153,92 @@ func setupPlanHandlers(
 					if supErr != nil {
 						log.Printf("[EventPlanCreated] Supervisor review failed: %v", supErr)
 					} else {
-						log.Printf("[EventPlanCreated] Supervisor review completed: %s", truncateOutput(supResult.Output))
+						log.Printf("[EventPlanCreated] Supervisor raw output: %s", truncateOutput(supResult.Output))
+
+						review, parseErr := runtime.ParseInitialReview(supResult.Output)
+						if parseErr != nil {
+							log.Printf("[EventPlanCreated] Failed to parse supervisor review: %v", parseErr)
+						} else {
+							log.Printf("[EventPlanCreated] Supervisor decision: %s, complexity: %s", review.Decision, review.Complexity)
+
+							switch review.Decision {
+							case "approved":
+								log.Printf("[EventPlanCreated] Plan %s approved, creating tasks...", truncateID(planID))
+
+								planForTasks := map[string]any{
+									"id":        planID,
+									"plan_path": plannerOutput.PlanPath,
+									"prd_path":  plan["prd_path"],
+								}
+
+								if err := createTasksFromApprovedPlan(ctx, database, planForTasks, cfg.GetValidationConfig(), cfg.GetRepoPath()); err != nil {
+									log.Printf("[EventPlanCreated] Failed to create tasks: %v", err)
+									database.RPC(ctx, "update_plan_status", map[string]any{
+										"p_plan_id":      planID,
+										"p_status":       "error",
+										"p_review_notes": map[string]any{"error": err.Error()},
+									})
+								} else {
+									database.RPC(ctx, "update_plan_status", map[string]any{
+										"p_plan_id": planID,
+										"p_status":  "approved",
+										"p_review_notes": map[string]any{
+											"decision":   review.Decision,
+											"complexity": review.Complexity,
+											"reasoning":  review.Reasoning,
+										},
+									})
+									log.Printf("[EventPlanCreated] Plan %s approved and tasks created", truncateID(planID))
+								}
+
+							case "needs_revision":
+								log.Printf("[EventPlanCreated] Plan %s needs revision: %s", truncateID(planID), review.Reasoning)
+
+								_, err := database.RPC(ctx, "record_revision_feedback", map[string]any{
+									"p_plan_id": planID,
+									"p_feedback": map[string]any{
+										"decision":               review.Decision,
+										"reasoning":              review.Reasoning,
+										"concerns":               review.Concerns,
+										"tasks_needing_revision": review.TasksNeedingRevision,
+									},
+								})
+								if err != nil {
+									log.Printf("[EventPlanCreated] Failed to record revision feedback: %v", err)
+								}
+
+								database.RPC(ctx, "update_plan_status", map[string]any{
+									"p_plan_id": planID,
+									"p_status":  "revision_needed",
+									"p_review_notes": map[string]any{
+										"decision":               review.Decision,
+										"reasoning":              review.Reasoning,
+										"concerns":               review.Concerns,
+										"tasks_needing_revision": review.TasksNeedingRevision,
+									},
+								})
+
+							case "council_review":
+								log.Printf("[EventPlanCreated] Plan %s requires council review (complexity: %s)", truncateID(planID), review.Complexity)
+								database.RPC(ctx, "update_plan_status", map[string]any{
+									"p_plan_id": planID,
+									"p_status":  "council_review",
+									"p_review_notes": map[string]any{
+										"decision":   review.Decision,
+										"complexity": review.Complexity,
+										"reasoning":  review.Reasoning,
+									},
+								})
+
+							default:
+								log.Printf("[EventPlanCreated] Unknown supervisor decision: %s", review.Decision)
+								database.RPC(ctx, "update_plan_status", map[string]any{
+									"p_plan_id":      planID,
+									"p_status":       "error",
+									"p_review_notes": map[string]any{"error": "unknown_decision", "decision": review.Decision},
+								})
+							}
+						}
 					}
 				}
 			}
