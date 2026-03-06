@@ -6,29 +6,26 @@
 
 ## ⛔ STOP. READ THIS FIRST. ⛔
 
-### 1. Read VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md (MANDATORY)
+### The 3 Files You MUST Read (In Order)
 
-**Before ANY action, read `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` in full.**
+**1.** [VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md](VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md)
+   - What VibePilot is and why it exists
+   - Core principles (no hardcoding, no Type 1 errors)
+   - How the vault works (credentials access)
+   - How the dashboard works (READ-ONLY)
+   - Complete flow (PRD → task → completion)
+   - Deep dive links to detailed docs
 
-This document contains:
-- What VibePilot is and why it exists
-- Core principles (no hardcoding, no Type 1 errors, no multiple choice forms)
-- How the vault works (credentials access)
-- Coding rules (JSONB everywhere, no vendor lock-in)
-- How the dashboard works (READ-ONLY - fix Go code, not dashboard)
-- Complete flow (PRD → task → completion)
-- What is where (file locations)
-- Common tasks quick reference
+**2.** [CURRENT_STATE.md](CURRENT_STATE.md)
+   - What's done
+   - What's broken
+   - What's next
 
-**Why:** It takes 5 minutes to read and saves hours of confusion. Every session that skipped this wasted 60%+ of context re-learning the basics.
+**3.** [CHANGELOG.md](CHANGELOG.md)
+   - Recent changes
+   - Full audit trail
 
-### 2. Then Read Current State
-
-After VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md, read:
-1. `CURRENT_STATE.md` - What's done, what's in progress, what's next
-2. `CHANGELOG.md` - Recent changes
-
-### 3. Only Then Act
+### Only Then Act
 
 Now you understand:
 - The system architecture
