@@ -97,15 +97,14 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 
 	createdCount := 0
 	for _, task := range tasks {
-		routingFlag := "web"
-		if task.RequiresCodebase {
-			routingFlag = "internal"
-		}
+		// Routing is decided dynamically at execution time
+		// Router considers: dependencies, category, available resources, learned preferences
+		routingFlag := "auto"
+		routingReason := fmt.Sprintf("category=%s, deps=%d", task.Category, len(task.Dependencies))
 
 		// Determine status based on dependencies
 		status := "available"
 		if len(task.Dependencies) > 0 {
-			// Task has dependencies - starts as pending until deps complete
 			status = "pending"
 		}
 
@@ -119,7 +118,7 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 			"p_confidence":          task.Confidence,
 			"p_category":            task.Category,
 			"p_routing_flag":        routingFlag,
-			"p_routing_flag_reason": fmt.Sprintf("From plan: %s", planPath),
+			"p_routing_flag_reason": routingReason,
 			"p_dependencies":        task.Dependencies,
 			"p_prompt":              task.PromptPacket,
 			"p_expected_output":     task.ExpectedOutput,
