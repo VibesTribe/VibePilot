@@ -5,6 +5,71 @@
 
 ---
 
+# 2026-03-06 (Session 53 - Routing & Dashboard Tracking Fixes)
+
+## Problem:
+Dashboard showing zeros for all metrics because Go code wasn't writing:
+1. `tasks.assigned_to` - which model is working on task
+2. `task_runs` records - token tracking per execution
+3. Model ID was hardcoded as "unknown" instead of actual model
+
+## What We Fixed:
+
+### 1. Routing Returns Model ID
+- Changed `selectDestination()` → `selectRouting()` returning `*RoutingResult`
+- Now returns both `DestinationID` (connector) AND `ModelID` (actual model)
+- Router already selected model, we were just discarding it
+
+### 2. Task Assignment Tracking
+- Added `update_task_assignment` RPC call (replaces `update_task_status`)
+- Sets both `status` AND `assigned_to` atomically
+- Dashboard can now show which model is working on each task
+
+### 3. Task Runs Creation
+- Added `task_runs` record creation after execution:
+  - `task_id`, `model_id`, `courier`, `platform`
+  - `tokens_in`, `tokens_out`, `tokens_used`
+  - `started_at`, `completed_at`, `status`
+- Dashboard ROI calculator reads from this table
+
+### 4. Model ID in Output
+- Changed from `"model_id": "unknown"` to actual model ID
+- Uses `routingResult.ModelID` from router
+
+## Commits:
+1. `742b50e4` - docs: update task assignment RPC with model tracking
+
+## Files Changed:
+- `governor/cmd/governor/handlers_task.go` (major rewrite of EventTaskAvailable)
+- `docs/supabase-schema/042_update_task_assignment.sql` (new migration)
+
+## Migration Required:
+**Must apply in Supabase SQL Editor:**
+```sql
+-- See: docs/supabase-schema/042_update_task_assignment.sql
+CREATE OR REPLACE FUNCTION update_task_assignment(
+  p_task_id UUID,
+  p_status TEXT,
+  p_assigned_to TEXT DEFAULT NULL
+) RETURNS VOID AS $$ ...
+```
+
+## Architecture Gaps Still To Address:
+| Gap | Status | Notes |
+|-----|--------|-------|
+| Rate limit checking | Not implemented | Router should check model capacity before selecting |
+| Token estimation | Not implemented | Web platforms don't report tokens, need estimation |
+| Model capacity tracking | Not implemented | Track usage vs limits, auto-pause at 80% |
+| Cooldown timers | Not implemented | Pause models when limits hit, resume when reset |
+
+## Next Session:
+1. Apply migration 042 in Supabase
+2. Rebuild and deploy governor
+3. Test end-to-end flow
+4. Verify dashboard shows model assignment and token tracking
+
+---
+
 # 2026-03-06 (Session 52 - End-to-End Flow Fixes)
 
 ## What We Did:
