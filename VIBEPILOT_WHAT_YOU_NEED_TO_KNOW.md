@@ -556,6 +556,36 @@ governor/
 
 ---
 
+## 9. Deep Dive References
+
+**When you need more detail than this file provides:**
+
+| Document | When to Read | What It Contains |
+|----------|--------------|------------------|
+| [docs/HOW_DASHBOARD_WORKS.md](docs/HOW_DASHBOARD_WORKS.md) | Fixing dashboard display issues | Full dashboard data flow, all sections, field mappings |
+| [docs/DATA_FLOW_MAPPING.md](docs/DATA_FLOW_MAPPING.md) | Understanding what Go code writes where | Dashboard → Supabase → Go code mapping, current gaps |
+| [docs/supabase-schema/](docs/supabase-schema/) | Making schema changes | All database migrations, numbered SQL files |
+| [docs/core_philosophy.md](docs/core_philosophy.md) | Understanding the "why" | Strategic mindset, principles, decision framework |
+
+### Quick Schema Reference
+
+**Core Tables:**
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `tasks` | Work items | id, title, status, assigned_to, slice_id, routing_flag, dependencies |
+| `task_runs` | Execution history | task_id, model_id, tokens_in, tokens_out, *_cost_usd |
+| `models` | AI model registry | id, name, status, context_limit, subscription_* |
+| `platforms` | Web platforms | id, name, status, config (free_tier, capabilities) |
+| `plans` | Plan records | id, prd_id, status, plan_path |
+| `orchestrator_events` | Event log | event_type, task_id, model_id, reason |
+
+**Key RPCs:**
+- `claim_next_task(courier, platform, model_id)` - Atomically claim task
+- `update_task_status(task_id, status)` - Update task status
+- `unlock_dependent_tasks(completed_task_id)` - Unlock waiting tasks
+
+---
+
 ## Start of Session Checklist
 
 **Every session, do this:**
@@ -632,4 +662,6 @@ cd ~/vibepilot && git add docs/prd/test-feature.md && git commit -m "test: add t
 - **Supabase = State source of truth**
 - **Use sudo + systemctl to access Supabase** - Don't waste time looking for .env files
 
-**Questions? Check ARCHITECTURE.md or ask the human.**
+**Need more detail?** See Section 9 for deep dive references.
+
+**Questions?** Ask the human.
