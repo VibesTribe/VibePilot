@@ -136,6 +136,28 @@ func setupPlanHandlers(
 				log.Printf("[EventPlanCreated] Failed to update plan status: %v", updateErr)
 			}
 
+			if newStatus == "review" {
+				log.Printf("[EventPlanCreated] Triggering supervisor review for plan %s", truncateID(planID))
+				supervisorSession, supErr := factory.Create("supervisor")
+				if supErr != nil {
+					log.Printf("[EventPlanCreated] Failed to create supervisor session: %v", supErr)
+				} else {
+					updatedPlan := map[string]any{
+						"id":           planID,
+						"prd_path":     plan["prd_path"],
+						"plan_path":    plannerOutput.PlanPath,
+						"status":       newStatus,
+						"plan_content": plannerOutput.PlanContent,
+					}
+					supResult, supErr := supervisorSession.Run(ctx, map[string]any{"plan": updatedPlan, "event": "plan_review"})
+					if supErr != nil {
+						log.Printf("[EventPlanCreated] Supervisor review failed: %v", supErr)
+					} else {
+						log.Printf("[EventPlanCreated] Supervisor review completed: %s", truncateOutput(supResult.Output))
+					}
+				}
+			}
+
 			database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), true, nil)
 			return nil
 		})
