@@ -79,7 +79,7 @@ func main() {
 	})
 
 	sessionFactory := runtime.NewSessionFactory(cfg)
-	registerConnectors(sessionFactory, cfg, v)
+	registerConnectors(sessionFactory, cfg, v, repoPath)
 
 	contextBuilder := runtime.NewContextBuilder(database)
 	sessionFactory.SetContextBuilder(contextBuilder)
@@ -186,7 +186,7 @@ func getEnvOrDefault(key, defaultVal string) string {
 	return defaultVal
 }
 
-func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault) {
+func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault, repoPath string) {
 	connectorsCfg := cfg.Connectors
 	if connectorsCfg == nil {
 		log.Println("Warning: no connectors configured")
@@ -211,7 +211,7 @@ func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v 
 			if len(cliArgs) == 0 {
 				cliArgs = cfg.GetDefaultCLIArgs()
 			}
-			runner := connectors.NewCLIRunnerWithArgs(conn.Command, cliArgs, timeout)
+			runner := connectors.NewCLIRunnerWithWorkDir(conn.Command, cliArgs, timeout, repoPath)
 			factory.RegisterConnector(conn.ID, runner)
 			log.Printf("Registered CLI connector: %s (%s)", conn.ID, conn.Command)
 		case "api":
