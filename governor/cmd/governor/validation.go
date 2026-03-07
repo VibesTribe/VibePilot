@@ -221,6 +221,7 @@ func parseTaskSection(section string) (TaskData, error) {
 	task.Type = "feature"
 	task.Category = "coding"
 	task.Confidence = 0.95
+	task.Dependencies = []string{}
 
 	headerEnd := strings.Index(section, "\n")
 	if headerEnd == -1 {
