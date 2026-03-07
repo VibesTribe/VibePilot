@@ -11,7 +11,9 @@ var defaultRPCAllowlist = map[string]bool{
 	// Task management
 	"get_available_tasks":     true,
 	"update_task_status":      true,
+	"update_task_assignment":  true,
 	"create_task_with_packet": true,
+	"create_task_run":         true,
 	"unlock_dependent_tasks":  true,
 
 	// Plan lifecycle
