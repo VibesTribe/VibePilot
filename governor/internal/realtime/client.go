@@ -188,7 +188,7 @@ func (c *Client) Connect() error {
 // Note: We only subscribe to INSERT to avoid thundering herd on UPDATEs.
 // Status changes are tracked via the initial INSERT and processing logic.
 func (c *Client) SubscribeToTable(table string) error {
-	return c.SubscribeToTableWithFilter(table, "INSERT", "")
+	return c.SubscribeToTableWithFilter(table, "*", "")
 }
 
 // SubscribeToTableWithFilter subscribes to changes with specific event type.
