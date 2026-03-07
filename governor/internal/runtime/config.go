@@ -68,6 +68,7 @@ type ValidationConfig struct {
 	RequirePromptPacket   bool    `json:"require_prompt_packet"`
 	RequireCategory       bool    `json:"require_category"`
 	RequireExpectedOutput bool    `json:"require_expected_output"`
+	DefaultMaxAttempts    int     `json:"default_max_attempts"`
 }
 
 // DatabaseConfig specifies how to connect to Supabase.
