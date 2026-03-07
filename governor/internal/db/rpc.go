@@ -34,11 +34,12 @@ var defaultRPCAllowlist = map[string]bool{
 	"recover_stale_processing": true,
 
 	// Failure & learning
-	"record_failure":           true,
-	"record_model_failure":     true,
-	"record_model_success":     true,
-	"get_model_score_for_task": true,
-	"check_model_availability": true,
+	"record_failure":              true,
+	"record_model_failure":        true,
+	"record_model_success":        true,
+	"get_model_score_for_task":    true,
+	"check_model_availability":    true,
+	"check_platform_availability": true,
 
 	// Planner learning
 	"create_planner_rule":         true,

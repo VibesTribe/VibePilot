@@ -99,7 +99,8 @@
     "min_task_confidence": 0.95,
     "require_prompt_packet": true,
     "require_category": true,
-    "require_expected_output": true
+    "require_expected_output": true,
+    "default_max_attempts": 3
   },
   "logging": {
     "max_output_length": 5000,

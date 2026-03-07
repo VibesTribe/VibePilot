@@ -144,6 +144,10 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 			status = "pending"
 		}
 
+		maxAttempts := 3
+		if cfg != nil && cfg.DefaultMaxAttempts > 0 {
+			maxAttempts = cfg.DefaultMaxAttempts
+		}
 		taskID, err := database.RPC(ctx, "create_task_with_packet", map[string]any{
 			"p_plan_id":             planID,
 			"p_task_number":         task.TaskNumber,
@@ -159,6 +163,7 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 			"p_prompt":              task.PromptPacket,
 			"p_expected_output":     task.ExpectedOutput,
 			"p_context":             map[string]any{"source": "plan_approval"},
+			"p_max_attempts":        maxAttempts,
 		})
 		if err != nil {
 			log.Printf("[createTasksFromApprovedPlan] Failed to create task %s: %v", task.TaskNumber, err)
