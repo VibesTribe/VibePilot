@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -15,44 +14,76 @@ import (
 	"github.com/vibepilot/governor/internal/runtime"
 )
 
-func validateTasks(tasks []TaskData, validationCfg *runtime.ValidationConfig) *ValidationFailedError {
-	var errors []ValidationError
+type TaskData struct {
+	TaskNumber       string
+	Title            string
+	Type             string
+	Confidence       float64
+	Category         string
+	Dependencies     []string
+	RequiresCodebase bool
+	PromptPacket     string
+	ExpectedOutput   string
+}
 
-	if validationCfg == nil {
-		validationCfg = &runtime.ValidationConfig{
-			MinTaskConfidence:     0.95,
+type ValidationError struct {
+	TaskNumber string
+	Issue      string
+	Severity   string
+}
+
+func (e *ValidationError) Error() string {
+	return "task " + e.TaskNumber + ": " + e.Issue
+}
+
+type ValidationFailedError struct {
+	Errors []ValidationError
+}
+
+func (e *ValidationFailedError) Error() string {
+	if len(e.Errors) == 0 {
+		return "validation failed"
+	}
+	return e.Errors[0].Issue + " (" + e.Errors[0].TaskNumber + ")"
+}
+
+func validateTasks(tasks []TaskData, cfg *runtime.ValidationConfig) *ValidationFailedError {
+	if cfg == nil {
+		cfg = &runtime.ValidationConfig{
+			MinTaskConfidence:     0.0,
 			RequirePromptPacket:   true,
 			RequireCategory:       true,
 			RequireExpectedOutput: true,
 		}
 	}
 
+	var errors []ValidationError
 	for _, task := range tasks {
-		if task.Confidence < validationCfg.MinTaskConfidence {
+		if task.Confidence < cfg.MinTaskConfidence {
 			errors = append(errors, ValidationError{
 				TaskNumber: task.TaskNumber,
-				Issue:      fmt.Sprintf("confidence %.2f below minimum %.2f - task must be split further", task.Confidence, validationCfg.MinTaskConfidence),
+				Issue:      fmt.Sprintf("confidence %.2f below minimum %.2f", task.Confidence, cfg.MinTaskConfidence),
 				Severity:   "high",
 			})
 		}
-		if validationCfg.RequirePromptPacket && task.PromptPacket == "" {
+		if cfg.RequirePromptPacket && task.PromptPacket == "" {
 			errors = append(errors, ValidationError{
 				TaskNumber: task.TaskNumber,
-				Issue:      "empty prompt packet - task has no instructions",
+				Issue:      "empty prompt packet",
 				Severity:   "critical",
 			})
 		}
-		if validationCfg.RequireCategory && task.Category == "" {
+		if cfg.RequireCategory && task.Category == "" {
 			errors = append(errors, ValidationError{
 				TaskNumber: task.TaskNumber,
-				Issue:      "missing category - needed for routing to appropriate model",
+				Issue:      "missing category",
 				Severity:   "medium",
 			})
 		}
-		if validationCfg.RequireExpectedOutput && task.ExpectedOutput == "" {
+		if cfg.RequireExpectedOutput && task.ExpectedOutput == "" {
 			errors = append(errors, ValidationError{
 				TaskNumber: task.TaskNumber,
-				Issue:      "missing expected output - supervisor cannot verify completion",
+				Issue:      "missing expected output",
 				Severity:   "medium",
 			})
 		}
@@ -64,16 +95,14 @@ func validateTasks(tasks []TaskData, validationCfg *runtime.ValidationConfig) *V
 	return nil
 }
 
-func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[string]any, validationCfg *runtime.ValidationConfig, repoPath string) error {
+func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[string]any, cfg *runtime.ValidationConfig, repoPath string) error {
 	planID, _ := plan["id"].(string)
 	planPath, _ := plan["plan_path"].(string)
-
 	if planPath == "" {
 		return fmt.Errorf("plan has no plan_path")
 	}
 
 	fullPath := filepath.Join(repoPath, planPath)
-
 	planContent, err := os.ReadFile(fullPath)
 	if err != nil {
 		return fmt.Errorf("read plan file %s: %w", fullPath, err)
@@ -90,33 +119,25 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 
 	log.Printf("[createTasksFromApprovedPlan] Found %d tasks in plan %s", len(tasks), truncateID(planID))
 
-	if validationErr := validateTasks(tasks, validationCfg); validationErr != nil {
-		log.Printf("[createTasksFromApprovedPlan] Validation failed for plan %s: %v", truncateID(planID), validationErr)
+	if validationErr := validateTasks(tasks, cfg); validationErr != nil {
+		log.Printf("[createTasksFromApprovedPlan] Validation failed: %v", validationErr)
 		return validationErr
 	}
 
 	createdCount := 0
 	for _, task := range tasks {
-		// Initial routing flag based on task characteristics
-		// Router can override at execution time based on available resources
 		var routingFlag string
 		var routingReason string
 
-		switch task.Category {
-		case "coding", "testing", "refactor":
+		if task.RequiresCodebase || len(task.Dependencies) > 0 {
 			routingFlag = "internal"
-			routingReason = fmt.Sprintf("category=%s requires codebase access", task.Category)
-		default:
-			if len(task.Dependencies) > 0 {
-				routingFlag = "internal"
-				routingReason = fmt.Sprintf("category=%s has %d dependencies, may need context", task.Category, len(task.Dependencies))
+			if task.RequiresCodebase {
+				routingReason = "requires codebase access"
 			} else {
-				routingFlag = "web"
-				routingReason = fmt.Sprintf("category=%s no dependencies, can use any available resource", task.Category)
+				routingReason = fmt.Sprintf("has %d dependencies", len(task.Dependencies))
 			}
 		}
 
-		// Determine status based on dependencies
 		status := "available"
 		if len(task.Dependencies) > 0 {
 			status = "pending"
@@ -189,34 +210,11 @@ func parseTasksFromPlanMarkdown(content string) ([]TaskData, error) {
 	return tasks, nil
 }
 
-func findMatchingCodeBlockEnd(content string) int {
-	depth := 1
-	i := 0
-	for i < len(content) {
-		if strings.HasPrefix(content[i:], "```") {
-			if i > 0 && content[i-1] == '\n' {
-				depth++
-			}
-			i += 3
-			continue
-		}
-		if strings.HasPrefix(content[i:], "\n```") {
-			depth--
-			if depth == 0 {
-				return i
-			}
-			i += 4
-			continue
-		}
-		i++
-	}
-	return -1
-}
-
 func parseTaskSection(section string) (TaskData, error) {
 	var task TaskData
 	task.Type = "feature"
 	task.Category = "coding"
+	task.Confidence = 0.95
 
 	headerEnd := strings.Index(section, "\n")
 	if headerEnd == -1 {
@@ -247,9 +245,9 @@ func parseTaskSection(section string) (TaskData, error) {
 		}
 	}
 
-	categoryMatch := regexp.MustCompile(`\*\*Category:\*\*\s*(\w+)`).FindStringSubmatch(body)
-	if len(categoryMatch) > 1 {
-		task.Category = strings.TrimSpace(categoryMatch[1])
+	catMatch := regexp.MustCompile(`\*\*Category:\*\*\s*(\w+)`).FindStringSubmatch(body)
+	if len(catMatch) > 1 {
+		task.Category = strings.TrimSpace(catMatch[1])
 	}
 
 	typeMatch := regexp.MustCompile(`\*\*Type:\*\*\s*(\w+)`).FindStringSubmatch(body)
@@ -262,59 +260,39 @@ func parseTaskSection(section string) (TaskData, error) {
 		task.RequiresCodebase = strings.ToLower(codebaseMatch[1]) == "true"
 	}
 
-	ppStart := strings.Index(body, "#### Prompt Packet")
-	if ppStart != -1 {
-		ppContent := body[ppStart+19:]
-		ppContent = strings.TrimSpace(ppContent)
-
-		codeStart := strings.Index(ppContent, "```")
-		if codeStart != -1 && codeStart < 10 {
-			ppContent = ppContent[codeStart+3:]
-			if strings.HasPrefix(ppContent, "json") || strings.HasPrefix(ppContent, "markdown") {
-				ppContent = ppContent[strings.Index(ppContent, "\n")+1:]
-			} else if strings.HasPrefix(ppContent, "\n") {
-				ppContent = ppContent[1:]
-			}
-			ppEnd := findMatchingCodeBlockEnd(ppContent)
-			if ppEnd != -1 {
-				task.PromptPacket = strings.TrimSpace(ppContent[:ppEnd])
-			}
-		} else {
-			nextSection := strings.Index(ppContent, "\n#### ")
-			if nextSection != -1 {
-				task.PromptPacket = strings.TrimSpace(ppContent[:nextSection])
-			} else {
-				task.PromptPacket = strings.TrimSpace(ppContent)
-			}
-		}
-	}
-
-	eoStart := strings.Index(body, "#### Expected Output")
-	if eoStart != -1 {
-		eoContent := body[eoStart+19:]
-		eoContent = strings.TrimSpace(eoContent)
-
-		codeStart := strings.Index(eoContent, "```")
-		if codeStart != -1 && codeStart < 10 {
-			eoContent = eoContent[codeStart+3:]
-			if strings.HasPrefix(eoContent, "json") || strings.HasPrefix(eoContent, "markdown") {
-				eoContent = eoContent[strings.Index(eoContent, "\n")+1:]
-			} else if strings.HasPrefix(eoContent, "\n") {
-				eoContent = eoContent[1:]
-			}
-			eoEnd := findMatchingCodeBlockEnd(eoContent)
-			if eoEnd != -1 {
-				task.ExpectedOutput = strings.TrimSpace(eoContent[:eoEnd])
-			}
-		} else {
-			nextSection := strings.Index(eoContent, "\n#### ")
-			if nextSection != -1 {
-				task.ExpectedOutput = strings.TrimSpace(eoContent[:nextSection])
-			} else {
-				task.ExpectedOutput = strings.TrimSpace(eoContent)
-			}
-		}
-	}
+	task.PromptPacket = extractSection(body, "#### Prompt Packet")
+	task.ExpectedOutput = extractSection(body, "#### Expected Output")
 
 	return task, nil
+}
+
+func extractSection(body, heading string) string {
+	start := strings.Index(body, heading)
+	if start == -1 {
+		return ""
+	}
+
+	content := body[start+len(heading):]
+	content = strings.TrimSpace(content)
+
+	if strings.HasPrefix(content, "```") {
+		newlineIdx := strings.Index(content, "\n")
+		if newlineIdx == -1 {
+			return content
+		}
+		content = content[newlineIdx+1:]
+		endMarker := "\n```"
+		endIdx := strings.Index(content, endMarker)
+		if endIdx == -1 {
+			return content
+		}
+		return strings.TrimSpace(content[:endIdx])
+	}
+
+	nextSection := strings.Index(content, "\n#### ")
+	if nextSection != -1 {
+		return strings.TrimSpace(content[:nextSection])
+	}
+
+	return strings.TrimSpace(content)
 }
