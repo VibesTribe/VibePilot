@@ -1,85 +1,59 @@
 # VibePilot Current State
 
-**Last Updated:** 2026-03-06 Session 55
-**Status:** GO CODE REWRITE REQUIRED
+**Last Updated:** 2026-03-07 Session 56
+**Status:** GO CODE REWRITE IN PROGRESS
 
 ---
 
-## ⚠️ CRITICAL: Go Code Is Broken
-
-**Symptom:** Tasks show "active", "pending", "assigned" all at once. Never completes.
-
-**Root Cause:** Go handlers have 4 critical bugs:
-1. RPC allowlist check failing (even though RPCs are in list)
-2. Git commit failing ("files must be an array")
-3. Status logic wrong (sets "review" even on failure)
-4. No error recovery (continues on errors)
-
-**Time Analysis:**
-- Plan creation: ~25 seconds ✅
-- Supervisor review: ~22 seconds ✅
-- Task creation: instant ✅
-- Task execution: ~26 seconds ✅
-- **Total: 73 seconds for hello world** (but never actually completes)
-
----
-
-## 📋 The Fix: Complete Rewrite Spec
-
-**READ THIS FIRST:** [`docs/GO_REWRITE_SPEC.md`](docs/GO_REWRITE_SPEC.md)
-This is the **single source of truth** for the rewrite. Contains:
-- Files to KEEP (15 files, no modifications)
-- Files to REWRITE (8 files, ~1,600 lines)
-- Complete database schema
-- Exact event flows (5 events, step-by-step)
-- Router logic (models vs destinations)
-- Error handling rules
-- Testing plan
-- Success criteria
-
----
-
-## ✅ Session 1 Complete
+## ✅ Session 2 Complete
 
 **Files rewritten:**
-- `internal/runtime/router.go` - Clean routing logic (360 lines)
-- `cmd/governor/validation.go` - Task parsing + creation (299 lines)
-- `cmd/governor/types.go` - Removed duplicate types
+- `governor/cmd/governor/handlers_plan.go` (~320 lines) - Clean event handlers for- `governor/internal/runtime/router.go` (~360 lines) - Clean routing logic
+- `governor/cmd/governor/validation.go` (~299 lines) - Task parsing
+- `governor/cmd/governor/types.go` (41 lines) - Cleaned duplicates
+- `governor/internal/db/rpc.go` - Added `create_task_run` to `update_task_assignment`
+
+**Build status:** ✅ Passes
 
 **Key changes:**
-- Routing logic: `internal` flag → internal only, no flag → try web, fallback to internal
-- No "web" flag (too restrictive, causes limbo)
-- Proper JSONB handling for dependencies
-- Correct field mapping for dashboard
+1. Routing logic: `internal` flag → internal only. No flag → try web, fallback to internal
+2. No "web" flag (too restrictive, causes limbo)
+3. Proper JSONB handling for4. Atomic state transitions with defer
+5. Learning system wired (record_model_success, record_model_failure)
+6. Follow exact event flows from GO_REWRITE_SPEC.md
 
-**Build status:** ✅ Packages compile successfully
+---
+
+## ⚠️ Still Broken: handlers_task.go, handlers_testing.go, handlers_council.go, handlers_research.go, handlers_maint.go
+
+These use old router API and need rewrite in Sessions 3-4.
 
 ---
 
 ## 🎯 Next Action
 
-**Start Rewrite Session 2:** handlers_plan.go
+**Start Rewrite Session 3:** handlers_task.go
 
-This rewrites the plan event handlers with correct flow.
+This rewrites task execution with git commits, task_runs creation, proper error handling.
 
-**Say:** "START REWRITE SESSION 2"
+**Say:** "START REWRITE SESSION 3"
 
 ---
 
 ## 📊 Rewrite Sessions
 
-| Session | Files | Lines | Time | Status |
-|---------|-------|-------|------|--------|
-| **1** | validation.go, router.go | ~350 | 1-2h | ⏳ READY |
-| **2** | handlers_plan.go | ~400 | 1-2h | 🔒 Blocked on 1 |
-| **3** | handlers_task.go | ~500 | 2-3h | 🔒 Blocked on 2 |
-| **4** | handlers_testing, council, research | ~350 | 1-2h | 🔒 Blocked on 3 |
+| Session | Files | Lines | Status |
+|---------|-------|-------|--------|
+| **1** | validation.go, router.go | ~700 | ✅ Complete |
+| **2** | handlers_plan.go | ~320 | ✅ Complete |
+| **3** | handlers_task.go | ~500 | ⏳ Ready |
+| **4** | handlers_testing, council, research, ~350 | ⏳ Ready |
 
 ---
 
 ## 📚 Documentation Reference
 
-### Primary Docs (Read These)
+### Primary Docs
 
 | Doc | Purpose |
 |-----|---------|
@@ -146,6 +120,12 @@ ALL of these must work:
 
 ## 🕐 Session History
 
+### Session 56 (2026-03-07)
+- Rewrote handlers_plan.go - clean,- Rewrote router.go - clean routing logic
+- Rewrote validation.go - correct task parsing
+- Cleaned types.go - removed duplicates
+- Build passes ✅
+
 ### Session 55 (2026-03-06)
 - Created complete rewrite specification
 - Mapped all Go code logic
@@ -156,14 +136,3 @@ ALL of these must work:
 - Documentation cleanup
 - Dashboard status mapping
 - Found task_runs broken
-
-### Session 53 (2026-03-06)
-- Routing fixes
-- Migration 064
-
-### Session 52 (2026-03-06)
-- E2E flow verification
-
-### Session 51 (2026-03-05)
-- Database cleanup
-- Connector fixes
