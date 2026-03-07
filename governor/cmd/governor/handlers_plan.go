@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
-	"strings"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/vibepilot/governor/internal/db"
@@ -24,707 +24,327 @@ func setupPlanHandlers(
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
 ) {
-	selectDestination := func(agentID, planID, taskType string) string {
-		result, err := connRouter.SelectDestination(ctx, runtime.RoutingRequest{
-			AgentID:  agentID,
-			TaskID:   planID,
-			TaskType: taskType,
-		})
-		if err != nil || result == nil {
-			log.Printf("[Router] No destination available for agent %s, using fallback", agentID)
-			dests := connRouter.GetAvailableConnectors()
-			if len(dests) > 0 {
-				return dests[0]
-			}
-			return ""
-		}
-		return result.DestinationID
+	router.On(runtime.EventPlanCreated, func(event runtime.Event) {
+		handlePlanCreated(ctx, factory, pool, database, cfg, connRouter, git, event)
+	})
+	router.On(runtime.EventPlanReview, func(event runtime.Event) {
+		handlePlanReview(ctx, factory, pool, database, cfg, connRouter, event)
+	})
+}
+
+func handlePlanCreated(
+	ctx context.Context,
+	factory *runtime.SessionFactory,
+	pool *runtime.AgentPool,
+	database *db.DB,
+	cfg *runtime.Config,
+	connRouter *runtime.Router,
+	git *gitree.Gitree,
+	event runtime.Event,
+) {
+	startTime := time.Now()
+	var plan map[string]any
+	if err := json.Unmarshal(event.Record, &plan); err != nil {
+		log.Printf("[EventPlanCreated] Failed to parse plan: %v", err)
+		return
 	}
 
-	router.On(runtime.EventPlanCreated, func(event runtime.Event) {
-		log.Printf("[EventPlanCreated] Handler invoked for event ID=%s", event.ID)
-		startTime := time.Now()
-		var plan map[string]any
-		if err := json.Unmarshal(event.Record, &plan); err != nil {
-			log.Printf("[EventPlanCreated] Failed to unmarshal plan: %v", err)
-			return
-		}
+	planID, _ := plan["id"].(string)
+	prdPath, _ := plan["prd_path"].(string)
+	currentStatus, _ := plan["status"].(string)
 
-		planID, _ := plan["id"].(string)
-		currentStatus, _ := plan["status"].(string)
-		log.Printf("[EventPlanCreated] Processing plan %s, status=%s", truncateID(planID), currentStatus)
+	log.Printf("[EventPlanCreated] Processing plan %s, status=%s", truncateID(planID), currentStatus)
 
-		processingBy := fmt.Sprintf("plan_created:%d", time.Now().UnixNano())
-		claimed, claimErr := database.RPC(ctx, "set_processing", map[string]any{
-			"p_table":         "plans",
-			"p_id":            planID,
-			"p_processing_by": processingBy,
+	processingBy := fmt.Sprintf("planner:%d", time.Now().UnixNano())
+	claimed, err := database.RPC(ctx, "set_processing", map[string]any{
+		"p_table":         "plans",
+		"p_id":            planID,
+		"p_processing_by": processingBy,
+	})
+	if err != nil {
+		log.Printf("[EventPlanCreated] Failed to claim plan %s: %v", truncateID(planID), err)
+		return
+	}
+
+	var claimSuccess bool
+	if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
+		log.Printf("[EventPlanCreated] Plan %s already being processed", truncateID(planID))
+		return
+	}
+
+	defer func() {
+		database.RPC(ctx, "clear_processing", map[string]any{
+			"p_table": "plans",
+			"p_id":    planID,
 		})
-		if claimErr != nil || claimed == nil {
-			log.Printf("[EventPlanCreated] Plan %s claim failed: %v", truncateID(planID), claimErr)
-			return
-		}
-		var claimSuccess bool
-		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
-			log.Printf("[EventPlanCreated] Plan %s already being processed", truncateID(planID))
-			return
-		}
-		log.Printf("[EventPlanCreated] Plan %s claimed successfully", truncateID(planID))
+	}()
 
-		destID := selectDestination("planner", planID, "plan_creation")
-		log.Printf("[EventPlanCreated] Selected destination: %s", destID)
-		if destID == "" {
-			log.Printf("[EventPlanCreated] No destination available for plan %s", truncateID(planID))
-			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "no_destination")
-			return
-		}
+	repoPath := cfg.GetRepoPath()
+	prdContent, err := os.ReadFile(filepath.Join(repoPath, prdPath))
+	if err != nil {
+		log.Printf("[EventPlanCreated] Failed to read PRD: %v", err)
+		setPlanError(ctx, database, planID, "prd_read_failed")
+		return
+	}
 
-		session, err := factory.Create("planner")
-		if err != nil {
-			log.Printf("[EventPlanCreated] Failed to create session: %v", err)
-			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "session_creation_failed")
-			return
-		}
-		log.Printf("[EventPlanCreated] Session created, submitting to pool...")
+	routingResult, err := connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+		Role:        "planner",
+		TaskType:    "planning",
+		RoutingFlag: "internal",
+	})
+	if err != nil || routingResult == nil {
+		log.Printf("[EventPlanCreated] No routing available for planner")
+		setPlanError(ctx, database, planID, "no_routing")
+		return
+	}
 
-		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
-			defer database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "review", "plan_created")
+	session, err := factory.CreateWithContext(ctx, "planner", "planning")
+	if err != nil {
+		log.Printf("[EventPlanCreated] Failed to create planner session: %v", err)
+		setPlanError(ctx, database, planID, "session_failed")
+		return
+	}
 
-			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "plan_created"})
-			if err != nil {
-				database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), false, map[string]any{"error": err.Error()})
-				return err
-			}
-
-			log.Printf("[EventPlanCreated] Raw planner output: %s", truncateOutput(result.Output))
-
-			log.Printf("[EventPlanCreated] Raw output (first 500 chars): %s", truncateOutput(result.Output))
-
-			plannerOutput, parseErr := runtime.ParsePlannerOutput(result.Output)
-			if parseErr != nil {
-				log.Printf("[EventPlanCreated] Failed to parse planner output: %v", parseErr)
-				database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), false, map[string]any{"error": parseErr.Error()})
-				return nil
-			}
-
-			log.Printf("[EventPlanCreated] Plan %s created, status: %s, tasks: %d", truncateID(planID), plannerOutput.Status, plannerOutput.TotalTasks)
-
-			if plannerOutput.PlanPath != "" && plannerOutput.PlanContent != "" {
-				files := []interface{}{
-					map[string]interface{}{"path": plannerOutput.PlanPath, "content": plannerOutput.PlanContent},
-				}
-				output := map[string]interface{}{"files": files}
-				if commitErr := git.CommitOutput(ctx, "main", output); commitErr != nil {
-					log.Printf("[EventPlanCreated] Failed to commit plan to GitHub: %v", commitErr)
-				} else {
-					log.Printf("[EventPlanCreated] Plan file committed: %s", plannerOutput.PlanPath)
-				}
-			}
-
-			newStatus := plannerOutput.Status
-			if newStatus == "" {
-				newStatus = "review"
-			}
-
-			_, updateErr := database.RPC(ctx, "update_plan_status", map[string]any{
-				"p_plan_id":      planID,
-				"p_status":       newStatus,
-				"p_plan_path":    plannerOutput.PlanPath,
-				"p_review_notes": map[string]any{"plan_content": plannerOutput.PlanContent, "total_tasks": plannerOutput.TotalTasks},
-			})
-			if updateErr != nil {
-				log.Printf("[EventPlanCreated] Failed to update plan status: %v", updateErr)
-			}
-
-			if newStatus == "review" {
-				log.Printf("[EventPlanCreated] Triggering supervisor review for plan %s", truncateID(planID))
-				supervisorSession, supErr := factory.Create("supervisor")
-				if supErr != nil {
-					log.Printf("[EventPlanCreated] Failed to create supervisor session: %v", supErr)
-				} else {
-					updatedPlan := map[string]any{
-						"id":           planID,
-						"prd_path":     plan["prd_path"],
-						"plan_path":    plannerOutput.PlanPath,
-						"status":       newStatus,
-						"plan_content": plannerOutput.PlanContent,
-					}
-					supResult, supErr := supervisorSession.Run(ctx, map[string]any{"plan": updatedPlan, "event": "plan_review"})
-					if supErr != nil {
-						log.Printf("[EventPlanCreated] Supervisor review failed: %v", supErr)
-					} else {
-						log.Printf("[EventPlanCreated] Supervisor raw output: %s", truncateOutput(supResult.Output))
-
-						review, parseErr := runtime.ParseInitialReview(supResult.Output)
-						if parseErr != nil {
-							log.Printf("[EventPlanCreated] Failed to parse supervisor review: %v", parseErr)
-						} else {
-							log.Printf("[EventPlanCreated] Supervisor decision: %s, complexity: %s", review.Decision, review.Complexity)
-
-							switch review.Decision {
-							case "approved":
-								log.Printf("[EventPlanCreated] Plan %s approved, creating tasks...", truncateID(planID))
-
-								planForTasks := map[string]any{
-									"id":        planID,
-									"plan_path": plannerOutput.PlanPath,
-									"prd_path":  plan["prd_path"],
-								}
-
-								if err := createTasksFromApprovedPlan(ctx, database, planForTasks, cfg.GetValidationConfig(), cfg.GetRepoPath()); err != nil {
-									log.Printf("[EventPlanCreated] Failed to create tasks: %v", err)
-									database.RPC(ctx, "update_plan_status", map[string]any{
-										"p_plan_id":      planID,
-										"p_status":       "error",
-										"p_review_notes": map[string]any{"error": err.Error()},
-									})
-								} else {
-									database.RPC(ctx, "update_plan_status", map[string]any{
-										"p_plan_id": planID,
-										"p_status":  "approved",
-										"p_review_notes": map[string]any{
-											"decision":   review.Decision,
-											"complexity": review.Complexity,
-											"reasoning":  review.Reasoning,
-										},
-									})
-									log.Printf("[EventPlanCreated] Plan %s approved and tasks created", truncateID(planID))
-								}
-
-							case "needs_revision":
-								log.Printf("[EventPlanCreated] Plan %s needs revision: %s", truncateID(planID), review.Reasoning)
-
-								_, err := database.RPC(ctx, "record_revision_feedback", map[string]any{
-									"p_plan_id": planID,
-									"p_feedback": map[string]any{
-										"decision":               review.Decision,
-										"reasoning":              review.Reasoning,
-										"concerns":               review.Concerns,
-										"tasks_needing_revision": review.TasksNeedingRevision,
-									},
-								})
-								if err != nil {
-									log.Printf("[EventPlanCreated] Failed to record revision feedback: %v", err)
-								}
-
-								database.RPC(ctx, "update_plan_status", map[string]any{
-									"p_plan_id": planID,
-									"p_status":  "revision_needed",
-									"p_review_notes": map[string]any{
-										"decision":               review.Decision,
-										"reasoning":              review.Reasoning,
-										"concerns":               review.Concerns,
-										"tasks_needing_revision": review.TasksNeedingRevision,
-									},
-								})
-
-							case "council_review":
-								log.Printf("[EventPlanCreated] Plan %s requires council review (complexity: %s)", truncateID(planID), review.Complexity)
-								database.RPC(ctx, "update_plan_status", map[string]any{
-									"p_plan_id": planID,
-									"p_status":  "council_review",
-									"p_review_notes": map[string]any{
-										"decision":   review.Decision,
-										"complexity": review.Complexity,
-										"reasoning":  review.Reasoning,
-									},
-								})
-
-							default:
-								log.Printf("[EventPlanCreated] Unknown supervisor decision: %s", review.Decision)
-								database.RPC(ctx, "update_plan_status", map[string]any{
-									"p_plan_id":      planID,
-									"p_status":       "error",
-									"p_review_notes": map[string]any{"error": "unknown_decision", "decision": review.Decision},
-								})
-							}
-						}
-					}
-				}
-			}
-
-			database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), true, nil)
-			return nil
+	result, err := session.Run(ctx, map[string]any{
+		"prd_content": string(prdContent),
+		"plan_id":     planID,
+	})
+	if err != nil {
+		log.Printf("[EventPlanCreated] Planner execution failed: %v", err)
+		database.RPC(ctx, "record_model_failure", map[string]any{
+			"p_model_id":         routingResult.ModelID,
+			"p_task_id":          planID,
+			"p_failure_type":     "execution_error",
+			"p_failure_category": "model_issue",
 		})
-		if err != nil {
-			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "pool_submit_failed")
-			log.Printf("[EventPlanCreated] Failed to submit to pool: %v", err)
+		setPlanError(ctx, database, planID, "execution_failed")
+		return
+	}
+
+	plannerOutput, err := runtime.ParsePlannerOutput(result.Output)
+	if err != nil {
+		log.Printf("[EventPlanCreated] Failed to parse planner output: %v", err)
+		setPlanError(ctx, database, planID, "parse_failed")
+		return
+	}
+
+	if plannerOutput.PlanPath != "" && plannerOutput.PlanContent != "" {
+		planFilePath := filepath.Join(repoPath, plannerOutput.PlanPath)
+		planDir := filepath.Dir(planFilePath)
+		if err := os.MkdirAll(planDir, 0755); err != nil {
+			log.Printf("[EventPlanCreated] Failed to create plan directory: %v", err)
+		} else if err := os.WriteFile(planFilePath, []byte(plannerOutput.PlanContent), 0644); err != nil {
+			log.Printf("[EventPlanCreated] Failed to write plan file: %v", err)
+		} else {
+			log.Printf("[EventPlanCreated] Plan file written: %s", plannerOutput.PlanPath)
 		}
-		log.Printf("[EventPlanCreated] Submitted to pool successfully")
+	}
+
+	_, err = database.RPC(ctx, "update_plan_status", map[string]any{
+		"p_plan_id":   planID,
+		"p_status":    "review",
+		"p_plan_path": plannerOutput.PlanPath,
+	})
+	if err != nil {
+		log.Printf("[EventPlanCreated] Failed to update plan status: %v", err)
+		return
+	}
+
+	database.RPC(ctx, "record_performance_metric", map[string]any{
+		"p_metric_type": "prd_to_plan",
+		"p_entity_id":   planID,
+		"p_duration_ms": time.Since(startTime).Milliseconds(),
+		"p_success":     true,
 	})
 
-	router.On(runtime.EventRevisionNeeded, func(event runtime.Event) {
-		var plan map[string]any
-		if err := json.Unmarshal(event.Record, &plan); err != nil {
-			return
-		}
+	log.Printf("[EventPlanCreated] Plan %s created successfully in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
+}
 
-		planID, _ := plan["id"].(string)
+func handlePlanReview(
+	ctx context.Context,
+	factory *runtime.SessionFactory,
+	pool *runtime.AgentPool,
+	database *db.DB,
+	cfg *runtime.Config,
+	connRouter *runtime.Router,
+	event runtime.Event,
+) {
+	startTime := time.Now()
+	var plan map[string]any
+	if err := json.Unmarshal(event.Record, &plan); err != nil {
+		log.Printf("[EventPlanReview] Failed to parse plan: %v", err)
+		return
+	}
 
-		processingBy := fmt.Sprintf("planner_revision:%d", time.Now().UnixNano())
-		claimed, err := database.RPC(ctx, "set_processing", map[string]any{
-			"p_table":         "plans",
-			"p_id":            planID,
-			"p_processing_by": processingBy,
+	planID, _ := plan["id"].(string)
+	prdPath, _ := plan["prd_path"].(string)
+	planPath, _ := plan["plan_path"].(string)
+	currentStatus, _ := plan["status"].(string)
+
+	log.Printf("[EventPlanReview] Processing plan %s, status=%s", truncateID(planID), currentStatus)
+
+	processingBy := fmt.Sprintf("supervisor:%d", time.Now().UnixNano())
+	claimed, err := database.RPC(ctx, "set_processing", map[string]any{
+		"p_table":         "plans",
+		"p_id":            planID,
+		"p_processing_by": processingBy,
+	})
+	if err != nil {
+		log.Printf("[EventPlanReview] Failed to claim plan %s: %v", truncateID(planID), err)
+		return
+	}
+
+	var claimSuccess bool
+	if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
+		log.Printf("[EventPlanReview] Plan %s already being processed", truncateID(planID))
+		return
+	}
+
+	defer func() {
+		database.RPC(ctx, "clear_processing", map[string]any{
+			"p_table": "plans",
+			"p_id":    planID,
 		})
-		if err != nil || claimed == nil {
-			log.Printf("[EventRevisionNeeded] Plan %s already being processed or claim failed", truncateID(planID))
-			return
-		}
-		var claimSuccess bool
-		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
-			log.Printf("[EventRevisionNeeded] Plan %s already being processed", truncateID(planID))
-			return
-		}
+	}()
 
-		maxRounds := cfg.GetMaxRevisionRounds()
-		onMaxRounds := cfg.GetOnMaxRoundsAction()
+	repoPath := cfg.GetRepoPath()
+	prdContent, err := os.ReadFile(filepath.Join(repoPath, prdPath))
+	if err != nil {
+		log.Printf("[EventPlanReview] Failed to read PRD: %v", err)
+		setPlanError(ctx, database, planID, "prd_read_failed")
+		return
+	}
 
-		currentRound, _ := plan["revision_round"].(float64)
-		if int(currentRound) >= maxRounds {
-			log.Printf("[EventRevisionNeeded] Plan %s revision limit (%d) reached (current: %d), escalating", truncateID(planID), maxRounds, int(currentRound))
-			_, err := database.RPC(ctx, "update_plan_status", map[string]any{
-				"p_plan_id": planID,
-				"p_status":  onMaxRounds,
-				"p_review_notes": map[string]any{
-					"error":         "revision_limit_reached",
-					"max_rounds":    maxRounds,
-					"current_round": int(currentRound),
-				},
-			})
-			if err != nil {
-				log.Printf("[EventRevisionNeeded] Failed to update plan status: %v", err)
-			}
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			return
-		}
+	planContent, err := os.ReadFile(filepath.Join(repoPath, planPath))
+	if err != nil {
+		log.Printf("[EventPlanReview] Failed to read plan: %v", err)
+		setPlanError(ctx, database, planID, "plan_read_failed")
+		return
+	}
 
-		limitReached, _ := database.RPC(ctx, "check_revision_limit", map[string]any{
-			"p_plan_id":    planID,
-			"p_max_rounds": maxRounds,
+	routingResult, err := connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+		Role:        "supervisor",
+		TaskType:    "review",
+		RoutingFlag: "internal",
+	})
+	if err != nil || routingResult == nil {
+		log.Printf("[EventPlanReview] No routing available for supervisor")
+		setPlanError(ctx, database, planID, "no_routing")
+		return
+	}
+
+	session, err := factory.CreateWithContext(ctx, "supervisor", "review")
+	if err != nil {
+		log.Printf("[EventPlanReview] Failed to create supervisor session: %v", err)
+		setPlanError(ctx, database, planID, "session_failed")
+		return
+	}
+
+	result, err := session.Run(ctx, map[string]any{
+		"prd_content":  string(prdContent),
+		"plan_content": string(planContent),
+		"plan_id":      planID,
+	})
+	if err != nil {
+		log.Printf("[EventPlanReview] Supervisor execution failed: %v", err)
+		database.RPC(ctx, "record_model_failure", map[string]any{
+			"p_model_id":         routingResult.ModelID,
+			"p_task_id":          planID,
+			"p_failure_type":     "execution_error",
+			"p_failure_category": "model_issue",
 		})
+		setPlanError(ctx, database, planID, "execution_failed")
+		return
+	}
 
-		var limitReachedBool bool
-		if limitReached != nil {
-			if err := json.Unmarshal(limitReached, &limitReachedBool); err != nil {
-				var result []bool
-				if err := json.Unmarshal(limitReached, &result); err == nil && len(result) > 0 {
-					limitReachedBool = result[0]
-				}
-			}
-		}
+	review, err := runtime.ParseInitialReview(result.Output)
+	if err != nil {
+		log.Printf("[EventPlanReview] Failed to parse supervisor output: %v", err)
+		setPlanError(ctx, database, planID, "parse_failed")
+		return
+	}
 
-		if limitReachedBool {
-			log.Printf("[EventRevisionNeeded] Plan %s revision limit (%d) reached, escalating to human", truncateID(planID), maxRounds)
-			_, err := database.RPC(ctx, "update_plan_status", map[string]any{
-				"p_plan_id": planID,
-				"p_status":  onMaxRounds,
-				"p_review_notes": map[string]any{
-					"error":      "revision_limit_reached",
-					"max_rounds": maxRounds,
-				},
-			})
-			if err != nil {
-				log.Printf("[EventRevisionNeeded] Failed to update plan status: %v", err)
-			}
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
+	log.Printf("[EventPlanReview] Supervisor decision: %s", review.Decision)
+
+	switch review.Decision {
+	case "approved":
+		if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig(), repoPath); err != nil {
+			log.Printf("[EventPlanReview] Failed to create tasks: %v", err)
+			setPlanError(ctx, database, planID, "task_creation_failed")
 			return
 		}
 
-		_, err = database.RPC(ctx, "increment_revision_round", map[string]any{
+		_, err = database.RPC(ctx, "update_plan_status", map[string]any{
 			"p_plan_id": planID,
-		})
-		if err != nil {
-			log.Printf("[EventRevisionNeeded] Failed to increment revision round: %v", err)
-		}
-
-		revisionHistory, _ := plan["revision_history"].([]interface{})
-		var latestFeedback map[string]any
-		if len(revisionHistory) > 0 {
-			if rh, ok := revisionHistory[len(revisionHistory)-1].(map[string]any); ok {
-				latestFeedback = rh
-			}
-		}
-
-		destID := selectDestination("planner", planID, "revision")
-		if destID == "" {
-			log.Printf("[EventRevisionNeeded] No destination available for plan %s", truncateID(planID))
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			return
-		}
-
-		session, err := factory.CreateWithContext(ctx, "planner", "revision")
-		if err != nil {
-			log.Printf("[EventRevisionNeeded] Failed to create planner session: %v", err)
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			return
-		}
-
-		err = pool.SubmitWithDestination(ctx, "planning", destID, func() error {
-			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-
-			result, err := session.Run(ctx, map[string]any{
-				"plan":             plan,
-				"event":            "revision_needed",
-				"revision_history": revisionHistory,
-				"latest_feedback":  latestFeedback,
-			})
-			if err != nil {
-				log.Printf("[EventRevisionNeeded] Planner session failed for %s: %v", truncateID(planID), err)
-				return err
-			}
-
-			plannerOutput, parseErr := runtime.ParsePlannerOutput(result.Output)
-			if parseErr != nil {
-				log.Printf("[EventRevisionNeeded] Failed to parse planner output: %v", parseErr)
-				return nil
-			}
-
-			log.Printf("[EventRevisionNeeded] Plan %s revised, status: %s", truncateID(planID), plannerOutput.Status)
-
-			if plannerOutput.PlanPath != "" && plannerOutput.PlanContent != "" {
-				files := []interface{}{
-					map[string]interface{}{"path": plannerOutput.PlanPath, "content": plannerOutput.PlanContent},
-				}
-				output := map[string]interface{}{"files": files}
-				if err := git.CommitOutput(ctx, "main", output); err != nil {
-					log.Printf("[EventRevisionNeeded] Failed to commit plan to GitHub: %v", err)
-				}
-			}
-
-			newStatus := plannerOutput.Status
-			if newStatus == "" {
-				newStatus = "review"
-			}
-
-			_, err = database.RPC(ctx, "update_plan_status", map[string]any{
-				"p_plan_id":      planID,
-				"p_status":       newStatus,
-				"p_plan_path":    plannerOutput.PlanPath,
-				"p_review_notes": map[string]any{"plan_content": plannerOutput.PlanContent, "total_tasks": plannerOutput.TotalTasks, "revised": true},
-			})
-			if err != nil {
-				log.Printf("[EventRevisionNeeded] Failed to update plan status: %v", err)
-			}
-
-			return nil
-		})
-		if err != nil {
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			log.Printf("[EventRevisionNeeded] Failed to submit to pool: %v", err)
-		}
-	})
-
-	router.On(runtime.EventPlanApproved, func(event runtime.Event) {
-		var plan map[string]any
-		if err := json.Unmarshal(event.Record, &plan); err != nil {
-			return
-		}
-
-		planID, _ := plan["id"].(string)
-		log.Printf("[EventPlanApproved] Plan %s already approved (direct), tasks should exist", truncateID(planID))
-	})
-
-	router.On(runtime.EventPlanBlocked, func(event runtime.Event) {
-		var plan map[string]any
-		if err := json.Unmarshal(event.Record, &plan); err != nil {
-			return
-		}
-
-		planID, _ := plan["id"].(string)
-		log.Printf("[EventPlanBlocked] Plan %s blocked - requires human intervention", truncateID(planID))
-	})
-
-	router.On(runtime.EventPRDIncomplete, func(event runtime.Event) {
-		var plan map[string]any
-		if err := json.Unmarshal(event.Record, &plan); err != nil {
-			return
-		}
-
-		planID, _ := plan["id"].(string)
-		reviewNotes, _ := plan["review_notes"].(map[string]any)
-		blockedReason, _ := reviewNotes["blocked_reason"].(string)
-
-		log.Printf("[EventPRDIncomplete] Plan %s PRD incomplete: %s", truncateID(planID), blockedReason)
-
-		_, err := database.RPC(ctx, "update_plan_status", map[string]any{
-			"p_plan_id": planID,
-			"p_status":  "pending_human",
+			"p_status":  "approved",
 			"p_review_notes": map[string]any{
-				"blocked_reason": blockedReason,
-				"action_needed":  "Update PRD with missing information",
+				"decision":   review.Decision,
+				"complexity": review.Complexity,
+				"reasoning":  review.Reasoning,
 			},
 		})
 		if err != nil {
-			log.Printf("[EventPRDIncomplete] Failed to update plan status: %v", err)
-		}
-	})
-
-	router.On(runtime.EventPlanError, func(event runtime.Event) {
-		var plan map[string]any
-		if err := json.Unmarshal(event.Record, &plan); err != nil {
+			log.Printf("[EventPlanReview] Failed to update plan status: %v", err)
 			return
 		}
 
-		planID, _ := plan["id"].(string)
-		reviewNotes, _ := plan["review_notes"].(map[string]any)
-		errorMsg, _ := reviewNotes["error"].(string)
-		log.Printf("[EventPlanError] Plan %s in error state: %s", truncateID(planID), errorMsg)
-	})
-
-	router.On(runtime.EventPRDReady, func(event runtime.Event) {
-		startTime := time.Now()
-		var plan map[string]any
-		if err := json.Unmarshal(event.Record, &plan); err != nil {
-			log.Printf("[EventPRDReady] Failed to parse plan: %v", err)
-			return
-		}
-
-		planID, _ := plan["id"].(string)
-		currentStatus, _ := plan["status"].(string)
-
-		processingBy := fmt.Sprintf("planner:%d", time.Now().UnixNano())
-		claimed, err := database.RPC(ctx, "set_processing", map[string]any{
-			"p_table":         "plans",
-			"p_id":            planID,
-			"p_processing_by": processingBy,
+		database.RPC(ctx, "record_model_success", map[string]any{
+			"p_model_id":         routingResult.ModelID,
+			"p_task_type":        "review",
+			"p_duration_seconds": int(time.Since(startTime).Seconds()),
 		})
-		if err != nil || claimed == nil {
-			log.Printf("[EventPRDReady] Plan %s already being processed or claim failed", truncateID(planID))
-			return
-		}
-		var claimSuccess bool
-		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
-			log.Printf("[EventPRDReady] Plan %s already being processed", truncateID(planID))
-			return
-		}
 
-		destID := selectDestination("planner", planID, "planning")
-		if destID == "" {
-			log.Printf("[EventPRDReady] No destination available for plan %s", truncateID(planID))
-			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "no_destination")
-			return
-		}
+		log.Printf("[EventPlanReview] Plan %s approved and tasks created in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
 
-		projectType := "general"
-		if prdPath, ok := plan["prd_path"].(string); ok {
-			if strings.Contains(strings.ToLower(prdPath), "dashboard") || strings.Contains(strings.ToLower(prdPath), "ui") {
-				projectType = "frontend"
-			} else if strings.Contains(strings.ToLower(prdPath), "api") {
-				projectType = "backend"
-			}
-		}
-
-		session, err := factory.CreateWithContext(ctx, "planner", projectType)
-		if err != nil {
-			log.Printf("[EventPRDReady] Failed to create planner session: %v", err)
-			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "session_creation_failed")
-			return
-		}
-
-		err = pool.SubmitWithDestination(ctx, "planning", destID, func() error {
-			defer database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "review", "planning_complete")
-
-			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "prd_ready"})
-			if err != nil {
-				log.Printf("[EventPRDReady] Planner session failed for %s: %v", truncateID(planID), err)
-				database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), false, map[string]any{"error": err.Error()})
-				return err
-			}
-
-			database.RecordPerformanceMetric(ctx, "prd_to_plan", planID, time.Since(startTime), true, nil)
-
-			log.Printf("[EventPRDReady] Raw output for %s (len=%d): %s", truncateID(planID), len(result.Output), truncateOutput(result.Output))
-
-			plannerOutput, parseErr := runtime.ParsePlannerOutput(result.Output)
-			if parseErr != nil {
-				log.Printf("[EventPRDReady] Failed to parse planner output: %v", parseErr)
-				return nil
-			}
-
-			if plannerOutput.Status == "" {
-				plannerOutput.Status = "review"
-			}
-
-			log.Printf("[EventPRDReady] Plan %s created with %d tasks, status: %s", truncateID(planID), plannerOutput.TotalTasks, plannerOutput.Status)
-
-			if plannerOutput.PlanPath != "" && plannerOutput.PlanContent != "" {
-				files := []interface{}{
-					map[string]interface{}{"path": plannerOutput.PlanPath, "content": plannerOutput.PlanContent},
-				}
-				output := map[string]interface{}{"files": files}
-				if err := git.CommitOutput(ctx, "main", output); err != nil {
-					log.Printf("[EventPRDReady] Failed to commit plan to GitHub: %v", err)
-				}
-			}
-
-			_, err = database.RPC(ctx, "update_plan_status", map[string]any{
-				"p_plan_id":      planID,
-				"p_status":       plannerOutput.Status,
-				"p_plan_path":    plannerOutput.PlanPath,
-				"p_review_notes": map[string]any{"plan_content": plannerOutput.PlanContent, "total_tasks": plannerOutput.TotalTasks},
-			})
-			if err != nil {
-				log.Printf("[EventPRDReady] Failed to update plan status: %v", err)
-			}
-
-			return nil
+	case "needs_revision":
+		_, err = database.RPC(ctx, "update_plan_status", map[string]any{
+			"p_plan_id": planID,
+			"p_status":  "revision_needed",
+			"p_review_notes": map[string]any{
+				"decision":  review.Decision,
+				"reasoning": review.Reasoning,
+				"concerns":  review.Concerns,
+			},
 		})
 		if err != nil {
-			database.ClearProcessingAndRecordTransition(ctx, "plans", planID, currentStatus, "error", "pool_submit_failed")
-			log.Printf("[EventPRDReady] Failed to submit to pool: %v", err)
-		}
-	})
-
-	router.On(runtime.EventPlanReview, func(event runtime.Event) {
-		var plan map[string]any
-		if err := json.Unmarshal(event.Record, &plan); err != nil {
-			log.Printf("[EventPlanReview] Failed to parse plan: %v", err)
+			log.Printf("[EventPlanReview] Failed to update plan status: %v", err)
 			return
 		}
 
-		planID, _ := plan["id"].(string)
+		log.Printf("[EventPlanReview] Plan %s needs revision", truncateID(planID))
 
-		processingBy := fmt.Sprintf("supervisor:%d", time.Now().UnixNano())
-		claimed, err := database.RPC(ctx, "set_processing", map[string]any{
-			"p_table":         "plans",
-			"p_id":            planID,
-			"p_processing_by": processingBy,
-		})
-		if err != nil || claimed == nil {
-			log.Printf("[EventPlanReview] Plan %s already being processed or claim failed", truncateID(planID))
-			return
-		}
-		var claimSuccess bool
-		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
-			log.Printf("[EventPlanReview] Plan %s already being processed", truncateID(planID))
-			return
-		}
-
-		destID := selectDestination("supervisor", planID, "plan_review")
-		if destID == "" {
-			log.Printf("[EventPlanReview] No destination available for plan %s", truncateID(planID))
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			return
-		}
-
-		session, err := factory.Create("supervisor")
-		if err != nil {
-			log.Printf("[EventPlanReview] Failed to create supervisor session: %v", err)
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			return
-		}
-
-		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
-			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-
-			result, err := session.Run(ctx, map[string]any{"plan": plan, "event": "plan_review"})
-			if err != nil {
-				log.Printf("[EventPlanReview] Supervisor session failed for %s: %v", truncateID(planID), err)
-				return err
-			}
-
-			review, parseErr := runtime.ParseInitialReview(result.Output)
-			if parseErr != nil {
-				log.Printf("[EventPlanReview] Failed to parse review: %v", parseErr)
-				log.Printf("[EventPlanReview] Raw output: %s", truncateOutput(result.Output))
-				return nil
-			}
-
-			log.Printf("[EventPlanReview] Plan %s review: decision=%s complexity=%s", truncateID(planID), review.Decision, review.Complexity)
-
-			var newStatus string
-			var statusError error
-			switch review.Decision {
-			case "approved":
-				if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig(), cfg.GetRepoPath()); err != nil {
-					var validationErr *ValidationFailedError
-					if errors.As(err, &validationErr) {
-						log.Printf("[EventPlanReview] Task validation failed for plan %s - sending back to planner", truncateID(planID))
-						newStatus = "revision_needed"
-
-						var concerns []string
-						var taskNumbers []string
-						for _, e := range validationErr.Errors {
-							concerns = append(concerns, fmt.Sprintf("%s: %s", e.TaskNumber, e.Issue))
-							taskNumbers = append(taskNumbers, e.TaskNumber)
-						}
-
-						_, recordErr := database.RPC(ctx, "record_planner_revision", map[string]any{
-							"p_plan_id":                planID,
-							"p_concerns":               concerns,
-							"p_tasks_needing_revision": taskNumbers,
-						})
-						if recordErr != nil {
-							log.Printf("[EventPlanReview] Failed to record validation feedback: %v", recordErr)
-						}
-
-						_, recordErr = database.RPC(ctx, "record_supervisor_rule", map[string]any{
-							"p_rule_text":  fmt.Sprintf("Plan passed review but failed task validation: %s", strings.Join(concerns, "; ")),
-							"p_applies_to": "plan_review",
-							"p_source":     "validation_safety_net",
-						})
-						if recordErr != nil {
-							log.Printf("[EventPlanReview] Failed to record supervisor rule: %v", recordErr)
-						}
-
-						log.Printf("[EventPlanReview] Validation concerns: %v", concerns)
-						statusError = err
-					} else {
-						log.Printf("[EventPlanReview] Failed to create tasks: %v", err)
-						newStatus = "error"
-						statusError = err
-					}
-				} else {
-					newStatus = "approved"
-				}
-			case "needs_revision":
-				newStatus = "revision_needed"
-				_, err := database.RPC(ctx, "record_planner_revision", map[string]any{
-					"p_plan_id":                planID,
-					"p_concerns":               review.Concerns,
-					"p_tasks_needing_revision": review.TasksNeedingRevision,
-				})
-				if err != nil {
-					log.Printf("[EventPlanReview] Failed to record revision feedback: %v", err)
-				}
-				log.Printf("[EventPlanReview] Plan %s needs revision: %v", truncateID(planID), review.Concerns)
-			case "council_review":
-				newStatus = "council_review"
-			default:
-				newStatus = "revision_needed"
-			}
-
-			reviewNotes := map[string]any{
-				"complexity": review.Complexity,
-				"reasoning":  review.Reasoning,
-				"concerns":   review.Concerns,
-				"task_count": review.TaskCount,
-			}
-			if statusError != nil {
-				reviewNotes["error"] = statusError.Error()
-			}
-
-			log.Printf("[EventPlanReview] Updating plan %s status to: %s", truncateID(planID), newStatus)
-			_, err = database.RPC(ctx, "update_plan_status", map[string]any{
-				"p_plan_id":      planID,
-				"p_status":       newStatus,
-				"p_review_notes": reviewNotes,
-			})
-			if err != nil {
-				log.Printf("[EventPlanReview] Failed to update plan status: %v", err)
-			} else {
-				log.Printf("[EventPlanReview] Plan %s status updated to: %s", truncateID(planID), newStatus)
-			}
-
-			if statusError != nil {
-				return statusError
-			}
-			return nil
+	case "council_review":
+		_, err = database.RPC(ctx, "update_plan_status", map[string]any{
+			"p_plan_id": planID,
+			"p_status":  "council_review",
+			"p_review_notes": map[string]any{
+				"decision":  review.Decision,
+				"reasoning": review.Reasoning,
+			},
 		})
 		if err != nil {
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			log.Printf("[EventPlanReview] Failed to submit to pool: %v", err)
+			log.Printf("[EventPlanReview] Failed to update plan status: %v", err)
+			return
 		}
+
+		log.Printf("[EventPlanReview] Plan %s sent to council review", truncateID(planID))
+
+	default:
+		log.Printf("[EventPlanReview] Unknown decision: %s", review.Decision)
+		setPlanError(ctx, database, planID, "unknown_decision")
+	}
+}
+
+func setPlanError(ctx context.Context, database *db.DB, planID string, reason string) {
+	_, err := database.RPC(ctx, "update_plan_status", map[string]any{
+		"p_plan_id": planID,
+		"p_status":  "error",
+		"p_review_notes": map[string]any{
+			"error": reason,
+			"at":    time.Now().Format(time.RFC3339),
+		},
 	})
+	if err != nil {
+		log.Printf("[setPlanError] Failed to set plan error: %v", err)
+	}
 }
