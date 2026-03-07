@@ -27,8 +27,24 @@ ALTER TABLE tasks ADD CONSTRAINT tasks_status_check
     'testing', 'approval', 'merged', 'escalated', 'blocked'
   ));
 
--- Re-add self-dependency check (was dropped with other constraints)
-ALTER TABLE tasks ADD CONSTRAINT no_self_dependency 
-  CHECK (NOT (id = ANY(dependencies)));
+-- Self-dependency check for JSONB dependencies column
+-- Note: dependencies is JSONB, not UUID[], so we need jsonb operations
+-- The Go code should prevent self-dependencies, but we add a trigger for safety
 
-SELECT 'Migration 071 complete: task constraints unified' AS status;
+CREATE OR REPLACE FUNCTION check_no_self_dependency()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Check if new.id exists in the new.dependencies JSONB array
+  IF NEW.dependencies::jsonb ? NEW.id::text THEN
+    RAISE EXCEPTION 'Task cannot depend on itself';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_no_self_dependency ON tasks;
+CREATE TRIGGER trg_no_self_dependency
+  BEFORE INSERT OR UPDATE ON tasks
+  FOR EACH ROW EXECUTE FUNCTION check_no_self_dependency();
+
+SELECT 'Migration 071 complete: task constraints unified, self-dep check via trigger' AS status;
