@@ -25,7 +25,7 @@ func setupCouncilHandlers(
 	connRouter *runtime.Router,
 ) {
 	selectDestination := func(agentID, planID, taskType string) string {
-		result, err := connRouter.SelectDestination(ctx, runtime.RoutingRequest{
+		result, err := connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
 			AgentID:  agentID,
 			TaskID:   planID,
 			TaskType: taskType,

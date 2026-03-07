@@ -1,42 +1,41 @@
 # VibePilot Current State
 
-**Last Updated:** 2026-03-07 Session 56
+**Last Updated:** 2026-03-07 Session 57
 **Status:** GO CODE REWRITE IN PROGRESS
 
 ---
 
-## ✅ Session 2 Complete
+## ✅ Session 3 Complete
 
 **Files rewritten:**
-- `governor/cmd/governor/handlers_plan.go` (~320 lines) - Clean event handlers for- `governor/internal/runtime/router.go` (~360 lines) - Clean routing logic
-- `governor/cmd/governor/validation.go` (~299 lines) - Task parsing
-- `governor/cmd/governor/types.go` (41 lines) - Cleaned duplicates
-- `governor/internal/db/rpc.go` - Added `create_task_run` to `update_task_assignment`
+- `governor/cmd/governor/handlers_task.go` (~580 lines) - Clean task execution
 
 **Build status:** ✅ Passes
 
 **Key changes:**
-1. Routing logic: `internal` flag → internal only. No flag → try web, fallback to internal
-2. No "web" flag (too restrictive, causes limbo)
-3. Proper JSONB handling for4. Atomic state transitions with defer
-5. Learning system wired (record_model_success, record_model_failure)
-6. Follow exact event flows from GO_REWRITE_SPEC.md
+1. TaskHandler struct with clean separation of concerns
+2. EventTaskAvailable: Full execution flow with routing, session, git commit
+3. EventTaskReview: Supervisor review with pass/fail/reroute decisions
+4. EventTaskCompleted: Final merge or approval flow
+5. Atomic state transitions with defer
+6. Learning system fully wired (recordSuccess, recordFailure, recordIssues)
+7. Checkpoint support for recovery
+8. Cost calculation integrated
+9. Security leak detection integrated
 
 ---
 
-## ⚠️ Still Broken: handlers_task.go, handlers_testing.go, handlers_council.go, handlers_research.go, handlers_maint.go
+## ⚠️ Still Broken: handlers_testing.go, handlers_council.go, handlers_research.go, handlers_maint.go
 
-These use old router API and need rewrite in Sessions 3-4.
+These use old router API and need rewrite in Session 4.
 
 ---
 
 ## 🎯 Next Action
 
-**Start Rewrite Session 3:** handlers_task.go
+**Start Rewrite Session 4:** handlers_testing.go, handlers_council.go, handlers_research.go, handlers_maint.go
 
-This rewrites task execution with git commits, task_runs creation, proper error handling.
-
-**Say:** "START REWRITE SESSION 3"
+**Say:** "START REWRITE SESSION 4"
 
 ---
 
@@ -46,8 +45,8 @@ This rewrites task execution with git commits, task_runs creation, proper error 
 |---------|-------|-------|--------|
 | **1** | validation.go, router.go | ~700 | ✅ Complete |
 | **2** | handlers_plan.go | ~320 | ✅ Complete |
-| **3** | handlers_task.go | ~500 | ⏳ Ready |
-| **4** | handlers_testing, council, research, ~350 | ⏳ Ready |
+| **3** | handlers_task.go | ~580 | ✅ Complete |
+| **4** | handlers_testing, council, research, maint | ~350 | ⏳ Ready |
 
 ---
 
@@ -84,6 +83,8 @@ This rewrites task execution with git commits, task_runs creation, proper error 
 | Model routing | ✅ | Selects glm-5 |
 | CLI execution | ✅ | kilo works |
 | Token extraction | ✅ | Gets tokens from output |
+| Task execution | ✅ | handlers_task.go rewritten |
+| Learning system | ✅ | Wired in task handlers |
 
 ---
 
@@ -91,11 +92,10 @@ This rewrites task execution with git commits, task_runs creation, proper error 
 
 | Component | Issue | Impact |
 |-----------|-------|--------|
-| Task assignment | RPC fails | Task never gets assigned_to |
-| Git commit | Files parsing fails | Output not committed |
-| Status updates | Wrong logic | Shows review even on failure |
-| Error recovery | None | Task stuck forever |
-| Learning system | Not wired | No self-improvement |
+| Testing handlers | Old router API | Testing flow broken |
+| Council handlers | Old router API | Council review broken |
+| Research handlers | Old router API | Research flow broken |
+| Maintenance handlers | Old router API | Maintenance broken |
 
 ---
 
@@ -120,8 +120,15 @@ ALL of these must work:
 
 ## 🕐 Session History
 
+### Session 57 (2026-03-07)
+- Rewrote handlers_task.go - clean task execution flow
+- TaskHandler struct with separation of concerns
+- Learning system fully wired
+- Build passes ✅
+
 ### Session 56 (2026-03-07)
-- Rewrote handlers_plan.go - clean,- Rewrote router.go - clean routing logic
+- Rewrote handlers_plan.go - clean
+- Rewrote router.go - clean routing logic
 - Rewrote validation.go - correct task parsing
 - Cleaned types.go - removed duplicates
 - Build passes ✅

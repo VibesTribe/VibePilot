@@ -22,7 +22,7 @@ func setupResearchHandlers(
 	connRouter *runtime.Router,
 ) {
 	selectDestination := func(agentID, suggestionID, taskType string) string {
-		result, err := connRouter.SelectDestination(ctx, runtime.RoutingRequest{
+		result, err := connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
 			AgentID:  agentID,
 			TaskID:   suggestionID,
 			TaskType: taskType,
