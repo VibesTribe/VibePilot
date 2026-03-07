@@ -7,13 +7,471 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/runtime"
 )
+
+type CouncilHandler struct {
+	database   *db.DB
+	factory    *runtime.SessionFactory
+	pool       *runtime.AgentPool
+	connRouter *runtime.Router
+	cfg        *runtime.Config
+}
+
+func NewCouncilHandler(
+	database *db.DB,
+	factory *runtime.SessionFactory,
+	pool *runtime.AgentPool,
+	connRouter *runtime.Router,
+	cfg *runtime.Config,
+) *CouncilHandler {
+	return &CouncilHandler{
+		database:   database,
+		factory:    factory,
+		pool:       pool,
+		connRouter: connRouter,
+		cfg:        cfg,
+	}
+}
+
+func (h *CouncilHandler) Register(router *runtime.EventRouter) {
+	router.On(runtime.EventCouncilReview, h.handleCouncilReview)
+	router.On(runtime.EventCouncilDone, h.handleCouncilDone)
+}
+
+func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
+	ctx := context.Background()
+
+	var plan map[string]any
+	if err := json.Unmarshal(event.Record, &plan); err != nil {
+		log.Printf("[CouncilReview] Failed to parse event: %v", err)
+		return
+	}
+
+	planID := getString(plan, "id")
+	if planID == "" {
+		return
+	}
+
+	processingBy := fmt.Sprintf("council_review:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
+		"p_table":         "plans",
+		"p_id":            planID,
+		"p_processing_by": processingBy,
+	})
+	if err != nil || !parseBool(claimed) {
+		log.Printf("[CouncilReview] Plan %s already being processed", truncateID(planID))
+		return
+	}
+
+	defer h.database.RPC(ctx, "clear_processing", map[string]any{
+		"p_table": "plans",
+		"p_id":    planID,
+	})
+
+	memberCount := h.cfg.GetCouncilMemberCount()
+	lenses := h.cfg.GetCouncilLenses()
+	includePRD := h.cfg.ShouldCouncilIncludePRD()
+
+	if memberCount <= 0 {
+		memberCount = 3
+	}
+	if len(lenses) == 0 {
+		lenses = []string{"user_alignment", "architecture", "feasibility"}
+	}
+
+	var prdContent string
+	if includePRD {
+		if prdPath := getString(plan, "prd_path"); prdPath != "" {
+			fullPath := fmt.Sprintf("%s/%s", h.cfg.GetRepoPath(), prdPath)
+			if content, err := os.ReadFile(fullPath); err == nil {
+				prdContent = string(content)
+			}
+		}
+	}
+
+	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
+		AgentID:  "council",
+		TaskID:   planID,
+		TaskType: "council_review",
+	})
+	if err != nil || routingResult == nil {
+		log.Printf("[CouncilReview] No destination for plan %s", truncateID(planID))
+		_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
+			"p_plan_id":      planID,
+			"p_status":       "error",
+			"p_review_notes": map[string]any{"error": "no_destination"},
+		})
+		return
+	}
+
+	councilMode := "sequential_same_model"
+	availableDests := h.connRouter.GetAvailableConnectors()
+	internalCount := 0
+	for _, d := range availableDests {
+		if h.cfg.GetConnectorCategory(d) == "internal" {
+			internalCount++
+		}
+	}
+	if internalCount >= memberCount {
+		councilMode = "parallel_different_models"
+	}
+
+	log.Printf("[CouncilReview] Plan %s starting (mode: %s, members: %d)",
+		truncateID(planID), councilMode, memberCount)
+
+	reviews := make([]map[string]any, memberCount)
+	councilModels := make([]map[string]any, 0, memberCount)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	for i := 0; i < memberCount; i++ {
+		wg.Add(1)
+		go func(memberIndex int) {
+			defer wg.Done()
+
+			lens := lenses[memberIndex%len(lenses)]
+			session, err := h.factory.CreateWithContext(ctx, "council", lens)
+			if err != nil {
+				log.Printf("[CouncilReview] Failed to create session for member %d: %v", memberIndex+1, err)
+				return
+			}
+
+			contextData := map[string]any{
+				"plan":          plan,
+				"lens":          lens,
+				"member_number": memberIndex + 1,
+			}
+			if prdContent != "" {
+				contextData["prd_content"] = prdContent
+			}
+
+			result, err := session.Run(ctx, contextData)
+			if err != nil {
+				log.Printf("[CouncilReview] Member %d failed: %v", memberIndex+1, err)
+				return
+			}
+
+			vote, parseErr := runtime.ParseCouncilVote(result.Output)
+			if parseErr != nil {
+				log.Printf("[CouncilReview] Failed to parse vote from member %d: %v", memberIndex+1, parseErr)
+				return
+			}
+
+			mu.Lock()
+			reviews[memberIndex] = map[string]any{
+				"member_number": memberIndex + 1,
+				"lens":          lens,
+				"vote":          vote.Vote,
+				"concerns":      vote.Concerns,
+				"reasoning":     vote.Reasoning,
+				"model_id":      routingResult.ModelID,
+			}
+			councilModels = append(councilModels, map[string]any{
+				"lens":  lens,
+				"model": routingResult.ModelID,
+			})
+			mu.Unlock()
+
+			log.Printf("[CouncilReview] Member %d (%s) voted: %s", memberIndex+1, lens, vote.Vote)
+		}(i)
+	}
+	wg.Wait()
+
+	validReviews := make([]map[string]any, 0, len(reviews))
+	for _, r := range reviews {
+		if r != nil {
+			validReviews = append(validReviews, r)
+		}
+	}
+
+	if len(validReviews) == 0 {
+		log.Printf("[CouncilReview] No valid votes for plan %s", truncateID(planID))
+		return
+	}
+
+	consensus := h.determineConsensus(validReviews, memberCount)
+	log.Printf("[CouncilReview] Plan %s consensus: %s (votes: %d/%d)",
+		truncateID(planID), consensus, len(validReviews), memberCount)
+
+	reviewsJSON, _ := json.Marshal(validReviews)
+	modelsJSON, _ := json.Marshal(councilModels)
+	_, _ = h.database.RPC(ctx, "store_council_reviews", map[string]any{
+		"p_plan_id": planID,
+		"p_reviews": reviewsJSON,
+		"p_mode":    councilMode,
+		"p_models":  modelsJSON,
+	})
+
+	_, _ = h.database.RPC(ctx, "set_council_consensus", map[string]any{
+		"p_plan_id":   planID,
+		"p_consensus": consensus,
+	})
+
+	switch consensus {
+	case "approved":
+		h.handleApprovedPlan(ctx, plan, planID)
+	case "blocked":
+		h.recordCouncilFeedback(ctx, planID, validReviews)
+		_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
+			"p_plan_id": planID,
+			"p_status":  "blocked",
+			"p_review_notes": map[string]any{
+				"consensus": consensus,
+				"reviews":   validReviews,
+			},
+		})
+	case "revision_needed":
+		h.recordCouncilFeedback(ctx, planID, validReviews)
+		h.updatePlanForRevision(ctx, planID, validReviews)
+	}
+}
+
+func (h *CouncilHandler) handleCouncilDone(event runtime.Event) {
+	ctx := context.Background()
+
+	var plan map[string]any
+	if err := json.Unmarshal(event.Record, &plan); err != nil {
+		log.Printf("[CouncilDone] Failed to parse event: %v", err)
+		return
+	}
+
+	planID := getString(plan, "id")
+	if planID == "" {
+		return
+	}
+
+	processingBy := fmt.Sprintf("council_done:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
+		"p_table":         "plans",
+		"p_id":            planID,
+		"p_processing_by": processingBy,
+	})
+	if err != nil || !parseBool(claimed) {
+		log.Printf("[CouncilDone] Plan %s already being processed", truncateID(planID))
+		return
+	}
+
+	defer h.database.RPC(ctx, "clear_processing", map[string]any{
+		"p_table": "plans",
+		"p_id":    planID,
+	})
+
+	councilReviews := h.extractCouncilReviews(plan)
+	consensus := getString(plan, "council_consensus")
+	if consensus == "" {
+		consensus = h.determineConsensus(councilReviews, h.cfg.GetCouncilMemberCount())
+	}
+
+	log.Printf("[CouncilDone] Plan %s consensus: %s", truncateID(planID), consensus)
+
+	switch consensus {
+	case "approved":
+		h.handleApprovedPlan(ctx, plan, planID)
+	case "blocked":
+		h.recordCouncilFeedback(ctx, planID, councilReviews)
+		_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
+			"p_plan_id": planID,
+			"p_status":  "blocked",
+		})
+	case "revision_needed":
+		h.recordCouncilFeedback(ctx, planID, councilReviews)
+		h.updatePlanForRevision(ctx, planID, councilReviews)
+	}
+}
+
+func (h *CouncilHandler) handleApprovedPlan(ctx context.Context, plan map[string]any, planID string) {
+	if err := createTasksFromApprovedPlan(ctx, h.database, plan, h.cfg.GetValidationConfig(), h.cfg.GetRepoPath()); err != nil {
+		var validationErr *ValidationFailedError
+		if errors.As(err, &validationErr) {
+			log.Printf("[Council] Task validation failed for %s", truncateID(planID))
+			var concerns []string
+			var taskNumbers []string
+			for _, e := range validationErr.Errors {
+				concerns = append(concerns, fmt.Sprintf("%s: %s", e.TaskNumber, e.Issue))
+				taskNumbers = append(taskNumbers, e.TaskNumber)
+			}
+			_, _ = h.database.RPC(ctx, "record_planner_revision", map[string]any{
+				"p_plan_id":                planID,
+				"p_concerns":               concerns,
+				"p_tasks_needing_revision": taskNumbers,
+			})
+			_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
+				"p_plan_id": planID,
+				"p_status":  "revision_needed",
+				"p_review_notes": map[string]any{
+					"validation_errors": concerns,
+					"source":            "council_approved_but_validation_failed",
+				},
+			})
+			return
+		}
+		log.Printf("[Council] Failed to create tasks for %s: %v", truncateID(planID), err)
+		_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
+			"p_plan_id": planID,
+			"p_status":  "error",
+			"p_review_notes": map[string]any{
+				"error": err.Error(),
+			},
+		})
+		return
+	}
+
+	_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
+		"p_plan_id": planID,
+		"p_status":  "approved",
+	})
+	log.Printf("[Council] Plan %s approved, tasks created", truncateID(planID))
+}
+
+func (h *CouncilHandler) determineConsensus(reviews []map[string]any, memberCount int) string {
+	if len(reviews) == 0 {
+		return "revision_needed"
+	}
+
+	approved := 0
+	blocked := 0
+
+	for _, r := range reviews {
+		vote := getString(r, "vote")
+		switch vote {
+		case "APPROVED", "approved":
+			approved++
+		case "BLOCKED", "blocked":
+			blocked++
+		}
+	}
+
+	consensusMethod := h.cfg.GetConsensusMethod()
+	if consensusMethod == "unanimous_approval" {
+		if approved == memberCount {
+			return "approved"
+		}
+		if blocked > 0 {
+			return "blocked"
+		}
+		return "revision_needed"
+	}
+
+	if approved > memberCount/2 {
+		return "approved"
+	}
+	if blocked > memberCount/2 {
+		return "blocked"
+	}
+	return "revision_needed"
+}
+
+func (h *CouncilHandler) extractCouncilReviews(plan map[string]any) []map[string]any {
+	reviews := plan["council_reviews"]
+	if reviews == nil {
+		return nil
+	}
+
+	switch v := reviews.(type) {
+	case []interface{}:
+		result := make([]map[string]any, 0, len(v))
+		for _, item := range v {
+			if m, ok := item.(map[string]interface{}); ok {
+				result = append(result, mapStrAny(m))
+			}
+		}
+		return result
+	case []map[string]interface{}:
+		result := make([]map[string]any, 0, len(v))
+		for _, m := range v {
+			result = append(result, mapStrAny(m))
+		}
+		return result
+	case string:
+		if v == "" || v == "[]" || v == "null" {
+			return nil
+		}
+		var parsed []map[string]any
+		if err := json.Unmarshal([]byte(v), &parsed); err == nil {
+			return parsed
+		}
+	}
+	return nil
+}
+
+func mapStrAny(m map[string]interface{}) map[string]any {
+	result := make(map[string]any)
+	for k, v := range m {
+		result[k] = v
+	}
+	return result
+}
+
+func (h *CouncilHandler) recordCouncilFeedback(ctx context.Context, planID string, reviews []map[string]any) {
+	for _, r := range reviews {
+		concerns, _ := r["concerns"].([]interface{})
+		for _, c := range concerns {
+			var description string
+			switch cm := c.(type) {
+			case map[string]interface{}:
+				description = getString(mapStrAny(cm), "description")
+				if description == "" {
+					description = getString(mapStrAny(cm), "issue")
+				}
+			case string:
+				description = cm
+			}
+			if description != "" {
+				_, _ = h.database.RPC(ctx, "create_planner_rule", map[string]any{
+					"p_applies_to": "*",
+					"p_rule_type":  "council_feedback",
+					"p_rule_text":  "Avoid: " + description,
+					"p_source":     "council",
+				})
+			}
+		}
+	}
+}
+
+func (h *CouncilHandler) updatePlanForRevision(ctx context.Context, planID string, reviews []map[string]any) {
+	var allConcerns []string
+	var tasksNeedingRevision []string
+
+	for _, r := range reviews {
+		if concerns, ok := r["concerns"].([]interface{}); ok {
+			for _, c := range concerns {
+				switch cm := c.(type) {
+				case map[string]interface{}:
+					if desc := getString(mapStrAny(cm), "description"); desc != "" {
+						allConcerns = append(allConcerns, desc)
+					}
+					if taskID := getString(mapStrAny(cm), "task_id"); taskID != "" {
+						tasksNeedingRevision = append(tasksNeedingRevision, taskID)
+					}
+				case string:
+					allConcerns = append(allConcerns, cm)
+				}
+			}
+		}
+	}
+
+	_, _ = h.database.RPC(ctx, "record_revision_feedback", map[string]any{
+		"p_plan_id":                planID,
+		"p_source":                 "council",
+		"p_feedback":               map[string]any{"concerns": allConcerns},
+		"p_tasks_needing_revision": tasksNeedingRevision,
+	})
+
+	_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
+		"p_plan_id": planID,
+		"p_status":  "revision_needed",
+		"p_review_notes": map[string]any{
+			"consensus":              "revision_needed",
+			"concerns":               allConcerns,
+			"tasks_needing_revision": tasksNeedingRevision,
+		},
+	})
+}
 
 func setupCouncilHandlers(
 	ctx context.Context,
@@ -24,446 +482,6 @@ func setupCouncilHandlers(
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 ) {
-	selectDestination := func(agentID, planID, taskType string) string {
-		result, err := connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-			AgentID:  agentID,
-			TaskID:   planID,
-			TaskType: taskType,
-		})
-		if err != nil || result == nil {
-			log.Printf("[Router] No destination available for agent %s, using fallback", agentID)
-			dests := connRouter.GetAvailableConnectors()
-			if len(dests) > 0 {
-				return dests[0]
-			}
-			return ""
-		}
-		return result.DestinationID
-	}
-
-	router.On(runtime.EventCouncilDone, func(event runtime.Event) {
-		var plan map[string]any
-		if err := json.Unmarshal(event.Record, &plan); err != nil {
-			return
-		}
-
-		planID, _ := plan["id"].(string)
-
-		processingBy := fmt.Sprintf("council_done:%d", time.Now().UnixNano())
-		claimed, claimErr := database.RPC(ctx, "set_processing", map[string]any{
-			"p_table":         "plans",
-			"p_id":            planID,
-			"p_processing_by": processingBy,
-		})
-		if claimErr != nil || claimed == nil {
-			log.Printf("[EventCouncilDone] Plan %s already being processed or claim failed", truncateID(planID))
-			return
-		}
-		var claimSuccess bool
-		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
-			log.Printf("[EventCouncilDone] Plan %s already being processed", truncateID(planID))
-			return
-		}
-
-		councilReviews := extractCouncilReviews(plan)
-
-		if len(councilReviews) == 0 {
-			log.Printf("[EventCouncilDone] No council reviews for plan %s - direct supervisor approval, creating tasks", truncateID(planID))
-			if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig(), cfg.GetRepoPath()); err != nil {
-				var validationErr *ValidationFailedError
-				if errors.As(err, &validationErr) {
-					log.Printf("[EventCouncilDone] Task validation failed for plan %s - sending back to planner", truncateID(planID))
-					var concerns []string
-					var taskNumbers []string
-					for _, e := range validationErr.Errors {
-						concerns = append(concerns, fmt.Sprintf("%s: %s", e.TaskNumber, e.Issue))
-						taskNumbers = append(taskNumbers, e.TaskNumber)
-					}
-					_, _ = database.RPC(ctx, "record_planner_revision", map[string]any{
-						"p_plan_id":                planID,
-						"p_concerns":               concerns,
-						"p_tasks_needing_revision": taskNumbers,
-					})
-					_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
-						"p_plan_id":      planID,
-						"p_status":       "revision_needed",
-						"p_review_notes": map[string]any{"validation_errors": concerns},
-					})
-				} else {
-					log.Printf("[EventCouncilDone] Failed to create tasks: %v", err)
-					_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
-						"p_plan_id":      planID,
-						"p_status":       "error",
-						"p_review_notes": map[string]any{"error": err.Error()},
-					})
-				}
-			} else {
-				_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
-					"p_plan_id": planID,
-					"p_status":  "approved",
-				})
-			}
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			return
-		}
-
-		destID := selectDestination("supervisor", planID, "council_done")
-		if destID == "" {
-			log.Printf("[EventCouncilDone] No destination available for plan %s", truncateID(planID))
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			return
-		}
-
-		session, err := factory.Create("supervisor")
-		if err != nil {
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			return
-		}
-
-		err = pool.SubmitWithDestination(ctx, "plans", destID, func() error {
-			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-
-			_, err := session.Run(ctx, map[string]any{"plan": plan, "event": "council_done"})
-			if err != nil {
-				return err
-			}
-
-			approved := 0
-			revisionNeeded := 0
-			blocked := 0
-
-			for _, r := range councilReviews {
-				vote, _ := r["vote"].(string)
-				switch vote {
-				case "APPROVED":
-					approved++
-				case "REVISION_NEEDED":
-					revisionNeeded++
-				case "BLOCKED":
-					blocked++
-				}
-			}
-
-			memberCount := cfg.GetCouncilMemberCount()
-			consensusMethod := cfg.GetConsensusMethod()
-
-			var consensus string
-			if consensusMethod == "unanimous_approval" {
-				if approved == memberCount {
-					consensus = "approved"
-				} else if blocked > 0 {
-					consensus = "blocked"
-				} else {
-					consensus = "revision_needed"
-				}
-			} else {
-				if approved == memberCount {
-					consensus = "approved"
-				} else if blocked > 0 {
-					consensus = "blocked"
-				} else {
-					consensus = "revision_needed"
-				}
-			}
-
-			log.Printf("[EventCouncilDone] Plan %s consensus: %s (approved=%d, revision=%d, blocked=%d, method=%s)", truncateID(planID), consensus, approved, revisionNeeded, blocked, consensusMethod)
-
-			_, err = database.RPC(ctx, "set_council_consensus", map[string]any{
-				"p_plan_id":   planID,
-				"p_consensus": consensus,
-			})
-			if err != nil {
-				log.Printf("[EventCouncilDone] Failed to set council consensus: %v", err)
-			}
-
-			switch consensus {
-			case "approved":
-				if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig(), cfg.GetRepoPath()); err != nil {
-					var validationErr *ValidationFailedError
-					if errors.As(err, &validationErr) {
-						log.Printf("[EventCouncilDone] Task validation failed for plan %s - sending back to planner", truncateID(planID))
-						var concerns []string
-						var taskNumbers []string
-						for _, e := range validationErr.Errors {
-							concerns = append(concerns, fmt.Sprintf("%s: %s", e.TaskNumber, e.Issue))
-							taskNumbers = append(taskNumbers, e.TaskNumber)
-						}
-						_, _ = database.RPC(ctx, "record_planner_revision", map[string]any{
-							"p_plan_id":                planID,
-							"p_concerns":               concerns,
-							"p_tasks_needing_revision": taskNumbers,
-						})
-						_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
-							"p_plan_id":      planID,
-							"p_status":       "revision_needed",
-							"p_review_notes": map[string]any{"validation_errors": concerns, "source": "council_approved_but_validation_failed"},
-						})
-					} else {
-						log.Printf("[EventCouncilDone] Failed to create tasks: %v", err)
-						_, _ = database.RPC(ctx, "update_plan_status", map[string]any{
-							"p_plan_id":      planID,
-							"p_status":       "error",
-							"p_review_notes": map[string]any{"error": err.Error()},
-						})
-					}
-				}
-
-			case "revision_needed", "blocked":
-				for _, r := range councilReviews {
-					concerns, _ := r["concerns"].([]interface{})
-					for _, c := range concerns {
-						if cm, ok := c.(map[string]interface{}); ok {
-							description, _ := cm["description"].(string)
-							if description != "" {
-								_, err := database.RPC(ctx, "create_planner_rule", map[string]any{
-									"p_applies_to": "*",
-									"p_rule_type":  "council_feedback",
-									"p_rule_text":  "Avoid: " + description,
-									"p_source":     "council",
-								})
-								if err != nil {
-									log.Printf("[EventCouncilDone] Failed to create planner rule: %v", err)
-								}
-							}
-						}
-					}
-				}
-			}
-
-			return nil
-		})
-		if err != nil {
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			log.Printf("[EventCouncilDone] Failed to submit to pool: %v", err)
-		}
-	})
-
-	router.On(runtime.EventCouncilReview, func(event runtime.Event) {
-		var plan map[string]any
-		if err := json.Unmarshal(event.Record, &plan); err != nil {
-			return
-		}
-
-		planID, _ := plan["id"].(string)
-
-		processingBy := fmt.Sprintf("council_review:%d", time.Now().UnixNano())
-		claimed, err := database.RPC(ctx, "set_processing", map[string]any{
-			"p_table":         "plans",
-			"p_id":            planID,
-			"p_processing_by": processingBy,
-		})
-		if err != nil || claimed == nil {
-			log.Printf("[EventCouncilReview] Plan %s already being processed or claim failed", truncateID(planID))
-			return
-		}
-		var claimSuccess bool
-		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
-			log.Printf("[EventCouncilReview] Plan %s already being processed", truncateID(planID))
-			return
-		}
-
-		memberCount := cfg.GetCouncilMemberCount()
-		lenses := cfg.GetCouncilLenses()
-		includePRD := cfg.ShouldCouncilIncludePRD()
-
-		var prdContent string
-		if includePRD {
-			if prdPath, ok := plan["prd_path"].(string); ok && prdPath != "" {
-				fullPath := filepath.Join(cfg.GetRepoPath(), prdPath)
-				if content, err := os.ReadFile(fullPath); err == nil {
-					prdContent = string(content)
-				}
-			}
-		}
-
-		destID := selectDestination("council", planID, "council_review")
-		if destID == "" {
-			log.Printf("[EventCouncilReview] No destination available for plan %s", truncateID(planID))
-			return
-		}
-
-		councilMode := "sequential_same_model_different_hats"
-		councilModels := []map[string]any{}
-
-		availableDests := connRouter.GetAvailableConnectors()
-		internalDests := 0
-		for _, d := range availableDests {
-			category := cfg.GetConnectorCategory(d)
-			if category == "internal" {
-				internalDests++
-			}
-		}
-
-		if internalDests >= memberCount {
-			councilMode = "parallel_different_models"
-		}
-
-		log.Printf("[EventCouncilReview] Plan %s council starting (mode: %s, members: %d)", truncateID(planID), councilMode, memberCount)
-
-		reviews := make([]map[string]any, memberCount)
-		var wg sync.WaitGroup
-		var mu sync.Mutex
-
-		for i := 0; i < memberCount; i++ {
-			wg.Add(1)
-			go func(memberIndex int) {
-				defer wg.Done()
-
-				lens := lenses[memberIndex%len(lenses)]
-				session, err := factory.CreateWithContext(ctx, "council", lens)
-				if err != nil {
-					log.Printf("[EventCouncilReview] Failed to create council session for member %d: %v", memberIndex+1, err)
-					return
-				}
-
-				contextData := map[string]any{
-					"plan":          plan,
-					"lens":          lens,
-					"member_number": memberIndex + 1,
-				}
-				if prdContent != "" {
-					contextData["prd_content"] = prdContent
-				}
-
-				result, err := session.Run(ctx, contextData)
-				if err != nil {
-					log.Printf("[EventCouncilReview] Council member %d failed: %v", memberIndex+1, err)
-					return
-				}
-
-				vote, parseErr := runtime.ParseCouncilVote(result.Output)
-				if parseErr != nil {
-					log.Printf("[EventCouncilReview] Failed to parse vote from member %d: %v", memberIndex+1, parseErr)
-					return
-				}
-
-				mu.Lock()
-				reviews[memberIndex] = map[string]any{
-					"member_number": memberIndex + 1,
-					"lens":          lens,
-					"vote":          vote.Vote,
-					"concerns":      vote.Concerns,
-					"reasoning":     vote.Reasoning,
-					"destination":   destID,
-				}
-				councilModels = append(councilModels, map[string]any{
-					"lens":        lens,
-					"destination": destID,
-				})
-				mu.Unlock()
-
-				log.Printf("[EventCouncilReview] Member %d (%s) voted: %s", memberIndex+1, lens, vote.Vote)
-			}(i)
-		}
-		wg.Wait()
-
-		validReviews := make([]map[string]any, 0)
-		for _, r := range reviews {
-			if r != nil {
-				validReviews = append(validReviews, r)
-			}
-		}
-
-		if len(validReviews) == 0 {
-			log.Printf("[EventCouncilReview] No valid votes for plan %s", truncateID(planID))
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-			return
-		}
-
-		reviewsJSON, _ := json.Marshal(validReviews)
-		modelsJSON, _ := json.Marshal(councilModels)
-		_, storeErr := database.RPC(ctx, "store_council_reviews", map[string]any{
-			"p_plan_id": planID,
-			"p_reviews": reviewsJSON,
-			"p_mode":    councilMode,
-			"p_models":  modelsJSON,
-		})
-		if storeErr != nil {
-			log.Printf("[EventCouncilReview] Failed to store council reviews: %v", storeErr)
-		}
-
-		approved := 0
-		revisionNeeded := 0
-		blocked := 0
-		var allConcerns []string
-		var tasksNeedingRevision []string
-
-		for _, r := range validReviews {
-			vote, _ := r["vote"].(string)
-			switch vote {
-			case "APPROVED":
-				approved++
-			case "REVISION_NEEDED":
-				revisionNeeded++
-			case "BLOCKED":
-				blocked++
-			}
-			if concerns, ok := r["concerns"].([]interface{}); ok {
-				for _, c := range concerns {
-					if concern, ok := c.(string); ok {
-						allConcerns = append(allConcerns, concern)
-					}
-				}
-			}
-		}
-
-		consensusMethod := cfg.GetConsensusMethod()
-		var consensus string
-		if consensusMethod == "unanimous_approval" {
-			if approved == memberCount {
-				consensus = "approved"
-			} else if blocked > 0 {
-				consensus = "blocked"
-			} else {
-				consensus = "revision_needed"
-			}
-		} else {
-			if approved > memberCount/2 {
-				consensus = "approved"
-			} else if blocked > memberCount/2 {
-				consensus = "blocked"
-			} else {
-				consensus = "revision_needed"
-			}
-		}
-
-		log.Printf("[EventCouncilReview] Plan %s consensus: %s (approved=%d, revision=%d, blocked=%d, method=%s)", truncateID(planID), consensus, approved, revisionNeeded, blocked, consensusMethod)
-
-		var newStatus string
-		switch consensus {
-		case "approved":
-			newStatus = "approved"
-		case "blocked":
-			newStatus = "blocked"
-		case "revision_needed":
-			newStatus = "revision_needed"
-			_, feedbackErr := database.RPC(ctx, "record_revision_feedback", map[string]any{
-				"p_plan_id":                planID,
-				"p_source":                 "council",
-				"p_feedback":               map[string]any{"concerns": allConcerns},
-				"p_tasks_needing_revision": tasksNeedingRevision,
-			})
-			if feedbackErr != nil {
-				log.Printf("[EventCouncilReview] Failed to record revision feedback: %v", feedbackErr)
-			}
-		}
-
-		_, updateErr := database.RPC(ctx, "update_plan_status", map[string]any{
-			"p_plan_id": planID,
-			"p_status":  newStatus,
-			"p_review_notes": map[string]any{
-				"consensus":        consensus,
-				"approved_count":   approved,
-				"revision_count":   revisionNeeded,
-				"blocked_count":    blocked,
-				"council_mode":     councilMode,
-				"consensus_method": consensusMethod,
-			},
-		})
-		if updateErr != nil {
-			log.Printf("[EventCouncilReview] Failed to update plan status: %v", updateErr)
-		}
-
-		database.RPC(ctx, "clear_processing", map[string]any{"p_table": "plans", "p_id": planID})
-	})
+	handler := NewCouncilHandler(database, factory, pool, connRouter, cfg)
+	handler.Register(router)
 }

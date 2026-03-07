@@ -14,9 +14,11 @@ const (
 	EventTaskAvailable   EventType = "task_available"
 	EventTaskCompleted   EventType = "task_completed"
 	EventTaskReview      EventType = "task_review"
+	EventTaskTesting     EventType = "task_testing"
 	EventPlanReview      EventType = "plan_review"
 	EventPlanCreated     EventType = "plan_created"
 	EventCouncilDone     EventType = "council_done"
+	EventCouncilReview   EventType = "council_review"
 	EventResearchReady   EventType = "research_ready"
 	EventResearchCouncil EventType = "research_council"
 	EventMaintenanceCmd  EventType = "maintenance_command"
@@ -24,12 +26,13 @@ const (
 	EventTestResults     EventType = "test_results"
 	EventHumanQuery      EventType = "human_query"
 	EventRevisionNeeded  EventType = "revision_needed"
-	EventCouncilReview   EventType = "council_review"
 	EventCouncilComplete EventType = "council_complete"
 	EventPlanApproved    EventType = "plan_approved"
 	EventPlanBlocked     EventType = "plan_blocked"
 	EventPRDIncomplete   EventType = "prd_incomplete"
 	EventPlanError       EventType = "plan_error"
+	EventTaskApproval    EventType = "task_approval"
+	EventTaskMerged      EventType = "task_merged"
 )
 
 type Event struct {

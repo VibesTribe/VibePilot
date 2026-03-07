@@ -12,6 +12,295 @@ import (
 	"github.com/vibepilot/governor/internal/runtime"
 )
 
+type TestingHandler struct {
+	database   *db.DB
+	factory    *runtime.SessionFactory
+	pool       *runtime.AgentPool
+	connRouter *runtime.Router
+	git        *gitree.Gitree
+	cfg        *runtime.Config
+}
+
+func NewTestingHandler(
+	database *db.DB,
+	factory *runtime.SessionFactory,
+	pool *runtime.AgentPool,
+	connRouter *runtime.Router,
+	git *gitree.Gitree,
+	cfg *runtime.Config,
+) *TestingHandler {
+	return &TestingHandler{
+		database:   database,
+		factory:    factory,
+		pool:       pool,
+		connRouter: connRouter,
+		git:        git,
+		cfg:        cfg,
+	}
+}
+
+func (h *TestingHandler) Register(router *runtime.EventRouter) {
+	router.On(runtime.EventTaskTesting, h.handleTaskTesting)
+	router.On(runtime.EventTestResults, h.handleTestResults)
+}
+
+func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
+	ctx := context.Background()
+
+	var task map[string]any
+	if err := json.Unmarshal(event.Record, &task); err != nil {
+		log.Printf("[TaskTesting] Failed to parse event: %v", err)
+		return
+	}
+
+	taskID := getString(task, "id")
+	taskNumber := getString(task, "task_number")
+	taskType := getString(task, "type")
+	modelID := getString(task, "assigned_to")
+	sliceID := getStringOr(task, "slice_id", "testing")
+
+	if taskID == "" {
+		return
+	}
+
+	processingBy := fmt.Sprintf("tester:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
+		"p_table":         "tasks",
+		"p_id":            taskID,
+		"p_processing_by": processingBy,
+	})
+	if err != nil || !parseBool(claimed) {
+		log.Printf("[TaskTesting] Task %s already being processed", truncateID(taskID))
+		return
+	}
+
+	defer h.database.RPC(ctx, "clear_processing", map[string]any{
+		"p_table": "tasks",
+		"p_id":    taskID,
+	})
+
+	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
+		AgentID:  "tester",
+		TaskID:   taskID,
+		TaskType: taskType,
+	})
+	if err != nil || routingResult == nil {
+		log.Printf("[TaskTesting] No destination for task %s", truncateID(taskID))
+		h.recordFailure(ctx, modelID, taskID, "no_destination")
+		return
+	}
+
+	branchName := h.buildBranchName(taskNumber, taskID)
+
+	session, err := h.factory.CreateWithContext(ctx, "tester", taskType)
+	if err != nil {
+		log.Printf("[TaskTesting] Failed to create session for %s: %v", truncateID(taskID), err)
+		h.recordFailure(ctx, modelID, taskID, "session_create_failed")
+		return
+	}
+
+	err = h.pool.SubmitWithDestination(ctx, sliceID, routingResult.DestinationID, func() error {
+		start := time.Now()
+		result, sessionErr := session.Run(ctx, map[string]any{
+			"task":        task,
+			"branch_name": branchName,
+			"repo_path":   h.cfg.GetRepoPath(),
+			"event":       "task_testing",
+		})
+		duration := time.Since(start).Seconds()
+
+		if sessionErr != nil {
+			log.Printf("[TaskTesting] Session failed for %s: %v", truncateID(taskID), sessionErr)
+			h.recordFailure(ctx, modelID, taskID, "session_error")
+			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "available",
+			})
+			return sessionErr
+		}
+
+		testOutput, parseErr := runtime.ParseTestResults(result.Output)
+		if parseErr != nil {
+			log.Printf("[TaskTesting] Failed to parse test output for %s: %v", truncateID(taskID), parseErr)
+			h.recordFailure(ctx, modelID, taskID, "parse_error")
+			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "available",
+			})
+			return nil
+		}
+
+		log.Printf("[TaskTesting] Task %s test outcome: %s, next: %s",
+			truncateID(taskID), testOutput.TestOutcome, testOutput.NextAction)
+
+		switch testOutput.TestOutcome {
+		case "pass", "passed", "success":
+			h.recordSuccess(ctx, routingResult.ModelID, taskType, duration, result.TokensIn+result.TokensOut)
+			_, err := h.database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "approval",
+			})
+			if err != nil {
+				log.Printf("[TaskTesting] Failed to update status: %v", err)
+			}
+
+		case "fail", "failed":
+			h.recordFailure(ctx, routingResult.ModelID, taskID, "test_failed")
+			_, err := h.database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "available",
+			})
+			if err != nil {
+				log.Printf("[TaskTesting] Failed to reset task: %v", err)
+			}
+
+		default:
+			if testOutput.NextAction == "return_for_fix" {
+				h.recordFailure(ctx, routingResult.ModelID, taskID, "test_needs_fix")
+				_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "available",
+				})
+			} else if testOutput.NextAction == "await_human_approval" {
+				_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "approval",
+				})
+			} else {
+				h.recordFailure(ctx, routingResult.ModelID, taskID, "unknown_test_outcome")
+				_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "available",
+				})
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Printf("[TaskTesting] Failed to submit: %v", err)
+	}
+}
+
+func (h *TestingHandler) handleTestResults(event runtime.Event) {
+	ctx := context.Background()
+
+	var testResult map[string]any
+	if err := json.Unmarshal(event.Record, &testResult); err != nil {
+		log.Printf("[TestResults] Failed to parse event: %v", err)
+		return
+	}
+
+	resultID := getString(testResult, "id")
+	taskID := getString(testResult, "task_id")
+	taskNumber := getString(testResult, "task_number")
+	testOutcome := getString(testResult, "test_outcome")
+	nextAction := getString(testResult, "next_action")
+
+	if resultID == "" {
+		return
+	}
+
+	processingBy := fmt.Sprintf("test_results:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
+		"p_table":         "test_results",
+		"p_id":            resultID,
+		"p_processing_by": processingBy,
+	})
+	if err != nil || !parseBool(claimed) {
+		log.Printf("[TestResults] Result %s already being processed", truncateID(resultID))
+		return
+	}
+
+	defer h.database.RPC(ctx, "clear_processing", map[string]any{
+		"p_table": "test_results",
+		"p_id":    resultID,
+	})
+
+	log.Printf("[TestResults] Task %s outcome: %s, next: %s",
+		truncateID(taskID), testOutcome, nextAction)
+
+	switch nextAction {
+	case "final_merge":
+		branchName := fmt.Sprintf("task/%s", taskNumber)
+		sliceID := getStringOr(testResult, "slice_id", "default")
+		targetBranch := fmt.Sprintf("module/%s", sliceID)
+
+		if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
+			log.Printf("[TestResults] Merge failed %s -> %s: %v", branchName, targetBranch, err)
+			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "error",
+			})
+			return
+		}
+
+		h.git.DeleteBranch(ctx, branchName)
+
+		_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+			"p_task_id": taskID,
+			"p_status":  "merged",
+		})
+		_, _ = h.database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
+			"p_completed_task_id": taskID,
+		})
+		log.Printf("[TestResults] Task %s merged to %s", truncateID(taskID), targetBranch)
+
+	case "return_for_fix":
+		_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+			"p_task_id": taskID,
+			"p_status":  "available",
+		})
+
+	case "await_human_approval":
+		_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+			"p_task_id": taskID,
+			"p_status":  "approval",
+		})
+	}
+}
+
+func (h *TestingHandler) buildBranchName(taskNumber, taskID string) string {
+	prefix := h.cfg.GetTaskBranchPrefix()
+	if prefix == "" {
+		prefix = "task/"
+	}
+	if taskNumber != "" {
+		return prefix + taskNumber
+	}
+	return prefix + truncateID(taskID)
+}
+
+func (h *TestingHandler) recordSuccess(ctx context.Context, modelID, taskType string, durationSeconds float64, tokensUsed int) {
+	if modelID == "" {
+		return
+	}
+	_, err := h.database.RPC(ctx, "record_model_success", map[string]any{
+		"p_model_id":         modelID,
+		"p_task_type":        taskType,
+		"p_duration_seconds": durationSeconds,
+		"p_tokens_used":      tokensUsed,
+	})
+	if err != nil {
+		log.Printf("[Learning] Failed to record success: %v", err)
+	}
+}
+
+func (h *TestingHandler) recordFailure(ctx context.Context, modelID, taskID, failureType string) {
+	if modelID == "" {
+		return
+	}
+	_, err := h.database.RPC(ctx, "record_model_failure", map[string]any{
+		"p_model_id":         modelID,
+		"p_task_id":          taskID,
+		"p_failure_type":     failureType,
+		"p_failure_category": runtime.CategorizeFailure(failureType),
+	})
+	if err != nil {
+		log.Printf("[Learning] Failed to record failure: %v", err)
+	}
+}
+
 func setupTestingHandlers(
 	ctx context.Context,
 	router *runtime.EventRouter,
@@ -22,136 +311,6 @@ func setupTestingHandlers(
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
 ) {
-	selectDestination := func(agentID, taskID, taskType string) string {
-		result, err := connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-			AgentID:  agentID,
-			TaskID:   taskID,
-			TaskType: taskType,
-		})
-		if err != nil || result == nil {
-			log.Printf("[Router] No destination available for agent %s, using fallback", agentID)
-			dests := connRouter.GetAvailableConnectors()
-			if len(dests) > 0 {
-				return dests[0]
-			}
-			return ""
-		}
-		return result.DestinationID
-	}
-
-	router.On(runtime.EventTestResults, func(event runtime.Event) {
-		var testResult map[string]any
-		if err := json.Unmarshal(event.Record, &testResult); err != nil {
-			return
-		}
-
-		resultID, _ := testResult["id"].(string)
-		taskID, _ := testResult["task_id"].(string)
-		taskNumber, _ := testResult["task_number"].(string)
-
-		processingBy := fmt.Sprintf("test_results:%d", time.Now().UnixNano())
-		claimed, claimErr := database.RPC(ctx, "set_processing", map[string]any{
-			"p_table":         "test_results",
-			"p_id":            resultID,
-			"p_processing_by": processingBy,
-		})
-		if claimErr != nil || claimed == nil {
-			log.Printf("[EventTestResults] Test result %s already being processed or claim failed", truncateID(resultID))
-			return
-		}
-		var claimSuccess bool
-		if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
-			log.Printf("[EventTestResults] Test result %s already being processed", truncateID(resultID))
-			return
-		}
-
-		destID := selectDestination("supervisor", taskID, "test_review")
-		if destID == "" {
-			log.Printf("[EventTestResults] No destination available for task %s", truncateID(taskID))
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "test_results", "p_id": resultID})
-			return
-		}
-
-		session, err := factory.Create("supervisor")
-		if err != nil {
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "test_results", "p_id": resultID})
-			return
-		}
-
-		err = pool.SubmitWithDestination(ctx, "testing", destID, func() error {
-			defer database.RPC(ctx, "clear_processing", map[string]any{"p_table": "test_results", "p_id": resultID})
-
-			result, err := session.Run(ctx, map[string]any{"test_result": testResult, "event": "test_results"})
-			if err != nil {
-				return err
-			}
-
-			testOutput, parseErr := runtime.ParseTestResults(result.Output)
-			if parseErr != nil {
-				log.Printf("[EventTestResults] Failed to parse test output: %v", parseErr)
-				log.Printf("[EventTestResults] Raw output: %s", truncateOutput(result.Output))
-				return nil
-			}
-
-			log.Printf("[EventTestResults] Task %s test outcome: %s, next: %s", truncateID(taskID), testOutput.TestOutcome, testOutput.NextAction)
-
-			switch testOutput.NextAction {
-			case "final_merge":
-				branchName := fmt.Sprintf("task/%s", taskNumber)
-				sliceID, _ := testResult["slice_id"].(string)
-				if sliceID == "" {
-					sliceID = "default"
-				}
-				targetBranch := fmt.Sprintf("module/%s", sliceID)
-
-				if err := git.MergeBranch(ctx, branchName, targetBranch); err != nil {
-					log.Printf("[EventTestResults] Failed to merge %s to %s: %v", branchName, targetBranch, err)
-					return nil
-				}
-
-				if err := git.DeleteBranch(ctx, branchName); err != nil {
-					log.Printf("[EventTestResults] Failed to delete branch %s: %v", branchName, err)
-				}
-
-				_, err := database.RPC(ctx, "update_task_status", map[string]any{
-					"p_task_id": taskID,
-					"p_status":  "complete",
-				})
-				if err != nil {
-					log.Printf("[EventTestResults] Failed to update task status to complete: %v", err)
-				}
-
-				_, err = database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
-					"p_completed_task_id": taskID,
-				})
-				if err != nil {
-					log.Printf("[EventTestResults] Failed to unlock dependents: %v", err)
-				}
-
-			case "return_for_fix":
-				_, err := database.RPC(ctx, "update_task_status", map[string]any{
-					"p_task_id": taskID,
-					"p_status":  "available",
-				})
-				if err != nil {
-					log.Printf("[EventTestResults] Failed to reset task for fix: %v", err)
-				}
-
-			case "await_human_approval":
-				_, err := database.RPC(ctx, "update_task_status", map[string]any{
-					"p_task_id": taskID,
-					"p_status":  "awaiting_human",
-				})
-				if err != nil {
-					log.Printf("[EventTestResults] Failed to set task awaiting_human: %v", err)
-				}
-			}
-
-			return nil
-		})
-		if err != nil {
-			database.RPC(ctx, "clear_processing", map[string]any{"p_table": "test_results", "p_id": resultID})
-			log.Printf("[EventTestResults] Failed to submit to pool: %v", err)
-		}
-	})
+	handler := NewTestingHandler(database, factory, pool, connRouter, git, cfg)
+	handler.Register(router)
 }
