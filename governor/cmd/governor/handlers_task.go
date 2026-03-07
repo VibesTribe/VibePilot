@@ -73,6 +73,11 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		return
 	}
 
+	if !h.pool.CanAcquire(sliceID, "") {
+		log.Printf("[TaskAvailable] Pool at capacity, skipping task %s (will retry later)", truncateID(taskID))
+		return
+	}
+
 	processingBy := fmt.Sprintf("task_runner:%d", time.Now().UnixNano())
 	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
 		"p_table":         "tasks",

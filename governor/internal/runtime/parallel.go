@@ -174,6 +174,32 @@ func (p *AgentPool) ModuleCount(moduleID string) int {
 	return 0
 }
 
+func (p *AgentPool) CanAcquire(moduleID, destination string) bool {
+	currentTotal := p.active.Load()
+	if int(currentTotal) >= p.maxTotal {
+		return false
+	}
+
+	moduleCountI, _ := p.perModule.LoadOrStore(moduleID, new(int32))
+	moduleCount := moduleCountI.(*int32)
+
+	if int(atomic.LoadInt32(moduleCount)) >= p.maxPerModule {
+		return false
+	}
+
+	if destination != "" && p.concurrency != nil {
+		destLimit := p.concurrency.GetLimit(destination)
+		destCountI, _ := p.perDest.LoadOrStore(destination, new(int32))
+		destCount := destCountI.(*int32)
+
+		if int(atomic.LoadInt32(destCount)) >= destLimit {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (p *AgentPool) Stats() map[string]interface{} {
 	moduleStats := make(map[string]int)
 	p.perModule.Range(func(key, value interface{}) bool {
