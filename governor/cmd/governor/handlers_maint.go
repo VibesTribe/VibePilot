@@ -21,7 +21,7 @@ func setupMaintenanceHandler(
 	connRouter *runtime.Router,
 ) {
 	selectDestination := func(agentID, cmdID, taskType string) string {
-		result, err := connRouter.SelectDestination(ctx, runtime.RoutingRequest{
+		result, err := connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
 			AgentID:  agentID,
 			TaskID:   cmdID,
 			TaskType: taskType,

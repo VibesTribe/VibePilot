@@ -23,7 +23,7 @@ func setupTestingHandlers(
 	git *gitree.Gitree,
 ) {
 	selectDestination := func(agentID, taskID, taskType string) string {
-		result, err := connRouter.SelectDestination(ctx, runtime.RoutingRequest{
+		result, err := connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
 			AgentID:  agentID,
 			TaskID:   taskID,
 			TaskType: taskType,
