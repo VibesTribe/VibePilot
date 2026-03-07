@@ -1,7 +1,7 @@
 # PLAN: Add Hello Function
 
 ## Overview
-Create a simple hello function to test the VibePilot flow end-to-end.
+Create a simple Go hello function to test the VibePilot flow end-to-end.
 
 ## Tasks
 
@@ -15,15 +15,16 @@ Create a simple hello function to test the VibePilot flow end-to-end.
 # TASK: T001 - Create Hello Function
 
 ## Context
-We need a simple hello function to test the VibePilot flow end-to-end. This serves as a minimal test case for the entire system.
+We need a simple hello function to test the VibePilot flow end-to-end. This validates that the planning and execution pipeline works correctly.
 
 ## What to Build
 Create a Go file at `governor/cmd/tools/hello.go` that:
-1. Defines a `Hello()` function that prints "Hello from VibePilot!" to stdout and returns nil error
-2. Contains a `main()` function that calls `Hello()` and exits with status 0
+- Defines a `Hello()` function that prints "Hello from VibePilot!" to stdout and returns nil error
+- Has a `main()` function that calls `Hello()`
+- Follows standard Go conventions
 
 ## Files
-- `governor/cmd/tools/hello.go` - The hello function implementation
+- `governor/cmd/tools/hello.go` - The hello command implementation
 ```
 
 #### Expected Output
