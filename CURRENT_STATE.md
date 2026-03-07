@@ -1,136 +1,148 @@
 # VibePilot Current State
 
 **Last Updated:** 2026-03-07 Session 58
-**Status:** GO CODE REWRITE COMPLETE
+**Status:** GO REWRITE IN PROGRESS - STILL BROKEN
 
 ---
 
-## ✅ All Rewrite Sessions Complete
+## ⚠️ CRITICAL: Supabase Anon Key Deprecation
 
-**Session 1:** validation.go, router.go (~700 lines) ✅
-**Session 2:** handlers_plan.go (~320 lines) ✅
-**Session 3:** handlers_task.go (~580 lines) ✅
-**Session 4:** handlers_testing, council, research, maint (~500 lines) ✅
+**Supabase will disable all anon keys by April 6th, 2026.**
 
-**Total rewritten:** ~2,100 lines
-**Build status:** ✅ Passes
+This means:
+- Dashboard cannot use anon key for reads
+- Options:
+  1. Embed dashboard in Go binary and serve from governor
+  2. Use service role key with RLS policies
+  3. Implement proper authentication
 
----
-
-## 🎯 Next Action
-
-**Test the complete flow:**
-
-1. Push a test PRD
-2. Verify plan creation
-3. Verify task creation
-4. Verify task execution
-5. Verify dashboard shows correct data
-
-**Say:** "RUN END-TO-END TEST"
+**Action required before April 6th.**
 
 ---
 
-## 📊 Rewrite Sessions Summary
+## 🔴 Current Status: BROKEN
 
-| Session | Files | Lines | Status |
-|---------|-------|-------|--------|
-| **1** | validation.go, router.go | ~700 | ✅ Complete |
-| **2** | handlers_plan.go | ~320 | ✅ Complete |
-| **3** | handlers_task.go | ~580 | ✅ Complete |
-| **4** | handlers_testing, council, research, maint | ~500 | ✅ Complete |
+The rewrite is incomplete and the flow is broken:
+
+1. **Plan creation works** - Planner creates plan file
+2. **Plan review fails** - "Plan already being processed" error
+3. **No tasks created** - Flow stops at plan review
+4. **Root cause unclear** - Processing lock not being cleared properly OR duplicate events
 
 ---
 
-## 📚 Documentation Reference
+## What Was Done This Session
 
-### Primary Docs
+### Session 58 (2026-03-07)
+- Rewrote `handlers_testing.go` - task testing flow
+- Rewrote `handlers_council.go` - council review with parallel voting
+- Rewrote `handlers_research.go` - research suggestion review
+- Rewrote `handlers_maint.go` - maintenance command execution
+- Changed realtime from INSERT-only to all events (then reverted)
+- Changed plan flow to call runPlanReview directly after plan creation
+- Build passes but flow is broken
+
+### Issues Found
+1. Realtime only subscribed to INSERT events (UPDATEs not triggering handlers)
+2. Attempted fix: Call runPlanReview() directly from handlePlanCreated()
+3. New issue: "Plan already being processed" - processing lock conflict
+4. The defer clear_processing may not run before runPlanReview tries to claim
+
+---
+
+## 🔧 What Needs to Happen Next
+
+### Option A: Fix the Processing Lock Issue
+The problem: handlePlanCreated holds a processing lock, then calls runPlanReview which tries to get the same lock.
+
+Fix: Clear the processing lock BEFORE calling runPlanReview, or don't use processing locks for the same-plan chain.
+
+### Option B: Use UPDATE Events Properly
+1. Subscribe to UPDATE events on plans table
+2. When plan status changes to "review", trigger handlePlanReview
+3. Keep processing locks separate for each handler
+
+### Option C: Single Handler Chain
+1. handlePlanCreated does everything: plan creation + review + task creation
+2. No separate runPlanReview function
+3. Single processing lock for entire flow
+
+---
+
+## 📊 Rewrite Status
+
+| File | Status | Notes |
+|------|--------|-------|
+| validation.go | ✅ Rewritten | Task validation |
+| router.go | ✅ Rewritten | Model routing |
+| handlers_plan.go | ⚠️ Broken | Plan creation works, review broken |
+| handlers_task.go | ✅ Rewritten | Task execution (untested) |
+| handlers_testing.go | ✅ Rewritten | Testing flow (untested) |
+| handlers_council.go | ✅ Rewritten | Council review (untested) |
+| handlers_research.go | ✅ Rewritten | Research flow (untested) |
+| handlers_maint.go | ✅ Rewritten | Maintenance (untested) |
+
+**Build:** ✅ Passes
+**Flow:** ❌ Broken at plan review
+
+---
+
+## 📚 Key Documentation
 
 | Doc | Purpose |
 |-----|---------|
-| [`docs/GO_REWRITE_SPEC.md`](docs/GO_REWRITE_SPEC.md) | **REWRITE SPEC - Single source of truth** |
-| [`docs/GO_CODE_LOGIC_MAP.md`](docs/GO_CODE_LOGIC_MAP.md) | Complete analysis of current broken code |
-| [`VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md`](VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md) | Everything about VibePilot design |
-
-### Supporting Docs
-
-| Doc | Purpose |
-|-----|---------|
-| [`docs/DATA_FLOW_MAPPING.md`](docs/DATA_FLOW_MAPPING.md) | Dashboard → Supabase → Go mapping |
-| [`docs/HOW_DASHBOARD_WORKS.md`](docs/HOW_DASHBOARD_WORKS.md) | Dashboard data flow |
-| [`docs/SUPABASE_ACTUAL_STATE.md`](docs/SUPABASE_ACTUAL_STATE.md) | Current Supabase schema state |
-| [`CHANGELOG.md`](CHANGELOG.md) | Full change history |
+| `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` | Read this FIRST every session |
+| `docs/GO_REWRITE_SPEC.md` | Rewrite specification |
+| `docs/GO_CODE_LOGIC_MAP.md` | Current code analysis |
+| `docs/HOW_DASHBOARD_WORKS.md` | Dashboard data flow |
 
 ---
 
-## 🔍 What's Working
+## 🔑 Supabase Access
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| GitHub webhooks | ✅ | Detects PRD pushes |
-| Supabase realtime | ✅ | Receives INSERT events |
-| Plan creation | ✅ | Planner works |
-| Supervisor review | ✅ | Reads PRD + plan |
-| Task creation | ✅ | Creates in available status |
-| Model routing | ✅ | Selects glm-5 |
-| CLI execution | ✅ | kilo works |
-| Token extraction | ✅ | Gets tokens from output |
-| Task execution | ✅ | handlers_task.go rewritten |
-| Learning system | ✅ | Wired in task handlers |
-| Testing handlers | ✅ | handlers_testing.go rewritten |
-| Council handlers | ✅ | handlers_council.go rewritten |
-| Research handlers | ✅ | handlers_research.go rewritten |
-| Maintenance handlers | ✅ | handlers_maint.go rewritten |
+```bash
+# Credentials are in systemd override
+sudo cat /etc/systemd/system/governor.service.d/override.conf
 
----
-
-## 📈 Success Criteria
-
-ALL of these must work:
-
-1. ✅ PRD pushed → Plan created (< 30s)
-2. ✅ Plan reviewed → Tasks created (< 30s)
-3. ✅ Task available → Task assigned (< 5s)
-4. ✅ Task assigned → Task in_progress (< 5s)
-5. ✅ Task executed → Output committed (< 60s for hello world)
-6. ✅ task_runs created with tokens
-7. ✅ Dashboard shows correct status at each step
-8. ✅ Errors trigger retry (status=available)
-9. ✅ Learning system records success/failure
-10. ✅ Dependencies block until parent completes
-
-**Total time for hello world:** < 2 minutes end-to-end
+# Query Supabase
+curl -s "https://qtpdzsinvifkgpxyxlaz.supabase.co/rest/v1/TABLE?select=*" \
+  -H "apikey: SERVICE_KEY" \
+  -H "Authorization: Bearer SERVICE_KEY"
+```
 
 ---
 
 ## 🕐 Session History
 
-### Session 58 (2026-03-07)
-- Completed Session 4: handlers_testing, handlers_council, handlers_research, handlers_maint
-- All handlers now follow consistent patterns
-- Build passes ✅
-- Full rewrite complete
+### Session 58 (2026-03-07) - CURRENT
+- Rewrote handlers_testing, council, research, maint
+- Flow still broken - processing lock issue
+- Need to fix plan → review → tasks chain
 
 ### Session 57 (2026-03-07)
-- Rewrote handlers_task.go - clean task execution flow
-- TaskHandler struct with separation of concerns
-- Learning system fully wired
-- Build passes ✅
+- Rewrote handlers_task.go
+- Build passes
 
 ### Session 56 (2026-03-07)
-- Rewrote handlers_plan.go - clean
-- Rewrote router.go - clean routing logic
-- Rewrote validation.go - correct task parsing
-- Cleaned types.go - removed duplicates
-- Build passes ✅
+- Rewrote handlers_plan.go, router.go, validation.go
+- Build passes
 
-### Session 55 (2026-03-06)
-- Created complete rewrite specification
-- Mapped all Go code logic
-- Identified 4 critical bugs
-- Decision: Full rewrite (Option C)
+---
 
-### Session 54 (2026-03-06)
-- Documentation cleanup
-- Dashboard status mapping
-- Found task_runs broken
+## Next Session Tasks
+
+1. **Fix the plan review flow** - Processing lock conflict
+2. **Get end-to-end test working** - PRD → Plan → Tasks → Execution
+3. **Address Supabase anon key deprecation** - Before April 6th
+4. **Test all handlers** - Currently only plan creation tested
+
+---
+
+## Remember
+
+- **Read VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md first**
+- **Dashboard is READ-ONLY** - Fix Go code, not dashboard
+- **No webhooks** - Using Supabase Realtime
+- **No hardcoding** - Everything in config files
+- **GitHub = Code source of truth**
+- **Supabase = State source of truth**
