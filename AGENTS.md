@@ -276,9 +276,14 @@ sb.table('agent_messages').insert({
 → **Branch:** `main`
 → **Action:** Fix, test, commit, push
 
-### Scenario 3: "I'm improving the dashboard CSS"
-→ **Branch:** `feature/dashboard-css-fix`
-→ **Action:** Create branch, make changes, push, **wait for human approval**
+### Scenario 3: "I'm updating the documentation"
+→ **Branch:** `main`
+→ **Action:** Update docs, commit, push
+
+### Scenario 4: "I'm rewriting handler files"
+→ **Branch:** `main`
+→ **Action:** Rewrite handlers, commit, push
+→ **Note:** handlers_plan.go, handlers_task.go, handlers_testing.go, handlers_council.go, handlers_research.go, handlers_maint.go are being rewritten in Sessions 1-4
 
 ### Scenario 4: "I'm updating the documentation"
 → **Branch:** `main`
@@ -458,6 +463,7 @@ git push origin main
 | Document | Purpose | Read When |
 |----------|---------|-----------|
 | [CHANGELOG.md](CHANGELOG.md) | Full history | Need context on changes |
+| [docs/GO_REwrite_SPEC.md](docs/GO_REWRITE_SPEC.md) | Rewrite specification | During rewrite sessions |
 | [docs/HOW_DASHBOARD_WORKS.md](docs/HOW_DASHBOARD_WORKS.md) | Dashboard data flow | Fixing dashboard issues |
 | [docs/DATA_FLOW_MAPPING.md](docs/DATA_FLOW_MAPPING.md) | Dashboard → Supabase → Go mapping | Understanding data flow |
 | [docs/core_philosophy.md](docs/core_philosophy.md) | Strategic mindset | Need to understand "why" |
