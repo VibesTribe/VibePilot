@@ -158,30 +158,27 @@ func handlePlanCreated(
 	})
 
 	log.Printf("[EventPlanCreated] Plan %s created successfully in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
+
+	plan["plan_path"] = plannerOutput.PlanPath
+	runPlanReview(ctx, factory, pool, database, cfg, connRouter, plan)
 }
 
-func handlePlanReview(
+func runPlanReview(
 	ctx context.Context,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
 	database *db.DB,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
-	event runtime.Event,
+	plan map[string]any,
 ) {
 	startTime := time.Now()
-	var plan map[string]any
-	if err := json.Unmarshal(event.Record, &plan); err != nil {
-		log.Printf("[EventPlanReview] Failed to parse plan: %v", err)
-		return
-	}
 
 	planID, _ := plan["id"].(string)
 	prdPath, _ := plan["prd_path"].(string)
 	planPath, _ := plan["plan_path"].(string)
-	currentStatus, _ := plan["status"].(string)
 
-	log.Printf("[EventPlanReview] Processing plan %s, status=%s", truncateID(planID), currentStatus)
+	log.Printf("[PlanReview] Starting review for plan %s", truncateID(planID))
 
 	processingBy := fmt.Sprintf("supervisor:%d", time.Now().UnixNano())
 	claimed, err := database.RPC(ctx, "set_processing", map[string]any{
@@ -190,13 +187,13 @@ func handlePlanReview(
 		"p_processing_by": processingBy,
 	})
 	if err != nil {
-		log.Printf("[EventPlanReview] Failed to claim plan %s: %v", truncateID(planID), err)
+		log.Printf("[PlanReview] Failed to claim plan %s: %v", truncateID(planID), err)
 		return
 	}
 
 	var claimSuccess bool
 	if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
-		log.Printf("[EventPlanReview] Plan %s already being processed", truncateID(planID))
+		log.Printf("[PlanReview] Plan %s already being processed", truncateID(planID))
 		return
 	}
 
@@ -210,14 +207,14 @@ func handlePlanReview(
 	repoPath := cfg.GetRepoPath()
 	prdContent, err := os.ReadFile(filepath.Join(repoPath, prdPath))
 	if err != nil {
-		log.Printf("[EventPlanReview] Failed to read PRD: %v", err)
+		log.Printf("[PlanReview] Failed to read PRD: %v", err)
 		setPlanError(ctx, database, planID, "prd_read_failed")
 		return
 	}
 
 	planContent, err := os.ReadFile(filepath.Join(repoPath, planPath))
 	if err != nil {
-		log.Printf("[EventPlanReview] Failed to read plan: %v", err)
+		log.Printf("[PlanReview] Failed to read plan: %v", err)
 		setPlanError(ctx, database, planID, "plan_read_failed")
 		return
 	}
@@ -228,14 +225,14 @@ func handlePlanReview(
 		RoutingFlag: "internal",
 	})
 	if err != nil || routingResult == nil {
-		log.Printf("[EventPlanReview] No routing available for supervisor")
+		log.Printf("[PlanReview] No routing available for supervisor")
 		setPlanError(ctx, database, planID, "no_routing")
 		return
 	}
 
 	session, err := factory.CreateWithContext(ctx, "supervisor", "review")
 	if err != nil {
-		log.Printf("[EventPlanReview] Failed to create supervisor session: %v", err)
+		log.Printf("[PlanReview] Failed to create supervisor session: %v", err)
 		setPlanError(ctx, database, planID, "session_failed")
 		return
 	}
@@ -246,7 +243,7 @@ func handlePlanReview(
 		"plan_id":      planID,
 	})
 	if err != nil {
-		log.Printf("[EventPlanReview] Supervisor execution failed: %v", err)
+		log.Printf("[PlanReview] Supervisor execution failed: %v", err)
 		database.RPC(ctx, "record_model_failure", map[string]any{
 			"p_model_id":         routingResult.ModelID,
 			"p_task_id":          planID,
@@ -259,17 +256,17 @@ func handlePlanReview(
 
 	review, err := runtime.ParseInitialReview(result.Output)
 	if err != nil {
-		log.Printf("[EventPlanReview] Failed to parse supervisor output: %v", err)
+		log.Printf("[PlanReview] Failed to parse supervisor output: %v", err)
 		setPlanError(ctx, database, planID, "parse_failed")
 		return
 	}
 
-	log.Printf("[EventPlanReview] Supervisor decision: %s", review.Decision)
+	log.Printf("[PlanReview] Supervisor decision: %s", review.Decision)
 
 	switch review.Decision {
 	case "approved":
 		if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig(), repoPath); err != nil {
-			log.Printf("[EventPlanReview] Failed to create tasks: %v", err)
+			log.Printf("[PlanReview] Failed to create tasks: %v", err)
 			setPlanError(ctx, database, planID, "task_creation_failed")
 			return
 		}
@@ -284,7 +281,7 @@ func handlePlanReview(
 			},
 		})
 		if err != nil {
-			log.Printf("[EventPlanReview] Failed to update plan status: %v", err)
+			log.Printf("[PlanReview] Failed to update plan status: %v", err)
 			return
 		}
 
@@ -294,7 +291,7 @@ func handlePlanReview(
 			"p_duration_seconds": int(time.Since(startTime).Seconds()),
 		})
 
-		log.Printf("[EventPlanReview] Plan %s approved and tasks created in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
+		log.Printf("[PlanReview] Plan %s approved and tasks created in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
 
 	case "needs_revision":
 		_, err = database.RPC(ctx, "update_plan_status", map[string]any{
@@ -307,11 +304,11 @@ func handlePlanReview(
 			},
 		})
 		if err != nil {
-			log.Printf("[EventPlanReview] Failed to update plan status: %v", err)
+			log.Printf("[PlanReview] Failed to update plan status: %v", err)
 			return
 		}
 
-		log.Printf("[EventPlanReview] Plan %s needs revision", truncateID(planID))
+		log.Printf("[PlanReview] Plan %s needs revision", truncateID(planID))
 
 	case "council_review":
 		_, err = database.RPC(ctx, "update_plan_status", map[string]any{
@@ -323,16 +320,40 @@ func handlePlanReview(
 			},
 		})
 		if err != nil {
-			log.Printf("[EventPlanReview] Failed to update plan status: %v", err)
+			log.Printf("[PlanReview] Failed to update plan status: %v", err)
 			return
 		}
 
-		log.Printf("[EventPlanReview] Plan %s sent to council review", truncateID(planID))
+		log.Printf("[PlanReview] Plan %s sent to council review", truncateID(planID))
 
 	default:
-		log.Printf("[EventPlanReview] Unknown decision: %s", review.Decision)
+		log.Printf("[PlanReview] Unknown decision: %s", review.Decision)
 		setPlanError(ctx, database, planID, "unknown_decision")
 	}
+}
+
+func handlePlanReview(
+	ctx context.Context,
+	factory *runtime.SessionFactory,
+	pool *runtime.AgentPool,
+	database *db.DB,
+	cfg *runtime.Config,
+	connRouter *runtime.Router,
+	event runtime.Event,
+) {
+	var plan map[string]any
+	if err := json.Unmarshal(event.Record, &plan); err != nil {
+		log.Printf("[EventPlanReview] Failed to parse plan: %v", err)
+		return
+	}
+
+	planPath, _ := plan["plan_path"].(string)
+	if planPath == "" {
+		log.Printf("[EventPlanReview] Plan has no plan_path, skipping")
+		return
+	}
+
+	runPlanReview(ctx, factory, pool, database, cfg, connRouter, plan)
 }
 
 func setPlanError(ctx context.Context, database *db.DB, planID string, reason string) {
