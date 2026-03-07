@@ -26,6 +26,7 @@ type RoutingRequest struct {
 	TaskCategory     string
 	RoutingFlag      string
 	RequiresCodebase bool
+	Dependencies     []string
 }
 
 type RoutingResult struct {
@@ -37,6 +38,12 @@ type RoutingResult struct {
 
 func (r *Router) SelectRouting(ctx context.Context, req RoutingRequest) (*RoutingResult, error) {
 	if req.RoutingFlag == "internal" {
+		log.Printf("[Router] Planner flagged internal → internal")
+		return r.selectInternal(ctx, req)
+	}
+
+	if !r.hasCourierAvailable(ctx) {
+		log.Printf("[Router] No courier agent → internal")
 		return r.selectInternal(ctx, req)
 	}
 
@@ -45,8 +52,17 @@ func (r *Router) SelectRouting(ctx context.Context, req RoutingRequest) (*Routin
 		return result, nil
 	}
 
-	log.Printf("[Router] No web destination available, using internal")
+	log.Printf("[Router] No web platform available → internal")
 	return r.selectInternal(ctx, req)
+}
+
+func (r *Router) hasCourierAvailable(ctx context.Context) bool {
+	courierModel := r.selectCourierModel(ctx)
+	if courierModel == "" {
+		return false
+	}
+	courierConn := r.findConnectorForModel(courierModel)
+	return courierConn != ""
 }
 
 func (r *Router) tryWebRouting(ctx context.Context, req RoutingRequest) *RoutingResult {

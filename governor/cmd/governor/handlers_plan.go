@@ -141,6 +141,11 @@ func handlePlanCreated(
 			log.Printf("[EventPlanCreated] Failed to write plan file: %v", err)
 		} else {
 			log.Printf("[EventPlanCreated] Plan file written: %s", plannerOutput.PlanPath)
+			if err := git.CommitAndPush(ctx, plannerOutput.PlanPath, fmt.Sprintf("docs: add plan %s", truncateID(planID))); err != nil {
+				log.Printf("[EventPlanCreated] Failed to commit/push plan file: %v", err)
+			} else {
+				log.Printf("[EventPlanCreated] Plan file committed and pushed: %s", plannerOutput.PlanPath)
+			}
 		}
 	}
 
@@ -168,7 +173,10 @@ func handlePlanCreated(
 
 	clearProcessingLock()
 
-	runPlanReview(ctx, factory, pool, database, cfg, connRouter, plan)
+	// Note: We do NOT call runPlanReview directly here.
+	// The update_plan_status RPC (line 147) triggers a realtime UPDATE event,
+	// which will be handled by handlePlanReview -> runPlanReview.
+	// This avoids race conditions with processing locks.
 }
 
 func runPlanReview(

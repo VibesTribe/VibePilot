@@ -1,7 +1,6 @@
 # VibePilot Current State
-
-**Last Updated:** 2026-03-07 Session 59
-**Status:** FLOW WORKING - Issues documented
+**Last Updated:** 2026-03-07 Session 62
+**Status:** FLOW FIXED - All blocking bugs resolved
 
 ---
 
@@ -18,25 +17,32 @@ Dashboard cannot use anon key for reads. Options:
 
 ---
 
-## 🔴 Current Status: FLOW WORKING
+## ✅ Current Status: FLOW WORKING
 
 **Plan creation works** - Planner creates plan file
 **Plan review works** - Supervisor reviews plans
 **Task creation works** - Tasks created from approved plans
 **Task execution works** - Tasks run via CLI/API connectors
 **Dashboard data flow** - Token counts and costs being recorded
+**Realtime subscriptions** - Listening to all events (INSERT, UPDATE, DELETE)
+**Git push** - Plan files now committed and pushed
 
 ---
 
-## 📋 Active Issues
+## ✅ Fixed Issues (Session 62)
 
-**See [docs/CURRENT_ISSUES.md](docs/CURRENT_ISSUES.md) for comprehensive issue tracking.**
+### 1. Realtime now subscribes to all events ✅
+**Location:** `governor/internal/realtime/client.go:187-191`
+**Fix:** `SubscribeToTable` now calls `SubscribeToTableWithFilter(table, "*", "")`
 
-### Quick Summary:
-- 🔴 **Blocking:** Schema `type` constraint needs migration
-- 🔴 **Blocking:** `check_platform_availability` RPC missing from allowlist
-- 🟡 **Hardcoding:** Several timeout values should be config-driven
-- 🟢 **Working:** Token extraction, cost calculation, task_runs creation
+### 2. Processing lock race condition ✅
+**Location:** `governor/cmd/governor/handlers_plan.go:169-175`
+**Fix:** Clear processing lock before status update, rely on realtime UPDATE event to trigger next step
+
+### 3. Git push for plan files ✅
+**Location:** `governor/cmd/governor/handlers_plan.go:135-152`
+**Fix:** Added `git.CommitAndPush()` call after writing plan file
+**New method:** `governor/internal/gitree/gitree.go:CommitAndPush()`
 
 ---
 
@@ -44,6 +50,7 @@ Dashboard cannot use anon key for reads. Options:
 
 | Migration | Purpose | Status |
 |-----------|---------|--------|
+| 067 | Fix task type constraint | ✅ Applied |
 | 066 | Fix RPC signatures | ✅ Applied |
 | 064 | Update task assignment | ✅ Applied |
 | 063 | Enable realtime | ✅ Applied |
@@ -51,7 +58,9 @@ Dashboard cannot use anon key for reads. Options:
 ---
 
 ## 🔄 Session History
-
+- **Session 62:** Fixed all 3 blocking bugs (realtime, processing lock, git push)
+- **Session 61:** Comprehensive audit, blocking bugs identified
+- **Session 59:** Flow working, realtime issue identified
 - **Session 58:** Flow working, schema issue identified
 - **Session 57:** Realtime integration complete
 - **Session 56:** Task execution working

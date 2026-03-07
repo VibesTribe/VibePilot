@@ -372,6 +372,34 @@ func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 	return g.gitCommand(ctx, "push", "-u", g.remoteName, branchName).Run()
 }
 
+func (g *Gitree) CommitAndPush(ctx context.Context, filePath, message string) error {
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
+
+	if err := g.gitCommand(ctx, "add", filePath).Run(); err != nil {
+		return fmt.Errorf("git add: %w", err)
+	}
+
+	var out bytes.Buffer
+	commitCmd := g.gitCommand(ctx, "commit", "-m", message)
+	commitCmd.Stdout = &out
+	commitCmd.Stderr = &out
+
+	if err := commitCmd.Run(); err != nil {
+		outStr := out.String()
+		if strings.Contains(outStr, "nothing to commit") || strings.Contains(outStr, "no changes added") {
+			return nil
+		}
+		return fmt.Errorf("git commit: %w - %s", err, outStr)
+	}
+
+	if err := g.gitCommand(ctx, "push", g.remoteName).Run(); err != nil {
+		return fmt.Errorf("git push: %w", err)
+	}
+
+	return nil
+}
+
 func (g *Gitree) gitCommand(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = g.repoPath
