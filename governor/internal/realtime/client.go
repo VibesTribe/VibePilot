@@ -184,11 +184,10 @@ func (c *Client) Connect() error {
 	return nil
 }
 
-// SubscribeToTable subscribes to INSERT events only on a specific table.
-// Note: We only subscribe to INSERT to avoid thundering herd on UPDATEs.
-// Status changes are tracked via the initial INSERT and processing logic.
+// SubscribeToTable subscribes to all events (INSERT, UPDATE, DELETE) on a specific table.
+// We need UPDATE events to detect status changes (draft → review, available → in_progress, etc.)
 func (c *Client) SubscribeToTable(table string) error {
-	return c.SubscribeToTableWithFilter(table, "INSERT", "")
+	return c.SubscribeToTableWithFilter(table, "*", "")
 }
 
 // SubscribeToTableWithFilter subscribes to changes with specific event type.
@@ -454,20 +453,21 @@ func (c *Client) mapToEventType(change *ChangeEvent) string {
 
 	case table == "plans":
 		status, _ := change.New["status"].(string)
-		switch status {
-		case "draft":
+		oldStatus, _ := change.Old["status"].(string)
+		switch {
+		case status == "draft" && action == "INSERT":
 			return string(runtime.EventPlanCreated)
-		case "review":
+		case status == "review" && (action == "UPDATE" || oldStatus != "review"):
 			return string(runtime.EventPlanReview)
-		case "council_review":
+		case status == "council_review":
 			return string(runtime.EventCouncilReview)
-		case "council_done":
+		case status == "council_done":
 			return string(runtime.EventCouncilDone)
-		case "approved":
+		case status == "approved":
 			return string(runtime.EventPlanApproved)
-		case "blocked":
+		case status == "blocked":
 			return string(runtime.EventPlanBlocked)
-		case "revision_needed":
+		case status == "revision_needed":
 			return string(runtime.EventRevisionNeeded)
 		}
 
