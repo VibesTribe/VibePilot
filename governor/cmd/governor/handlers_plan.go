@@ -149,11 +149,8 @@ func handlePlanCreated(
 		}
 	}
 
-<<<<<<< Updated upstream
-=======
 	plan["plan_path"] = plannerOutput.PlanPath
 
->>>>>>> Stashed changes
 	_, err = database.RPC(ctx, "update_plan_status", map[string]any{
 		"p_plan_id":   planID,
 		"p_status":    "review",
