@@ -27,7 +27,6 @@
 ## 📋 The Fix: Complete Rewrite Spec
 
 **READ THIS FIRST:** [`docs/GO_REWRITE_SPEC.md`](docs/GO_REWRITE_SPEC.md)
-
 This is the **single source of truth** for the rewrite. Contains:
 - Files to KEEP (15 files, no modifications)
 - Files to REWRITE (8 files, ~1,600 lines)
@@ -40,13 +39,30 @@ This is the **single source of truth** for the rewrite. Contains:
 
 ---
 
+## ✅ Session 1 Complete
+
+**Files rewritten:**
+- `internal/runtime/router.go` - Clean routing logic (360 lines)
+- `cmd/governor/validation.go` - Task parsing + creation (299 lines)
+- `cmd/governor/types.go` - Removed duplicate types
+
+**Key changes:**
+- Routing logic: `internal` flag → internal only, no flag → try web, fallback to internal
+- No "web" flag (too restrictive, causes limbo)
+- Proper JSONB handling for dependencies
+- Correct field mapping for dashboard
+
+**Build status:** ✅ Packages compile successfully
+
+---
+
 ## 🎯 Next Action
 
-**Start Rewrite Session 1:** validation.go + router.go
+**Start Rewrite Session 2:** handlers_plan.go
 
-This fixes the foundation before touching handlers.
+This rewrites the plan event handlers with correct flow.
 
-**Say:** "START REWRITE SESSION 1"
+**Say:** "START REWRITE SESSION 2"
 
 ---
 
