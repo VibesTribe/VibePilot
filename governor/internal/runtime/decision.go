@@ -25,7 +25,7 @@ type SupervisorDecision struct {
 		ErrorHandlingPresent   bool `json:"error_handling_present"`
 		UnexpectedChanges      bool `json:"unexpected_changes"`
 	} `json:"checks"`
-	IssuesRaw      json.RawMessage `json:"issues_raw"`
+	IssuesRaw      json.RawMessage `json:"issues"`
 	Issues         []Issue         `json:"-"`
 	ReturnFeedback struct {
 		Summary        string   `json:"summary"`

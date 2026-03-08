@@ -130,17 +130,25 @@ const SLICE_ACCENTS = {
 ```typescript
 // From vibepilotAdapter.ts - mapTaskStatus()
 const statusMap = {
-  pending: "assigned",
-  available: "assigned",
-  in_progress: "in_progress",
-  awaiting_human: "supervisor_review",
-  testing: "testing",
-  approval: "supervisor_approval",
-  merged: "complete",
-  failed: "blocked",
-  escalated: "blocked"
+  pending: "pending",      // Awaiting dependencies or resources
+  available: "pending",    // Ready but waiting for model/connector
+  in_progress: "in_progress",   // Actively being worked on
+  review: "in_progress",   // Supervisor reviewing output
+  testing: "in_progress",  // Tests running
+  approval: "supervisor_approval",  // Ready for human review
+  merged: "complete",      // Successfully merged
+  complete: "complete",    // Task done
+  failed: "pending",       // Will retry
+  escalated: "pending",    // Will retry (no human needed)
 };
 ```
+
+**Human Review Required Only For:**
+1. Visual UI/UX changes (requires human aesthetic judgment)
+2. System researcher suggestions (after council review)
+3. Paid API key out of credit (requires human to add funds)
+
+All other failures are handled by AI - retries, model switching, etc.
 
 **Owner Display:**
 ```typescript
