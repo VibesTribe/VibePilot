@@ -52,16 +52,16 @@
     "timeout_seconds": 30
   },
 "runtime": {
-     "max_concurrent_per_module": 2,
-     "max_concurrent_total": 2,
+     "max_concurrent_per_module": 3,
+     "max_concurrent_total": 3,
      "agent_timeout_seconds": 300,
      "max_tool_turns": 10
    },
    "concurrency": {
      "limits": {
-       "kilo": 2
+       "kilo": 3
      },
-     "default_limit": 2
+     "default_limit": 3
    },
   "security": {
     "leak_detection_enabled": true,
