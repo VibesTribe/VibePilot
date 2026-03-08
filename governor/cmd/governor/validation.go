@@ -118,6 +118,18 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 		return fmt.Errorf("no valid tasks found in plan")
 	}
 
+	// Check if tasks already exist for this plan (prevents duplicates from multiple events)
+	existingData, err := database.REST(ctx, "GET",
+		fmt.Sprintf("/rest/v1/tasks?plan_id=eq.%s&select=id", planID), nil)
+	if err == nil && len(existingData) > 2 {
+		var existing []map[string]interface{}
+		if parseErr := json.Unmarshal(existingData, &existing); parseErr == nil && len(existing) > 0 {
+			log.Printf("[createTasksFromApprovedPlan] Plan %s already has %d tasks, skipping duplicate creation",
+				truncateID(planID), len(existing))
+			return nil
+		}
+	}
+
 	log.Printf("[createTasksFromApprovedPlan] Found %d tasks in plan %s", len(tasks), truncateID(planID))
 
 	if validationErr := validateTasks(tasks, cfg); validationErr != nil {
