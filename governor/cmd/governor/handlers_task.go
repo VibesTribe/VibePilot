@@ -112,6 +112,11 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		log.Printf("[TaskAvailable] Warning: branch creation failed for %s: %v", branchName, err)
 	}
 
+	_, _ = h.database.RPC(ctx, "update_task_branch", map[string]any{
+		"p_task_id":     taskID,
+		"p_branch_name": branchName,
+	})
+
 	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
 		AgentID:  "task_runner",
 		TaskID:   taskID,
@@ -538,6 +543,14 @@ func (h *TaskHandler) handleTaskError(ctx context.Context, taskID, modelID, fail
 	if modelID != "" {
 		h.recordFailure(ctx, modelID, taskID, failureType)
 	}
+
+	_, err := h.database.RPC(ctx, "increment_task_attempts", map[string]any{
+		"p_task_id": taskID,
+	})
+	if err != nil {
+		log.Printf("[TaskAvailable] Failed to increment attempts for %s: %v", truncateID(taskID), err)
+	}
+
 	_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 		"p_task_id": taskID,
 		"p_status":  "available",
@@ -637,12 +650,12 @@ func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files
 	}
 
 	if len(files) > 0 {
-		var fileMaps []map[string]any
-		for _, f := range files {
-			fileMaps = append(fileMaps, map[string]any{
+		fileMaps := make([]any, len(files))
+		for i, f := range files {
+			fileMaps[i] = map[string]any{
 				"path":    f.Path,
 				"content": f.Content,
-			})
+			}
 		}
 		outputMap["files"] = fileMaps
 	}
