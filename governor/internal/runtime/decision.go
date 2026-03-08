@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+type Issue struct {
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Severity    string `json:"severity"`
+}
+
 type SupervisorDecision struct {
 	Action     string `json:"action"`
 	TaskID     string `json:"task_id"`
@@ -19,11 +25,8 @@ type SupervisorDecision struct {
 		ErrorHandlingPresent   bool `json:"error_handling_present"`
 		UnexpectedChanges      bool `json:"unexpected_changes"`
 	} `json:"checks"`
-	Issues []struct {
-		Type        string `json:"type"`
-		Description string `json:"description"`
-		Severity    string `json:"severity"`
-	} `json:"issues"`
+	IssuesRaw      json.RawMessage `json:"issues_raw"`
+	Issues         []Issue         `json:"-"`
 	ReturnFeedback struct {
 		Summary        string   `json:"summary"`
 		SpecificIssues []string `json:"specific_issues"`
@@ -131,7 +134,38 @@ func ParseSupervisorDecision(output string) (*SupervisorDecision, error) {
 	if err := json.Unmarshal([]byte(jsonStr), &d); err != nil {
 		return nil, err
 	}
+
+	if len(d.IssuesRaw) > 0 {
+		d.Issues = parseIssues(d.IssuesRaw)
+	}
+
 	return &d, nil
+}
+
+func parseIssues(raw json.RawMessage) []Issue {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	var issues []Issue
+	if err := json.Unmarshal(raw, &issues); err == nil {
+		return issues
+	}
+
+	var issueStr string
+	if err := json.Unmarshal(raw, &issueStr); err == nil && issueStr != "" {
+		return []Issue{{Type: "general", Description: issueStr, Severity: "medium"}}
+	}
+
+	var issueArr []string
+	if err := json.Unmarshal(raw, &issueArr); err == nil {
+		for _, s := range issueArr {
+			issues = append(issues, Issue{Type: "general", Description: s, Severity: "medium"})
+		}
+		return issues
+	}
+
+	return nil
 }
 
 func ParseCouncilVote(output string) (*CouncilVote, error) {

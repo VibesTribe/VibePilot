@@ -587,11 +587,7 @@ func (h *TaskHandler) recordFailure(ctx context.Context, modelID, taskID, failur
 	}
 }
 
-func (h *TaskHandler) recordIssues(ctx context.Context, taskID, modelID, taskType string, issues []struct {
-	Type        string `json:"type"`
-	Description string `json:"description"`
-	Severity    string `json:"severity"`
-}) {
+func (h *TaskHandler) recordIssues(ctx context.Context, taskID, modelID, taskType string, issues []runtime.Issue) {
 	for _, issue := range issues {
 		_, _ = h.database.RPC(ctx, "record_failure", map[string]any{
 			"p_task_id":          taskID,
