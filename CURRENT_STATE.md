@@ -1,6 +1,6 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-07 Session 63
-**Status:** BLOCKED - Migration 069 needs to be applied to Supabase
+**Last Updated:** 2026-03-08 Session 64
+**Status:** IN PROGRESS - Testing end-to-end flow
 
 ---
 
@@ -17,74 +17,88 @@ Dashboard cannot use anon key for reads. Options:
 
 ---
 
-## 🚫 Current Blocker: Duplicate RPC Function
+## Current State
 
-**Problem:** Two versions of `create_task_with_packet` exist in Supabase:
-- Old version (pre-068) with wrong parameter order
-- New version (068) with correct parameter order
+**Task T001 (Hello World):**
+- Status: `available` (should be `review` or `testing`)
+- Branch: `task/T001` EXISTS with correct `hello.go` file
+- `tasks.branch_name` is NULL (migration 074 will fix)
+- `tasks.result` has `prompt_packet` ✓
 
-Supabase returns error: "Could not choose the best candidate function"
-
-**Result:** Tasks are NOT being created from approved plans.
-
-**Fix:** Migration 069 on GitHub - needs to be applied in Supabase SQL Editor
-https://github.com/VibesTribe/VibePilot/blob/main/docs/supabase-schema/069_fix_duplicate_functions_and_missing_rpcs.sql
-
----
-
-## 🔧 After Applying Migration 069
-
-The following will be fixed:
-1. ✅ Duplicate `create_task_with_packet` dropped
-2. ✅ `check_platform_availability` RPC added (router needs this)
-3. ✅ `get_vault_secret` RPC added (for GEMINI_API_KEY access)
+**What's Working:**
+1. ✅ Plan creation from PRD
+2. ✅ Supervisor approval
+3. ✅ Task creation with prompt_packet
+4. ✅ Router selecting kilo/glm-5
+5. ✅ Branch creation
+6. ✅ kilo executing and creating files
+7. ❌ Status not progressing to review/testing
+8. ❌ branch_name not saved to task
 
 ---
 
-## 📋 Configuration Status
-
-**Concurrency (already correct):**
-- `max_concurrent_per_module: 1`
-- `max_concurrent_total: 1`
-- `kilo limit: 1`
-
-This prevents multiple kilo sessions from crashing.
-
----
-
-## 🎯 What Should Work After Migration 069
-
-**Internal Flow:**
-1. Create PRD in `docs/prd/`
-2. Push to GitHub
-3. Governor detects via Supabase realtime
-4. Planner creates plan (committed to GitHub)
-5. Supervisor reviews plan
-6. If approved, tasks created ← **THIS IS BROKEN NOW**
-7. Tasks routed to internal (kilo only - gemini-api needs vault fix)
-8. Tasks executed
-9. Results committed
-
-**Available Internal Models:**
-- glm-5 via kilo CLI (subscription) ← **WORKING**
-- gemini-2.5-flash via gemini-api ← **NEEDS GEMINI_API_KEY IN VAULT**
-
----
-
-## 📁 Recent Migrations
+## Pending Migrations
 
 | Migration | Purpose | Status |
 |-----------|---------|--------|
-| 069 | Fix duplicate function, add missing RPCs | ⏳ **NEEDS TO BE APPLIED** |
-| 068 | Fix task creation RPC | ✅ Applied (but duplicate exists) |
-| 067 | Fix task type constraint | ✅ Applied |
-| 066 | Fix RPC signatures | ✅ Applied |
-| 063 | Enable realtime | ✅ Applied |
+| 074 | Save branch_name to task | ⏳ **NEEDS TO BE APPLIED** |
+| 073 | Write prompt_packet to tasks.result | ✅ Applied |
+| 071 | Fix task constraints | ✅ Applied |
+| 070 | Fix vault column name | ✅ Applied |
+
+**Apply 074:**
+```
+https://github.com/VibesTribe/VibePilot/blob/main/docs/supabase-schema/074_update_task_branch.sql
+```
 
 ---
 
-## 🔄 Session History
-- **Session 63:** Identified duplicate RPC function blocker, created migration 069
-- **Session 62:** Fixed realtime, processing lock, git push (but task creation still broken)
-- **Session 61:** Comprehensive audit, blocking bugs identified
-- **Session 59:** Flow working, realtime issue identified
+## Known Issues
+
+1. **gemini-api disabled** - Vault uses Fernet encryption (Python), Go expects AES-GCM
+   - Workaround: Using kilo/glm-5 only
+   - Fix: Re-encrypt vault secrets with Go's AES-GCM format
+
+2. **Infinite retry loop** - Error handling resets status to `available`
+   - Fixed: Added attempt tracking, escalate after max attempts
+
+3. **branch_name not saved** - Created branch but didn't update task
+   - Fixed: Migration 074 adds `update_task_branch` RPC
+
+---
+
+## Configuration
+
+**Concurrency:**
+- `max_concurrent_per_module: 1`
+- `max_concurrent_total: 1`
+- Prevents kilo crashes
+
+**Active Connectors:**
+- kilo (CLI) - glm-5 via Z.ai subscription
+
+**Disabled:**
+- gemini-api (vault encryption mismatch)
+
+---
+
+## Flow Status
+
+```
+PRD → Plan → Supervisor → Tasks → Router → Execute → Review → Test → Merge
+ ✅     ✅        ✅         ✅       ✅        ✅        ❌      ❌      ❌
+```
+
+**Broken:**
+- Execute completes but status doesn't progress
+- No supervisor review of output
+- No testing phase
+- No merge
+
+---
+
+## Session History
+- **Session 64:** Fixed branch_name saving, commitOutput type, error handling
+- **Session 63:** Fixed duplicate RPCs, constraints, dashboard data
+- **Session 62:** Fixed realtime, processing lock
+- **Session 61:** Comprehensive audit
