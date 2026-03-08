@@ -14,4 +14,4 @@ Create a simple hello function in Go:
 ## Success Criteria
 
 - Compiles without errors
-- Returns correct greeting
+- Returns correct greeting format
