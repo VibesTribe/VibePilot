@@ -2,10 +2,14 @@ package main
 
 import "fmt"
 
-func Hello() {
-	fmt.Println("Hello, VibePilot!")
+func SayHello(name string) string {
+	if name == "" {
+		return "Hello, World!"
+	}
+	return "Hello, " + name + "!"
 }
 
 func main() {
-	Hello()
+	fmt.Println(SayHello(""))
+	fmt.Println(SayHello("VibePilot"))
 }
