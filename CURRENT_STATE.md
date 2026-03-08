@@ -1,6 +1,6 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-08 Session 67
-**Status:** E2E FLOW WORKING
+**Last Updated:** 2026-03-08 Session 68
+**Status:** FIXING MERGE FLOW
 
 ---
 
@@ -11,36 +11,40 @@ Action required before April 6th.
 
 ---
 
-## Session 67 Summary
+## Session 68 Summary
 
 **Fixes applied:**
-1. Gemini API activated in connectors.json - now registered and available
-2. Fixed dashboard status mapping:
-   - `pending`/`available` → pending (awaiting deps or resources)
-   - `in_progress`/`review`/`testing` → in_progress (actively working)
-   - `approval` → supervisor_approval (human review for UI/UX, research, credit)
-   - `failed`/`escalated` → pending (system retries, no human needed)
-3. Fixed Go code to retry instead of escalate on parse errors
-4. Fixed SupervisorDecision.issues JSON tag (`issues` not `issues_raw`)
+1. Branch creation - now creates from source branch (main/module) instead of orphan
+2. Merge - added `--allow-unrelated-histories` flag
+3. Merge failure - now sets status to `merge_pending` (system retries, no human)
+4. Task retry - deletes old branch and recreates clean
+5. Prompt packet - falls back to task.result.prompt_packet if task_packets table empty
+6. Disabled gemini-api connector (broken vault key)
 
 **Human only reviews 3 things:**
 1. Visual UI/UX changes
 2. System researcher suggestions (after council review)
 3. Paid API key out of credit
 
+**All technical issues handled by system:**
+- Merge failures → auto retry
+- Parse errors → auto retry
+- Model failures → auto retry with different model
+- Branch issues → auto recreate
+
 ---
 
 ## Flow Status
 ```
 PRD → Plan → Supervisor → Tasks → Router → Execute → Review → Test → Approval → Merge
- ✅     ✅        ✅         ✅       ✅        ✅        ✅      ✅       ✅        ✅
+ ✅     ✅        ✅         ✅       ✅        ✅        ✅      ✅       ✅        🔄
 ```
 
 ---
 
 ## Configuration
-- **Active connectors:** kilo (cli), gemini-api (api)
-- **Active models:** glm-5 (via kilo), gemini-2.5-flash (via gemini-api)
+- **Active connectors:** kilo (cli)
+- **Active models:** glm-5 (via kilo)
 - **Concurrency:** 2 per module, 2 total
 
 ---
@@ -48,14 +52,16 @@ PRD → Plan → Supervisor → Tasks → Router → Execute → Review → Test
 ## Task Status Flow
 ```
 pending → available → in_progress → review → testing → approval → merged
-   ↑         ↑            ↓           ↓         ↓          ↓
-   └─────────┴────────────┴───────────┴─────────┴──────────┘
-                     (on failure, retry from available)
+   ↑         ↑            ↓           ↓         ↓          ↓           ↓
+   └─────────┴────────────┴───────────┴─────────┴──────────┘     merge_pending
+                     (on failure, retry from available)              ↓
+                                                               (system retries)
 ```
 
 ---
 
 ## Session History
+- **68:** Branch creation from source, merge fixes, disabled gemini-api
 - **67:** Gemini API activated, status mapping fixed, removed escalated status
 - **66:** Fixed RPC allowlist for update_task_branch
 - **65:** E2E flow testing, multiple fixes applied
