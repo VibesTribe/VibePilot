@@ -178,7 +178,7 @@ func (h *TaskHandler) executeTask(
 		json.Unmarshal(taskPacket.Context, &contextData)
 	}
 
-	session, err := h.factory.CreateWithContext(ctx, "task_runner", taskCategory)
+	session, err := h.factory.CreateWithConnector(ctx, "task_runner", taskCategory, connectorID)
 	if err != nil {
 		h.handleTaskError(ctx, taskID, modelID, "session_create_failed")
 		return err
