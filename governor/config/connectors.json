@@ -40,12 +40,13 @@
       "id": "gemini-api",
       "name": "Gemini API",
       "type": "api",
-      "status": "active",
+      "status": "inactive",
       "provider": "google",
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
       "api_key_ref": "GEMINI_API_KEY",
       "models_available": ["gemini-2.0-flash", "gemini-1.5-pro"],
-      "provides_tools": []
+      "provides_tools": [],
+      "notes": "Disabled until vault encryption is fixed (Fernet vs AES-GCM)"
     },
     {
       "id": "deepseek-api",
