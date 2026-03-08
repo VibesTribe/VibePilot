@@ -368,13 +368,9 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
 			h.recordFailure(ctx, modelID, taskID, "supervisor_reject")
 
-			nextStatus := "available"
-			if decision.NextAction == "split_task" || decision.NextAction == "escalate" {
-				nextStatus = "escalated"
-			}
 			_, err = h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
-				"p_status":  nextStatus,
+				"p_status":  "available",
 			})
 
 		case "reroute":
@@ -464,8 +460,9 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 			log.Printf("[TaskCompleted] Failed to parse decision for %s: %v", truncateID(taskID), parseErr)
 			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
-				"p_status":  "escalated",
+				"p_status":  "available",
 			})
+			h.recordFailure(ctx, modelID, taskID, "parse_failed")
 			return nil
 		}
 
@@ -494,8 +491,9 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 					log.Printf("[TaskCompleted] Merge failed for %s: %v", branchName, err)
 					_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 						"p_task_id": taskID,
-						"p_status":  "escalated",
+						"p_status":  "approval",
 					})
+					h.recordFailure(ctx, modelID, taskID, "merge_failed")
 				} else {
 					log.Printf("[TaskCompleted] Merged %s to %s", branchName, targetBranch)
 					_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
@@ -516,19 +514,16 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
 			h.recordFailure(ctx, modelID, taskID, decision.NextAction)
 
-			nextStatus := "available"
-			if decision.NextAction != "return_to_runner" {
-				nextStatus = "escalated"
-			}
 			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
-				"p_status":  nextStatus,
+				"p_status":  "available",
 			})
 
 		default:
+			log.Printf("[TaskCompleted] Unknown decision '%s' for %s, retrying", decision.Decision, truncateID(taskID))
 			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
-				"p_status":  "escalated",
+				"p_status":  "available",
 			})
 		}
 
