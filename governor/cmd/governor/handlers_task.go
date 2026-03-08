@@ -252,7 +252,7 @@ func (h *TaskHandler) executeTask(
 		files = taskOutput.Files
 		summary = taskOutput.Summary
 		status = taskOutput.Status
-		if status == "" {
+		if status == "" || status == "complete" || status == "completed" {
 			status = "success"
 		}
 	}
