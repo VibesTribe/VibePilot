@@ -320,12 +320,20 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 	taskID := getString(task, "id")
 	taskType := getString(task, "type")
+	taskNumber := getString(task, "task_number")
 	modelID := getString(task, "assigned_to")
 	sliceID := getStringOr(task, "slice_id", "review")
 
 	if taskID == "" {
 		return
 	}
+
+	if !h.pool.CanAcquire(sliceID, "") {
+		log.Printf("[TaskReview] Pool at capacity, skipping task %s (will retry later)", truncateID(taskID))
+		return
+	}
+
+	branchName := h.buildBranchName(taskNumber, taskID)
 
 	processingBy := fmt.Sprintf("supervisor_review:%d", time.Now().UnixNano())
 	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
@@ -389,8 +397,14 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			}
 
 		case "fail":
+			failureReason := "supervisor_reject"
+			if len(decision.Issues) > 0 {
+				failureReason = decision.Issues[0].Description
+			}
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
 			h.recordFailure(ctx, modelID, taskID, "supervisor_reject")
+			h.recordFailureNotes(ctx, taskID, failureReason)
+			h.git.DeleteBranch(ctx, branchName)
 
 			_, err = h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
@@ -398,6 +412,8 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			})
 
 		case "reroute":
+			h.recordFailureNotes(ctx, taskID, "reroute_requested")
+			h.git.DeleteBranch(ctx, branchName)
 			_, err = h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
 				"p_status":  "available",
@@ -426,6 +442,11 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 	sliceID := getStringOr(task, "slice_id", "complete")
 
 	if taskID == "" {
+		return
+	}
+
+	if !h.pool.CanAcquire(sliceID, "") {
+		log.Printf("[TaskCompleted] Pool at capacity, skipping task %s (will retry later)", truncateID(taskID))
 		return
 	}
 
@@ -510,7 +531,7 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 		switch decision.Decision {
 		case "pass":
 			if decision.NextAction == "final_merge" {
-				targetBranch := h.cfg.GetDefaultMergeTarget()
+				targetBranch := h.getTargetBranch(sliceID)
 				if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
 					log.Printf("[TaskCompleted] Merge failed for %s: %v - will retry", branchName, err)
 					_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
@@ -535,8 +556,14 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 			h.recordSuccess(ctx, modelID, taskType, duration, result.TokensIn+result.TokensOut)
 
 		case "fail":
+			failureReason := decision.NextAction
+			if len(decision.Issues) > 0 {
+				failureReason = decision.Issues[0].Description
+			}
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
 			h.recordFailure(ctx, modelID, taskID, decision.NextAction)
+			h.recordFailureNotes(ctx, taskID, failureReason)
+			h.git.DeleteBranch(ctx, branchName)
 
 			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
@@ -545,6 +572,8 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 
 		default:
 			log.Printf("[TaskCompleted] Unknown decision '%s' for %s, retrying", decision.Decision, truncateID(taskID))
+			h.recordFailureNotes(ctx, taskID, fmt.Sprintf("unknown_decision: %s", decision.Decision))
+			h.git.DeleteBranch(ctx, branchName)
 			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
 				"p_status":  "available",
@@ -562,6 +591,7 @@ func (h *TaskHandler) handleTaskError(ctx context.Context, taskID, modelID, fail
 	if modelID != "" {
 		h.recordFailure(ctx, modelID, taskID, failureType)
 	}
+	h.recordFailureNotes(ctx, taskID, failureType)
 
 	_, err := h.database.RPC(ctx, "increment_task_attempts", map[string]any{
 		"p_task_id": taskID,
@@ -731,6 +761,34 @@ func (h *TaskHandler) getSourceBranch(sliceID string) string {
 		}
 	}
 	return h.cfg.GetDefaultMergeTarget()
+}
+
+func (h *TaskHandler) getTargetBranch(sliceID string) string {
+	if sliceID != "" && sliceID != "default" && sliceID != "review" && sliceID != "complete" {
+		moduleBranch := "module/" + sliceID
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", moduleBranch)
+		cmd.Dir = h.cfg.GetRepoPath()
+		output, err := cmd.Output()
+		if err == nil && len(output) > 0 {
+			return moduleBranch
+		}
+	}
+	return h.cfg.GetDefaultMergeTarget()
+}
+
+func (h *TaskHandler) recordFailureNotes(ctx context.Context, taskID, reason string) {
+	if reason == "" {
+		return
+	}
+
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	_, _ = h.database.RPC(ctx, "append_failure_notes", map[string]any{
+		"p_task_id": taskID,
+		"p_notes":   fmt.Sprintf("%s (%s)", reason, timestamp),
+	})
 }
 
 func (h *TaskHandler) deriveRoutingFlag(conn *runtime.ConnectorConfig) string {

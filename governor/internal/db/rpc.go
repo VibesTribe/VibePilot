@@ -17,6 +17,8 @@ var defaultRPCAllowlist = map[string]bool{
 	"create_task_run":         true,
 	"unlock_dependent_tasks":  true,
 	"increment_task_attempts": true,
+	"append_failure_notes":    true,
+	"set_failure_reason":      true,
 
 	// Plan lifecycle
 	"create_plan":              true,

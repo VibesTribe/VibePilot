@@ -453,26 +453,6 @@ func (c *Client) mapToEventType(change *ChangeEvent) string {
 
 	case table == "plans":
 		status, _ := change.New["status"].(string)
-		oldStatus, _ := change.Old["status"].(string)
-		switch {
-		case status == "draft" && action == "INSERT":
-			return string(runtime.EventPlanCreated)
-		case status == "review" && (action == "UPDATE" || oldStatus != "review"):
-			return string(runtime.EventPlanReview)
-		case status == "council_review":
-			return string(runtime.EventCouncilReview)
-		case status == "council_done":
-			return string(runtime.EventCouncilDone)
-		case status == "approved":
-			return string(runtime.EventPlanApproved)
-		case status == "blocked":
-			return string(runtime.EventPlanBlocked)
-		case status == "revision_needed":
-			return string(runtime.EventRevisionNeeded)
-		}
-
-	case table == "research_suggestions":
-		status, _ := change.New["status"].(string)
 		switch status {
 		case "ready":
 			return string(runtime.EventResearchReady)
