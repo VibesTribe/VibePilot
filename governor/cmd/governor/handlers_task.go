@@ -74,11 +74,6 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		return
 	}
 
-	if !h.pool.CanAcquire(sliceID, "") {
-		log.Printf("[TaskAvailable] Pool at capacity, skipping task %s (will retry later)", truncateID(taskID))
-		return
-	}
-
 	processingBy := fmt.Sprintf("task_runner:%d", time.Now().UnixNano())
 	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
 		"p_table":         "tasks",
@@ -328,11 +323,6 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		return
 	}
 
-	if !h.pool.CanAcquire(sliceID, "") {
-		log.Printf("[TaskReview] Pool at capacity, skipping task %s (will retry later)", truncateID(taskID))
-		return
-	}
-
 	branchName := h.buildBranchName(taskNumber, taskID)
 
 	processingBy := fmt.Sprintf("supervisor_review:%d", time.Now().UnixNano())
@@ -442,11 +432,6 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 	sliceID := getStringOr(task, "slice_id", "complete")
 
 	if taskID == "" {
-		return
-	}
-
-	if !h.pool.CanAcquire(sliceID, "") {
-		log.Printf("[TaskCompleted] Pool at capacity, skipping task %s (will retry later)", truncateID(taskID))
 		return
 	}
 
