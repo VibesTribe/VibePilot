@@ -13,9 +13,9 @@ type AgentPool struct {
 	maxTotal     int
 	concurrency  *ConcurrencyConfig
 	active       atomic.Int32
-	perModule    sync.Map
-	perDest      sync.Map
-	sem          chan struct{}
+	perModule    map[string]*int32
+	perDest      map[string]*int32
+	mu           sync.Mutex
 	wg           sync.WaitGroup
 	errorCh      chan error
 }
@@ -28,7 +28,8 @@ func NewAgentPool(maxPerModule, maxTotal int) *AgentPool {
 		maxPerModule: maxPerModule,
 		maxTotal:     maxTotal,
 		concurrency:  &ConcurrencyConfig{DefaultLimit: maxPerModule},
-		sem:          make(chan struct{}, maxTotal),
+		perModule:    make(map[string]*int32),
+		perDest:      make(map[string]*int32),
 		errorCh:      make(chan error, maxTotal),
 	}
 }
@@ -44,7 +45,8 @@ func NewAgentPoolWithConcurrency(maxPerModule, maxTotal int, concurrency *Concur
 		maxPerModule: maxPerModule,
 		maxTotal:     maxTotal,
 		concurrency:  concurrency,
-		sem:          make(chan struct{}, maxTotal),
+		perModule:    make(map[string]*int32),
+		perDest:      make(map[string]*int32),
 		errorCh:      make(chan error, maxTotal),
 	}
 }
@@ -85,62 +87,59 @@ func (p *AgentPool) SubmitWithDestination(ctx context.Context, moduleID, destina
 }
 
 func (p *AgentPool) acquire(moduleID, destination string) bool {
-	currentTotal := p.active.Load()
-	if int(currentTotal) >= p.maxTotal {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Check total limit
+	if int(p.active.Load()) >= p.maxTotal {
 		return false
 	}
 
-	moduleCountI, _ := p.perModule.LoadOrStore(moduleID, new(int32))
-	moduleCount := moduleCountI.(*int32)
-
+	// Check per-module limit
+	moduleCount, ok := p.perModule[moduleID]
+	if !ok {
+		moduleCount = new(int32)
+		p.perModule[moduleID] = moduleCount
+	}
 	if int(atomic.LoadInt32(moduleCount)) >= p.maxPerModule {
 		return false
 	}
 
+	// Check per-destination limit
 	if destination != "" && p.concurrency != nil {
 		destLimit := p.concurrency.GetLimit(destination)
-		destCountI, _ := p.perDest.LoadOrStore(destination, new(int32))
-		destCount := destCountI.(*int32)
-
+		destCount, ok := p.perDest[destination]
+		if !ok {
+			destCount = new(int32)
+			p.perDest[destination] = destCount
+		}
 		if int(atomic.LoadInt32(destCount)) >= destLimit {
 			return false
 		}
-
-		select {
-		case p.sem <- struct{}{}:
-			p.active.Add(1)
-			atomic.AddInt32(moduleCount, 1)
-			atomic.AddInt32(destCount, 1)
-			return true
-		default:
-			return false
-		}
+		atomic.AddInt32(destCount, 1)
 	}
 
-	select {
-	case p.sem <- struct{}{}:
-		p.active.Add(1)
-		atomic.AddInt32(moduleCount, 1)
-		return true
-	default:
-		return false
-	}
+	// All checks passed - acquire
+	p.active.Add(1)
+	atomic.AddInt32(moduleCount, 1)
+	return true
 }
 
 func (p *AgentPool) release(moduleID, destination string) {
-	moduleCountI, ok := p.perModule.Load(moduleID)
-	if ok {
-		atomic.AddInt32(moduleCountI.(*int32), -1)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if moduleCount, ok := p.perModule[moduleID]; ok {
+		atomic.AddInt32(moduleCount, -1)
 	}
 
 	if destination != "" {
-		if destCountI, ok := p.perDest.Load(destination); ok {
-			atomic.AddInt32(destCountI.(*int32), -1)
+		if destCount, ok := p.perDest[destination]; ok {
+			atomic.AddInt32(destCount, -1)
 		}
 	}
 
 	p.active.Add(-1)
-	<-p.sem
 }
 
 func (p *AgentPool) Wait() {
@@ -168,50 +167,27 @@ func (p *AgentPool) ActiveCount() int {
 }
 
 func (p *AgentPool) ModuleCount(moduleID string) int {
-	if countI, ok := p.perModule.Load(moduleID); ok {
-		return int(atomic.LoadInt32(countI.(*int32)))
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if count, ok := p.perModule[moduleID]; ok {
+		return int(atomic.LoadInt32(count))
 	}
 	return 0
 }
 
-func (p *AgentPool) CanAcquire(moduleID, destination string) bool {
-	currentTotal := p.active.Load()
-	if int(currentTotal) >= p.maxTotal {
-		return false
-	}
-
-	moduleCountI, _ := p.perModule.LoadOrStore(moduleID, new(int32))
-	moduleCount := moduleCountI.(*int32)
-
-	if int(atomic.LoadInt32(moduleCount)) >= p.maxPerModule {
-		return false
-	}
-
-	if destination != "" && p.concurrency != nil {
-		destLimit := p.concurrency.GetLimit(destination)
-		destCountI, _ := p.perDest.LoadOrStore(destination, new(int32))
-		destCount := destCountI.(*int32)
-
-		if int(atomic.LoadInt32(destCount)) >= destLimit {
-			return false
-		}
-	}
-
-	return true
-}
-
 func (p *AgentPool) Stats() map[string]interface{} {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	moduleStats := make(map[string]int)
-	p.perModule.Range(func(key, value interface{}) bool {
-		moduleStats[key.(string)] = int(atomic.LoadInt32(value.(*int32)))
-		return true
-	})
+	for key, count := range p.perModule {
+		moduleStats[key] = int(atomic.LoadInt32(count))
+	}
 
 	destStats := make(map[string]int)
-	p.perDest.Range(func(key, value interface{}) bool {
-		destStats[key.(string)] = int(atomic.LoadInt32(value.(*int32)))
-		return true
-	})
+	for key, count := range p.perDest {
+		destStats[key] = int(atomic.LoadInt32(count))
+	}
 
 	return map[string]interface{}{
 		"active_total":   p.ActiveCount(),
