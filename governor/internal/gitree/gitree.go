@@ -88,6 +88,10 @@ func (g *Gitree) isTaskOrModuleBranch(branchName string) bool {
 }
 
 func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
+	return g.CreateBranchFrom(ctx, branchName, "")
+}
+
+func (g *Gitree) CreateBranchFrom(ctx context.Context, branchName, sourceBranch string) error {
 	if !isValidBranchName(branchName) {
 		return fmt.Errorf("invalid branch name: %s", branchName)
 	}
@@ -99,6 +103,37 @@ func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
 	defer cancel()
 
 	var out bytes.Buffer
+
+	if sourceBranch != "" {
+		if err := g.gitCommand(ctx, "fetch", g.remoteName, sourceBranch).Run(); err != nil {
+			log.Printf("[Gitree] Warning: fetch %s failed: %v", sourceBranch, err)
+		}
+
+		checkoutCmd := g.gitCommand(ctx, "checkout", "-b", branchName, g.remoteName+"/"+sourceBranch)
+		checkoutCmd.Stdout = &out
+		checkoutCmd.Stderr = &out
+
+		if err := checkoutCmd.Run(); err != nil {
+			if strings.Contains(out.String(), "already exists") {
+				return g.gitCommand(ctx, "checkout", branchName).Run()
+			}
+			return fmt.Errorf("create branch from %s: %w - %s", sourceBranch, err, out.String())
+		}
+
+		pushCmd := g.gitCommand(ctx, "push", "-u", g.remoteName, branchName)
+		var pushOut bytes.Buffer
+		pushCmd.Stdout = &pushOut
+		pushCmd.Stderr = &pushOut
+		if err := pushCmd.Run(); err != nil {
+			return fmt.Errorf("push branch: %w - %s", err, pushOut.String())
+		}
+
+		if err := g.gitCommand(ctx, "checkout", "main").Run(); err != nil {
+			log.Printf("[Gitree] Warning: checkout main failed: %v", err)
+		}
+
+		return nil
+	}
 
 	cmd := g.gitCommand(ctx, "checkout", "--orphan", branchName)
 	cmd.Stdout = &out
@@ -284,7 +319,7 @@ func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch str
 	}
 
 	var out bytes.Buffer
-	cmd := g.gitCommand(ctx, "merge", sourceBranch)
+	cmd := g.gitCommand(ctx, "merge", sourceBranch, "--allow-unrelated-histories", "-m", fmt.Sprintf("Merge %s", sourceBranch))
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os/exec"
 	"time"
 
 	"github.com/vibepilot/governor/internal/core"
@@ -94,11 +95,22 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		"p_id":    taskID,
 	})
 
-	taskPacket, err := h.database.GetTaskPacket(ctx, taskID)
+	var taskPacket *db.TaskPacket
+	taskPacket, err = h.database.GetTaskPacket(ctx, taskID)
 	if err != nil {
-		log.Printf("[TaskAvailable] Failed to get task packet for %s: %v", truncateID(taskID), err)
-		h.handleTaskError(ctx, taskID, "", "packet_fetch_failed")
-		return
+		if result, ok := task["result"].(map[string]any); ok {
+			if prompt, ok := result["prompt_packet"].(string); ok && prompt != "" {
+				taskPacket = &db.TaskPacket{
+					TaskID: taskID,
+					Prompt: prompt,
+				}
+			}
+		}
+		if taskPacket == nil {
+			log.Printf("[TaskAvailable] Failed to get task packet for %s: %v", truncateID(taskID), err)
+			h.handleTaskError(ctx, taskID, "", "packet_fetch_failed")
+			return
+		}
 	}
 
 	if taskPacket.Prompt == "" {
@@ -108,8 +120,20 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	}
 
 	branchName := h.buildBranchName(taskNumber, taskID)
-	if err := h.git.CreateBranch(ctx, branchName); err != nil {
-		log.Printf("[TaskAvailable] Warning: branch creation failed for %s: %v", branchName, err)
+	sourceBranch := h.getSourceBranch(sliceID)
+
+	attempts := 0
+	if v, ok := task["attempts"].(float64); ok {
+		attempts = int(v)
+	}
+	if attempts > 0 {
+		if clearErr := h.git.DeleteBranch(ctx, branchName); clearErr != nil {
+			log.Printf("[TaskAvailable] Warning: failed to delete old branch %s: %v", branchName, clearErr)
+		}
+	}
+
+	if createErr := h.git.CreateBranchFrom(ctx, branchName, sourceBranch); createErr != nil {
+		log.Printf("[TaskAvailable] Warning: branch creation failed for %s: %v", branchName, createErr)
 	}
 
 	_, _ = h.database.RPC(ctx, "update_task_branch", map[string]any{
@@ -488,10 +512,10 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 			if decision.NextAction == "final_merge" {
 				targetBranch := h.cfg.GetDefaultMergeTarget()
 				if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
-					log.Printf("[TaskCompleted] Merge failed for %s: %v", branchName, err)
+					log.Printf("[TaskCompleted] Merge failed for %s: %v - will retry", branchName, err)
 					_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 						"p_task_id": taskID,
-						"p_status":  "approval",
+						"p_status":  "merge_pending",
 					})
 					h.recordFailure(ctx, modelID, taskID, "merge_failed")
 				} else {
@@ -691,6 +715,22 @@ func (h *TaskHandler) buildBranchName(taskNumber, taskID string) string {
 		return prefix + taskNumber
 	}
 	return prefix + truncateID(taskID)
+}
+
+func (h *TaskHandler) getSourceBranch(sliceID string) string {
+	if sliceID != "" && sliceID != "default" {
+		moduleBranch := "module/" + sliceID
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", moduleBranch)
+		cmd.Dir = h.cfg.GetRepoPath()
+		output, err := cmd.Output()
+		if err == nil && len(output) > 0 {
+			return moduleBranch
+		}
+	}
+	return h.cfg.GetDefaultMergeTarget()
 }
 
 func (h *TaskHandler) deriveRoutingFlag(conn *runtime.ConnectorConfig) string {
