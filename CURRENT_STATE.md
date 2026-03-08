@@ -1,6 +1,6 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-08 Session 68
-**Status:** FIXING MERGE FLOW
+**Last Updated:** 2026-03-08 Session 69
+**Status:** FLOW WORKING - Thread-safe pool fixed
 
 ---
 
@@ -11,15 +11,17 @@ Action required before April 6th.
 
 ---
 
-## Session 68 Summary
+## Session 69 Summary
 
-**Fixes applied:**
-1. Branch creation - now creates from source branch (main/module) instead of orphan
-2. Merge - added `--allow-unrelated-histories` flag
-3. Merge failure - now sets status to `merge_pending` (system retries, no human)
-4. Task retry - deletes old branch and recreates clean
-5. Prompt packet - falls back to task.result.prompt_packet if task_packets table empty
-6. Disabled gemini-api connector (broken vault key)
+**Critical fixes applied:**
+1. **Realtime mapping** - Fixed plans table mapping (was mapping to research events, now correctly maps to plan events)
+2. **Thread-safe AgentPool** - Fixed race condition causing 6+ kilo sessions to spawn for same task
+3. **Failure notes tracking** - Added `recordFailureNotes()` for learning/routing improvements
+4. **Migration 076** - Added `append_failure_notes` RPC
+
+**Root cause of session spawning:**
+- `sync.Map` allowed race condition: multiple events passed `CanAcquire()` check before any incremented counter
+- Fix: Replaced with mutex-protected maps for atomic check-and-acquire in `SubmitWithDestination()`
 
 **Human only reviews 3 things:**
 1. Visual UI/UX changes
@@ -37,7 +39,7 @@ Action required before April 6th.
 ## Flow Status
 ```
 PRD → Plan → Supervisor → Tasks → Router → Execute → Review → Test → Approval → Merge
- ✅     ✅        ✅         ✅       ✅        ✅        ✅      ✅       ✅        🔄
+ ✅     ✅        ✅         ✅       ✅        ✅        ✅      ✅       ✅        ✅
 ```
 
 ---
@@ -61,6 +63,7 @@ pending → available → in_progress → review → testing → approval → me
 ---
 
 ## Session History
+- **69:** Fixed realtime mapping, thread-safe AgentPool, failure notes tracking
 - **68:** Branch creation from source, merge fixes, disabled gemini-api
 - **67:** Gemini API activated, status mapping fixed, removed escalated status
 - **66:** Fixed RPC allowlist for update_task_branch
