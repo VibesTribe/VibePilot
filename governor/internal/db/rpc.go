@@ -119,6 +119,9 @@ var defaultRPCAllowlist = map[string]bool{
 
 	// Dashboard (may be used by frontend)
 	"get_dashboard_stats": true,
+
+	// Task creation (migration 077)
+	"create_task_if_not_exists": true,
 }
 
 type RPCAllowlist struct {

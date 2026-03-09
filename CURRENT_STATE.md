@@ -1,6 +1,6 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-08 Session 69 END
-**Status:** FIX APPLIED - Needs testing
+**Last Updated:** 2026-03-09 Session 70
+**Status:** FIXES APPLIED - Ready for testing
 
 ---
 
@@ -11,39 +11,56 @@ Action required before April 6th.
 
 ---
 
-## 🔧 FIX APPLIED (Not Yet Tested)
+## 🔧 FIXES APPLIED (Session 70)
 
-### Bug: Duplicate Task Creation
-**Symptom:** Plan approval creates duplicate tasks (2x T001, 2x T002) causing endless session spawning
+### Bug: Endless Session Spawning
+**Symptom:** Governor spawns multiple kilo sessions for the same task, overwhelming the system
 
-**Root Cause:** `plan_review` event fires multiple times faster than processing lock can prevent
+**Root Causes Found:**
+1. `defer clear_processing` in handlers fires when handler returns, NOT when task completes
+2. Pool submits async, but defer clears processing immediately
+3. No unique constraint on (plan_id, task_number) - allows duplicate tasks
+4. Double `clearProcessingLock()` call in handlePlanCreated
 
-**Fix Applied:** 
-- Added check in `createTasksFromApprovedPlan()` to query existing tasks before creation
-- If tasks exist for plan_id, skip creation
-- Second line of defense after processing lock
-- Commit: `22025cb1`
+**Fixes Applied:**
+
+1. **handlers_task.go** - Moved `clear_processing` into pool functions:
+   - `handleTaskAvailable`: defer moved inside `executeTask()`
+   - `handleTaskReview`: defer moved inside pool function
+   - `handleTaskCompleted`: defer moved inside pool function
+
+2. **handlers_plan.go** - Removed duplicate `clearProcessingLock()` call
+
+3. **Migration 077** - Added:
+   - Unique constraint on `tasks(plan_id, task_number)`
+   - Atomic `create_task_if_not_exists` RPC with ON CONFLICT
+   - Updated `createTasksFromApprovedPlan` to use atomic RPC
+
+**Database Migration Required:**
+Apply `docs/supabase-schema/077_prevent_duplicate_tasks.sql` in Supabase SQL Editor
 
 **Next Steps:**
-1. Test with simple PRD
-2. Verify only 1 set of tasks created
-3. Verify sessions don't spawn endlessly
-4. Verify flow completes
+1. Apply migration 077 to Supabase
+2. Rebuild and restart governor
+3. Test with simple PRD
+4. Verify only 1 set of tasks created
+5. Verify sessions don't spawn endlessly
+6. Verify flow completes
 
 ---
 
-## Session 69 Summary
+## Session 70 Summary
 
 **Fixes applied:**
-1. ✅ Realtime mapping (plans → plan events)
-2. ✅ Thread-safe AgentPool (mutex-protected maps)
-3. ✅ Failure notes tracking
-4. ✅ Duplicate task prevention (needs testing)
+1. ✅ Processing lock timing (defer in pool, not handler)
+2. ✅ Unique constraint on (plan_id, task_number)
+3. ✅ Atomic task creation RPC
+4. ✅ Removed duplicate clearProcessingLock call
 
 **System status:**
 - Governor: stopped
 - Sessions: 0 (only interactive)
-- Supabase: clean (no tasks/plans)
+- Supabase: clean (no tasks/plans) - NEEDS MIGRATION 077
 - GitHub: clean (no test PRDs/plans/branches)
 
 ---
@@ -56,6 +73,7 @@ Action required before April 6th.
 ---
 
 ## Session History
+- **70:** Fixed endless session spawning bug (processing lock timing, unique constraint, atomic RPC)
 - **69 END:** Applied duplicate task fix, ready for testing
 - **68:** Branch creation from source, merge fixes, disabled gemini-api
 - **67:** Gemini API activated, status mapping fixed, removed escalated status

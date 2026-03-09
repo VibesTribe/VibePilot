@@ -85,11 +85,6 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		return
 	}
 
-	defer h.database.RPC(ctx, "clear_processing", map[string]any{
-		"p_table": "tasks",
-		"p_id":    taskID,
-	})
-
 	var taskPacket *db.TaskPacket
 	taskPacket, err = h.database.GetTaskPacket(ctx, taskID)
 	if err != nil {
@@ -196,6 +191,13 @@ func (h *TaskHandler) executeTask(
 	runStart time.Time,
 ) error {
 	taskType := getString(task, "type")
+
+	defer func() {
+		_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
+			"p_table": "tasks",
+			"p_id":    taskID,
+		})
+	}()
 
 	var contextData map[string]any
 	if len(taskPacket.Context) > 0 {
@@ -336,11 +338,6 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		return
 	}
 
-	defer h.database.RPC(ctx, "clear_processing", map[string]any{
-		"p_table": "tasks",
-		"p_id":    taskID,
-	})
-
 	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
 		AgentID:  "supervisor",
 		TaskID:   taskID,
@@ -358,6 +355,12 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 	}
 
 	err = h.pool.SubmitWithDestination(ctx, sliceID, routingResult.DestinationID, func() error {
+		defer func() {
+			_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
+				"p_table": "tasks",
+				"p_id":    taskID,
+			})
+		}()
 		result, err := session.Run(ctx, map[string]any{
 			"task":  task,
 			"event": "task_review",
@@ -446,11 +449,6 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 		return
 	}
 
-	defer h.database.RPC(ctx, "clear_processing", map[string]any{
-		"p_table": "tasks",
-		"p_id":    taskID,
-	})
-
 	branchName := h.buildBranchName(taskNumber, taskID)
 
 	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
@@ -472,6 +470,12 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 	}
 
 	err = h.pool.SubmitWithDestination(ctx, sliceID, routingResult.DestinationID, func() error {
+		defer func() {
+			_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
+				"p_table": "tasks",
+				"p_id":    taskID,
+			})
+		}()
 		start := time.Now()
 		result, sessionErr := session.Run(ctx, map[string]any{
 			"task":  task,

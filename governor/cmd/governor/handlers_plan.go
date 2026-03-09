@@ -173,10 +173,6 @@ func handlePlanCreated(
 
 	log.Printf("[EventPlanCreated] Plan %s created successfully in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
 
-	plan["plan_path"] = plannerOutput.PlanPath
-
-	clearProcessingLock()
-
 	// Note: We do NOT call runPlanReview directly here.
 	// The update_plan_status RPC (line 147) triggers a realtime UPDATE event,
 	// which will be handled by handlePlanReview -> runPlanReview.
