@@ -365,10 +365,24 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 				"p_id":    taskID,
 			})
 		}()
-		result, err := session.Run(ctx, map[string]any{
-			"task":  task,
-			"event": "task_review",
-		})
+
+		taskPacket, _ := h.database.GetTaskPacket(ctx, taskID)
+
+		taskRunData, _ := h.database.REST(ctx, "GET", fmt.Sprintf("task_runs?task_id=eq.%s&order=created_at.desc&limit=1", taskID), nil)
+		var taskRuns []map[string]any
+		var latestRun map[string]any
+		if err := json.Unmarshal(taskRunData, &taskRuns); err == nil && len(taskRuns) > 0 {
+			latestRun = taskRuns[0]
+		}
+
+		reviewInput := map[string]any{
+			"task":        task,
+			"event":       "task_review",
+			"task_packet": taskPacket,
+			"task_run":    latestRun,
+		}
+
+		result, err := session.Run(ctx, reviewInput)
 		if err != nil {
 			log.Printf("[TaskReview] Session failed for %s: %v", truncateID(taskID), err)
 			return err
