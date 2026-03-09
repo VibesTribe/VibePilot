@@ -179,6 +179,10 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	})
 	if err != nil {
 		log.Printf("[TaskAvailable] Failed to submit task %s: %v", truncateID(taskID), err)
+		_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
+			"p_table": "tasks",
+			"p_id":    taskID,
+		})
 		h.handleTaskError(ctx, taskID, modelID, "pool_submit_failed")
 	}
 }

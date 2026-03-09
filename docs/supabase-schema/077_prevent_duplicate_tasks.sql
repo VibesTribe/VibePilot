@@ -11,10 +11,10 @@
 -- 2. Create atomic create_task_if_not_exists RPC using ON CONFLICT
 
 -- ============================================================================
--- UNIQUE CONSTRAINT
+-- UNIQUE CONSTRAINT (skip if already exists)
 -- ============================================================================
 
--- First, clean up any existing duplicates (keep the oldest one)
+-- Clean up any existing duplicates (keep the oldest one)
 DELETE FROM tasks t1
 WHERE EXISTS (
     SELECT 1 FROM tasks t2
@@ -23,10 +23,16 @@ WHERE EXISTS (
       AND t2.created_at < t1.created_at
 );
 
--- Add unique constraint
-ALTER TABLE tasks
-ADD CONSTRAINT tasks_plan_id_task_number_key
-UNIQUE (plan_id, task_number);
+-- Add unique constraint (will fail silently if exists via DO NOTHING pattern)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'tasks_plan_id_task_number_key'
+    ) THEN
+        ALTER TABLE tasks ADD CONSTRAINT tasks_plan_id_task_number_key UNIQUE (plan_id, task_number);
+    END IF;
+END $$;
 
 -- ============================================================================
 -- ATOMIC TASK CREATION RPC
