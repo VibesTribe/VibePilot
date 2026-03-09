@@ -291,30 +291,30 @@ func (h *TaskHandler) executeTask(
 	}
 
 	if status == "success" && commitErr == nil {
-	 // Clear lock BEFORE status update
-        _, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
-            "p_table": "tasks"
-            "p_id":    taskID,
-        })
-        _, err = h.database.RPC(ctx, "update_task_status", map[string]any{
-            "p_task_id": taskID
-            "p_status":  "review",
-        })
-        h.recordSuccess(ctx, modelID, taskCategory, duration.Seconds(), totalTokens)
-        log.Printf("[TaskAvailable] Task %s complete, status=review", truncateID(taskID))
-    } else {
-        // Clear lock BEFORE status update
-        _, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
-            "p_table": "tasks"
-            "p_id":    taskID,
-        })
-        _, err = h.database.RPC(ctx, "update_task_status", map[string]any{
-            "p_task_id": taskID
-            "p_status":  "available",
-        })
-        h.recordFailure(ctx, modelID, taskID, "commit_or_parse_failed")
-        log.Printf("[TaskAvailable] Task %s failed, retrying", truncateID(taskID))
-    }
+		// Clear lock BEFORE status update
+		_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
+			"p_table": "tasks",
+			"p_id":    taskID,
+		})
+		_, err = h.database.RPC(ctx, "update_task_status", map[string]any{
+			"p_task_id": taskID,
+			"p_status":  "review",
+		})
+		h.recordSuccess(ctx, modelID, taskCategory, duration.Seconds(), totalTokens)
+		log.Printf("[TaskAvailable] Task %s complete, status=review", truncateID(taskID))
+	} else {
+		// Clear lock BEFORE status update
+		_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
+			"p_table": "tasks",
+			"p_id":    taskID,
+		})
+		_, err = h.database.RPC(ctx, "update_task_status", map[string]any{
+			"p_task_id": taskID,
+			"p_status":  "available",
+		})
+		h.recordFailure(ctx, modelID, taskID, "commit_or_parse_failed")
+		log.Printf("[TaskAvailable] Task %s failed, retrying", truncateID(taskID))
+	}
 
 	h.deleteCheckpoint(ctx, taskID)
 
