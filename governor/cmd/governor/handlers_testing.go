@@ -112,6 +112,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		if sessionErr != nil {
 			log.Printf("[TaskTesting] Session failed for %s: %v", truncateID(taskID), sessionErr)
 			h.recordFailure(ctx, modelID, taskID, "session_error")
+			h.recordFailureNotes(ctx, taskID, fmt.Sprintf("session_error: %v", sessionErr))
 			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
 				"p_status":  "available",
@@ -123,6 +124,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		if parseErr != nil {
 			log.Printf("[TaskTesting] Failed to parse test output for %s: %v", truncateID(taskID), parseErr)
 			h.recordFailure(ctx, modelID, taskID, "parse_error")
+			h.recordFailureNotes(ctx, taskID, fmt.Sprintf("parse_error: %v", parseErr))
 			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
 				"p_status":  "available",
@@ -145,7 +147,9 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			}
 
 		case "fail", "failed":
+			failureDetail := testOutput.NextAction
 			h.recordFailure(ctx, routingResult.ModelID, taskID, "test_failed")
+			h.recordFailureNotes(ctx, taskID, fmt.Sprintf("test_failed: %s", failureDetail))
 			_, err := h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
 				"p_status":  "available",
@@ -157,6 +161,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		default:
 			if testOutput.NextAction == "return_for_fix" {
 				h.recordFailure(ctx, routingResult.ModelID, taskID, "test_needs_fix")
+				h.recordFailureNotes(ctx, taskID, fmt.Sprintf("test_needs_fix: %s", testOutput.NextAction))
 				_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 					"p_task_id": taskID,
 					"p_status":  "available",
@@ -168,6 +173,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 				})
 			} else {
 				h.recordFailure(ctx, routingResult.ModelID, taskID, "unknown_test_outcome")
+				h.recordFailureNotes(ctx, taskID, fmt.Sprintf("unknown_test_outcome: %s, next: %s", testOutput.TestOutcome, testOutput.NextAction))
 				_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 					"p_task_id": taskID,
 					"p_status":  "available",
@@ -299,6 +305,17 @@ func (h *TestingHandler) recordFailure(ctx context.Context, modelID, taskID, fai
 	if err != nil {
 		log.Printf("[Learning] Failed to record failure: %v", err)
 	}
+}
+
+func (h *TestingHandler) recordFailureNotes(ctx context.Context, taskID, reason string) {
+	if reason == "" {
+		return
+	}
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	_, _ = h.database.RPC(ctx, "append_failure_notes", map[string]any{
+		"p_task_id": taskID,
+		"p_notes":   fmt.Sprintf("%s (%s)", reason, timestamp),
+	})
 }
 
 func setupTestingHandlers(
