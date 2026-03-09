@@ -293,7 +293,7 @@ func (h *TaskHandler) executeTask(
 	if status == "success" && commitErr == nil {
 		_, err = h.database.RPC(ctx, "update_task_status", map[string]any{
 			"p_task_id": taskID,
-			"p_status":  "review",
+			"p_status":  "supervisor_review",
 		})
 		h.recordSuccess(ctx, modelID, taskCategory, duration.Seconds(), totalTokens)
 		log.Printf("[TaskAvailable] Task %s complete, status=review", truncateID(taskID))
@@ -359,13 +359,6 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 	}
 
 	err = h.pool.SubmitWithDestination(ctx, sliceID, routingResult.DestinationID, func() error {
-		defer func() {
-			_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
-				"p_table": "tasks",
-				"p_id":    taskID,
-			})
-		}()
-
 		taskPacket, _ := h.database.GetTaskPacket(ctx, taskID)
 
 		taskRunData, _ := h.database.REST(ctx, "GET", fmt.Sprintf("task_runs?task_id=eq.%s&order=created_at.desc&limit=1", taskID), nil)
@@ -385,17 +378,30 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		result, err := session.Run(ctx, reviewInput)
 		if err != nil {
 			log.Printf("[TaskReview] Session failed for %s: %v", truncateID(taskID), err)
+			h.database.RPC(ctx, "clear_processing", map[string]any{
+				"p_table": "tasks",
+				"p_id":    taskID,
+			})
 			return err
 		}
 
 		decision, parseErr := runtime.ParseSupervisorDecision(result.Output)
 		if parseErr != nil {
 			log.Printf("[TaskReview] Failed to parse decision for %s: %v", truncateID(taskID), parseErr)
+			h.database.RPC(ctx, "clear_processing", map[string]any{
+				"p_table": "tasks",
+				"p_id":    taskID,
+			})
 			return nil
 		}
 
 		log.Printf("[TaskReview] Task %s decision: %s, next: %s",
 			truncateID(taskID), decision.Decision, decision.NextAction)
+
+		h.database.RPC(ctx, "clear_processing", map[string]any{
+			"p_table": "tasks",
+			"p_id":    taskID,
+		})
 
 		switch decision.Decision {
 		case "pass":
