@@ -151,6 +151,8 @@ func handlePlanCreated(
 
 	plan["plan_path"] = plannerOutput.PlanPath
 
+	clearProcessingLock()
+
 	_, err = database.RPC(ctx, "update_plan_status", map[string]any{
 		"p_plan_id":   planID,
 		"p_status":    "review",
@@ -158,11 +160,8 @@ func handlePlanCreated(
 	})
 	if err != nil {
 		log.Printf("[EventPlanCreated] Failed to update plan status: %v", err)
-		clearProcessingLock()
 		return
 	}
-
-	clearProcessingLock()
 
 	database.RPC(ctx, "record_performance_metric", map[string]any{
 		"p_metric_type": "prd_to_plan",
