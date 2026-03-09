@@ -401,6 +401,14 @@ func (c *Client) handlePostgresChange(msg phoenixMessage) {
 	id := extractID(change.New)
 	eventKey := fmt.Sprintf("%s:%s:%s", change.Table, id, change.EventType)
 
+	if change.Table == "plans" || change.Table == "tasks" {
+		newStatus, _ := change.New["status"].(string)
+		oldStatus, _ := change.Old["status"].(string)
+		if newStatus != "" || oldStatus != "" {
+			eventKey = fmt.Sprintf("%s:%s:%s:%s->%s", change.Table, id, change.EventType, oldStatus, newStatus)
+		}
+	}
+
 	if c.isDuplicateEvent(eventKey) {
 		log.Printf("[Realtime] Duplicate event detected for %s, skipping", eventKey)
 		return
