@@ -1,6 +1,6 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-09 Session 73 (18:15 UTC)
-**Status:** DASHBOARD ALIGNMENT FIXES APPLIED
+**Last Updated:** 2026-03-09 Session 73 (18:30 UTC)
+**Status:** TESTING FLOW FIXED - Failure tracking enhanced
 
 ---
 
@@ -15,93 +15,135 @@ Action required before April 6th.
 
 ### 1. Migration 079 - Dashboard Alignment
 **File:** `docs/supabase-schema/079_dashboard_alignment.sql`
+**Status:** READY TO APPLY (not yet in Supabase)
 
 **Changes:**
 - Added `p_slice_id` parameter to `create_task_if_not_exists` RPC
-- RPC now writes `prompt_packet` to `tasks.result` for dashboard display
+- RPC now writes `prompt_packet` to `tasks.result` for dashboard
 - Ensures `tasks.result` and `tasks.slice_id` columns exist
 
-### 2. validation.go - Parse Slice ID
-**File:** `governor/cmd/governor/validation.go`
+### 2. Realtime Event Mapping - Testing Flow FIXED
+**File:** `governor/internal/realtime/client.go:470-471`
+
+**Before (BROKEN):**
+```go
+case status == "testing" || status == "approval":
+    return string(runtime.EventTaskCompleted)
+```
+
+**After (FIXED):**
+```go
+case status == "testing":
+    return string(runtime.EventTaskTesting)
+case status == "approval":
+    return string(runtime.EventTaskCompleted)
+```
+
+**Impact:** Testing handler now actually runs when status = "testing"!
+
+### 3. Testing Handler - Failure Notes
+**File:** `governor/cmd/governor/handlers_testing.go`
 
 **Changes:**
-- Added `SliceID` field to `TaskData` struct
-- Added slice parsing: `\*\*Slice:\*\* auth` → `task.SliceID = "auth"`
-- Default: `"general"` if not specified
-- Passes `p_slice_id` to RPC
+- Added `recordFailureNotes()` calls for ALL failure paths
+- Records detailed failure reasons:
+  - `session_error: <error>`
+  - `parse_error: <error>`
+  - `test_failed: <next_action>`
+  - `test_needs_fix: <next_action>`
+  - `unknown_test_outcome: <outcome>, next: <action>`
+
+### 4. Dashboard - Failure Notes Display
+**Files:** 
+- `vibeflow/src/core/types.ts` - Added `failureNotes?: string` to TaskSnapshot
+- `vibeflow/apps/dashboard/lib/vibepilotAdapter.ts` - Added `failure_notes` field
 
 ---
 
-## 📋 WHAT DASHBOARD EXPECTS vs WHAT GOVERNOR WRITES
+## 📊 COMPLETE FLOW NOW
 
-### tasks table:
-| Dashboard Expects | Governor Now Writes | Status |
-|-------------------|---------------------|--------|
-| `result.prompt_packet` | ✅ RPC writes to `result` | FIXED |
-| `slice_id` | ✅ Passed to RPC | FIXED |
-| `assigned_to` | ✅ Router sets | Working |
-| `routing_flag` | ✅ Router sets | Working |
-| `status` | ✅ Handlers update | Working |
-
-### Status Mapping (vibepilotAdapter.ts):
-| Governor Status | Dashboard Maps To |
-|------------------|-------------------|
-| `pending`, `available` | `"pending"` |
-| `in_progress`, `review`, `testing` | `"in_progress"` |
-| `approval` | `"supervisor_approval"` |
-| `merged`, `complete` | `"complete"` |
-| `failed`, `escalated` | `"pending"` |
+```
+PRD Push → Plan Created → Plan Review → Tasks Created
+     ↓
+Task Available → Router Assigns → Task Executes → Status: "review"
+     ↓
+Task Review → Supervisor Reviews → Pass → Status: "testing"
+     ↓
+Task Testing → Tester Runs Tests → Pass → Status: "approval"
+     ↓                              ↓
+                              Fail → Status: "available" (with failure_notes!)
+     ↓
+Task Completed → Supervisor Final Review → Merge → Status: "merged"
+```
 
 ---
 
-## 🔧 ACTION REQUIRED: Apply Migration 079
+## 🔧 ACTION REQUIRED
 
-**The migration must be applied in Supabase SQL Editor:**
-
+### 1. Apply Migration 079 in Supabase
 ```sql
 -- File: docs/supabase-schema/079_dashboard_alignment.sql
 -- Apply this in Supabase SQL Editor
 ```
 
-1. Go to Supabase Dashboard
-2. Open SQL Editor
-3. Copy contents of `079_dashboard_alignment.sql`
-4. Execute
+### 2. Test the Flow
+Create a test PRD to verify:
+- Tasks get `slice_id`
+- Tasks get `result.prompt_packet`
+- Testing runs
+- Failures get `failure_notes`
+- Dashboard shows failure notes
 
 ---
 
-## 🚀 NEXT STEPS
+## 📋 STATUS VALUES
 
-1. **Apply migration 079 in Supabase** - Required for dashboard to work
-2. Create test PRD to verify flow
-3. Check dashboard shows:
-   - Tasks grouped by slice
-   - Prompt packets visible
-   - Status pills correct
+| Governor Status | Dashboard Maps To | Trigger Event |
+|-----------------|--------------------|---------------|
+| `available` | `"pending"` | EventTaskAvailable |
+| `in_progress` | `"in_progress"` | - |
+| `review` | `"in_progress"` | EventTaskReview |
+| `testing` | `"in_progress"` | **EventTaskTesting** (FIXED!) |
+| `approval` | `"supervisor_approval"` | EventTaskCompleted |
+| `merged` | `"complete"` | - |
+| `failed`/`available` (retry) | `"pending"` | EventTaskAvailable |
+
+---
+
+## 🐛 KNOWN ISSUES
+
+### 1. No Module Branches
+Tasks merge to `module/<slice_id>` but these branches don't exist yet.
+**Impact:** Merge will fail
+**Solution:** Create module branches or merge to main
+
+### 2. Tester Agent Not Configured
+Testing handler creates "tester" session but agent may not be configured.
+**Check:** `governor/config/agents.json` for "tester" agent
 
 ---
 
 ## 📁 FILES MODIFIED THIS SESSION
 
-1. `docs/supabase-schema/079_dashboard_alignment.sql` - New clean migration
-2. `governor/cmd/governor/validation.go` - Added SliceID parsing and passing
-3. Deleted `docs/supabase-schema/078_fix_prompt_packet_in_result.sql` (broken)
+1. `docs/supabase-schema/079_dashboard_alignment.sql` - NEW
+2. `governor/internal/realtime/client.go` - Fixed event mapping
+3. `governor/cmd/governor/handlers_testing.go` - Added failure notes
+4. `governor/cmd/governor/validation.go` - Added slice_id parsing
+5. `vibeflow/src/core/types.ts` - Added failureNotes field
+6. `vibeflow/apps/dashboard/lib/vibepilotAdapter.ts` - Added failure_notes
 
 ---
 
 ## 🧹 CLEANUP COMMANDS
 
 ```bash
-# Kill stuck governor processes
-sudo pkill -9 -f "governor/governor"
-
-# Clean port 8080
-sudo fuser -k 8080/tcp
-
 # Restart governor
 sudo systemctl restart governor
 
-# Clean Supabase test data
+# Check logs
+journalctl -u governor -f
+
+# Clean test data
 sudo bash -c 'source <(systemctl show governor -p Environment | sed "s/Environment=//" | tr " " "\n") && curl -s -X DELETE "${SUPABASE_URL}/rest/v1/task_runs?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "Prefer: return=minimal" && curl -s -X DELETE "${SUPABASE_URL}/rest/v1/task_packets?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "Prefer: return=minimal" && curl -s -X DELETE "${SUPABASE_URL}/rest/v1/tasks?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "Prefer: return=minimal" && curl -s -X DELETE "${SUPABASE_URL}/rest/v1/plans?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "Prefer: return=minimal"'
 ```
 
@@ -120,7 +162,7 @@ sudo bash -c 'source <(systemctl show governor -p Environment | sed "s/Environme
 
 ## 📜 SESSION HISTORY
 
-- **73:** Dashboard alignment fixes - migration 079, validation.go slice_id
+- **73:** Testing flow fix, failure notes, dashboard alignment
 - **72:** Fixed processing lock timing in handlers, status-based dedup, task context for supervisor
 - **71:** Deep analysis + 4 fixes (pool failure lock, processing_by check, event dedup, migration 077)
 - **70:** Fixed endless session spawning bug
