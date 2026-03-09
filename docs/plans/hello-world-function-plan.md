@@ -5,23 +5,23 @@ Create a simple Hello World function to test the VibePilot flow end-to-end.
 
 ## Tasks
 
-### T001: Create Hello Function
+### T001: Create SayHello Function
 **Confidence:** 0.99
 **Category:** coding
 **Dependencies:** none
 
 #### Prompt Packet
 ```
-# TASK: T001 - Create Hello Function
+# TASK: T001 - Create SayHello Function
 
 ## Context
-Create a simple Go function to test the VibePilot flow end-to-end.
+Implement a simple Hello World function in Go to validate the VibePilot development workflow.
 
 ## What to Build
-Create a Go function `SayHello(name string) string` in `pkg/hello/hello.go` that returns "Hello, {name}!".
+Create `pkg/hello/hello.go` with a function `SayHello(name string) string` that returns "Hello, {name}!".
 
 ## Files
-- `pkg/hello/hello.go` - Main function implementation
+- `pkg/hello/hello.go` - The Hello World function implementation
 ```
 
 #### Expected Output
@@ -33,23 +33,26 @@ Create a Go function `SayHello(name string) string` in `pkg/hello/hello.go` that
 }
 ```
 
-### T002: Create Hello Tests
+### T002: Create Tests for SayHello
 **Confidence:** 0.99
-**Category:** coding
+**Category:** testing
 **Dependencies:** T001
 
 #### Prompt Packet
 ```
-# TASK: T002 - Create Hello Tests
+# TASK: T002 - Create Tests for SayHello
 
 ## Context
-Add tests for the SayHello function to verify it works correctly.
+Write unit tests to verify the SayHello function works correctly.
 
 ## What to Build
-Create `pkg/hello/hello_test.go` with tests for the SayHello function. Test with various inputs including empty string.
+Create `pkg/hello/hello_test.go` with tests that verify:
+- SayHello("World") returns "Hello, World!"
+- SayHello("") returns "Hello, !"
+- SayHello("Alice") returns "Hello, Alice!"
 
 ## Files
-- `pkg/hello/hello_test.go` - Test file
+- `pkg/hello/hello_test.go` - Unit tests for SayHello
 ```
 
 #### Expected Output
