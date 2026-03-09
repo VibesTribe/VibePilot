@@ -21,6 +21,7 @@ type TaskData struct {
 	Type             string
 	Confidence       float64
 	Category         string
+	SliceID          string
 	Dependencies     []string
 	RequiresCodebase bool
 	PromptPacket     string
@@ -157,6 +158,7 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 			"p_priority":            5,
 			"p_confidence":          task.Confidence,
 			"p_category":            task.Category,
+			"p_slice_id":            task.SliceID,
 			"p_routing_flag":        routingFlag,
 			"p_routing_flag_reason": routingReason,
 			"p_dependencies":        task.Dependencies,
@@ -220,6 +222,7 @@ func parseTaskSection(section string) (TaskData, error) {
 	var task TaskData
 	task.Type = "feature"
 	task.Category = "coding"
+	task.SliceID = "general"
 	task.Confidence = 0.95
 	task.Dependencies = []string{}
 
@@ -255,6 +258,11 @@ func parseTaskSection(section string) (TaskData, error) {
 	catMatch := regexp.MustCompile(`\*\*Category:\*\*\s*(\w+)`).FindStringSubmatch(body)
 	if len(catMatch) > 1 {
 		task.Category = strings.TrimSpace(catMatch[1])
+	}
+
+	sliceMatch := regexp.MustCompile(`\*\*Slice:\*\*\s*(\w+)`).FindStringSubmatch(body)
+	if len(sliceMatch) > 1 {
+		task.SliceID = strings.TrimSpace(sliceMatch[1])
 	}
 
 	typeMatch := regexp.MustCompile(`\*\*Type:\*\*\s*(\w+)`).FindStringSubmatch(body)
