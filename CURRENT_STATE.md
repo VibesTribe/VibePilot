@@ -1,6 +1,6 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-09 Session 73 (18:30 UTC)
-**Status:** TESTING FLOW FIXED - Failure tracking enhanced
+**Last Updated:** 2026-03-09 Session 73 (19:00 UTC)
+**Status:** AUDIT COMPLETE - Ready for fixes
 
 ---
 
@@ -11,130 +11,95 @@ Action required before April 6th.
 
 ---
 
-## ✅ FIXES APPLIED (Session 73)
+## ✅ SESSION 73 COMPLETED
 
-### 1. Migration 079 - Dashboard Alignment
-**File:** `docs/supabase-schema/079_dashboard_alignment.sql`
-**Status:** READY TO APPLY (not yet in Supabase)
+### 1. Testing Flow Fixed
+- `status == "testing"` now triggers `EventTaskTesting`
+- Testing handler actually runs now
 
-**Changes:**
-- Added `p_slice_id` parameter to `create_task_if_not_exists` RPC
-- RPC now writes `prompt_packet` to `tasks.result` for dashboard
-- Ensures `tasks.result` and `tasks.slice_id` columns exist
+### 2. Failure Notes Added
+- All failure paths now record detailed reasons
+- Dashboard can show why tasks failed
 
-### 2. Realtime Event Mapping - Testing Flow FIXED
-**File:** `governor/internal/realtime/client.go:470-471`
+### 3. Dashboard Alignment (Migration 079)
+- RPC writes `prompt_packet` to `tasks.result`
+- `slice_id` parsed and passed to RPC
+- **Applied in Supabase** ✅
 
-**Before (BROKEN):**
-```go
-case status == "testing" || status == "approval":
-    return string(runtime.EventTaskCompleted)
-```
-
-**After (FIXED):**
-```go
-case status == "testing":
-    return string(runtime.EventTaskTesting)
-case status == "approval":
-    return string(runtime.EventTaskCompleted)
-```
-
-**Impact:** Testing handler now actually runs when status = "testing"!
-
-### 3. Testing Handler - Failure Notes
-**File:** `governor/cmd/governor/handlers_testing.go`
-
-**Changes:**
-- Added `recordFailureNotes()` calls for ALL failure paths
-- Records detailed failure reasons:
-  - `session_error: <error>`
-  - `parse_error: <error>`
-  - `test_failed: <next_action>`
-  - `test_needs_fix: <next_action>`
-  - `unknown_test_outcome: <outcome>, next: <action>`
-
-### 4. Dashboard - Failure Notes Display
-**Files:** 
-- `vibeflow/src/core/types.ts` - Added `failureNotes?: string` to TaskSnapshot
-- `vibeflow/apps/dashboard/lib/vibepilotAdapter.ts` - Added `failure_notes` field
+### 4. Full Audit Completed
+- 49 tables analyzed
+- 121 RPCs documented
+- 95 migrations reviewed
+- Learning gaps identified
 
 ---
 
-## 📊 COMPLETE FLOW NOW
+## 🔴 CRITICAL ISSUES TO FIX
 
-```
-PRD Push → Plan Created → Plan Review → Tasks Created
-     ↓
-Task Available → Router Assigns → Task Executes → Status: "review"
-     ↓
-Task Review → Supervisor Reviews → Pass → Status: "testing"
-     ↓
-Task Testing → Tester Runs Tests → Pass → Status: "approval"
-     ↓                              ↓
-                              Fail → Status: "available" (with failure_notes!)
-     ↓
-Task Completed → Supervisor Final Review → Merge → Status: "merged"
-```
+### Priority 1: Module Branch Creation
+**Problem:** `CreateModuleBranch()` exists but is NEVER CALLED
+**Impact:** Tasks cannot merge properly
+**Fix:** Call in `handlers_plan.go` after tasks created
 
----
+### Priority 2: Supervisor Rule Creation
+**Problem:** Rules not created from rejections
+**Impact:** No learning from mistakes
+**Fix:** Call `create_supervisor_rule` on rejection
 
-## 🔧 ACTION REQUIRED
+### Priority 3: Tester Rule Creation
+**Problem:** Rules not created from test failures
+**Impact:** Same bugs repeat
+**Fix:** Call `create_tester_rule` on test failure
 
-### 1. Apply Migration 079 in Supabase
-```sql
--- File: docs/supabase-schema/079_dashboard_alignment.sql
--- Apply this in Supabase SQL Editor
-```
-
-### 2. Test the Flow
-Create a test PRD to verify:
-- Tasks get `slice_id`
-- Tasks get `result.prompt_packet`
-- Testing runs
-- Failures get `failure_notes`
-- Dashboard shows failure notes
+### Priority 4: Heuristic Recording
+**Problem:** Router doesn't learn model preferences
+**Impact:** Suboptimal routing
+**Fix:** Call `upsert_heuristic` on success
 
 ---
 
-## 📋 STATUS VALUES
+## 📊 AUDIT FINDINGS
 
-| Governor Status | Dashboard Maps To | Trigger Event |
-|-----------------|--------------------|---------------|
-| `available` | `"pending"` | EventTaskAvailable |
-| `in_progress` | `"in_progress"` | - |
-| `review` | `"in_progress"` | EventTaskReview |
-| `testing` | `"in_progress"` | **EventTaskTesting** (FIXED!) |
-| `approval` | `"supervisor_approval"` | EventTaskCompleted |
-| `merged` | `"complete"` | - |
-| `failed`/`available` (retry) | `"pending"` | EventTaskAvailable |
+### Tables: 49 Total
+- **8 actively used** by governor
+- **6 learning tables** (3 empty, 3 populated)
+- **35 legacy/unused** (verify dashboard usage before removal)
 
----
+### RPCs: 121 Total
+- **34 actually called** in code
+- **87 in allowlist** but never called
+- **2 missing** from allowlist
 
-## 🐛 KNOWN ISSUES
-
-### 1. No Module Branches
-Tasks merge to `module/<slice_id>` but these branches don't exist yet.
-**Impact:** Merge will fail
-**Solution:** Create module branches or merge to main
-
-### 2. Tester Agent Not Configured
-Testing handler creates "tester" session but agent may not be configured.
-**Check:** `governor/config/agents.json` for "tester" agent
+### Learning System Status
+| Component | Table Rows | Status |
+|-----------|------------|--------|
+| Supervisor rules | 42 | ✅ Partially working |
+| Failure records | 332 | ✅ Working |
+| Tester rules | 0 | ❌ Not created |
+| Heuristics | 0 | ❌ Not created |
+| Problem solutions | 0 | ❌ Not created |
+| Lessons learned | 0 | ❌ Not populated |
 
 ---
 
-## 📁 FILES MODIFIED THIS SESSION
+## 📁 KEY DOCS
 
-1. `docs/supabase-schema/079_dashboard_alignment.sql` - NEW
-2. `governor/internal/realtime/client.go` - Fixed event mapping
-3. `governor/cmd/governor/handlers_testing.go` - Added failure notes
-4. `governor/cmd/governor/validation.go` - Added slice_id parsing
-5. `vibeflow/src/core/types.ts` - Added failureNotes field
-6. `vibeflow/apps/dashboard/lib/vibepilotAdapter.ts` - Added failure_notes
+- [CURRENT_ISSUES.md](docs/CURRENT_ISSUES.md) - Full issue list with fixes
+- [SUPABASE_AUDIT_2026-03-09.md](docs/SUPABASE_AUDIT_2026-03-09.md) - Raw audit data
+- [HOW_DASHBOARD_WORKS.md](docs/HOW_DASHBOARD_WORKS.md) - Dashboard expectations
 
 ---
 
-## 🧹 CLEANUP COMMANDS
+## 🖥️ SERVICE INFO
+
+- **Governor:** Active (port 8080)
+- **Active connectors:** kilo (cli)
+- **Active models:** glm-5 (via kilo)
+- **Concurrency:** 3 per module, 3 total
+
+---
+
+## 🧹 COMMANDS
 
 ```bash
 # Restart governor
@@ -144,26 +109,15 @@ sudo systemctl restart governor
 journalctl -u governor -f
 
 # Clean test data
-sudo bash -c 'source <(systemctl show governor -p Environment | sed "s/Environment=//" | tr " " "\n") && curl -s -X DELETE "${SUPABASE_URL}/rest/v1/task_runs?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "Prefer: return=minimal" && curl -s -X DELETE "${SUPABASE_URL}/rest/v1/task_packets?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "Prefer: return=minimal" && curl -s -X DELETE "${SUPABASE_URL}/rest/v1/tasks?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "Prefer: return=minimal" && curl -s -X DELETE "${SUPABASE_URL}/rest/v1/plans?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "Prefer: return=minimal"'
+sudo bash -c 'source <(systemctl show governor -p Environment | sed "s/Environment=//" | tr " " "\n") && curl -s -X DELETE "${SUPABASE_URL}/rest/v1/task_runs?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "Prefer: return=minimal"'
 ```
-
----
-
-## 🖥️ SERVICE INFO
-
-- **Governor binary:** `/home/mjlockboxsocial/vibepilot/governor/governor`
-- **Service:** `sudo systemctl restart governor`
-- **Logs:** `journalctl -u governor -f`
-- **Active connectors:** kilo (cli)
-- **Active models:** glm-5 (via kilo)
-- **Concurrency:** 3 per module, 3 total
 
 ---
 
 ## 📜 SESSION HISTORY
 
-- **73:** Testing flow fix, failure notes, dashboard alignment
-- **72:** Fixed processing lock timing in handlers, status-based dedup, task context for supervisor
-- **71:** Deep analysis + 4 fixes (pool failure lock, processing_by check, event dedup, migration 077)
-- **70:** Fixed endless session spawning bug
+- **73:** Full audit, testing fix, failure notes, dashboard alignment
+- **72:** Processing lock timing, status dedup, task context
+- **71:** Pool failure lock, processing_by check, event dedup
+- **70:** Fixed endless session spawning
 - **69:** Applied duplicate task fix
