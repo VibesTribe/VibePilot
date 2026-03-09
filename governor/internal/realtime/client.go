@@ -40,7 +40,9 @@ type Client struct {
 	connected       bool
 	refCounter      int64
 	heartbeatTicker *time.Ticker
-	isReconnect     bool // Track if this is a reconnect
+	isReconnect     bool
+	seenEvents      map[string]time.Time
+	seenEventsMu    sync.RWMutex
 }
 
 // Subscription represents a subscription to a table's changes.
@@ -131,6 +133,7 @@ func NewClient(cfg *Config, router *runtime.EventRouter) *Client {
 		subscriptions: make(map[string]*Subscription),
 		ctx:           ctx,
 		cancel:        cancel,
+		seenEvents:    make(map[string]time.Time),
 	}
 }
 
@@ -168,17 +171,14 @@ func (c *Client) Connect() error {
 	c.conn = conn
 	c.connected = true
 
-	// Start heartbeat to keep connection alive
 	c.startHeartbeat()
-
-	// Start message handler
 	go c.readMessages()
+	go c.cleanupSeenEvents()
 
-	// Only re-subscribe on reconnect (not first connect)
 	if c.isReconnect {
 		go c.resubscribeAll()
 	}
-	c.isReconnect = true // Mark that future connects are reconnects
+	c.isReconnect = true
 
 	log.Printf("[Realtime] Connected successfully")
 	return nil
@@ -392,15 +392,22 @@ func (c *Client) handlePostgresChange(msg phoenixMessage) {
 		return
 	}
 
-	// Normalize nested data structure
 	change.normalize()
 
-	// Skip if no new record data
 	if change.New == nil {
 		change.New = make(map[string]interface{})
 	}
 
-	// Route through the existing event router
+	id := extractID(change.New)
+	eventKey := fmt.Sprintf("%s:%s:%s", change.Table, id, change.EventType)
+
+	if c.isDuplicateEvent(eventKey) {
+		log.Printf("[Realtime] Duplicate event detected for %s, skipping", eventKey)
+		return
+	}
+
+	c.markEventSeen(eventKey)
+
 	if c.router != nil {
 		eventType := c.mapToEventType(&change)
 		log.Printf("[Realtime] Mapped %s on %s to event type: %s", change.EventType, change.Table, eventType)
@@ -412,7 +419,7 @@ func (c *Client) handlePostgresChange(msg phoenixMessage) {
 
 		event := runtime.Event{
 			Type:      runtime.EventType(eventType),
-			ID:        extractID(change.New),
+			ID:        id,
 			Table:     change.Table,
 			Record:    mustMarshal(change.New),
 			Timestamp: time.Now(),
@@ -421,7 +428,7 @@ func (c *Client) handlePostgresChange(msg phoenixMessage) {
 		c.router.Route(event)
 	}
 
-	log.Printf("[Realtime] %s on %s (id: %s)", change.EventType, change.Table, extractID(change.New))
+	log.Printf("[Realtime] %s on %s (id: %s)", change.EventType, change.Table, id)
 }
 
 // mapToEventType converts a change event to an internal event type.
@@ -431,6 +438,11 @@ func (c *Client) mapToEventType(change *ChangeEvent) string {
 
 	switch {
 	case table == "tasks":
+		processingBy, _ := change.New["processing_by"].(string)
+		if processingBy != "" {
+			log.Printf("[Realtime] Task %s has processing_by=%q, skipping event", extractID(change.New), processingBy)
+			return ""
+		}
 		statusRaw := change.New["status"]
 		status, ok := statusRaw.(string)
 		log.Printf("[Realtime] Task change: statusRaw=%v (%T), status=%q, ok=%v, action=%s", statusRaw, statusRaw, status, ok, action)
@@ -452,6 +464,11 @@ func (c *Client) mapToEventType(change *ChangeEvent) string {
 		}
 
 	case table == "plans":
+		processingBy, _ := change.New["processing_by"].(string)
+		if processingBy != "" {
+			log.Printf("[Realtime] Plan %s has processing_by=%q, skipping event", extractID(change.New), processingBy)
+			return ""
+		}
 		status, _ := change.New["status"].(string)
 		oldStatus, _ := change.Old["status"].(string)
 		switch {
@@ -516,15 +533,56 @@ func (c *Client) handleDisconnect() {
 	}
 	c.mu.Unlock()
 
-	// Attempt reconnection after delay
 	go func() {
 		time.Sleep(5 * time.Second)
 		log.Printf("[Realtime] Attempting reconnect...")
 		if err := c.Connect(); err != nil {
 			log.Printf("[Realtime] Reconnect failed: %v", err)
 		}
-		// resubscribeAll() is called by Connect() when isReconnect is true
 	}()
+}
+
+func (c *Client) isDuplicateEvent(eventKey string) bool {
+	c.seenEventsMu.Lock()
+	defer c.seenEventsMu.Unlock()
+
+	if seenAt, exists := c.seenEvents[eventKey]; exists {
+		if time.Since(seenAt) < 30*time.Second {
+			return true
+		}
+		delete(c.seenEvents, eventKey)
+	}
+	return false
+}
+
+func (c *Client) markEventSeen(eventKey string) {
+	c.seenEventsMu.Lock()
+	defer c.seenEventsMu.Unlock()
+	c.seenEvents[eventKey] = time.Now()
+}
+
+func (c *Client) cleanupOldEvents() {
+	c.seenEventsMu.Lock()
+	defer c.seenEventsMu.Unlock()
+	now := time.Now()
+	for key, seenAt := range c.seenEvents {
+		if now.Sub(seenAt) > 30*time.Second {
+			delete(c.seenEvents, key)
+		}
+	}
+}
+
+func (c *Client) cleanupSeenEvents() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-ticker.C:
+			c.cleanupOldEvents()
+		}
+	}
 }
 
 // nextRef generates the next message reference number.
