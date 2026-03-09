@@ -1,7 +1,7 @@
 # PRD: E2E Test
 
 ## Overview
-Test complete flow.
+Test complete VibePilot flow.
 
 ## Requirements
 - Create `e2e_test_passed.txt` with: "E2E TEST PASSED"
