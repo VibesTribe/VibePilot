@@ -1,0 +1,31 @@
+{
+  "prd": {
+    "version": "1.0",
+    "title": "VibePilot - Simple Test PRD",
+    "overview": "Add a simple test feature to verify the endless session spawning is fixed",
+    "project_type": "feature",
+    "existing_infrastructure": {
+      "schema": "supabase tables: tasks, task_packets, task_runs, models, platforms, projects, secrets_vault, council_reviews",
+      "runners": "kimi CLI (with swarm) and API runners (DeepSeek, Gemini, OpenRouter",
+      "core": "ConcurrentOrchestrator, SupervisorAgent, TaskManager, VaultManager"
+      "telemetry": "OpenTelemetry with fallback, LoopDetector"
+      "memory": "Pluggable interface (FileBackend, SupabaseBackend)"
+      "dependency_rpc": "Supabase functions for atomic task unlock"
+    },
+    "objectives": [
+      "Complete all agent implementations (Consultant, planner, council, tester)",
+      "Connect dashboard to live Supabase data",
+      "Enable full task lifecycle: create -> assign -> execute -> review -> test -> merge",
+      "Implement Courier agents for web platform delivery",
+      "Add voice interface for hands-free operation"
+    ],
+    "success_criteria": [
+      "User can submit app idea through Consultant",
+      "Planner generates atomic task plan",
+      "Tasks execute in parallel",
+      "Supervisor reviews and approves outputs",
+      "Complete app delivered to user repo",
+      "Voice commands control VibePilot operations"
+    ]
+  ]
+}
