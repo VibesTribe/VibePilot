@@ -467,7 +467,9 @@ func (c *Client) mapToEventType(change *ChangeEvent) string {
 			}
 		case status == "review":
 			return string(runtime.EventTaskReview)
-		case status == "testing" || status == "approval":
+		case status == "testing":
+			return string(runtime.EventTaskTesting)
+		case status == "approval":
 			return string(runtime.EventTaskCompleted)
 		}
 
