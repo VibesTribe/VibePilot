@@ -150,6 +150,20 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			failureDetail := testOutput.NextAction
 			h.recordFailure(ctx, routingResult.ModelID, taskID, "test_failed")
 			h.recordFailureNotes(ctx, taskID, fmt.Sprintf("test_failed: %s", failureDetail))
+
+			// Create learning rule from test failure
+			_, _ = h.database.RPC(ctx, "create_tester_rule", map[string]any{
+				"p_applies_to":      taskType,
+				"p_test_type":       "automated",
+				"p_test_command":    "watch_for_pattern",
+				"p_source":          "test_failure",
+				"p_trigger_pattern": failureDetail,
+				"p_priority":        5,
+				"p_source_task_id":  taskID,
+				"p_source_details":  map[string]any{"test_outcome": testOutput.TestOutcome},
+			})
+			log.Printf("[TaskTesting] Created tester rule for task %s", truncateID(taskID))
+
 			_, err := h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
 				"p_status":  "available",
@@ -162,6 +176,20 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			if testOutput.NextAction == "return_for_fix" {
 				h.recordFailure(ctx, routingResult.ModelID, taskID, "test_needs_fix")
 				h.recordFailureNotes(ctx, taskID, fmt.Sprintf("test_needs_fix: %s", testOutput.NextAction))
+
+				// Create learning rule from test failure
+				_, _ = h.database.RPC(ctx, "create_tester_rule", map[string]any{
+					"p_applies_to":      taskType,
+					"p_test_type":       "automated",
+					"p_test_command":    "watch_for_pattern",
+					"p_source":          "test_needs_fix",
+					"p_trigger_pattern": testOutput.NextAction,
+					"p_priority":        5,
+					"p_source_task_id":  taskID,
+					"p_source_details":  map[string]any{"test_outcome": testOutput.TestOutcome},
+				})
+				log.Printf("[TaskTesting] Created tester rule for task %s (needs fix)", truncateID(taskID))
+
 				_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 					"p_task_id": taskID,
 					"p_status":  "available",

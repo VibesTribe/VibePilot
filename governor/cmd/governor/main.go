@@ -227,7 +227,7 @@ func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v 
 func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector) {
 	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector)
 	setupPlanHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
-	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter)
+	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter)
 	setupTestingHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupResearchHandlers(ctx, router, factory, pool, database, cfg, connRouter)

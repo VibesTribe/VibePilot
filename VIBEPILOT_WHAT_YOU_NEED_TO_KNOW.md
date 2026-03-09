@@ -238,14 +238,14 @@ Fix the Go code that writes to Supabase.
 
 ### What Dashboard Displays
 
-| Section | Data Source | Polls Every |
-|---------|-------------|-------------|
-| Status Pills | `tasks.status` | 5s |
-| Slice Hub | `tasks.slice_id` | 5s |
-| Task Cards | `tasks.*`, `task_runs.*` | 5s |
-| Agent Hangar | `models.*`, `platforms.*` | 5s |
-| ROI Panel | `task_runs.tokens_*`, `task_runs.*_cost_usd` | 5s |
-| Event Timeline | `orchestrator_events.*` | 5s |
+| Section | Data Source | Update Method |
+|---------|-------------|---------------|
+| Status Pills | `tasks.status` | Realtime (instant) |
+| Slice Hub | `tasks.slice_id` | Realtime (instant) |
+| Task Cards | `tasks.*`, `task_runs.*` | Realtime (instant) |
+| Agent Hangar | `models.*`, `platforms.*` | Realtime (instant) |
+| ROI Panel | `task_runs.tokens_*`, `task_runs.*_cost_usd` | Realtime (instant) |
+| Event Timeline | `orchestrator_events.*` | Realtime (instant) |
 
 ### Critical Fields Dashboard Expects
 
