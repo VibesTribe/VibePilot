@@ -28,7 +28,7 @@ func setupPlanHandlers(
 		handlePlanCreated(ctx, factory, pool, database, cfg, connRouter, git, event)
 	})
 	router.On(runtime.EventPlanReview, func(event runtime.Event) {
-		handlePlanReview(ctx, factory, pool, database, cfg, connRouter, event)
+		handlePlanReview(ctx, factory, pool, database, cfg, connRouter, git, event)
 	})
 }
 
@@ -185,6 +185,7 @@ func runPlanReview(
 	database *db.DB,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
+	git *gitree.Gitree,
 	plan map[string]any,
 ) {
 	startTime := time.Now()
@@ -278,7 +279,7 @@ func runPlanReview(
 
 	switch review.Decision {
 	case "approved":
-		if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig(), repoPath); err != nil {
+		if err := createTasksFromApprovedPlan(ctx, database, plan, cfg.GetValidationConfig(), repoPath, git); err != nil {
 			log.Printf("[PlanReview] Failed to create tasks: %v", err)
 			setPlanError(ctx, database, planID, "task_creation_failed")
 			return
@@ -352,6 +353,7 @@ func handlePlanReview(
 	database *db.DB,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
+	git *gitree.Gitree,
 	event runtime.Event,
 ) {
 	var plan map[string]any
@@ -366,7 +368,7 @@ func handlePlanReview(
 		return
 	}
 
-	runPlanReview(ctx, factory, pool, database, cfg, connRouter, plan)
+	runPlanReview(ctx, factory, pool, database, cfg, connRouter, git, plan)
 }
 
 func setPlanError(ctx context.Context, database *db.DB, planID string, reason string) {

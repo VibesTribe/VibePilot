@@ -427,6 +427,17 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			failureReason := "supervisor_reject"
 			if len(decision.Issues) > 0 {
 				failureReason = decision.Issues[0].Description
+
+				// Create learning rule from rejection
+				_, _ = h.database.RPC(ctx, "create_supervisor_rule", map[string]any{
+					"p_trigger_pattern":   "task_review",
+					"p_action":            "flag_for_revision",
+					"p_reason":            failureReason,
+					"p_source":            "supervisor_rejection",
+					"p_trigger_condition": map[string]any{"task_type": taskType},
+					"p_source_task_id":    taskID,
+				})
+				log.Printf("[TaskReview] Created supervisor rule for task %s", truncateID(taskID))
 			}
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
 			h.recordFailure(ctx, modelID, taskID, "supervisor_reject")
@@ -582,6 +593,17 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 			failureReason := decision.NextAction
 			if len(decision.Issues) > 0 {
 				failureReason = decision.Issues[0].Description
+
+				// Create learning rule from rejection
+				_, _ = h.database.RPC(ctx, "create_supervisor_rule", map[string]any{
+					"p_trigger_pattern":   "task_completion_review",
+					"p_action":            "flag_for_revision",
+					"p_reason":            failureReason,
+					"p_source":            "supervisor_rejection",
+					"p_trigger_condition": map[string]any{"task_type": taskType},
+					"p_source_task_id":    taskID,
+				})
+				log.Printf("[TaskCompleted] Created supervisor rule for task %s", truncateID(taskID))
 			}
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
 			h.recordFailure(ctx, modelID, taskID, decision.NextAction)
@@ -641,6 +663,19 @@ func (h *TaskHandler) recordSuccess(ctx context.Context, modelID, taskType strin
 	})
 	if err != nil {
 		log.Printf("[Learning] Failed to record success: %v", err)
+	}
+
+	// Record heuristic for future routing
+	if taskType != "" {
+		_, _ = h.database.RPC(ctx, "upsert_heuristic", map[string]any{
+			"p_task_type":       taskType,
+			"p_condition":       map[string]any{},
+			"p_preferred_model": modelID,
+			"p_action":          map[string]any{"prefer": modelID},
+			"p_confidence":      0.8,
+			"p_source":          "task_success",
+		})
+		log.Printf("[Learning] Recorded heuristic: task_type=%s -> model=%s", taskType, modelID)
 	}
 }
 

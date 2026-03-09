@@ -6,7 +6,7 @@
 
 ## Overview
 
-The Vibeflow dashboard is a React/TypeScript application that displays real-time mission control for VibePilot. It polls Supabase every 5 seconds for task/run data and transforms it into visualizations.
+The Vibeflow dashboard is a React/TypeScript application that displays real-time mission control for VibePilot. It uses **Supabase Realtime (PostgreSQL Change Data Capture)** to receive instant updates when data changes - **NOT polling**.
 
 **Key Principle:** The dashboard is a **read-only view** of VibePilot state. It does NOT make decisions, route tasks, or execute code. It only displays what VibePilot has already done.
 
@@ -14,15 +14,15 @@ The Vibeflow dashboard is a React/TypeScript application that displays real-time
 
 ## Data Sources (Supabase Tables)
 
-The dashboard queries these Supabase tables:
+The dashboard subscribes to these Supabase tables via Realtime:
 
-| Table | Purpose | Poll Interval |
+| Table | Purpose | Update Method |
 |-------|---------|---------------|
-| `tasks` | All task records with status, assignment, etc. | 5 seconds |
-| `task_runs` | Execution records with tokens, costs, model info | 5 seconds |
-| `models` | Active/paused models with subscription info | 5 seconds |
-| `platforms` | Web platforms (Gemini Web, Claude Web, etc.) | 5 seconds |
-| `orchestrator_events` | Event log for routing decisions | 5 seconds |
+| `tasks` | All task records with status, assignment, etc. | Realtime (instant) |
+| `task_runs` | Execution records with tokens, costs, model info | Realtime (instant) |
+| `models` | Active/paused models with subscription info | Realtime (instant) |
+| `platforms` | Web platforms (Gemini Web, Claude Web, etc.) | Realtime (instant) |
+| `orchestrator_events` | Event log for routing decisions | Realtime (instant) |
 
 ---
 
@@ -424,14 +424,17 @@ LIMIT 500;
 
 ---
 
-## Dashboard Polling Intervals
+## Dashboard Realtime Subscriptions
 
-| Data | Interval | Hook |
-|------|----------|------|
-| Tasks/Runs/Models | 5 seconds | `useMissionData()` → `fetchSnapshot()` |
-| Run Metrics | 25 seconds | `useMissionData()` → `fetchRunMetrics()` |
-| Events | 5 seconds | `useMissionData()` → `fetchEvents()` |
-| Review Queue | On-demand | `useReviewData()` → `refresh()` |
+| Data | Method | Channel |
+|------|--------|---------|
+| Tasks/Runs/Models/Platforms | Supabase Realtime | `dashboard-tasks` |
+| Events | Supabase Realtime | `dashboard-events` |
+| Initial Load | REST API query | On mount |
+
+The dashboard creates two realtime channels:
+1. `dashboard-tasks` - Listens for changes on `tasks`, `task_runs`, `models`, `platforms`
+2. `dashboard-events` - Listens for changes on `orchestrator_events`
 
 ---
 

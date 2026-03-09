@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/vibepilot/governor/internal/db"
+	"github.com/vibepilot/governor/internal/gitree"
 	"github.com/vibepilot/governor/internal/runtime"
 )
 
@@ -20,6 +21,7 @@ type CouncilHandler struct {
 	pool       *runtime.AgentPool
 	connRouter *runtime.Router
 	cfg        *runtime.Config
+	git        *gitree.Gitree
 }
 
 func NewCouncilHandler(
@@ -28,6 +30,7 @@ func NewCouncilHandler(
 	pool *runtime.AgentPool,
 	connRouter *runtime.Router,
 	cfg *runtime.Config,
+	git *gitree.Gitree,
 ) *CouncilHandler {
 	return &CouncilHandler{
 		database:   database,
@@ -35,6 +38,7 @@ func NewCouncilHandler(
 		pool:       pool,
 		connRouter: connRouter,
 		cfg:        cfg,
+		git:        git,
 	}
 }
 
@@ -285,7 +289,7 @@ func (h *CouncilHandler) handleCouncilDone(event runtime.Event) {
 }
 
 func (h *CouncilHandler) handleApprovedPlan(ctx context.Context, plan map[string]any, planID string) {
-	if err := createTasksFromApprovedPlan(ctx, h.database, plan, h.cfg.GetValidationConfig(), h.cfg.GetRepoPath()); err != nil {
+	if err := createTasksFromApprovedPlan(ctx, h.database, plan, h.cfg.GetValidationConfig(), h.cfg.GetRepoPath(), h.git); err != nil {
 		var validationErr *ValidationFailedError
 		if errors.As(err, &validationErr) {
 			log.Printf("[Council] Task validation failed for %s", truncateID(planID))
@@ -481,7 +485,8 @@ func setupCouncilHandlers(
 	database *db.DB,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
+	git *gitree.Gitree,
 ) {
-	handler := NewCouncilHandler(database, factory, pool, connRouter, cfg)
+	handler := NewCouncilHandler(database, factory, pool, connRouter, cfg, git)
 	handler.Register(router)
 }

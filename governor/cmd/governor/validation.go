@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/vibepilot/governor/internal/db"
+	"github.com/vibepilot/governor/internal/gitree"
 	"github.com/vibepilot/governor/internal/runtime"
 )
 
@@ -97,7 +98,7 @@ func validateTasks(tasks []TaskData, cfg *runtime.ValidationConfig) *ValidationF
 	return nil
 }
 
-func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[string]any, cfg *runtime.ValidationConfig, repoPath string) error {
+func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[string]any, cfg *runtime.ValidationConfig, repoPath string, git *gitree.Gitree) error {
 	planID, _ := plan["id"].(string)
 	planPath, _ := plan["plan_path"].(string)
 	if planPath == "" {
@@ -124,6 +125,23 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 	if validationErr := validateTasks(tasks, cfg); validationErr != nil {
 		log.Printf("[createTasksFromApprovedPlan] Validation failed: %v", validationErr)
 		return validationErr
+	}
+
+	sliceIDs := make(map[string]bool)
+	for _, task := range tasks {
+		if task.SliceID != "" {
+			sliceIDs[task.SliceID] = true
+		}
+	}
+
+	if git != nil {
+		for sliceID := range sliceIDs {
+			if err := git.CreateModuleBranch(ctx, sliceID); err != nil {
+				log.Printf("[createTasksFromApprovedPlan] Warning: failed to create module branch %s: %v", sliceID, err)
+			} else {
+				log.Printf("[createTasksFromApprovedPlan] Created module branch: module/%s", sliceID)
+			}
+		}
 	}
 
 	createdCount := 0

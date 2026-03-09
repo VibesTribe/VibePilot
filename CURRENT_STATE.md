@@ -1,6 +1,6 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-09 Session 73 (19:00 UTC)
-**Status:** AUDIT COMPLETE - Ready for fixes
+**Last Updated:** 2026-03-09 Session 74 (19:30 UTC)
+**Status:** LEARNING SYSTEM FIXES APPLIED - Ready for testing
 
 ---
 
@@ -11,50 +11,41 @@ Action required before April 6th.
 
 ---
 
-## ✅ SESSION 73 COMPLETED
+## ✅ SESSION 74 COMPLETED
 
-### 1. Testing Flow Fixed
-- `status == "testing"` now triggers `EventTaskTesting`
-- Testing handler actually runs now
+### 1. Module Branch Creation Fixed
+- `CreateModuleBranch()` now called when tasks are created
+- Added `git` parameter to `createTasksFromApprovedPlan`
+- Added `git` to `CouncilHandler` and plan handlers
+- Module branches created for each unique `slice_id`
 
-### 2. Failure Notes Added
-- All failure paths now record detailed reasons
-- Dashboard can show why tasks failed
+### 2. Learning System Fixes Applied
+- **Supervisor rules**: Now created on rejection (both review and completion)
+- **Tester rules**: Now created on test failure and needs_fix
+- **Heuristics**: Now recorded on task success for routing optimization
 
-### 3. Dashboard Alignment (Migration 079)
-- RPC writes `prompt_packet` to `tasks.result`
-- `slice_id` parsed and passed to RPC
-- **Applied in Supabase** ✅
-
-### 4. Full Audit Completed
-- 49 tables analyzed
-- 121 RPCs documented
-- 95 migrations reviewed
-- Learning gaps identified
+### 3. Docs Updated
+- `HOW_DASHBOARD_WORKS.md`: Corrected to show Realtime (not polling)
+- `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md`: Updated dashboard section
 
 ---
 
-## 🔴 CRITICAL ISSUES TO FIX
+## 🔴 REMAINING ISSUES
 
-### Priority 1: Module Branch Creation
-**Problem:** `CreateModuleBranch()` exists but is NEVER CALLED
-**Impact:** Tasks cannot merge properly
-**Fix:** Call in `handlers_plan.go` after tasks created
+### Priority 1: Multiple Kilo Spawning
+**Problem:** Extra kilo processes spawned without task activity
+**Status:** Under investigation - not caused by governor (logs show idle)
+**Possible causes:** Previous session cleanup, external triggers
 
-### Priority 2: Supervisor Rule Creation
-**Problem:** Rules not created from rejections
-**Impact:** No learning from mistakes
-**Fix:** Call `create_supervisor_rule` on rejection
+### Priority 2: Problem-Solutions Never Recorded
+**Problem:** No code calls `record_solution_result`
+**Impact:** System doesn't learn what fixes work for what problems
+**Fix:** Add call when retry succeeds after initial failure
 
-### Priority 3: Tester Rule Creation
-**Problem:** Rules not created from test failures
-**Impact:** Same bugs repeat
-**Fix:** Call `create_tester_rule` on test failure
-
-### Priority 4: Heuristic Recording
-**Problem:** Router doesn't learn model preferences
-**Impact:** Suboptimal routing
-**Fix:** Call `upsert_heuristic` on success
+### Priority 3: Schema Consolidation
+**Problem:** 95 migrations is unmaintainable
+**Impact:** Confusion, hard to debug
+**Effort:** High
 
 ---
 
@@ -70,15 +61,15 @@ Action required before April 6th.
 - **87 in allowlist** but never called
 - **2 missing** from allowlist
 
-### Learning System Status
+### Learning System Status (After Session 74 Fixes)
 | Component | Table Rows | Status |
 |-----------|------------|--------|
-| Supervisor rules | 42 | ✅ Partially working |
+| Supervisor rules | 42+ | ✅ Now creating on rejection |
 | Failure records | 332 | ✅ Working |
-| Tester rules | 0 | ❌ Not created |
-| Heuristics | 0 | ❌ Not created |
-| Problem solutions | 0 | ❌ Not created |
-| Lessons learned | 0 | ❌ Not populated |
+| Tester rules | 0 → N/A | ✅ Now creating on test failure |
+| Heuristics | 0 → N/A | ✅ Now recording on success |
+| Problem solutions | 0 | ⚠️ Still not created |
+| Lessons learned | 0 | ⚠️ Not populated |
 
 ---
 
@@ -116,6 +107,7 @@ sudo bash -c 'source <(systemctl show governor -p Environment | sed "s/Environme
 
 ## 📜 SESSION HISTORY
 
+- **74:** Module branch creation, learning system fixes, docs update
 - **73:** Full audit, testing fix, failure notes, dashboard alignment
 - **72:** Processing lock timing, status dedup, task context
 - **71:** Pool failure lock, processing_by check, event dedup
