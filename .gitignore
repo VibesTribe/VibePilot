@@ -80,7 +80,7 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Test scripts (messy slate) - but keep integration tests in tests/
+# Test scripts (messy slate) - through keep integration tests in tests/
 test_*.py
 !tests/test_*.py
 universal_test.py
@@ -95,3 +95,6 @@ list_models.py
 # Go binaries
 governor/governor
 governor/governor.yaml
+
+# Supabase migrations - keep specific files
+!docs/supabase-schema/081_fix_duplicate_create_task_functions.sql
