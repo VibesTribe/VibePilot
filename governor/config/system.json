@@ -70,7 +70,7 @@
   "events": {
     "task_statuses_available": ["available"],
     "task_statuses_review": ["review"],
-    "task_statuses_completed": ["testing", "approval"],
+    "task_statuses_completed": ["testing", "merged", "merge_pending"]
     "plan_statuses_draft": ["draft"],
     "plan_statuses_review": ["review"],
     "plan_statuses_council": ["council_review"],
