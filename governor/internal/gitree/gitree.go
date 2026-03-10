@@ -263,7 +263,8 @@ func (g *Gitree) CommitOutput(ctx context.Context, branchName string, output int
 	if err := commitCmd.Run(); err != nil {
 		outStr := commitOut.String()
 		if strings.Contains(outStr, "nothing to commit") || strings.Contains(outStr, "no changes added") {
-			return fmt.Errorf("task produced no output: no files were created or modified")
+			log.Printf("[Gitree] No changes to commit for %s - task may already be complete", branchName)
+			return nil
 		}
 		return fmt.Errorf("git commit: %w - %s", err, outStr)
 	}

@@ -11,5 +11,5 @@ func SayHello(name string) string {
 
 func main() {
 	fmt.Println(SayHello(""))
-	fmt.Println(SayHello("VibePilot"))
+	fmt.Println(SayHello("VibePilot!"))
 }
