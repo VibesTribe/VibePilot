@@ -138,22 +138,12 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		switch testOutput.TestOutcome {
 		case "pass", "passed", "success":
 			h.recordSuccess(ctx, routingResult.ModelID, taskType, duration, result.TokensIn+result.TokensOut)
-			// Auto-merge after successful test - no human approval for code
-			targetBranch := h.getTargetBranch(sliceID)
-			if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
-				log.Printf("[TaskTesting] Merge failed for %s - will retry", branchName, err)
-				_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-					"p_task_id": taskID,
-					"p_status":  "merge_pending",
-				})
-				h.recordFailure(ctx, routingResult.ModelID, taskID, "merge_failed")
-			} else {
-				log.Printf("[TaskTesting] Merged %s to %s", branchName, targetBranch)
-				_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-					"p_task_id": taskID,
-					"p_status":  "merged",
-				})
-				h.git.DeleteBranch(ctx, branchName)
+			_, err := h.database.RPC(ctx, "update_task_status", map[string]any{
+				"p_task_id": taskID,
+				"p_status":  "approval",
+			})
+			if err != nil {
+				log.Printf("[TaskTesting] Failed to update status: %v", err)
 			}
 
 		case "fail", "failed":
@@ -304,20 +294,15 @@ func (h *TestingHandler) handleTestResults(event runtime.Event) {
 	}
 }
 
-func (h *TestingHandler) getTargetBranch(sliceID string) string {
-	if sliceID != "" && sliceID != "default" && sliceID != "review" && sliceID != "complete" {
-		moduleBranch := "module/" + sliceID
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", moduleBranch)
-		cmd.Dir = h.cfg.GetRepoPath()
-		output, err := cmd.Output()
-		if err == nil && len(output) > 0 {
-			return moduleBranch
-		}
+func (h *TestingHandler) buildBranchName(taskNumber, taskID string) string {
+	prefix := h.cfg.GetTaskBranchPrefix()
+	if prefix == "" {
+		prefix = "task/"
 	}
-	return h.cfg.GetDefaultMergeTarget()
+	if taskNumber != "" {
+		return prefix + taskNumber
+	}
+	return prefix + truncateID(taskID)
 }
 
 func (h *TestingHandler) recordSuccess(ctx context.Context, modelID, taskType string, durationSeconds float64, tokensUsed int) {
@@ -350,21 +335,10 @@ func (h *TestingHandler) recordFailure(ctx context.Context, modelID, taskID, fai
 	}
 }
 
-func (h *TestingHandler) getTargetBranch(sliceID string) string {
-	if sliceID != "" && sliceID != "default" && sliceID != "review" && sliceID != "complete" {
-        moduleBranch := "module/" + sliceID
-        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-        defer cancel()
- 
-        cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", moduleBranch)
-        cmd.Dir = h.cfg.GetRepoPath()
-        output, err := cmd.Output()
-        if err == nil && len(output) > 0 {
-            return moduleBranch
-        }
-    }
-    return h.cfg.GetDefaultMergeTarget()
-}
+func (h *TestingHandler) recordFailureNotes(ctx context.Context, taskID, reason string) {
+	if reason == "" {
+		return
+	}
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	_, _ = h.database.RPC(ctx, "append_failure_notes", map[string]any{
 		"p_task_id": taskID,
