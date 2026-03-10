@@ -562,61 +562,31 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 			log.Printf("[TaskCompleted] Commit failed for %s: %v", branchName, err)
 		}
 
-        switch decision.Decision {
-        case "pass":
-            // Always auto-merge - no human approval for code
-            targetBranch := h.getTargetBranch(sliceID)
-            if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
-                log.Printf("[TaskCompleted] Merge failed for %s - will retry", branchName, err)
-                _, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-                    "p_task_id": taskID,
-                    "p_status":  "merge_pending",
-                })
-                h.recordFailure(ctx, modelID, taskID, "merge_failed")
-            } else {
-                log.Printf("[TaskCompleted] Merged %s to %s", branchName, targetBranch)
-                _, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-                    "p_task_id": taskID,
-                    "p_status":  "merged",
-                })
-                h.git.DeleteBranch(ctx, branchName)
-            }
-            h.recordSuccess(ctx, taskID, modelID, taskType, duration, result.TokensIn+result.TokensOut)
-        case "fail":
-            failureReason := decision.NextAction
-            if len(decision.Issues) > 0 {
-                failureReason = decision.Issues[0].Description
-
-                // Create learning rule from rejection
-                _, _ = h.database.RPC(ctx, "create_supervisor_rule", map[string]any{
-                    "p_trigger_pattern":   "task_completion_review",
-                    "p_action":            "flag_for_revision",
-                    "p_reason":            failureReason,
-                    "p_source":            "supervisor_rejection",
-                    "p_trigger_condition": map[string]any{"task_type": taskType},
-                    "p_source_task_id":    taskID,
-                })
-                log.Printf("[TaskCompleted] Created supervisor rule for task %s", truncateID(taskID))
-            }
-            h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
-            h.recordFailure(ctx, modelID, taskID, decision.NextAction)
-            h.recordFailureNotes(ctx, taskID, failureReason)
-            h.git.DeleteBranch(ctx, branchName)
-
-            _, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-                "p_task_id": taskID,
-                "p_status":  "available",
-            })
-
-        default:
-            log.Printf("[TaskCompleted] Unknown decision '%s' for %s, retrying", decision.Decision, truncateID(taskID))
-            h.recordFailureNotes(ctx, taskID, fmt.Sprintf("unknown_decision: %s", decision.Decision))
-            h.git.DeleteBranch(ctx, branchName)
-            _, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-                "p_task_id": taskID,
-                "p_status":  "available",
-            })
-        }
+		switch decision.Decision {
+		case "pass":
+			if decision.NextAction == "final_merge" {
+				targetBranch := h.getTargetBranch(sliceID)
+				if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
+					log.Printf("[TaskCompleted] Merge failed for %s: %v - will retry", branchName, err)
+					_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+						"p_task_id": taskID,
+						"p_status":  "merge_pending",
+					})
+					h.recordFailure(ctx, modelID, taskID, "merge_failed")
+				} else {
+					log.Printf("[TaskCompleted] Merged %s to %s", branchName, targetBranch)
+					_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+						"p_task_id": taskID,
+						"p_status":  "merged",
+					})
+					h.git.DeleteBranch(ctx, branchName)
+				}
+			} else {
+				_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+					"p_task_id": taskID,
+					"p_status":  "approval",
+				})
+			}
 			h.recordSuccess(ctx, taskID, modelID, taskType, duration, result.TokensIn+result.TokensOut)
 
 		case "fail":

@@ -1,6 +1,6 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-10 Session 75 (15:55 UTC)
-**Status:** CLEAN - Ready for fresh testing
+**Last Updated:** 2026-03-10 Session 75 (16:30 UTC)
+**Status:** DOCS FIXED - Code changes needed
 
 ---
 
@@ -34,54 +34,85 @@ Action required before April 6th.
 
 ---
 
-## 🔴 REMAINING ISSUES
+## 🔴 REMAINING: Code Alignment with Docs
 
-### Priority 1: Multiple Kilo Spawning
-**Problem:** Extra kilo processes spawned without task activity
-**Status:** Under investigation - not caused by governor (logs show idle)
-**Possible causes:** Previous session cleanup, external triggers
+### Issue: "approval" status still in code
+The docs now say system is 100% autonomous, but code still has:
+- `status = "approval"` in handlers_testing.go (lines 143, 200, 292)
+- `status = "approval"` in handlers_task.go (line 587)
+- `TaskStatusesCompleted: []string{"testing", "approval"}` in config.go
 
-### Priority 2: Problem-Solutions Never Recorded
-**Problem:** No code calls `record_solution_result`
-**Impact:** System doesn't learn what fixes work for what problems
-**Fix:** Add call when retry succeeds after initial failure
+### Required Code Changes
 
-### Priority 3: Schema Consolidation
-**Problem:** 95 migrations is unmaintainable
-**Impact:** Confusion, hard to debug
-**Effort:** High
+**1. handlers_testing.go** - After test pass, auto-merge:
+```go
+case "pass", "passed", "success":
+    // Auto-merge - no human approval for code
+    targetBranch := h.getTargetBranch(sliceID)
+    if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
+        status = "merge_pending"
+    } else {
+        status = "merged"
+        h.git.DeleteBranch(ctx, branchName)
+    }
+```
+
+**2. handlers_task.go** - Remove "approval" status:
+```go
+case "pass":
+    // Always auto-merge - no human approval for code
+    targetBranch := h.getTargetBranch(sliceID)
+    // ... same merge logic
+```
+
+**3. config.go** - Change completed statuses:
+```go
+TaskStatusesCompleted: []string{"testing", "merged"},
+```
+
+**4. Add getTargetBranch to TestingHandler** (or use shared helper)
 
 ---
 
-## 📊 AUDIT FINDINGS
+## 📋 TASK FLOW (CORRECT)
 
-### Tables: 49 Total
-- **8 actively used** by governor
-- **6 learning tables** (3 empty, 3 populated)
-- **35 legacy/unused** (verify dashboard usage before removal)
+```
+1. PRD pushed → Plan created
+2. Plan approved → Tasks created with branches
+3. Task picked up → Task branch created
+4. Model executes → Output to task branch
+5. Supervisor reviews → Pass/Fail
+6. If Pass → Testing
+7. If Test Pass → AUTO-MERGE to module branch
+8. Task branch deleted
+9. Status = "merged" (DONE)
 
-### RPCs: 121 Total
-- **34 actually called** in code
-- **87 in allowlist** but never called
-- **2 missing** from allowlist
+Human NEVER involved in code flow.
+Human ONLY for: Visual UI/UX, API credits, Complex research suggestions
+```
 
-### Learning System Status
-| Component | Table Rows | Status |
-|-----------|------------|--------|
-| Supervisor rules | 42+ | ✅ Creating on rejection |
-| Failure records | 332 | ✅ Working |
-| Tester rules | 0 | ✅ Creating on test failure |
-| Heuristics | 0 | ✅ Recording on success |
-| Problem solutions | 0 | ⚠️ Still not created |
-| Lessons learned | 0 | ⚠️ Not populated |
+---
+
+## 🔴 OTHER REMAINING ISSUES
+
+### Priority 1: Multiple Kilo Spawning
+**Problem:** Extra kilo processes spawned without task activity
+**Status:** Under investigation
+
+### Priority 2: Problem-Solutions Never Recorded
+**Problem:** No code calls `record_solution_result`
+**Impact:** System doesn't learn what fixes work
+
+### Priority 3: Schema Consolidation
+**Problem:** 95 migrations is unmaintainable
 
 ---
 
 ## 📁 KEY DOCS
 
-- [CURRENT_ISSUES.md](docs/CURRENT_ISSUES.md) - Full issue list with fixes
-- [SUPABASE_AUDIT_2026-03-09.md](docs/SUPABASE_AUDIT_2026-03-09.md) - Raw audit data
+- [CURRENT_ISSUES.md](docs/CURRENT_ISSUES.md) - Full issue list
 - [HOW_DASHBOARD_WORKS.md](docs/HOW_DASHBOARD_WORKS.md) - Dashboard expectations
+- [learning_system.md](docs/learning_system.md) - Learning flow
 
 ---
 
@@ -103,18 +134,18 @@ sudo systemctl restart governor
 # Check logs
 journalctl -u governor -f
 
-# Clean test data
-sudo bash -c 'source <(systemctl show governor -p Environment | sed "s/Environment=//" | tr " " "\n") && curl -s -X DELETE "${SUPABASE_URL}/rest/v1/task_runs?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "Prefer: return=minimal"'
+# Build governor
+cd ~/vibepilot/governor && go build -o governor ./cmd/governor
 ```
 
 ---
 
 ## 📜 SESSION HISTORY
 
-- **75:** Cleanup - removed test PRDs, plans, branches, Supabase data
-- **74:** Module branch creation, learning system fixes, docs update
-- **73:** Full audit, testing fix, failure notes, dashboard alignment
-- **72:** Processing lock timing, status dedup, task context
-- **71:** Pool failure lock, processing_by check, event dedup
+- **75:** Cleanup, docs fixed (human role), code alignment started
+- **74:** Module branch creation, learning system fixes
+- **73:** Full audit, testing fix, failure notes
+- **72:** Processing lock timing, status dedup
+- **71:** Pool failure lock, processing_by check
 - **70:** Fixed endless session spawning
 - **69:** Applied duplicate task fix
