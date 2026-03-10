@@ -88,12 +88,13 @@ var defaultRPCAllowlist = map[string]bool{
 	"find_tasks_with_checkpoints": true,
 
 	// Heuristics
-	"get_heuristic":           true,
-	"upsert_heuristic":        true,
-	"get_recent_failures":     true,
-	"record_heuristic_result": true,
-	"get_problem_solution":    true,
-	"record_solution_result":  true,
+	"get_heuristic":              true,
+	"upsert_heuristic":           true,
+	"get_recent_failures":        true,
+	"record_heuristic_result":    true,
+	"get_problem_solution":       true,
+	"record_solution_result":     true,
+	"record_solution_on_success": true,
 
 	// Runner management
 	"archive_runner":       true,

@@ -300,7 +300,7 @@ func (h *TaskHandler) executeTask(
 			"p_task_id": taskID,
 			"p_status":  "review",
 		})
-		h.recordSuccess(ctx, modelID, taskCategory, duration.Seconds(), totalTokens)
+		h.recordSuccess(ctx, taskID, modelID, taskCategory, duration.Seconds(), totalTokens)
 		log.Printf("[TaskAvailable] Task %s complete, status=review", truncateID(taskID))
 	} else {
 		// Clear lock BEFORE status update
@@ -587,7 +587,7 @@ func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
 					"p_status":  "approval",
 				})
 			}
-			h.recordSuccess(ctx, modelID, taskType, duration, result.TokensIn+result.TokensOut)
+			h.recordSuccess(ctx, taskID, modelID, taskType, duration, result.TokensIn+result.TokensOut)
 
 		case "fail":
 			failureReason := decision.NextAction
@@ -651,7 +651,7 @@ func (h *TaskHandler) handleTaskError(ctx context.Context, taskID, modelID, fail
 	})
 }
 
-func (h *TaskHandler) recordSuccess(ctx context.Context, modelID, taskType string, durationSeconds float64, tokensUsed int) {
+func (h *TaskHandler) recordSuccess(ctx context.Context, taskID, modelID, taskType string, durationSeconds float64, tokensUsed int) {
 	if modelID == "" {
 		return
 	}
@@ -665,7 +665,17 @@ func (h *TaskHandler) recordSuccess(ctx context.Context, modelID, taskType strin
 		log.Printf("[Learning] Failed to record success: %v", err)
 	}
 
-	// Record heuristic for future routing
+	if taskID != "" {
+		solutionID, _ := h.database.RPC(ctx, "record_solution_on_success", map[string]any{
+			"p_task_id":   taskID,
+			"p_model_id":  modelID,
+			"p_task_type": taskType,
+		})
+		if solutionID != nil {
+			log.Printf("[Learning] Recorded solution for task %s (failure -> success pattern)", truncateID(taskID))
+		}
+	}
+
 	if taskType != "" {
 		_, _ = h.database.RPC(ctx, "upsert_heuristic", map[string]any{
 			"p_task_type":       taskType,
