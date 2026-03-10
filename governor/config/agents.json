@@ -62,7 +62,7 @@
     {
       "id": "tester",
       "name": "Tester",
-      "prompt": "testers.md",
+      "prompt": "testers_simple.md",
       "capabilities": ["file_access", "sandbox_execution"],
       "default_connector": "kilo",
       "description": "Code validation - runs tests, lint, typecheck"
