@@ -449,7 +449,7 @@ func (c *Config) Reload() error {
 			Events: EventsConfig{
 				TaskStatusesAvailable: []string{"available"},
 				TaskStatusesReview:    []string{"review"},
-				TaskStatusesCompleted: []string{"testing", "approval"},
+				TaskStatusesCompleted: []string{"testing", "merged"},
 				PlanStatusesCouncil:   []string{"council_review"},
 				PlanStatusesApproved:  []string{"approved"},
 				MaintenanceStatus:     "pending",
@@ -707,7 +707,7 @@ func (c *Config) GetEventsConfig() *EventsConfig {
 		return &EventsConfig{
 			TaskStatusesAvailable:    []string{"available"},
 			TaskStatusesReview:       []string{"review"},
-			TaskStatusesCompleted:    []string{"testing", "approval"},
+			TaskStatusesCompleted:    []string{"testing", "merged"},
 			PlanStatusesDraft:        []string{"draft"},
 			PlanStatusesCouncil:      []string{"council_review", "revision_needed"},
 			PlanStatusesPendingHuman: []string{"pending_human"},
