@@ -22,10 +22,10 @@
     {
       "id": "supervisor",
       "name": "Supervisor",
-      "prompt": "supervisor.md",
+      "prompt": "supervisor_simple.md",
       "capabilities": ["file_access"],
       "default_connector": "kilo",
-      "description": "Quality control - approves/rejects, decides simple vs complex"
+      "description": "Quality control - simple pass/fail checks"
     },
     {
       "id": "council",
