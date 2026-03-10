@@ -348,11 +348,10 @@ Fix the Go code that writes to Supabase.
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 10. HUMAN REVIEWS AND MERGES                                │
-│     - Dashboard shows task in review queue                  │
-│     - Human reviews diff                                    │
-│     - Human approves/rejects                                │
-│     - If approved → merge to main                           │
+│ 10. SYSTEM AUTO-MERGES                                      │
+│     - Task branch → Module branch (auto-merge)              │
+│     - Task branch deleted                                   │
+│     - No human involvement for code                         │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -363,6 +362,24 @@ Fix the Go code that writes to Supabase.
 │     - Token counts: how many tokens used                    │
 │     - ROI: cost savings                                     │
 └─────────────────────────────────────────────────────────────┘
+
+---
+
+## ⚠️ HUMAN ROLE (VERY LIMITED)
+
+**Human ONLY reviews these 3 things:**
+
+1. **Visual UI/UX changes** - Need human eyes on design
+2. **Paid API credit exhaustion** - Need human wallet
+3. **Complex researcher suggestions** - After council review, if it changes how the system works
+
+**Human NEVER:**
+- Reviews code
+- Merges code
+- Maintains the system
+- Writes code
+
+**The system is 100% self-learning, self-improving, self-maintaining.**
 ```
 
 ### Architecture Components

@@ -99,12 +99,16 @@
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 7: HUMAN REVIEW & MERGE                                                │
+│ PHASE 7: SYSTEM AUTO-MERGE                                                   │
 │                                                                              │
-│ Dashboard shows task in review queue                                         │
-│ Human reviews diff                                                            │
-│ Human approves/rejects                                                        │
-│ If approved → merge to main → status = merged                               │
+│ System auto-merges task branch → module branch                              │
+│ Task branch deleted after merge                                             │
+│ Status = merged                                                               │
+│                                                                              │
+│ ⚠️ HUMAN ONLY REVIEWS:                                                       │
+│   - Visual UI/UX changes                                                     │
+│   - Paid API credit exhaustion                                              │
+│   - Complex researcher suggestions (after council)                          │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
