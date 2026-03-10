@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/vibepilot/governor/internal/db"
+	"github.com/vibepilot/governor/internal/gitree"
 	"github.com/vibepilot/governor/internal/runtime"
 )
 
@@ -17,6 +18,7 @@ type MaintenanceHandler struct {
 	pool       *runtime.AgentPool
 	connRouter *runtime.Router
 	cfg        *runtime.Config
+	git        *gitree.Gitree
 }
 
 func NewMaintenanceHandler(
@@ -25,6 +27,7 @@ func NewMaintenanceHandler(
 	pool *runtime.AgentPool,
 	connRouter *runtime.Router,
 	cfg *runtime.Config,
+	git *gitree.Gitree,
 ) *MaintenanceHandler {
 	return &MaintenanceHandler{
 		database:   database,
@@ -32,11 +35,14 @@ func NewMaintenanceHandler(
 		pool:       pool,
 		connRouter: connRouter,
 		cfg:        cfg,
+		git:        git,
 	}
 }
 
 func (h *MaintenanceHandler) Register(router *runtime.EventRouter) {
 	router.On(runtime.EventMaintenanceCmd, h.handleMaintenanceCommand)
+	router.On(runtime.EventTaskApproval, h.handleTaskApproved)
+	router.On(runtime.EventTaskMergePending, h.handleTaskMergePending)
 }
 
 func (h *MaintenanceHandler) handleMaintenanceCommand(event runtime.Event) {
@@ -144,6 +150,134 @@ func (h *MaintenanceHandler) handleMaintenanceCommand(event runtime.Event) {
 	}
 }
 
+func (h *MaintenanceHandler) handleTaskApproved(event runtime.Event) {
+	ctx := context.Background()
+
+	var task map[string]any
+	if err := json.Unmarshal(event.Record, &task); err != nil {
+		log.Printf("[TaskApproved] Failed to parse event: %v", err)
+		return
+	}
+
+	taskID := getString(task, "id")
+	taskNumber := getString(task, "task_number")
+	sliceID := getStringOr(task, "slice_id", "default")
+
+	if taskID == "" {
+		return
+	}
+
+	processingBy := fmt.Sprintf("merge:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
+		"p_table":         "tasks",
+		"p_id":            taskID,
+		"p_processing_by": processingBy,
+	})
+	if err != nil || !parseBool(claimed) {
+		log.Printf("[TaskApproved] Task %s already being processed", truncateID(taskID))
+		return
+	}
+
+	defer h.database.RPC(ctx, "clear_processing", map[string]any{
+		"p_table": "tasks",
+		"p_id":    taskID,
+	})
+
+	branchName := h.buildBranchName(taskNumber, taskID)
+	targetBranch := h.getTargetBranch(sliceID)
+
+	log.Printf("[TaskApproved] Merging %s -> %s for task %s", branchName, targetBranch, truncateID(taskID))
+
+	if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
+		log.Printf("[TaskApproved] Merge failed for %s: %v - setting merge_pending", truncateID(taskID), err)
+		_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+			"p_task_id": taskID,
+			"p_status":  "merge_pending",
+		})
+		return
+	}
+
+	h.git.DeleteBranch(ctx, branchName)
+
+	_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
+		"p_task_id": taskID,
+		"p_status":  "merged",
+	})
+	_, _ = h.database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
+		"p_completed_task_id": taskID,
+	})
+	log.Printf("[TaskApproved] Task %s merged to %s", truncateID(taskID), targetBranch)
+}
+
+func (h *MaintenanceHandler) handleTaskMergePending(event runtime.Event) {
+	ctx := context.Background()
+
+	var task map[string]any
+	if err := json.Unmarshal(event.Record, &task); err != nil {
+		log.Printf("[TaskMergePending] Failed to parse event: %v", err)
+		return
+	}
+
+	taskID := getString(task, "id")
+	taskNumber := getString(task, "task_number")
+	sliceID := getStringOr(task, "slice_id", "default")
+
+	if taskID == "" {
+		return
+	}
+
+	processingBy := fmt.Sprintf("merge_retry:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
+		"p_table":         "tasks",
+		"p_id":            taskID,
+		"p_processing_by": processingBy,
+	})
+	if err != nil || !parseBool(claimed) {
+		log.Printf("[TaskMergePending] Task %s already being processed", truncateID(taskID))
+		return
+	}
+
+	defer h.database.RPC(ctx, "clear_processing", map[string]any{
+		"p_table": "tasks",
+		"p_id":    taskID,
+	})
+
+	log.Printf("[TaskMergePending] Creating maintenance command for task %s", truncateID(taskID))
+
+	_, err = h.database.RPC(ctx, "create_maintenance_command", map[string]any{
+		"p_command_type": "merge_conflict",
+		"p_payload": map[string]any{
+			"task_id":       taskID,
+			"task_number":   taskNumber,
+			"slice_id":      sliceID,
+			"branch_name":   h.buildBranchName(taskNumber, taskID),
+			"target_branch": h.getTargetBranch(sliceID),
+		},
+		"p_status": "pending",
+	})
+	if err != nil {
+		log.Printf("[TaskMergePending] Failed to create maintenance command: %v", err)
+	}
+}
+
+func (h *MaintenanceHandler) buildBranchName(taskNumber, taskID string) string {
+	prefix := h.cfg.GetTaskBranchPrefix()
+	if prefix == "" {
+		prefix = "task/"
+	}
+	if taskNumber != "" {
+		return prefix + taskNumber
+	}
+	return prefix + truncateID(taskID)
+}
+
+func (h *MaintenanceHandler) getTargetBranch(sliceID string) string {
+	if sliceID != "" && sliceID != "default" && sliceID != "testing" && sliceID != "review" {
+		return "module/" + sliceID
+	}
+	return h.cfg.GetDefaultMergeTarget()
+}
+
 func (h *MaintenanceHandler) recordSuccess(ctx context.Context, modelID, taskType string, durationSeconds float64, tokensUsed int) {
 	if modelID == "" {
 		return
@@ -167,7 +301,8 @@ func setupMaintenanceHandler(
 	database *db.DB,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
+	git *gitree.Gitree,
 ) {
-	handler := NewMaintenanceHandler(database, factory, pool, connRouter, cfg)
+	handler := NewMaintenanceHandler(database, factory, pool, connRouter, cfg, git)
 	handler.Register(router)
 }
