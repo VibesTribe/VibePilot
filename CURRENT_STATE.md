@@ -1,35 +1,46 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-10 Session 77 (19:49 UTC)
-**Status:** COMPLETE
+**Last Updated:** 2026-03-10 Session 77 (19:55 UTC)
+**Status:** COMPLETE - Auto-merge flow implemented
 
-## Session 77 Summary
+---
 
-### Goal
-Align code with docs: testing passes → task approved → auto-merge (no human approval for code)
+## What Was Done (Session 77)
 
-### Flow (Implemented)
+Implemented auto-merge flow: `testing passes → approved → auto-merge`
+
 ```
 Test pass → status="approved"
           → triggers EventTaskApproved
           → handleTaskApproved tries merge
           → merge succeeds → status="merged"
           → merge fails → status="merge_pending"
-          → triggers EventTaskMergePending
           → handleTaskMergePending creates maintenance command
 ```
 
-### Changes Made
-1. **system.json** - Added "approved", "merged", "merge_pending" to task_statuses_completed
-2. **events.go** - Added EventTaskApproval, EventTaskMergePending event types
-3. **realtime/client.go** - Added mapping for "approved" → EventTaskApproval, "merge_pending" → EventTaskMergePending
-4. **handlers_testing.go** - Changed status from "approval" to "approved" on test pass
-5. **handlers_maint.go** - Added handleTaskApproved, handleTaskMergePending with git support
-6. **main.go** - Updated setupMaintenanceHandler to pass git parameter
+**Files changed:**
+- `governor/config/system.json` - Added statuses
+- `governor/internal/runtime/events.go` - Added event types
+- `governor/internal/realtime/client.go` - Added event mappings
+- `governor/cmd/governor/handlers_testing.go` - Set "approved" on test pass
+- `governor/cmd/governor/handlers_maint.go` - Added merge handlers
+- `governor/cmd/governor/main.go` - Wired up git parameter
 
-### Status
-- Build: SUCCESS
-- Governor: RUNNING
-- Ready to commit when requested
+---
+
+## What's Next
+
+1. **Test the flow** - Run a task through to completion to verify:
+   - Test pass sets status to "approved"
+   - EventTaskApproved fires
+   - Merge executes automatically
+   - Status becomes "merged" (or "merge_pending" on failure)
+
+2. **Monitor for issues** - Watch logs for:
+   - Duplicate events
+   - Merge conflicts handled correctly
+   - Maintenance commands created when needed
+
+3. **Continue building** - Once verified, continue with other VibePilot features
 
 ---
 
