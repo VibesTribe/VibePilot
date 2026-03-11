@@ -167,32 +167,46 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 		if cfg != nil && cfg.DefaultMaxAttempts > 0 {
 			maxAttempts = cfg.DefaultMaxAttempts
 		}
-		taskID, err := database.RPC(ctx, "create_task_if_not_exists", map[string]any{
-			"p_plan_id":             planID,
-			"p_task_number":         task.TaskNumber,
-			"p_title":               task.Title,
-			"p_type":                task.Type,
-			"p_status":              status,
-			"p_priority":            5,
-			"p_confidence":          task.Confidence,
-			"p_category":            task.Category,
-			"p_slice_id":            task.SliceID,
-			"p_routing_flag":        routingFlag,
-			"p_routing_flag_reason": routingReason,
-			"p_dependencies":        task.Dependencies,
-			"p_prompt":              task.PromptPacket,
-			"p_expected_output":     task.ExpectedOutput,
-			"p_context":             map[string]any{"source": "plan_approval"},
-			"p_max_attempts":        maxAttempts,
-		})
+
+		taskData := map[string]any{
+			"plan_id":             planID,
+			"task_number":         task.TaskNumber,
+			"title":               task.Title,
+			"type":                task.Type,
+			"status":              status,
+			"priority":            5,
+			"confidence":          task.Confidence,
+			"category":            task.Category,
+			"slice_id":            task.SliceID,
+			"routing_flag":        routingFlag,
+			"routing_flag_reason": routingReason,
+			"dependencies":        task.Dependencies,
+			"prompt_packet":       task.PromptPacket,
+			"expected_output":     task.ExpectedOutput,
+			"context":             map[string]any{"source": "plan_approval"},
+			"max_attempts":        maxAttempts,
+		}
+
+		result, err := database.Insert(ctx, "tasks", taskData)
 		if err != nil {
+			if strings.Contains(err.Error(), "409") || strings.Contains(err.Error(), "duplicate") {
+				log.Printf("[createTasksFromApprovedPlan] Task %s already exists, skipping", task.TaskNumber)
+				createdCount++
+				continue
+			}
 			log.Printf("[createTasksFromApprovedPlan] Failed to create task %s: %v", task.TaskNumber, err)
 			continue
 		}
 
+		var createdTasks []map[string]any
+		if len(result) > 0 {
+			json.Unmarshal(result, &createdTasks)
+		}
 		var taskIDStr string
-		if len(taskID) > 0 {
-			json.Unmarshal(taskID, &taskIDStr)
+		if len(createdTasks) > 0 {
+			if id, ok := createdTasks[0]["id"].(string); ok {
+				taskIDStr = id
+			}
 		}
 		log.Printf("[createTasksFromApprovedPlan] Created task %s: %s (id: %s)", task.TaskNumber, task.Title, truncateID(taskIDStr))
 		createdCount++
