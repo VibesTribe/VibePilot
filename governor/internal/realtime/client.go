@@ -469,7 +469,7 @@ func (c *Client) mapToEventType(change *ChangeEvent) string {
 			return string(runtime.EventTaskReview)
 		case status == "testing":
 			return string(runtime.EventTaskTesting)
-		case status == "approved":
+		case status == "approval":
 			return string(runtime.EventTaskApproval)
 		case status == "merge_pending":
 			return string(runtime.EventTaskMergePending)
@@ -546,10 +546,15 @@ func (c *Client) handleDisconnect() {
 	c.mu.Unlock()
 
 	go func() {
-		time.Sleep(5 * time.Second)
-		log.Printf("[Realtime] Attempting reconnect...")
-		if err := c.Connect(); err != nil {
-			log.Printf("[Realtime] Reconnect failed: %v", err)
+		for {
+			time.Sleep(5 * time.Second)
+			log.Printf("[Realtime] Attempting reconnect...")
+			if err := c.Connect(); err != nil {
+				log.Printf("[Realtime] Reconnect failed: %v, will retry in 5s", err)
+				continue
+			}
+			log.Printf("[Realtime] Reconnected successfully")
+			break
 		}
 	}()
 }

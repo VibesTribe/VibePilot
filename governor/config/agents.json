@@ -22,10 +22,10 @@
     {
       "id": "supervisor",
       "name": "Supervisor",
-      "prompt": "supervisor_simple.md",
+      "prompt": "supervisor.md",
       "capabilities": ["file_access"],
       "default_connector": "kilo",
-      "description": "Quality control - simple pass/fail checks"
+      "description": "Quality gate - validates plans, reviews outputs, coordinates testing"
     },
     {
       "id": "council",
@@ -62,7 +62,7 @@
     {
       "id": "tester",
       "name": "Tester",
-      "prompt": "testers_simple.md",
+      "prompt": "testers.md",
       "capabilities": ["file_access", "sandbox_execution"],
       "default_connector": "kilo",
       "description": "Code validation - runs tests, lint, typecheck"
