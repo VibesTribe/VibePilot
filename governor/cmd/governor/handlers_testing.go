@@ -140,7 +140,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			h.recordSuccess(ctx, routingResult.ModelID, taskType, duration, result.TokensIn+result.TokensOut)
 			_, err := h.database.RPC(ctx, "update_task_status", map[string]any{
 				"p_task_id": taskID,
-				"p_status":  "approved",
+				"p_status":  "approval",
 			})
 			if err != nil {
 				log.Printf("[TaskTesting] Failed to update status: %v", err)
