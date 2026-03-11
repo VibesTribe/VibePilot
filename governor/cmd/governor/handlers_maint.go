@@ -167,21 +167,16 @@ func (h *MaintenanceHandler) handleTaskApproved(event runtime.Event) {
 		return
 	}
 
-	processingBy := fmt.Sprintf("merge:%d", time.Now().UnixNano())
-	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
-		"p_table":         "tasks",
-		"p_id":            taskID,
-		"p_processing_by": processingBy,
+	// Claim for merge
+	mergeID := fmt.Sprintf("merge:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "claim_for_review", map[string]any{
+		"p_task_id":     taskID,
+		"p_reviewer_id": mergeID,
 	})
 	if err != nil || !parseBool(claimed) {
 		log.Printf("[TaskApproved] Task %s already being processed", truncateID(taskID))
 		return
 	}
-
-	defer h.database.RPC(ctx, "clear_processing", map[string]any{
-		"p_table": "tasks",
-		"p_id":    taskID,
-	})
 
 	branchName := h.buildBranchName(taskNumber, taskID)
 	targetBranch := h.getTargetBranch(sliceID)
@@ -189,21 +184,22 @@ func (h *MaintenanceHandler) handleTaskApproved(event runtime.Event) {
 	log.Printf("[TaskApproved] Merging %s -> %s for task %s", branchName, targetBranch, truncateID(taskID))
 
 	if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
-		log.Printf("[TaskApproved] Merge failed for %s: %v - setting merge_pending", truncateID(taskID), err)
-		_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-			"p_task_id": taskID,
-			"p_status":  "merge_pending",
+		log.Printf("[TaskApproved] Merge failed for %s: %v", truncateID(taskID), err)
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "approval",
+			"p_failure_reason": "merge_failed",
 		})
 		return
 	}
 
 	h.git.DeleteBranch(ctx, branchName)
 
-	_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-		"p_task_id": taskID,
-		"p_status":  "merged",
+	h.database.RPC(ctx, "transition_task", map[string]any{
+		"p_task_id":    taskID,
+		"p_new_status": "merged",
 	})
-	_, _ = h.database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
+	h.database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
 		"p_completed_task_id": taskID,
 	})
 	log.Printf("[TaskApproved] Task %s merged to %s", truncateID(taskID), targetBranch)
@@ -226,21 +222,16 @@ func (h *MaintenanceHandler) handleTaskMergePending(event runtime.Event) {
 		return
 	}
 
-	processingBy := fmt.Sprintf("merge_retry:%d", time.Now().UnixNano())
-	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
-		"p_table":         "tasks",
-		"p_id":            taskID,
-		"p_processing_by": processingBy,
+	// Claim for merge retry
+	mergeID := fmt.Sprintf("merge_retry:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "claim_for_review", map[string]any{
+		"p_task_id":     taskID,
+		"p_reviewer_id": mergeID,
 	})
 	if err != nil || !parseBool(claimed) {
 		log.Printf("[TaskMergePending] Task %s already being processed", truncateID(taskID))
 		return
 	}
-
-	defer h.database.RPC(ctx, "clear_processing", map[string]any{
-		"p_table": "tasks",
-		"p_id":    taskID,
-	})
 
 	log.Printf("[TaskMergePending] Creating maintenance command for task %s", truncateID(taskID))
 

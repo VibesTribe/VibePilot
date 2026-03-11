@@ -51,15 +51,18 @@ func NewTaskHandler(
 func (h *TaskHandler) Register(router *runtime.EventRouter) {
 	router.On(runtime.EventTaskAvailable, h.handleTaskAvailable)
 	router.On(runtime.EventTaskReview, h.handleTaskReview)
-	router.On(runtime.EventTaskCompleted, h.handleTaskCompleted)
 }
+
+// ============================================================================
+// TASK EXECUTION: available → in_progress → review
+// ============================================================================
 
 func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	ctx := context.Background()
 
 	var task map[string]any
 	if err := json.Unmarshal(event.Record, &task); err != nil {
-		log.Printf("[TaskAvailable] Failed to parse event: %v", err)
+		log.Printf("[TaskAvailable] Parse error: %v", err)
 		return
 	}
 
@@ -70,67 +73,24 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	sliceID := getStringOr(task, "slice_id", "default")
 
 	if taskID == "" {
-		log.Printf("[TaskAvailable] Task has no ID, skipping")
 		return
 	}
 
-	processingBy := fmt.Sprintf("task_runner:%d", time.Now().UnixNano())
-	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
-		"p_table":         "tasks",
-		"p_id":            taskID,
-		"p_processing_by": processingBy,
-	})
-	if err != nil || !parseBool(claimed) {
-		log.Printf("[TaskAvailable] Task %s already being processed", truncateID(taskID))
-		return
-	}
-
-	var taskPacket *db.TaskPacket
-	taskPacket, err = h.database.GetTaskPacket(ctx, taskID)
+	// Get task packet
+	taskPacket, err := h.database.GetTaskPacket(ctx, taskID)
 	if err != nil {
 		if result, ok := task["result"].(map[string]any); ok {
 			if prompt, ok := result["prompt_packet"].(string); ok && prompt != "" {
-				taskPacket = &db.TaskPacket{
-					TaskID: taskID,
-					Prompt: prompt,
-				}
+				taskPacket = &db.TaskPacket{TaskID: taskID, Prompt: prompt}
 			}
 		}
-		if taskPacket == nil {
-			log.Printf("[TaskAvailable] Failed to get task packet for %s: %v", truncateID(taskID), err)
-			h.handleTaskError(ctx, taskID, "", "packet_fetch_failed")
+		if taskPacket == nil || taskPacket.Prompt == "" {
+			log.Printf("[TaskAvailable] No packet for %s", truncateID(taskID))
 			return
 		}
 	}
 
-	if taskPacket.Prompt == "" {
-		log.Printf("[TaskAvailable] Task %s has empty prompt", truncateID(taskID))
-		h.handleTaskError(ctx, taskID, "", "empty_prompt")
-		return
-	}
-
-	branchName := h.buildBranchName(taskNumber, taskID)
-
-	attempts := 0
-	if v, ok := task["attempts"].(float64); ok {
-		attempts = int(v)
-	}
-	if attempts > 0 {
-		if clearErr := h.git.DeleteBranch(ctx, branchName); clearErr != nil {
-			log.Printf("[TaskAvailable] Warning: failed to delete old branch %s: %v", branchName, clearErr)
-		}
-	}
-
-	// Task branches are orphans - only contain task output, not from main/module
-	if createErr := h.git.CreateBranch(ctx, branchName); createErr != nil {
-		log.Printf("[TaskAvailable] Warning: branch creation failed for %s: %v", branchName, createErr)
-	}
-
-	_, _ = h.database.RPC(ctx, "update_task_branch", map[string]any{
-		"p_task_id":     taskID,
-		"p_branch_name": branchName,
-	})
-
+	// Route to model
 	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
 		AgentID:  "task_runner",
 		TaskID:   taskID,
@@ -144,8 +104,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		})
 	}
 	if routingResult == nil {
-		log.Printf("[TaskAvailable] No destination for task %s", truncateID(taskID))
-		h.handleTaskError(ctx, taskID, "", "no_destination")
+		log.Printf("[TaskAvailable] No route for %s", truncateID(taskID))
 		return
 	}
 
@@ -154,36 +113,47 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	connConfig := h.cfg.GetConnector(connectorID)
 	routingFlag := h.deriveRoutingFlag(connConfig)
 
-	_, err = h.database.RPC(ctx, "update_task_assignment", map[string]any{
+	// Atomically claim task
+	workerID := fmt.Sprintf("executor:%s:%d", modelID, time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "claim_task", map[string]any{
 		"p_task_id":             taskID,
-		"p_status":              "in_progress",
+		"p_processing_by":       workerID,
 		"p_assigned_to":         modelID,
 		"p_routing_flag":        routingFlag,
 		"p_routing_flag_reason": fmt.Sprintf("Routed via %s", connectorID),
 	})
-	if err != nil {
-		log.Printf("[TaskAvailable] Failed to update assignment for %s: %v", truncateID(taskID), err)
-		h.handleTaskError(ctx, taskID, modelID, "assignment_failed")
+	if err != nil || !parseBool(claimed) {
+		log.Printf("[TaskAvailable] Task %s already claimed", truncateID(taskID))
 		return
 	}
 
-	log.Printf("[TaskAvailable] Task %s assigned to %s via %s (flag=%s)",
-		truncateID(taskID), modelID, connectorID, routingFlag)
+	log.Printf("[TaskAvailable] Task %s claimed by %s", truncateID(taskID), modelID)
+
+	// Setup branch
+	branchName := h.buildBranchName(taskNumber, taskID)
+	attempts := 0
+	if v, ok := task["attempts"].(float64); ok {
+		attempts = int(v)
+	}
+	if attempts > 0 {
+		h.git.DeleteBranch(ctx, branchName)
+	}
+	h.git.CreateBranch(ctx, branchName)
+	h.database.RPC(ctx, "update_task_branch", map[string]any{
+		"p_task_id":     taskID,
+		"p_branch_name": branchName,
+	})
 
 	h.saveCheckpoint(ctx, taskID, "execution_start", 0, "", nil)
-
 	runStart := time.Now()
 
+	// Execute
 	err = h.pool.SubmitWithDestination(ctx, sliceID, connectorID, func() error {
 		return h.executeTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, runStart)
 	})
 	if err != nil {
-		log.Printf("[TaskAvailable] Failed to submit task %s: %v", truncateID(taskID), err)
-		_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
-			"p_table": "tasks",
-			"p_id":    taskID,
-		})
-		h.handleTaskError(ctx, taskID, modelID, "pool_submit_failed")
+		log.Printf("[TaskAvailable] Pool error for %s: %v", truncateID(taskID), err)
+		h.failTask(ctx, taskID, modelID, branchName, "pool_submit_failed")
 	}
 }
 
@@ -194,14 +164,6 @@ func (h *TaskHandler) executeTask(
 	taskID, taskNumber, modelID, connectorID, branchName, taskCategory string,
 	runStart time.Time,
 ) error {
-	taskType := getString(task, "type")
-
-	defer func() {
-		_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
-			"p_table": "tasks",
-			"p_id":    taskID,
-		})
-	}()
 
 	var contextData map[string]any
 	if len(taskPacket.Context) > 0 {
@@ -210,7 +172,7 @@ func (h *TaskHandler) executeTask(
 
 	session, err := h.factory.CreateWithConnector(ctx, "task_runner", taskCategory, connectorID)
 	if err != nil {
-		h.handleTaskError(ctx, taskID, modelID, "session_create_failed")
+		h.failTask(ctx, taskID, modelID, branchName, "session_create_failed")
 		return err
 	}
 
@@ -218,7 +180,7 @@ func (h *TaskHandler) executeTask(
 		"task_id":         taskID,
 		"task_number":     taskNumber,
 		"title":           getString(task, "title"),
-		"type":            taskType,
+		"type":            getString(task, "type"),
 		"category":        taskCategory,
 		"prompt_packet":   taskPacket.Prompt,
 		"expected_output": taskPacket.ExpectedOutput,
@@ -227,14 +189,14 @@ func (h *TaskHandler) executeTask(
 		"event":           "task_available",
 	})
 	if err != nil {
-		log.Printf("[TaskAvailable] Execution failed for %s: %v", truncateID(taskID), err)
-		h.handleTaskError(ctx, taskID, modelID, "execution_error")
+		h.failTask(ctx, taskID, modelID, branchName, "execution_error")
 		return err
 	}
 
+	// Security scan
 	cleanOutput, leaks := h.leakDetector.Scan(result.Output)
 	if len(leaks) > 0 {
-		log.Printf("[TaskAvailable] SECURITY: %d leak(s) redacted in %s", len(leaks), truncateID(taskID))
+		log.Printf("[TaskAvailable] %d leaks redacted in %s", len(leaks), truncateID(taskID))
 	}
 
 	duration := time.Since(runStart)
@@ -242,35 +204,28 @@ func (h *TaskHandler) executeTask(
 	tokensOut := result.TokensOut
 	totalTokens := tokensIn + tokensOut
 
+	// Parse output
 	taskOutput, parseErr := runtime.ParseTaskRunnerOutput(result.Output)
 	var files []runtime.File
-	var summary, status string
+	var summary string
 	if parseErr != nil {
-		log.Printf("[TaskAvailable] Failed to parse output for %s: %v", truncateID(taskID), parseErr)
 		summary = cleanOutput
-		status = "success"
 	} else {
 		files = taskOutput.Files
 		summary = taskOutput.Summary
-		status = taskOutput.Status
-		if status == "" || status == "complete" || status == "completed" {
-			status = "success"
-		}
 	}
 
-	commitErr := h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds())
-	if commitErr != nil {
-		log.Printf("[TaskAvailable] Commit failed for %s: %v", branchName, commitErr)
-	}
+	// Commit output to branch
+	h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds())
 
+	// Record task run
 	costs := h.calculateCosts(ctx, modelID, tokensIn, tokensOut)
-
-	_, err = h.database.RPC(ctx, "create_task_run", map[string]any{
+	h.database.RPC(ctx, "create_task_run", map[string]any{
 		"p_task_id":                       taskID,
 		"p_model_id":                      modelID,
 		"p_courier":                       connectorID,
 		"p_platform":                      h.deriveRoutingFlag(h.cfg.GetConnector(connectorID)),
-		"p_status":                        status,
+		"p_status":                        "success",
 		"p_tokens_in":                     tokensIn,
 		"p_tokens_out":                    tokensOut,
 		"p_tokens_used":                   totalTokens,
@@ -283,43 +238,23 @@ func (h *TaskHandler) executeTask(
 		"p_started_at":                    runStart,
 		"p_completed_at":                  time.Now(),
 	})
-	if err != nil {
-		log.Printf("[TaskAvailable] Warning: task_run creation failed for %s: %v", truncateID(taskID), err)
-	} else {
-		log.Printf("[TaskAvailable] task_run created for %s: tokens=%d, savings=$%.4f",
-			truncateID(taskID), totalTokens, costs.Savings)
-	}
 
-	if status == "success" && commitErr == nil {
-		// Clear lock BEFORE status update
-		_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
-			"p_table": "tasks",
-			"p_id":    taskID,
-		})
-		_, err = h.database.RPC(ctx, "update_task_status", map[string]any{
-			"p_task_id": taskID,
-			"p_status":  "review",
-		})
-		h.recordSuccess(ctx, taskID, modelID, taskCategory, duration.Seconds(), totalTokens)
-		log.Printf("[TaskAvailable] Task %s complete, status=review", truncateID(taskID))
-	} else {
-		// Clear lock BEFORE status update
-		_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
-			"p_table": "tasks",
-			"p_id":    taskID,
-		})
-		_, err = h.database.RPC(ctx, "update_task_status", map[string]any{
-			"p_task_id": taskID,
-			"p_status":  "available",
-		})
-		h.recordFailure(ctx, modelID, taskID, "commit_or_parse_failed")
-		log.Printf("[TaskAvailable] Task %s failed, retrying", truncateID(taskID))
-	}
+	// Atomically transition to review
+	h.database.RPC(ctx, "transition_task", map[string]any{
+		"p_task_id":    taskID,
+		"p_new_status": "review",
+	})
 
+	h.recordSuccess(ctx, taskID, modelID, taskCategory, duration.Seconds(), totalTokens)
 	h.deleteCheckpoint(ctx, taskID)
 
+	log.Printf("[TaskAvailable] Task %s → review", truncateID(taskID))
 	return nil
 }
+
+// ============================================================================
+// SUPERVISOR REVIEW: review → testing (approved) OR available (fail)
+// ============================================================================
 
 func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 	ctx := context.Background()
@@ -341,36 +276,37 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 	branchName := h.buildBranchName(taskNumber, taskID)
 
-	processingBy := fmt.Sprintf("supervisor_review:%d", time.Now().UnixNano())
-	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
-		"p_table":         "tasks",
-		"p_id":            taskID,
-		"p_processing_by": processingBy,
+	// Claim for review
+	reviewerID := fmt.Sprintf("supervisor:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "claim_for_review", map[string]any{
+		"p_task_id":     taskID,
+		"p_reviewer_id": reviewerID,
 	})
 	if err != nil || !parseBool(claimed) {
-		log.Printf("[TaskReview] Task %s already being processed", truncateID(taskID))
+		log.Printf("[TaskReview] Task %s already being reviewed", truncateID(taskID))
 		return
 	}
 
-	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
+	// Route to supervisor
+	routingResult, _ := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
 		AgentID:  "supervisor",
 		TaskID:   taskID,
 		TaskType: taskType,
 	})
-	if err != nil || routingResult == nil {
-		log.Printf("[TaskReview] No destination for task %s", truncateID(taskID))
+	if routingResult == nil {
+		log.Printf("[TaskReview] No supervisor for %s", truncateID(taskID))
 		return
 	}
 
 	session, err := h.factory.CreateWithContext(ctx, "supervisor", taskType)
 	if err != nil {
-		log.Printf("[TaskReview] Failed to create session for %s: %v", truncateID(taskID), err)
+		log.Printf("[TaskReview] Session error for %s: %v", truncateID(taskID), err)
 		return
 	}
 
 	err = h.pool.SubmitWithDestination(ctx, sliceID, routingResult.DestinationID, func() error {
+		// Get context for review
 		taskPacket, _ := h.database.GetTaskPacket(ctx, taskID)
-
 		taskRunData, _ := h.database.REST(ctx, "GET", fmt.Sprintf("task_runs?task_id=eq.%s&order=created_at.desc&limit=1", taskID), nil)
 		var taskRuns []map[string]any
 		var latestRun map[string]any
@@ -378,424 +314,74 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			latestRun = taskRuns[0]
 		}
 
-		reviewInput := map[string]any{
+		result, err := session.Run(ctx, map[string]any{
 			"task":        task,
 			"event":       "task_review",
 			"task_packet": taskPacket,
 			"task_run":    latestRun,
-		}
-
-		result, err := session.Run(ctx, reviewInput)
+		})
 		if err != nil {
 			log.Printf("[TaskReview] Session failed for %s: %v", truncateID(taskID), err)
-			h.database.RPC(ctx, "clear_processing", map[string]any{
-				"p_table": "tasks",
-				"p_id":    taskID,
-			})
 			return err
 		}
 
 		decision, parseErr := runtime.ParseSupervisorDecision(result.Output)
 		if parseErr != nil {
-			log.Printf("[TaskReview] Failed to parse decision for %s: %v", truncateID(taskID), parseErr)
-			h.database.RPC(ctx, "clear_processing", map[string]any{
-				"p_table": "tasks",
-				"p_id":    taskID,
-			})
+			log.Printf("[TaskReview] Parse error for %s: %v", truncateID(taskID), parseErr)
 			return nil
 		}
 
-		log.Printf("[TaskReview] Task %s decision: %s, next: %s",
-			truncateID(taskID), decision.Decision, decision.NextAction)
-
-		h.database.RPC(ctx, "clear_processing", map[string]any{
-			"p_table": "tasks",
-			"p_id":    taskID,
-		})
+		log.Printf("[TaskReview] Task %s decision: %s", truncateID(taskID), decision.Decision)
 
 		switch decision.Decision {
-		case "pass":
-			_, err = h.database.RPC(ctx, "update_task_status", map[string]any{
-				"p_task_id": taskID,
-				"p_status":  "testing",
+		case "approved":
+			// Approved → testing
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "testing",
 			})
-			if err != nil {
-				log.Printf("[TaskReview] Failed to update status: %v", err)
-			}
+			log.Printf("[TaskReview] Task %s → testing", truncateID(taskID))
 
 		case "fail":
+			// Failed → back to available with notes
 			failureReason := "supervisor_reject"
 			if len(decision.Issues) > 0 {
 				failureReason = decision.Issues[0].Description
-
-				// Create learning rule from rejection
-				_, _ = h.database.RPC(ctx, "create_supervisor_rule", map[string]any{
-					"p_trigger_pattern":   "task_review",
-					"p_action":            "flag_for_revision",
-					"p_reason":            failureReason,
-					"p_source":            "supervisor_rejection",
-					"p_trigger_condition": map[string]any{"task_type": taskType},
-					"p_source_task_id":    taskID,
-				})
-				log.Printf("[TaskReview] Created supervisor rule for task %s", truncateID(taskID))
 			}
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
-			h.recordFailure(ctx, modelID, taskID, "supervisor_reject")
-			h.recordFailureNotes(ctx, taskID, failureReason)
+			h.recordFailure(ctx, modelID, taskID, "supervisor_fail")
 			h.git.DeleteBranch(ctx, branchName)
-
-			_, err = h.database.RPC(ctx, "update_task_status", map[string]any{
-				"p_task_id": taskID,
-				"p_status":  "available",
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":        taskID,
+				"p_new_status":     "available",
+				"p_failure_reason": failureReason,
 			})
-
-		case "reroute":
-			h.recordFailureNotes(ctx, taskID, "reroute_requested")
-			h.git.DeleteBranch(ctx, branchName)
-			_, err = h.database.RPC(ctx, "update_task_status", map[string]any{
-				"p_task_id": taskID,
-				"p_status":  "available",
-			})
-		}
-
-		return nil
-	})
-	if err != nil {
-		log.Printf("[TaskReview] Failed to submit: %v", err)
-	}
-}
-
-func (h *TaskHandler) handleTaskCompleted(event runtime.Event) {
-	ctx := context.Background()
-
-	var task map[string]any
-	if err := json.Unmarshal(event.Record, &task); err != nil {
-		return
-	}
-
-	taskID := getString(task, "id")
-	taskType := getString(task, "type")
-	taskNumber := getString(task, "task_number")
-	modelID := getString(task, "assigned_to")
-	sliceID := getStringOr(task, "slice_id", "complete")
-
-	if taskID == "" {
-		return
-	}
-
-	processingBy := fmt.Sprintf("supervisor_completed:%d", time.Now().UnixNano())
-	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
-		"p_table":         "tasks",
-		"p_id":            taskID,
-		"p_processing_by": processingBy,
-	})
-	if err != nil || !parseBool(claimed) {
-		log.Printf("[TaskCompleted] Task %s already being processed", truncateID(taskID))
-		return
-	}
-
-	branchName := h.buildBranchName(taskNumber, taskID)
-
-	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-		AgentID:  "supervisor",
-		TaskID:   taskID,
-		TaskType: taskType,
-	})
-	if err != nil || routingResult == nil {
-		log.Printf("[TaskCompleted] No destination for task %s", truncateID(taskID))
-		h.recordFailure(ctx, modelID, taskID, "no_destination")
-		return
-	}
-
-	session, err := h.factory.CreateWithContext(ctx, "supervisor", taskType)
-	if err != nil {
-		log.Printf("[TaskCompleted] Failed to create session for %s: %v", truncateID(taskID), err)
-		h.recordFailure(ctx, modelID, taskID, "session_create_failed")
-		return
-	}
-
-	err = h.pool.SubmitWithDestination(ctx, sliceID, routingResult.DestinationID, func() error {
-		defer func() {
-			_, _ = h.database.RPC(ctx, "clear_processing", map[string]any{
-				"p_table": "tasks",
-				"p_id":    taskID,
-			})
-		}()
-		start := time.Now()
-		result, sessionErr := session.Run(ctx, map[string]any{
-			"task":  task,
-			"event": "task_completed",
-		})
-		duration := time.Since(start).Seconds()
-
-		if sessionErr != nil {
-			log.Printf("[TaskCompleted] Session failed for %s: %v", truncateID(taskID), sessionErr)
-			h.recordFailure(ctx, modelID, taskID, "session_error")
-			return sessionErr
-		}
-
-		decision, parseErr := runtime.ParseSupervisorDecision(result.Output)
-		if parseErr != nil {
-			log.Printf("[TaskCompleted] Failed to parse decision for %s: %v", truncateID(taskID), parseErr)
-			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-				"p_task_id": taskID,
-				"p_status":  "available",
-			})
-			h.recordFailure(ctx, modelID, taskID, "parse_failed")
-			return nil
-		}
-
-		log.Printf("[TaskCompleted] Task %s decision: %s, next: %s",
-			truncateID(taskID), decision.Decision, decision.NextAction)
-
-		output := map[string]any{
-			"output":     result.Output,
-			"model_id":   modelID,
-			"task_id":    taskID,
-			"duration":   duration,
-			"tokens_in":  result.TokensIn,
-			"tokens_out": result.TokensOut,
-			"decision":   decision.Decision,
-		}
-
-		if err := h.git.CommitOutput(ctx, branchName, output); err != nil {
-			log.Printf("[TaskCompleted] Commit failed for %s: %v", branchName, err)
-		}
-
-		switch decision.Decision {
-		case "pass":
-			if decision.NextAction == "final_merge" {
-				targetBranch := h.getTargetBranch(sliceID)
-				if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
-					log.Printf("[TaskCompleted] Merge failed for %s: %v - will retry", branchName, err)
-					_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-						"p_task_id": taskID,
-						"p_status":  "merge_pending",
-					})
-					h.recordFailure(ctx, modelID, taskID, "merge_failed")
-				} else {
-					log.Printf("[TaskCompleted] Merged %s to %s", branchName, targetBranch)
-					_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-						"p_task_id": taskID,
-						"p_status":  "merged",
-					})
-					h.git.DeleteBranch(ctx, branchName)
-				}
-			} else {
-				_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-					"p_task_id": taskID,
-					"p_status":  "approval",
-				})
-			}
-			h.recordSuccess(ctx, taskID, modelID, taskType, duration, result.TokensIn+result.TokensOut)
-
-		case "fail":
-			failureReason := decision.NextAction
-			if len(decision.Issues) > 0 {
-				failureReason = decision.Issues[0].Description
-
-				// Create learning rule from rejection
-				_, _ = h.database.RPC(ctx, "create_supervisor_rule", map[string]any{
-					"p_trigger_pattern":   "task_completion_review",
-					"p_action":            "flag_for_revision",
-					"p_reason":            failureReason,
-					"p_source":            "supervisor_rejection",
-					"p_trigger_condition": map[string]any{"task_type": taskType},
-					"p_source_task_id":    taskID,
-				})
-				log.Printf("[TaskCompleted] Created supervisor rule for task %s", truncateID(taskID))
-			}
-			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
-			h.recordFailure(ctx, modelID, taskID, decision.NextAction)
-			h.recordFailureNotes(ctx, taskID, failureReason)
-			h.git.DeleteBranch(ctx, branchName)
-
-			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-				"p_task_id": taskID,
-				"p_status":  "available",
-			})
+			log.Printf("[TaskReview] Task %s failed: %s → available", truncateID(taskID), failureReason)
 
 		default:
-			log.Printf("[TaskCompleted] Unknown decision '%s' for %s, retrying", decision.Decision, truncateID(taskID))
-			h.recordFailureNotes(ctx, taskID, fmt.Sprintf("unknown_decision: %s", decision.Decision))
-			h.git.DeleteBranch(ctx, branchName)
-			_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-				"p_task_id": taskID,
-				"p_status":  "available",
-			})
+			log.Printf("[TaskReview] Unknown decision '%s' for %s", decision.Decision, truncateID(taskID))
 		}
 
 		return nil
 	})
 	if err != nil {
-		log.Printf("[TaskCompleted] Failed to submit: %v", err)
+		log.Printf("[TaskReview] Submit error: %v", err)
 	}
 }
 
-func (h *TaskHandler) handleTaskError(ctx context.Context, taskID, modelID, failureType string) {
-	if modelID != "" {
-		h.recordFailure(ctx, modelID, taskID, failureType)
-	}
-	h.recordFailureNotes(ctx, taskID, failureType)
+// ============================================================================
+// HELPERS
+// ============================================================================
 
-	// Update attempts directly (no RPC needed)
-	_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
-		"p_task_id": taskID,
-		"p_status":  "available",
+func (h *TaskHandler) failTask(ctx context.Context, taskID, modelID, branchName, reason string) {
+	h.recordFailure(ctx, modelID, taskID, reason)
+	h.git.DeleteBranch(ctx, branchName)
+	h.database.RPC(ctx, "transition_task", map[string]any{
+		"p_task_id":        taskID,
+		"p_new_status":     "available",
+		"p_failure_reason": reason,
 	})
-}
-
-func (h *TaskHandler) recordSuccess(ctx context.Context, taskID, modelID, taskType string, durationSeconds float64, tokensUsed int) {
-	if modelID == "" {
-		return
-	}
-	_, err := h.database.RPC(ctx, "record_model_success", map[string]any{
-		"p_model_id":         modelID,
-		"p_task_type":        taskType,
-		"p_duration_seconds": durationSeconds,
-		"p_tokens_used":      tokensUsed,
-	})
-	if err != nil {
-		log.Printf("[Learning] Failed to record success: %v", err)
-	}
-
-	if taskID != "" {
-		solutionID, _ := h.database.RPC(ctx, "record_solution_on_success", map[string]any{
-			"p_task_id":   taskID,
-			"p_model_id":  modelID,
-			"p_task_type": taskType,
-		})
-		if solutionID != nil {
-			log.Printf("[Learning] Recorded solution for task %s (failure -> success pattern)", truncateID(taskID))
-		}
-	}
-
-	if taskType != "" {
-		_, _ = h.database.RPC(ctx, "upsert_heuristic", map[string]any{
-			"p_task_type":       taskType,
-			"p_condition":       map[string]any{},
-			"p_preferred_model": modelID,
-			"p_action":          map[string]any{"prefer": modelID},
-			"p_confidence":      0.8,
-			"p_source":          "task_success",
-		})
-		log.Printf("[Learning] Recorded heuristic: task_type=%s -> model=%s", taskType, modelID)
-	}
-}
-
-func (h *TaskHandler) recordFailure(ctx context.Context, modelID, taskID, failureType string) {
-	if modelID == "" {
-		return
-	}
-	_, err := h.database.RPC(ctx, "record_model_failure", map[string]any{
-		"p_model_id":         modelID,
-		"p_task_id":          taskID,
-		"p_failure_type":     failureType,
-		"p_failure_category": runtime.CategorizeFailure(failureType),
-	})
-	if err != nil {
-		log.Printf("[Learning] Failed to record failure: %v", err)
-	}
-}
-
-func (h *TaskHandler) recordIssues(ctx context.Context, taskID, modelID, taskType string, issues []runtime.Issue) {
-	for _, issue := range issues {
-		_, _ = h.database.RPC(ctx, "record_failure", map[string]any{
-			"p_task_id":          taskID,
-			"p_failure_type":     issue.Type,
-			"p_failure_category": runtime.CategorizeFailure(issue.Type),
-			"p_failure_details": map[string]any{
-				"description": issue.Description,
-				"severity":    issue.Severity,
-			},
-			"p_model_id":  modelID,
-			"p_task_type": taskType,
-		})
-	}
-}
-
-type costResult struct {
-	Theoretical float64
-	Actual      float64
-	Savings     float64
-}
-
-func (h *TaskHandler) calculateCosts(ctx context.Context, modelID string, tokensIn, tokensOut int) costResult {
-	result, err := h.database.RPC(ctx, "calculate_run_costs", map[string]any{
-		"p_model_id":         modelID,
-		"p_tokens_in":        tokensIn,
-		"p_tokens_out":       tokensOut,
-		"p_courier_cost_usd": 0,
-	})
-	if err != nil {
-		return costResult{}
-	}
-
-	var costs struct {
-		TheoreticalCostUsd float64 `json:"theoretical_cost_usd"`
-		ActualCostUsd      float64 `json:"actual_cost_usd"`
-		SavingsUsd         float64 `json:"savings_usd"`
-	}
-	if result != nil {
-		json.Unmarshal(result, &costs)
-	}
-
-	return costResult{
-		Theoretical: costs.TheoreticalCostUsd,
-		Actual:      costs.ActualCostUsd,
-		Savings:     costs.SavingsUsd,
-	}
-}
-
-func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files []runtime.File, rawOutput, summary, modelID, taskID string, duration float64) error {
-	outputMap := map[string]any{
-		"raw_output": rawOutput,
-		"model_id":   modelID,
-		"task_id":    taskID,
-		"duration":   duration,
-		"summary":    summary,
-	}
-
-	if len(files) > 0 {
-		fileMaps := make([]any, len(files))
-		for i, f := range files {
-			fileMaps[i] = map[string]any{
-				"path":    f.Path,
-				"content": f.Content,
-			}
-		}
-		outputMap["files"] = fileMaps
-	}
-
-	return h.git.CommitOutput(ctx, branchName, outputMap)
-}
-
-func (h *TaskHandler) saveCheckpoint(ctx context.Context, taskID, step string, progress int, output string, files []string) {
-	if !h.cfg.GetCoreConfig().IsCheckpointEnabled() {
-		return
-	}
-	_, err := h.database.RPC(ctx, "save_checkpoint", map[string]any{
-		"p_task_id":  taskID,
-		"p_step":     step,
-		"p_progress": progress,
-		"p_output":   output,
-		"p_files":    files,
-	})
-	if err != nil {
-		log.Printf("[Checkpoint] Warning: save failed for %s: %v", truncateID(taskID), err)
-	}
-}
-
-func (h *TaskHandler) deleteCheckpoint(ctx context.Context, taskID string) {
-	if !h.cfg.GetCoreConfig().IsCheckpointEnabled() {
-		return
-	}
-	_, err := h.database.RPC(ctx, "delete_checkpoint", map[string]any{
-		"p_task_id": taskID,
-	})
-	if err != nil {
-		log.Printf("[Checkpoint] Warning: delete failed for %s: %v", truncateID(taskID), err)
-	}
+	log.Printf("[TaskHandler] Task %s failed: %s → available", truncateID(taskID), reason)
 }
 
 func (h *TaskHandler) buildBranchName(taskNumber, taskID string) string {
@@ -809,48 +395,18 @@ func (h *TaskHandler) buildBranchName(taskNumber, taskID string) string {
 	return prefix + truncateID(taskID)
 }
 
-func (h *TaskHandler) getSourceBranch(sliceID string) string {
-	if sliceID != "" && sliceID != "default" {
-		moduleBranch := "module/" + sliceID
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", moduleBranch)
-		cmd.Dir = h.cfg.GetRepoPath()
-		output, err := cmd.Output()
-		if err == nil && len(output) > 0 {
-			return moduleBranch
-		}
-	}
-	return h.cfg.GetDefaultMergeTarget()
-}
-
 func (h *TaskHandler) getTargetBranch(sliceID string) string {
-	if sliceID != "" && sliceID != "default" && sliceID != "review" && sliceID != "complete" {
+	if sliceID != "" && sliceID != "default" && sliceID != "review" && sliceID != "testing" {
 		moduleBranch := "module/" + sliceID
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-
 		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", moduleBranch)
 		cmd.Dir = h.cfg.GetRepoPath()
-		output, err := cmd.Output()
-		if err == nil && len(output) > 0 {
+		if output, err := cmd.Output(); err == nil && len(output) > 0 {
 			return moduleBranch
 		}
 	}
 	return h.cfg.GetDefaultMergeTarget()
-}
-
-func (h *TaskHandler) recordFailureNotes(ctx context.Context, taskID, reason string) {
-	if reason == "" {
-		return
-	}
-
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	_, _ = h.database.RPC(ctx, "append_failure_notes", map[string]any{
-		"p_task_id": taskID,
-		"p_notes":   fmt.Sprintf("%s (%s)", reason, timestamp),
-	})
 }
 
 func (h *TaskHandler) deriveRoutingFlag(conn *runtime.ConnectorConfig) string {
@@ -858,8 +414,6 @@ func (h *TaskHandler) deriveRoutingFlag(conn *runtime.ConnectorConfig) string {
 		return "internal"
 	}
 	switch conn.Type {
-	case "cli", "api":
-		return "internal"
 	case "mcp":
 		return "mcp"
 	case "web":
@@ -869,31 +423,95 @@ func (h *TaskHandler) deriveRoutingFlag(conn *runtime.ConnectorConfig) string {
 	}
 }
 
-func getString(m map[string]any, key string) string {
-	if v, ok := m[key]; ok {
-		if s, ok := v.(string); ok {
-			return s
+func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files []runtime.File, rawOutput, summary, modelID, taskID string, duration float64) error {
+	outputMap := map[string]any{
+		"raw_output": rawOutput,
+		"model_id":   modelID,
+		"task_id":    taskID,
+		"duration":   duration,
+		"summary":    summary,
+	}
+	if len(files) > 0 {
+		fileMaps := make([]any, len(files))
+		for i, f := range files {
+			fileMaps[i] = map[string]any{"path": f.Path, "content": f.Content}
 		}
+		outputMap["files"] = fileMaps
 	}
-	return ""
+	return h.git.CommitOutput(ctx, branchName, outputMap)
 }
 
-func getStringOr(m map[string]any, key, def string) string {
-	if v := getString(m, key); v != "" {
-		return v
+func (h *TaskHandler) recordSuccess(ctx context.Context, taskID, modelID, taskType string, durationSeconds float64, tokensUsed int) {
+	if modelID == "" {
+		return
 	}
-	return def
+	h.database.RPC(ctx, "record_model_success", map[string]any{
+		"p_model_id":         modelID,
+		"p_task_type":        taskType,
+		"p_duration_seconds": durationSeconds,
+		"p_tokens_used":      tokensUsed,
+	})
 }
 
-func parseBool(data []byte) bool {
-	if data == nil {
-		return false
+func (h *TaskHandler) recordFailure(ctx context.Context, modelID, taskID, failureType string) {
+	if modelID == "" {
+		return
 	}
-	var b bool
-	if err := json.Unmarshal(data, &b); err != nil {
-		return false
+	h.database.RPC(ctx, "record_model_failure", map[string]any{
+		"p_model_id":         modelID,
+		"p_task_id":          taskID,
+		"p_failure_type":     failureType,
+		"p_failure_category": runtime.CategorizeFailure(failureType),
+	})
+}
+
+func (h *TaskHandler) recordIssues(ctx context.Context, taskID, modelID, taskType string, issues []runtime.Issue) {
+	for _, issue := range issues {
+		h.database.RPC(ctx, "record_failure", map[string]any{
+			"p_task_id":          taskID,
+			"p_failure_type":     issue.Type,
+			"p_failure_category": runtime.CategorizeFailure(issue.Type),
+			"p_failure_details":  map[string]any{"description": issue.Description, "severity": issue.Severity},
+			"p_model_id":         modelID,
+			"p_task_type":        taskType,
+		})
 	}
-	return b
+}
+
+func (h *TaskHandler) saveCheckpoint(ctx context.Context, taskID, step string, progress int, output string, files []string) {
+	if !h.cfg.GetCoreConfig().IsCheckpointEnabled() {
+		return
+	}
+	h.database.RPC(ctx, "save_checkpoint", map[string]any{
+		"p_task_id": taskID, "p_step": step, "p_progress": progress, "p_output": output, "p_files": files,
+	})
+}
+
+func (h *TaskHandler) deleteCheckpoint(ctx context.Context, taskID string) {
+	if !h.cfg.GetCoreConfig().IsCheckpointEnabled() {
+		return
+	}
+	h.database.RPC(ctx, "delete_checkpoint", map[string]any{"p_task_id": taskID})
+}
+
+type costResult struct{ Theoretical, Actual, Savings float64 }
+
+func (h *TaskHandler) calculateCosts(ctx context.Context, modelID string, tokensIn, tokensOut int) costResult {
+	result, err := h.database.RPC(ctx, "calculate_run_costs", map[string]any{
+		"p_model_id": modelID, "p_tokens_in": tokensIn, "p_tokens_out": tokensOut, "p_courier_cost_usd": 0,
+	})
+	if err != nil {
+		return costResult{}
+	}
+	var costs struct {
+		TheoreticalCostUsd float64 `json:"theoretical_cost_usd"`
+		ActualCostUsd      float64 `json:"actual_cost_usd"`
+		SavingsUsd         float64 `json:"savings_usd"`
+	}
+	if result != nil {
+		json.Unmarshal(result, &costs)
+	}
+	return costResult{Theoretical: costs.TheoreticalCostUsd, Actual: costs.ActualCostUsd, Savings: costs.SavingsUsd}
 }
 
 func setupTaskHandlers(

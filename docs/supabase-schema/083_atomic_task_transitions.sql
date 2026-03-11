@@ -16,7 +16,7 @@ DECLARE
   v_updated INT;
 BEGIN
   -- Validate status
-  IF p_new_status NOT IN ('review', 'testing', 'approval', 'merged', 'available', 'escalated') THEN
+  IF p_new_status NOT IN ('review', 'testing', 'approval', 'merged', 'available', 'escalated', 'awaiting_human') THEN
     RAISE EXCEPTION 'Invalid status for task transition: %', p_new_status;
     RETURN FALSE;
   END IF;
