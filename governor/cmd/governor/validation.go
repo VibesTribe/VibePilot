@@ -181,10 +181,11 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 			"routing_flag":        routingFlag,
 			"routing_flag_reason": routingReason,
 			"dependencies":        task.Dependencies,
-			"prompt_packet":       task.PromptPacket,
-			"expected_output":     task.ExpectedOutput,
-			"context":             map[string]any{"source": "plan_approval"},
-			"max_attempts":        maxAttempts,
+			"result": map[string]any{
+				"prompt_packet":   task.PromptPacket,
+				"expected_output": task.ExpectedOutput,
+			},
+			"max_attempts": maxAttempts,
 		}
 
 		result, err := database.Insert(ctx, "tasks", taskData)
