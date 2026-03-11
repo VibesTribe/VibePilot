@@ -1,7 +1,7 @@
 # PLAN: Test Hello World
 
 ## Overview
-Create a simple Go file that prints "Hello from VibePilot!" to verify the task flow works correctly.
+Create a simple Go file to verify the task flow works correctly after Session 80 fixes.
 
 ## Tasks
 
@@ -11,23 +11,20 @@ Create a simple Go file that prints "Hello from VibePilot!" to verify the task f
 **Dependencies:** none
 
 #### Prompt Packet
-```
+```markdown
 # TASK: T001 - Create Hello World Go File
 
 ## Context
-Simple test to verify the task flow works correctly after Session 80 fixes.
+This task verifies the VibePilot task execution flow works correctly after Session 80 fixes. A simple, self-contained Go file is needed.
 
 ## What to Build
-Create a simple Go file at `governor/cmd/tools/hello.go` that prints "Hello from VibePilot!" to stdout when run.
-
-The file should:
-1. Be in package `main`
-2. Have a `main()` function
-3. Use `fmt.Println()` to print the greeting
-4. Compile and run successfully with `go run governor/cmd/tools/hello.go`
+Create a Go file at `governor/cmd/tools/hello.go` that:
+- Has a `main` function
+- Prints "Hello from VibePilot!" to stdout
+- Compiles and runs successfully
 
 ## Files
-- `governor/cmd/tools/hello.go` - The Go source file to create
+- `governor/cmd/tools/hello.go` - The hello world program
 ```
 
 #### Expected Output
