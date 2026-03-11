@@ -1,74 +1,164 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-11 Session 79 (17:02 UTC)
-**Status:** BROKEN - Fundamental issues remain
+**Last Updated:** 2026-03-11 Session 80 (19:15 UTC)
+**Status:** READY FOR TESTING - Core fixes complete
 
 ---
 
-## CRITICAL UNRESOLVED ISSUES
+## WHAT WAS FIXED SESSION 80
 
-### 1. Dashboard Shows Nothing
-- Realtime connected but dashboard not updating
-- No modules, tasks, or status changes visible
-- Need to check what dashboard expects vs what we send
+### 1. Atomic Operations (Migration 084)
+**Problem:** Race conditions - `clear_processing` + `update_task_status` fired separate realtime events, causing tasks to be reassigned mid-transition.
 
-### 2. Duplicate Events Should Be Impossible
-- Task in_progress should NEVER have duplicates
-- Multiple kilo processes spawning for same task
-- Root cause unknown
+**Solution:** Created atomic RPCs in `docs/supabase-schema/084_clean_task_flow.sql`:
+- `claim_task()` - Atomically claim for execution (sets status + processing_by + assigned_to)
+- `claim_for_review()` - Claim for supervisor/tester (status unchanged)
+- `transition_task()` - Atomically set status AND clear lock
+- `unlock_dependents()` - Unlock dependent tasks when merged
 
-### 3. Status Value Confusion
-- Tasks: `approval` (after testing) - schema correct
-- Plans: `approved` (after supervisor) - schema correct
-- But dashboard may expect different values
+**Status:** APPLIED
 
-### 4. Reassignment Logic Broken
-- Task should ONLY reassign on supervisor/tester FAIL
-- On reassign: branch must be deleted/cleared
-- Currently: old output stays, multiple attempts pile up
+### 2. Correct Decision Values
+**Problem:** Code checked for `"pass"` but agents output `"approved"`.
+
+**Solution:** Updated all handlers to use `"approved"` and `"fail"`:
+- Supervisor decision: `approved` or `fail`
+- Tester decision: `approved` or `fail`
+
+**Files:** `handlers_task.go`, `handlers_testing.go`
+
+### 3. TEST_MODULES Folder
+**Problem:** Module branches merged directly to main - dangerous.
+
+**Solution:** Created `TEST_MODULES/` folder:
+- Tasks merge to `TEST_MODULES/<slice_id>` branches
+- Module branches isolated from main
+- Easy cleanup if something goes wrong
+- Only merge to main after full module validation
+
+**Files:** `handlers_task.go`, `handlers_testing.go`, `handlers_maint.go`, `gitree.go`
 
 ---
 
 ## CORRECT FLOW
 
-**Task statuses:**
-`pending → available → in_progress → review → testing → approval → merged`
+```
+available → in_progress → review → testing → merged
+                              ↓         ↓
+                           (fail)    (fail)
+                              ↓         ↓
+                          available ←──┘
+```
 
-**Only reassign on:**
-- Supervisor: "fail" (with reason)
-- Tester: "fail" (with reason)
+**Task only goes to `available` on:**
+- Supervisor: `fail` (with reason in failure_notes)
+- Tester: `fail` (with reason in failure_notes)
 
-**On reassign:**
+**On fail:**
 - Delete task branch
-- Fresh branch on next attempt
+- Record failure_notes
+- System learns from pattern
+
+**On approved:**
+- Merge task → TEST_MODULES/<slice_id>
+- Delete task branch
+- Status = `merged`
 
 ---
 
-## FIXES COMMITTED SESSION 79
+## STATUS VALUES
 
-| Fix | File |
-|-----|------|
-| Realtime reconnect loop | `realtime/client.go` |
-| Task status "approval" | `handlers_testing.go` |
-| Orphan branch clean | `gitree.go` |
-| Force push branches | `gitree.go` |
-| Force checkout | `gitree.go` |
-| Remove missing RPC | `handlers_task.go` |
-| Revert to full prompts | `agents.json` |
+**Tasks:** `pending, available, in_progress, review, testing, approval, merged, escalated, blocked, awaiting_human`
+
+**Dashboard mapping** (from `vibepilotAdapter.ts`):
+- `pending/available/failed/escalated` → "pending"
+- `in_progress/review/testing` → "in_progress"
+- `approval` → "supervisor_approval" (both approved, ready to merge)
+- `merged/complete` → "complete"
+- `awaiting_human` → for UI/UX tasks
+
+---
+
+## HUMAN REVIEW
+
+**Only 3 cases:**
+1. Visual UI/UX task → `awaiting_human`
+2. System researcher suggestion → after council
+3. Paid API out of credit → human wallet needed
+
+**Human NEVER reviews code.**
+
+---
+
+## BRANCH STRUCTURE
+
+```
+task/T001              → Individual task output
+TEST_MODULES/auth      → All auth tasks merge here
+TEST_MODULES/ui        → All ui tasks merge here
+TEST_MODULES/general   → Default for unsorted tasks
+main                   → Only after full module validation
+```
+
+---
+
+## CLEANUP SQL
+
+Run in Supabase SQL Editor before testing:
+
+```sql
+DELETE FROM task_runs;
+DELETE FROM task_packets;
+DELETE FROM tasks;
+DELETE FROM plans;
+UPDATE maintenance_commands SET processing_by = NULL, processing_at = NULL WHERE processing_by IS NOT NULL;
+UPDATE research_suggestions SET processing_by = NULL, processing_at = NULL WHERE processing_by IS NOT NULL;
+SELECT 'Cleanup complete' as status;
+```
 
 ---
 
 ## NEXT SESSION
 
-1. **Read dashboard code** - what status values expected
-2. **Fix duplicate events** - why possible?
-3. **Fix dashboard updates** - why not showing?
-4. **Fix reassignment** - only on fail, with branch cleanup
-5. **Stop multiple kilo spawns** for same task
+1. **Run cleanup SQL** in Supabase
+2. **Create test PRD** in `docs/prd/`
+3. **Push to GitHub** to trigger flow
+4. **Watch dashboard** for task progression
+5. **Verify:**
+   - Tasks appear in dashboard
+   - Status transitions correctly
+   - No duplicate assignments
+   - Task merges to TEST_MODULES
+   - Branch cleanup happens
 
 ---
 
-## Status Values (Schema)
+## KEY FILES CHANGED
 
-**Tasks:** `pending, available, in_progress, review, testing, approval, merged, escalated, blocked`
+| File | Change |
+|------|--------|
+| `docs/supabase-schema/084_clean_task_flow.sql` | Atomic RPCs (APPLIED) |
+| `governor/cmd/governor/handlers_task.go` | Atomic ops, approved/fail, TEST_MODULES |
+| `governor/cmd/governor/handlers_testing.go` | Atomic ops, approved/fail, TEST_MODULES |
+| `governor/cmd/governor/handlers_maint.go` | TEST_MODULES target |
+| `governor/cmd/governor/helpers.go` | Shared helpers |
+| `governor/cmd/governor/recovery.go` | Uses transition_task |
+| `governor/internal/gitree/gitree.go` | TEST_MODULES branches |
+| `TEST_MODULES/README.md` | Documentation |
 
-**Plans:** `draft, review, council_review, revision_needed, prd_incomplete, blocked, pending_human, error, approved, active, archived, cancelled`
+---
+
+## VERIFICATION
+
+```bash
+# Check governor running
+sudo systemctl status governor
+
+# Check logs
+journalctl -u governor -n 50
+
+# Check processes
+ps aux | grep -E "kilo|governor" | grep -v grep
+
+# Rebuild if needed
+cd ~/vibepilot/governor && go build -o governor ./cmd/governor && sudo systemctl restart governor
+```
