@@ -73,7 +73,7 @@ Quality gate. Validate plans, review outputs, coordinate testing.
   "action": "task_review",
   "task_id": "<task_id>",
   "task_number": "T001",
-  "decision": "pass" | "fail" | "reroute",
+  "decision": "approved" | "fail" | "reroute",
   "checks": {
     "deliverables_present": true,
     "tests_written": true,
