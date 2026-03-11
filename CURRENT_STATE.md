@@ -1,149 +1,85 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-11 Session 81 (20:50 UTC)
-**Status:** BROKEN - Flow not completing, tasks stuck
+**Last Updated:** 2026-03-11 Session 81 End (21:50 UTC)
+**Status:** BROKEN - Prompts missing from task branches
 
 ---
 
-## SESSION 81 FAILURE - READ THIS FIRST
+## ROOT CAUSE FOUND
 
-**What I did wrong this session:**
-1. Manually called RPCs (`claim_for_review`, `claim_task`) to "test" things - this left stale `processing_by` values
-2. Manually PATCHed tasks in the database - broke the flow
-3. Made band-aid fixes instead of understanding the real problem
-4. Added complexity (duplicate detection "fix") instead of debugging actual failure
-5. Wasted ~200k tokens and entire session without fixing anything
+**The Problem:**
+1. Governor binary runs from current git working directory
+2. When task executes, git operations switch to `task/T001` branch
+3. `task/T001` branch does NOT have `prompts/` directory
+4. Supervisor fails: "supervisor.md: no such file or directory"
+5. Task stuck in `review` forever
 
-**What I should have done:**
-1. Clean database (run the SQL)
-2. Delete all git branches
-3. Rebuild governor binary
-4. Trigger ONE test
-5. Watch logs WITHOUT TOUCHING ANYTHING
-6. Debug from actual failure point
+**Evidence:**
+```
+Mar 11 21:46:45 governor[1853708]: [TaskReview] Session error for 3eacc447: load prompt: read prompt /home/mjlockboxsocial/vibepilot/prompts/supervisor.md: open /home/mjlockboxsocial/vibepilot/prompts/supervisor.md: no such file or directory
+```
 
-**DO NOT DO THESE THINGS:**
-- DO NOT manually call RPCs like `claim_for_review`, `claim_task`
-- DO NOT manually PATCH tasks in the database
-- DO NOT manually set `processing_by` or `processing_at`
-- DO NOT "test" individual parts - test the WHOLE flow
-- DO NOT add more complexity - fix the actual bug
+**Why prompts disappear:**
+- `prompts/` exists on `main` branch
+- When task branch is created/checked out, prompts/ is not included
+- Governor looks for prompts in working directory which is now on task branch
 
 ---
 
-## THE ACTUAL PROBLEM (Unknown)
+## FIX NEEDED
 
-We don't know why tasks get stuck. The Session 80 atomic operations SHOULD work.
-
-**To find the real problem:**
-1. Clean everything
-2. Run ONE test
-3. Watch logs at each step
-4. Find where it ACTUALLY fails
-5. Fix THAT specific issue
+Either:
+1. Prompts should be embedded in governor binary (not read from filesystem)
+2. Or prompts path should be absolute and outside git repo
+3. Or task branches should include prompts directory
 
 ---
 
-## MIGRATIONS APPLIED SESSION 81
+## CURRENT STUCK STATE
 
-| Migration | Purpose |
-|-----------|---------|
-| 086_restore_processing_functions.sql | Restore set_processing/clear_processing |
-| 088_add_missing_task_columns.sql | Add task_number, confidence, category, etc. |
-
----
-
-## GO CODE CHANGED SESSION 81
-
-| File | Change | May or may not be correct |
-|------|--------|---------------------------|
-| `governor/internal/db/rpc.go` | Added RPCs to allowlist | Probably correct |
-| `governor/cmd/governor/handlers_task.go` | Fixed claim_task params | Probably correct |
-| `governor/cmd/governor/validation.go` | Use result.jsonb | Probably correct |
-| `governor/internal/realtime/client.go` | Include processing_by in event key | Band-aid, may not be needed |
+- Task T001: `status=review`, `processing_by=supervisor:...` (stale)
+- Tokens used: Yes (task executed successfully)
+- File created: Yes (`governor/cmd/tools/hello.go` exists)
+- Stuck because: Supervisor can't run without prompt file
 
 ---
 
-## CORRECT FLOW (From Session 80)
+## NEXT SESSION
 
-```
-available → in_progress → review → testing → merged
-                              ↓         ↓
-                           (fail)    (fail)
-                              ↓         ↓
-                           available ←──┘
-```
-
-The atomic RPCs handle this. No manual intervention needed.
+1. Decide on fix approach (embed prompts, absolute path, or include in branches)
+2. Implement fix
+3. Clean everything
+4. Test fresh
 
 ---
 
-## NEXT SESSION - DO THIS EXACTLY
+## TIMELINE FROM CLEAN TEST
 
-### Step 1: Clean Database
-Run in Supabase SQL Editor:
-```sql
-DELETE FROM task_runs;
-DELETE FROM task_packets;
-DELETE FROM tasks;
-DELETE FROM plans;
-UPDATE maintenance_commands SET processing_by = NULL, processing_at = NULL;
-UPDATE research_suggestions SET processing_by = NULL, processing_at = NULL;
-SELECT 'Clean' as status;
-```
+| Time | Event | Duration |
+|------|-------|----------|
+| 21:42:38 | PRD detected, plan created | 0s |
+| 21:43:00 | Plan written to file | 22s |
+| 21:43:30 | Supervisor approved plan | 30s |
+| 21:43:30 | Task T001 created | 0s |
+| 21:43:30 | Task claimed by glm-5 | 0s |
+| 21:46:44 | Task → review | ~3min execution |
+| 21:46:45 | **FAIL: supervisor.md not found** | - |
 
-### Step 2: Clean Git Branches
-```bash
-cd ~/vibepilot
-git checkout main
-git pull origin main
-git branch -D $(git branch | grep -E "task/|TEST_MODULES" | tr -d ' *') 2>/dev/null
-git push origin --delete $(git branch -r | grep -E "task/|TEST_MODULES" | sed 's/origin\///') 2>/dev/null
-```
-
-### Step 3: Rebuild Governor
-```bash
-cd ~/vibepilot/governor && go build -o governor ./cmd/governor && sudo systemctl restart governor
-```
-
-### Step 4: Trigger ONE Test
-```bash
-curl -s -X POST http://localhost:8080/webhooks -H "Content-Type: application/json" -H "X-GitHub-Event: push" -d '{"ref": "refs/heads/main", "repository": {"full_name": "VibesTribe/VibePilot"}, "commits": [{"id": "test", "added": ["docs/prd/test-hello-world.md"], "removed": [], "modified": []}]}'
-```
-
-### Step 5: Watch Logs - DO NOT TOUCH ANYTHING
-```bash
-journalctl -u governor -f
-```
-
-### Step 6: Check Database State
-```bash
-sudo bash -c 'source <(systemctl show governor -p Environment | sed "s/Environment=//" | tr " " "\n") && curl -s "${SUPABASE_URL}/rest/v1/tasks?select=id,status,processing_by,assigned_to" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"'
-```
-
-### Step 7: Find Where It Fails
-- If stuck at `review` with `processing_by=null` → handler not firing
-- If stuck at `review` with `processing_by=set` → handler started but didn't finish
-- If stuck at `testing` → same logic
-- Find the ACTUAL failure point from logs
-
-### Step 8: Fix THAT Issue
-- Not a band-aid
-- Not more complexity
-- The actual bug
+The flow WORKS until supervisor review. The only issue is the missing prompt file.
 
 ---
 
-## KEY FILES
+## DO NOT DO NEXT SESSION
 
-| File | Purpose |
-|------|---------|
-| `docs/supabase-schema/084_clean_task_flow.sql` | Atomic RPCs - the real solution |
-| `governor/cmd/governor/handlers_task.go` | Task execution and review handlers |
-| `governor/cmd/governor/handlers_testing.go` | Testing handler |
-| `governor/internal/realtime/client.go` | Event routing |
+- DO NOT manually call RPCs
+- DO NOT manually PATCH database
+- DO NOT rebuild without understanding why
+- DO NOT add more complexity
+- DO NOT "test" individual parts
 
----
+## DO NEXT SESSION
 
-## REMEMBER
-
-The Session 80 atomic operations were designed to solve this. They should work. If they don't, there's a specific bug somewhere. Find it. Don't add more complexity. Don't manually muck with the database. Just find and fix the actual bug.
+1. Fix the prompts path issue (pick one approach)
+2. Clean everything
+3. One test
+4. Watch logs
+5. Verify completion
