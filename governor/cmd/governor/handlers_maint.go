@@ -263,10 +263,10 @@ func (h *MaintenanceHandler) buildBranchName(taskNumber, taskID string) string {
 }
 
 func (h *MaintenanceHandler) getTargetBranch(sliceID string) string {
-	if sliceID != "" && sliceID != "default" && sliceID != "testing" && sliceID != "review" {
-		return "module/" + sliceID
+	if sliceID == "" || sliceID == "default" || sliceID == "testing" || sliceID == "review" {
+		sliceID = "general"
 	}
-	return h.cfg.GetDefaultMergeTarget()
+	return "TEST_MODULES/" + sliceID
 }
 
 func (h *MaintenanceHandler) recordSuccess(ctx context.Context, modelID, taskType string, durationSeconds float64, tokensUsed int) {
