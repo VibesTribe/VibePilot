@@ -363,6 +363,7 @@ type Config struct {
 
 type PromptLoader interface {
 	REST(ctx context.Context, method, path string, body interface{}) ([]byte, error)
+	RESTWithHeaders(ctx context.Context, method, path string, body interface{}, headers map[string]string) ([]byte, error)
 }
 
 func (c *Config) SetDatabase(db PromptLoader) {
@@ -408,7 +409,10 @@ func (c *Config) SyncPromptsToDB() error {
 			"content": string(content),
 		}
 
-		_, err = db.REST(ctx, "POST", "prompts?on_conflict=name", body)
+		headers := map[string]string{
+			"Prefer": "resolution=merge-duplicates,return=representation",
+		}
+		_, err = db.RESTWithHeaders(ctx, "POST", "prompts?on_conflict=name", body, headers)
 		if err != nil {
 			log.Printf("Warning: failed to sync prompt %s to DB: %v", entry.Name(), err)
 			continue
