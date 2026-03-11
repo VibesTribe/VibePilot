@@ -200,10 +200,10 @@ func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v 
 	}
 
 	secretProvider := connectors.NewVaultAdapter(v)
+	activeCount := 0
 
 	for _, conn := range connectorsCfg.Connectors {
 		if conn.Status != "active" {
-			log.Printf("Skipping inactive connector: %s", conn.ID)
 			continue
 		}
 
@@ -219,14 +219,20 @@ func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v 
 			}
 			runner := connectors.NewCLIRunnerWithWorkDir(conn.Command, cliArgs, timeout, repoPath)
 			factory.RegisterConnector(conn.ID, runner)
-			log.Printf("Registered CLI connector: %s (%s)", conn.ID, conn.Command)
+			log.Printf("Registered: %s (%s)", conn.ID, conn.Command)
+			activeCount++
 		case "api":
 			runner := connectors.NewAPIRunnerFromConfig(conn, secretProvider)
 			factory.RegisterConnector(conn.ID, runner)
-			log.Printf("Registered API connector: %s (%s)", conn.ID, conn.Endpoint)
+			log.Printf("Registered: %s (api)", conn.ID)
+			activeCount++
 		default:
-			log.Printf("Unknown connector type: %s for %s", conn.Type, conn.ID)
+			// Skip unknown types silently
 		}
+	}
+
+	if activeCount == 0 {
+		log.Println("Warning: no active connectors registered")
 	}
 }
 
