@@ -206,9 +206,9 @@ func runCheckpointRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 
 		switch step {
 		case "execution":
-			_, err := database.RPC(ctx, "update_task_status", map[string]any{
-				"p_task_id": taskID,
-				"p_status":  "available",
+			_, err := database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "available",
 			})
 			if err != nil {
 				log.Printf("[CheckpointRecovery] Failed to reset task %s: %v", taskNumber, err)
@@ -218,9 +218,9 @@ func runCheckpointRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 			}
 
 		case "review":
-			_, err := database.RPC(ctx, "update_task_status", map[string]any{
-				"p_task_id": taskID,
-				"p_status":  "review",
+			_, err := database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "review",
 			})
 			if err != nil {
 				log.Printf("[CheckpointRecovery] Failed to set task %s to review: %v", taskNumber, err)
@@ -229,9 +229,9 @@ func runCheckpointRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 			}
 
 		case "testing":
-			_, err := database.RPC(ctx, "update_task_status", map[string]any{
-				"p_task_id": taskID,
-				"p_status":  "testing",
+			_, err := database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "testing",
 			})
 			if err != nil {
 				log.Printf("[CheckpointRecovery] Failed to set task %s to testing: %v", taskNumber, err)
@@ -241,9 +241,9 @@ func runCheckpointRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 
 		default:
 			log.Printf("[CheckpointRecovery] Unknown step '%s' for task %s, resetting to available", step, taskNumber)
-			_, err := database.RPC(ctx, "update_task_status", map[string]any{
-				"p_task_id": taskID,
-				"p_status":  "available",
+			_, err := database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "available",
 			})
 			if err == nil {
 				database.RPC(ctx, "delete_checkpoint", map[string]any{"p_task_id": taskID})
