@@ -1,53 +1,74 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-11 Session 79 (16:08 UTC)
-**Status:** FIXED - Ready for testing
+**Last Updated:** 2026-03-11 Session 79 (17:02 UTC)
+**Status:** BROKEN - Fundamental issues remain
 
 ---
 
-## Session 79 Fixes
+## CRITICAL UNRESOLVED ISSUES
 
-| Fix | File | Description |
-|-----|------|-------------|
-| Task status | `handlers_testing.go:143` | "approval" not "approved" (matches schema) |
-| Realtime reconnect | `realtime/client.go:540` | Retry forever, not give up after 1 try |
-| Supervisor prompt | `agents.json` | Reverted to supervisor.md (all 4 scenarios) |
-| Tester prompt | `agents.json` | Reverted to testers.md (full prompt) |
+### 1. Dashboard Shows Nothing
+- Realtime connected but dashboard not updating
+- No modules, tasks, or status changes visible
+- Need to check what dashboard expects vs what we send
+
+### 2. Duplicate Events Should Be Impossible
+- Task in_progress should NEVER have duplicates
+- Multiple kilo processes spawning for same task
+- Root cause unknown
+
+### 3. Status Value Confusion
+- Tasks: `approval` (after testing) - schema correct
+- Plans: `approved` (after supervisor) - schema correct
+- But dashboard may expect different values
+
+### 4. Reassignment Logic Broken
+- Task should ONLY reassign on supervisor/tester FAIL
+- On reassign: branch must be deleted/cleared
+- Currently: old output stays, multiple attempts pile up
 
 ---
 
-## Status Values (From Schema)
+## CORRECT FLOW
 
-**Tasks:** `pending, available, in_progress, review, testing, approval, merged, escalated, awaiting_human`
+**Task statuses:**
+`pending → available → in_progress → review → testing → approval → merged`
+
+**Only reassign on:**
+- Supervisor: "fail" (with reason)
+- Tester: "fail" (with reason)
+
+**On reassign:**
+- Delete task branch
+- Fresh branch on next attempt
+
+---
+
+## FIXES COMMITTED SESSION 79
+
+| Fix | File |
+|-----|------|
+| Realtime reconnect loop | `realtime/client.go` |
+| Task status "approval" | `handlers_testing.go` |
+| Orphan branch clean | `gitree.go` |
+| Force push branches | `gitree.go` |
+| Force checkout | `gitree.go` |
+| Remove missing RPC | `handlers_task.go` |
+| Revert to full prompts | `agents.json` |
+
+---
+
+## NEXT SESSION
+
+1. **Read dashboard code** - what status values expected
+2. **Fix duplicate events** - why possible?
+3. **Fix dashboard updates** - why not showing?
+4. **Fix reassignment** - only on fail, with branch cleanup
+5. **Stop multiple kilo spawns** for same task
+
+---
+
+## Status Values (Schema)
+
+**Tasks:** `pending, available, in_progress, review, testing, approval, merged, escalated, blocked`
 
 **Plans:** `draft, review, council_review, revision_needed, prd_incomplete, blocked, pending_human, error, approved, active, archived, cancelled`
-
----
-
-## Review Responsibilities
-
-**Human (only 3 cases):**
-1. Visual UI/UX changes
-2. Paid API credit exhaustion
-3. Complex researcher suggestions (after council)
-
-**Supervisor (4 scenarios):**
-1. Initial plan review → "approved" | "needs_revision" | "council_review"
-2. Task output review → "pass" | "fail" | "reroute"
-3. Test results → "passed" | "failed"
-4. Research review → "approved" | "council_review" | "human_review"
-
-**Council (2 cases):**
-1. Complex plans (security, UI, cross-module)
-2. Research affecting architecture/security/workflow
-
-**Tester (after supervisor passes task):**
-1. Runs tests/lint/typecheck
-2. Pass → "approval" status, Fail → back to runner
-
----
-
-## Previous Sessions
-
-- **78:** Agent timeout issues
-- **77:** Auto-merge flow
-- **76:** Started auto-merge changes
