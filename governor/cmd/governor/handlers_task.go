@@ -333,7 +333,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		log.Printf("[TaskReview] Task %s decision: %s", truncateID(taskID), decision.Decision)
 
 		switch decision.Decision {
-		case "approved":
+		case "approved", "pass":
 			// Approved → testing
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":    taskID,
@@ -341,7 +341,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			})
 			log.Printf("[TaskReview] Task %s → testing", truncateID(taskID))
 
-		case "fail":
+		case "fail", "failed":
 			// Failed → back to available with notes
 			failureReason := "supervisor_reject"
 			if len(decision.Issues) > 0 {
@@ -357,8 +357,40 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			})
 			log.Printf("[TaskReview] Task %s failed: %s → available", truncateID(taskID), failureReason)
 
+		case "needs_revision":
+			// Needs revision → back to available for re-execution
+			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
+			h.git.DeleteBranch(ctx, branchName)
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "available",
+			})
+			log.Printf("[TaskReview] Task %s needs revision → available", truncateID(taskID))
+
+		case "council_review":
+			// Complex → escalate to council
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "council_review",
+			})
+			log.Printf("[TaskReview] Task %s → council_review", truncateID(taskID))
+
+		case "reroute":
+			// Reroute → back to available for different assignment
+			h.git.DeleteBranch(ctx, branchName)
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "available",
+			})
+			log.Printf("[TaskReview] Task %s reroute → available", truncateID(taskID))
+
 		default:
-			log.Printf("[TaskReview] Unknown decision '%s' for %s", decision.Decision, truncateID(taskID))
+			// Unknown decision → human review
+			log.Printf("[TaskReview] Unknown decision '%s' for %s → awaiting_human", decision.Decision, truncateID(taskID))
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "awaiting_human",
+			})
 		}
 
 		return nil
