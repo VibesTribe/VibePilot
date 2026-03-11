@@ -1,39 +1,74 @@
 # PLAN: Hello VibePilot v4
 
 ## Overview
-Modify `governor/cmd/tools/hello.go` to print only "Hello VibePilot!" when executed.
+Create/modify `governor/cmd/tools/hello.go` to print "Hello VibePilot!" when run.
 
 ## Tasks
 
-### T001: Update Hello Tool Output
+### T001: Create Hello Tool
 **Confidence:** 0.99
 **Category:** coding
 **Dependencies:** none
 
 #### Prompt Packet
 ```
-# TASK: T001 - Update Hello Tool Output
+# TASK: T001 - Create Hello Tool
 
 ## Context
-The hello.go tool currently prints two lines. The PRD requires it to print only "Hello VibePilot!" when run.
+A simple CLI tool that demonstrates VibePilot's ability to create and test Go programs.
 
 ## What to Build
-Modify `governor/cmd/tools/hello.go` so that `go run ./cmd/tools/hello.go` outputs exactly:
+Create or modify `governor/cmd/tools/hello.go` to print exactly "Hello VibePilot!" (without comma) when executed.
 
-Hello VibePilot!
-
-The main() function should print only this single line. You may keep or remove the SayHello helper function as needed.
+The file must:
+1. Be in package main
+2. Have a main() function
+3. Print "Hello VibePilot!" to stdout
 
 ## Files
-- `governor/cmd/tools/hello.go` - Modify to print only "Hello VibePilot!"
+- `governor/cmd/tools/hello.go` - The main program file
 ```
 
 #### Expected Output
 ```json
 {
   "task_id": "T001",
-  "files_modified": ["governor/cmd/tools/hello.go"],
+  "files_created": ["governor/cmd/tools/hello.go"],
+  "tests_written": []
+}
+```
+
+### T002: Verify Output
+**Confidence:** 0.99
+**Category:** testing
+**Dependencies:** ["T001"]
+
+#### Prompt Packet
+```
+# TASK: T002 - Verify Output
+
+## Context
+Verify the hello tool produces the correct output.
+
+## What to Build
+Run the following command and verify output:
+
+```bash
+go run ./governor/cmd/tools/hello.go
+```
+
+Expected output: Hello VibePilot!
+
+## Files
+- No new files needed
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T002",
+  "files_created": [],
   "tests_written": [],
-  "verification": "go run ./cmd/tools/hello.go outputs: Hello VibePilot!"
+  "verified": true
 }
 ```
