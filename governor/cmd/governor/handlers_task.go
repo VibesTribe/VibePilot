@@ -115,14 +115,14 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	// Atomically claim task
 	workerID := fmt.Sprintf("executor:%s:%d", modelID, time.Now().UnixNano())
 	claimed, err := h.database.RPC(ctx, "claim_task", map[string]any{
-		"p_task_id":             taskID,
-		"p_processing_by":       workerID,
-		"p_assigned_to":         modelID,
-		"p_routing_flag":        routingFlag,
-		"p_routing_flag_reason": fmt.Sprintf("Routed via %s", connectorID),
+		"p_task_id":        taskID,
+		"p_worker_id":      workerID,
+		"p_model_id":       modelID,
+		"p_routing_flag":   routingFlag,
+		"p_routing_reason": fmt.Sprintf("Routed via %s", connectorID),
 	})
 	if err != nil || !parseBool(claimed) {
-		log.Printf("[TaskAvailable] Task %s already claimed", truncateID(taskID))
+		log.Printf("[TaskAvailable] Task %s claim failed: err=%v, result=%s", truncateID(taskID), err, string(claimed))
 		return
 	}
 
