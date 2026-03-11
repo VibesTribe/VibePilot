@@ -167,7 +167,8 @@ func (g *Gitree) CreateBranchFrom(ctx context.Context, branchName, sourceBranch 
 		return fmt.Errorf("initial commit: %w - %s", err, commitOut.String())
 	}
 
-	pushCmd := g.gitCommand(ctx, "push", "-u", g.remoteName, branchName)
+	// Force push orphan branch (may replace existing remote branch)
+	pushCmd := g.gitCommand(ctx, "push", "-f", "-u", g.remoteName, branchName)
 	var pushOut bytes.Buffer
 	pushCmd.Stdout = &pushOut
 	pushCmd.Stderr = &pushOut
@@ -434,7 +435,8 @@ func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 		log.Printf("[Gitree] Warning: initial commit failed: %v", err)
 	}
 
-	if err := g.gitCommand(ctx, "push", "-u", g.remoteName, branchName).Run(); err != nil {
+	// Force push orphan branch (may replace existing remote branch)
+	if err := g.gitCommand(ctx, "push", "-f", "-u", g.remoteName, branchName).Run(); err != nil {
 		return fmt.Errorf("push module branch: %w", err)
 	}
 
