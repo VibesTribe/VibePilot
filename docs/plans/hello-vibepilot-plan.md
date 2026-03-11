@@ -1,7 +1,7 @@
 # PLAN: Hello VibePilot
 
 ## Overview
-Create a simple Go program that prints "Hello VibePilot!" to stdout.
+Create a simple Go program that prints "Hello VibePilot!" to verify the VibePilot system is working.
 
 ## Tasks
 
@@ -15,13 +15,13 @@ Create a simple Go program that prints "Hello VibePilot!" to stdout.
 # TASK: T001 - Create Hello VibePilot Tool
 
 ## Context
-A simple hello world program to verify the VibePilot tooling setup works correctly.
+A simple test program to verify the VibePilot system is functioning correctly for session 79.
 
 ## What to Build
-Create a Go file at `governor/cmd/tools/hello.go` with a main function that prints "Hello VibePilot!" to stdout.
+Create `governor/cmd/tools/hello.go` with a main function that prints "Hello VibePilot!" to stdout.
 
 ## Files
-- `governor/cmd/tools/hello.go` - Main entry point that prints the message
+- `governor/cmd/tools/hello.go` - Main Go file with print statement
 ```
 
 #### Expected Output
