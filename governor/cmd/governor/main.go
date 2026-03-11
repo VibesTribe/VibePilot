@@ -45,6 +45,8 @@ func main() {
 	defer database.Close()
 	log.Println("Connected to database")
 
+	cfg.SetDatabase(database)
+
 	stateMachine := core.NewStateMachine()
 	checkpointStorage := &dbCheckpointAdapter{db: database}
 	checkpointMgr := core.NewCheckpointManager(stateMachine, checkpointStorage)

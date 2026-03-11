@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -354,8 +355,19 @@ type Config struct {
 	routingPath       string
 	planLifecyclePath string
 	promptsDir        string
+	db                PromptLoader
 
 	mu sync.RWMutex
+}
+
+type PromptLoader interface {
+	REST(ctx context.Context, method, path string, body interface{}) ([]byte, error)
+}
+
+func (c *Config) SetDatabase(db PromptLoader) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.db = db
 }
 
 func LoadConfig(configDir string) (*Config, error) {
@@ -558,12 +570,31 @@ func (c *Config) GetModel(id string) *ModelConfig {
 }
 
 func (c *Config) LoadPrompt(promptPath string) (string, error) {
+	promptName := filepath.Base(promptPath)
+
+	c.mu.RLock()
+	db := c.db
+	c.mu.RUnlock()
+
+	if db != nil {
+		ctx := context.Background()
+		data, err := db.REST(ctx, "GET", fmt.Sprintf("prompts?name=eq.%s&select=content", promptName), nil)
+		if err == nil {
+			var results []struct {
+				Content string `json:"content"`
+			}
+			if err := json.Unmarshal(data, &results); err == nil && len(results) > 0 {
+				return results[0].Content, nil
+			}
+		}
+	}
+
 	c.mu.RLock()
 	promptsDir := c.promptsDir
 	if c.System != nil && c.System.PromptsDir != "" {
 		promptsDir = c.System.PromptsDir
 	}
-	fullPath := filepath.Join(promptsDir, filepath.Base(promptPath))
+	fullPath := filepath.Join(promptsDir, promptName)
 	c.mu.RUnlock()
 
 	data, err := os.ReadFile(fullPath)
