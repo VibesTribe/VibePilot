@@ -404,8 +404,9 @@ func (c *Client) handlePostgresChange(msg phoenixMessage) {
 	if change.Table == "plans" || change.Table == "tasks" {
 		newStatus, _ := change.New["status"].(string)
 		oldStatus, _ := change.Old["status"].(string)
+		processingBy, _ := change.New["processing_by"].(string)
 		if newStatus != "" || oldStatus != "" {
-			eventKey = fmt.Sprintf("%s:%s:%s:%s->%s", change.Table, id, change.EventType, oldStatus, newStatus)
+			eventKey = fmt.Sprintf("%s:%s:%s:%s->%s:pb=%s", change.Table, id, change.EventType, oldStatus, newStatus, processingBy)
 		}
 	}
 
