@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/vibepilot/governor/internal/db"
@@ -116,10 +117,17 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			return nil
 		}
 
-		log.Printf("[Testing] Task %s outcome: %s", truncateID(taskID), testOutput.TestOutcome)
+		log.Printf("[Testing] Task %s outcome: test_outcome=%s overall_result=%s", truncateID(taskID), testOutput.TestOutcome, testOutput.OverallResult)
 
-		switch testOutput.TestOutcome {
-		case "approved":
+		// Normalize outcome from either field (prompt uses different formats)
+		outcome := testOutput.TestOutcome
+		if outcome == "" {
+			outcome = testOutput.OverallResult
+		}
+		outcome = strings.ToLower(outcome)
+
+		switch outcome {
+		case "approved", "passed", "pass":
 			// Tests passed → merge to module
 			targetBranch := h.getTargetBranch(sliceID)
 			if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
@@ -144,7 +152,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 				log.Printf("[Testing] Task %s → merged to %s", truncateID(taskID), targetBranch)
 			}
 
-		case "fail":
+		case "fail", "failed":
 			// Tests failed → back to available with notes
 			failureReason := testOutput.NextAction
 			if failureReason == "" {
@@ -160,16 +168,12 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			log.Printf("[Testing] Task %s failed: %s → available", truncateID(taskID), failureReason)
 
 		default:
-			if testOutput.NextAction == "await_human_approval" {
-				// UI/UX task needs human eyes
-				h.database.RPC(ctx, "transition_task", map[string]any{
-					"p_task_id":    taskID,
-					"p_new_status": "awaiting_human",
-				})
-				log.Printf("[Testing] Task %s → awaiting_human", truncateID(taskID))
-			} else {
-				log.Printf("[Testing] Unknown outcome '%s' for %s", testOutput.TestOutcome, truncateID(taskID))
-			}
+			// Unknown or empty outcome - needs human eyes
+			log.Printf("[Testing] Task %s unclear outcome '%s' → awaiting_human", truncateID(taskID), outcome)
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "awaiting_human",
+			})
 		}
 
 		return nil

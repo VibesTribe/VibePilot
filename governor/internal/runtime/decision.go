@@ -63,11 +63,12 @@ type PlannerOutput struct {
 }
 
 type TestResults struct {
-	Action      string `json:"action"`
-	TaskID      string `json:"task_id"`
-	TaskNumber  string `json:"task_number"`
-	TestOutcome string `json:"test_outcome"`
-	NextAction  string `json:"next_action"`
+	Action        string `json:"action"`
+	TaskID        string `json:"task_id"`
+	TaskNumber    string `json:"task_number"`
+	TestOutcome   string `json:"test_outcome"`
+	OverallResult string `json:"overall_result"`
+	NextAction    string `json:"next_action"`
 }
 
 type InitialReviewDecision struct {
