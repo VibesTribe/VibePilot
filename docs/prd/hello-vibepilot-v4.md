@@ -9,3 +9,6 @@ Create `governor/cmd/tools/hello.go` that prints "Hello VibePilot!"
 
 ## Expected Output
 `go run ./cmd/tools/hello.go` outputs: Hello VibePilot!
+
+## Test
+Trigger webhook test.
