@@ -1,79 +1,53 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-11 Session 78 (00:30 UTC)
-**Status:** BROKEN - Agents timing out
+**Last Updated:** 2026-03-11 Session 79 (16:08 UTC)
+**Status:** FIXED - Ready for testing
 
 ---
 
-## Critical Issue
+## Session 79 Fixes
 
-**Agents (supervisor, tester) are taking 5+ minutes and getting killed.**
-
-A simple "Hello VibePilot" task should complete in 30 seconds:
-- Planner: ~30s (acceptable - comprehensive analysis)
-- Supervisor: should be <5s (just check validity)
-- Task runner: ~3-5s (direct code generation)
-- Tester: should be <5s (just run the code)
-
-Currently supervisor takes 5+ minutes and times out.
+| Fix | File | Description |
+|-----|------|-------------|
+| Task status | `handlers_testing.go:143` | "approval" not "approved" (matches schema) |
+| Realtime reconnect | `realtime/client.go:540` | Retry forever, not give up after 1 try |
+| Supervisor prompt | `agents.json` | Reverted to supervisor.md (all 4 scenarios) |
+| Tester prompt | `agents.json` | Reverted to testers.md (full prompt) |
 
 ---
 
-## Root Cause Analysis
+## Status Values (From Schema)
 
-1. **Kilo CLI is thorough, not fast** - Even with minimal prompts, the agent reads files, analyzes, explores
-2. **Processing timeout is 300s** - Agent gets killed after 5 minutes
-3. **No fast-path for simple decisions** - Every decision goes through full agent analysis
+**Tasks:** `pending, available, in_progress, review, testing, approval, merged, escalated, awaiting_human`
 
----
-
-## Fixes Applied This Session
-
-| Fix | File | Status |
-|-----|------|--------|
-| "No files modified" = success | `gitree.go:266` | ✅ Committed |
-| Removed processing_by event blocking | `realtime/client.go` | ✅ Committed |
-| Checkpoint step name fix | `handlers_task.go:173` | ✅ Committed |
-| Minimal supervisor prompt | `prompts/supervisor_simple.md` | ✅ Committed |
-| Minimal tester prompt | `prompts/testers_simple.md` | ✅ Committed |
+**Plans:** `draft, review, council_review, revision_needed, prd_incomplete, blocked, pending_human, error, approved, active, archived, cancelled`
 
 ---
 
-## What's NOT Working
+## Review Responsibilities
 
-1. **Plan review** - Supervisor times out
-2. **Task testing** - Tester times out  
-3. **Full flow** - Never completes
+**Human (only 3 cases):**
+1. Visual UI/UX changes
+2. Paid API credit exhaustion
+3. Complex researcher suggestions (after council)
 
----
+**Supervisor (4 scenarios):**
+1. Initial plan review → "approved" | "needs_revision" | "council_review"
+2. Task output review → "pass" | "fail" | "reroute"
+3. Test results → "passed" | "failed"
+4. Research review → "approved" | "council_review" | "human_review"
 
-## Options to Fix
+**Council (2 cases):**
+1. Complex plans (security, UI, cross-module)
+2. Research affecting architecture/security/workflow
 
-### Option A: Skip Review for Simple Plans
-Auto-approve plans with:
-- Single task
-- Confidence ≥ 0.95
-- Category = "coding"
-- No dependencies
-
-### Option B: Use Faster Model for Reviews
-Route supervisor/tester to a faster model (if available)
-
-### Option C: Increase Timeout (Band-aid)
-Increase processing_timeout_seconds from 300 to 600+
-- Doesn't solve the root cause
-- Still slow
-
-### Option D: Direct Code Path
-For simple tasks, skip supervisor entirely:
-- Task completes → Direct to testing → Auto-merge
+**Tester (after supervisor passes task):**
+1. Runs tests/lint/typecheck
+2. Pass → "approval" status, Fail → back to runner
 
 ---
 
 ## Previous Sessions
 
-- **77:** Auto-merge flow (untested)
+- **78:** Agent timeout issues
+- **77:** Auto-merge flow
 - **76:** Started auto-merge changes
-- **75:** Cleanup, docs
-- **74:** Module branches
-- **73:** Full audit
-- **70-72:** Processing locks, duplicate fixes
