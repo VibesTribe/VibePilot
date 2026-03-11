@@ -1,56 +1,79 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-10 Session 77 (19:55 UTC)
-**Status:** COMPLETE - Auto-merge flow implemented
+**Last Updated:** 2026-03-11 Session 78 (00:30 UTC)
+**Status:** BROKEN - Agents timing out
 
 ---
 
-## What Was Done (Session 77)
+## Critical Issue
 
-Implemented auto-merge flow: `testing passes → approved → auto-merge`
+**Agents (supervisor, tester) are taking 5+ minutes and getting killed.**
 
-```
-Test pass → status="approved"
-          → triggers EventTaskApproved
-          → handleTaskApproved tries merge
-          → merge succeeds → status="merged"
-          → merge fails → status="merge_pending"
-          → handleTaskMergePending creates maintenance command
-```
+A simple "Hello VibePilot" task should complete in 30 seconds:
+- Planner: ~30s (acceptable - comprehensive analysis)
+- Supervisor: should be <5s (just check validity)
+- Task runner: ~3-5s (direct code generation)
+- Tester: should be <5s (just run the code)
 
-**Files changed:**
-- `governor/config/system.json` - Added statuses
-- `governor/internal/runtime/events.go` - Added event types
-- `governor/internal/realtime/client.go` - Added event mappings
-- `governor/cmd/governor/handlers_testing.go` - Set "approved" on test pass
-- `governor/cmd/governor/handlers_maint.go` - Added merge handlers
-- `governor/cmd/governor/main.go` - Wired up git parameter
+Currently supervisor takes 5+ minutes and times out.
 
 ---
 
-## What's Next
+## Root Cause Analysis
 
-1. **Test the flow** - Run a task through to completion to verify:
-   - Test pass sets status to "approved"
-   - EventTaskApproved fires
-   - Merge executes automatically
-   - Status becomes "merged" (or "merge_pending" on failure)
+1. **Kilo CLI is thorough, not fast** - Even with minimal prompts, the agent reads files, analyzes, explores
+2. **Processing timeout is 300s** - Agent gets killed after 5 minutes
+3. **No fast-path for simple decisions** - Every decision goes through full agent analysis
 
-2. **Monitor for issues** - Watch logs for:
-   - Duplicate events
-   - Merge conflicts handled correctly
-   - Maintenance commands created when needed
+---
 
-3. **Continue building** - Once verified, continue with other VibePilot features
+## Fixes Applied This Session
+
+| Fix | File | Status |
+|-----|------|--------|
+| "No files modified" = success | `gitree.go:266` | ✅ Committed |
+| Removed processing_by event blocking | `realtime/client.go` | ✅ Committed |
+| Checkpoint step name fix | `handlers_task.go:173` | ✅ Committed |
+| Minimal supervisor prompt | `prompts/supervisor_simple.md` | ✅ Committed |
+| Minimal tester prompt | `prompts/testers_simple.md` | ✅ Committed |
+
+---
+
+## What's NOT Working
+
+1. **Plan review** - Supervisor times out
+2. **Task testing** - Tester times out  
+3. **Full flow** - Never completes
+
+---
+
+## Options to Fix
+
+### Option A: Skip Review for Simple Plans
+Auto-approve plans with:
+- Single task
+- Confidence ≥ 0.95
+- Category = "coding"
+- No dependencies
+
+### Option B: Use Faster Model for Reviews
+Route supervisor/tester to a faster model (if available)
+
+### Option C: Increase Timeout (Band-aid)
+Increase processing_timeout_seconds from 300 to 600+
+- Doesn't solve the root cause
+- Still slow
+
+### Option D: Direct Code Path
+For simple tasks, skip supervisor entirely:
+- Task completes → Direct to testing → Auto-merge
 
 ---
 
 ## Previous Sessions
 
-- **76:** Started auto-merge flow changes
-- **75:** Cleanup, docs fixed (human role clarified)
-- **74:** Module branch creation, learning system fixes
-- **73:** Full audit, testing fix, failure notes
-- **72:** Processing lock timing, status dedup
-- **71:** Pool failure lock, processing_by check
-- **70:** Fixed endless session spawning
-- **69:** Applied duplicate task fix
+- **77:** Auto-merge flow (untested)
+- **76:** Started auto-merge changes
+- **75:** Cleanup, docs
+- **74:** Module branches
+- **73:** Full audit
+- **70-72:** Processing locks, duplicate fixes
