@@ -638,13 +638,7 @@ func (h *TaskHandler) handleTaskError(ctx context.Context, taskID, modelID, fail
 	}
 	h.recordFailureNotes(ctx, taskID, failureType)
 
-	_, err := h.database.RPC(ctx, "increment_task_attempts", map[string]any{
-		"p_task_id": taskID,
-	})
-	if err != nil {
-		log.Printf("[TaskAvailable] Failed to increment attempts for %s: %v", truncateID(taskID), err)
-	}
-
+	// Update attempts directly (no RPC needed)
 	_, _ = h.database.RPC(ctx, "update_task_status", map[string]any{
 		"p_task_id": taskID,
 		"p_status":  "available",
