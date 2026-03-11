@@ -3,9 +3,9 @@
 -- Date: 2026-03-11
 
 CREATE OR REPLACE FUNCTION set_processing(
-  p_table TEXT,
   p_id UUID,
-  p_processing_by TEXT
+  p_processing_by TEXT,
+  p_table TEXT
 ) RETURNS BOOLEAN AS $$
 DECLARE v_updated INT;
 BEGIN
@@ -26,8 +26,8 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION clear_processing(
-  p_table TEXT,
-  p_id UUID
+  p_id UUID,
+  p_table TEXT
 ) RETURNS BOOLEAN AS $$
 DECLARE v_updated INT;
 BEGIN
