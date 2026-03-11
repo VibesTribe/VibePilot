@@ -47,6 +47,10 @@ func main() {
 
 	cfg.SetDatabase(database)
 
+	if err := cfg.SyncPromptsToDB(); err != nil {
+		log.Printf("Warning: failed to sync prompts to DB: %v", err)
+	}
+
 	stateMachine := core.NewStateMachine()
 	checkpointStorage := &dbCheckpointAdapter{db: database}
 	checkpointMgr := core.NewCheckpointManager(stateMachine, checkpointStorage)

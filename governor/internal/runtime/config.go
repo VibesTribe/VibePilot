@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -368,6 +369,57 @@ func (c *Config) SetDatabase(db PromptLoader) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.db = db
+}
+
+func (c *Config) SyncPromptsToDB() error {
+	c.mu.RLock()
+	db := c.db
+	promptsDir := c.promptsDir
+	if c.System != nil && c.System.PromptsDir != "" {
+		promptsDir = c.System.PromptsDir
+	}
+	c.mu.RUnlock()
+
+	if db == nil {
+		return nil
+	}
+
+	entries, err := os.ReadDir(promptsDir)
+	if err != nil {
+		return fmt.Errorf("read prompts dir %s: %w", promptsDir, err)
+	}
+
+	ctx := context.Background()
+	synced := 0
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
+			continue
+		}
+
+		fullPath := filepath.Join(promptsDir, entry.Name())
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			continue
+		}
+
+		body := map[string]interface{}{
+			"name":    entry.Name(),
+			"content": string(content),
+		}
+
+		_, err = db.REST(ctx, "POST", "prompts?on_conflict=name", body)
+		if err != nil {
+			log.Printf("Warning: failed to sync prompt %s to DB: %v", entry.Name(), err)
+			continue
+		}
+		synced++
+	}
+
+	if synced > 0 {
+		log.Printf("Synced %d prompts from %s to Supabase", synced, promptsDir)
+	}
+	return nil
 }
 
 func LoadConfig(configDir string) (*Config, error) {
