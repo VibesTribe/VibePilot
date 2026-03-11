@@ -141,13 +141,22 @@ func (g *Gitree) CreateBranchFrom(ctx context.Context, branchName, sourceBranch 
 
 	if err := cmd.Run(); err != nil {
 		if strings.Contains(out.String(), "already exists") {
-			return g.gitCommand(ctx, "checkout", branchName).Run()
+			if err := g.gitCommand(ctx, "checkout", branchName).Run(); err != nil {
+				return err
+			}
+			g.gitCommand(ctx, "clean", "-fd").Run()
+			return nil
 		}
 		return fmt.Errorf("create orphan branch: %w - %s", err, out.String())
 	}
 
 	if err := g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run(); err != nil {
 		log.Printf("[Gitree] Warning: rm -rf --cached failed: %v", err)
+	}
+
+	// Critical: clean working directory after orphan branch creation
+	if err := g.gitCommand(ctx, "clean", "-fd").Run(); err != nil {
+		log.Printf("[Gitree] Warning: clean -fd failed: %v", err)
 	}
 
 	commitCmd := g.gitCommand(ctx, "commit", "--allow-empty", "-m", "Initialize task branch")
@@ -392,20 +401,49 @@ func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 	branchName := "module/" + sliceID
 	var out bytes.Buffer
 
+	// Ensure we start on main
+	if err := g.gitCommand(ctx, "checkout", "main").Run(); err != nil {
+		log.Printf("[Gitree] Warning: checkout main failed: %v", err)
+	}
+
 	cmd := g.gitCommand(ctx, "checkout", "--orphan", branchName)
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 
 	if err := cmd.Run(); err != nil {
 		if strings.Contains(out.String(), "already exists") {
-			return g.gitCommand(ctx, "checkout", branchName).Run()
+			if err := g.gitCommand(ctx, "checkout", branchName).Run(); err != nil {
+				return err
+			}
+			g.gitCommand(ctx, "clean", "-fd").Run()
+			return nil
 		}
 		return fmt.Errorf("create module branch: %w - %s", err, out.String())
 	}
 
 	g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run()
+	// Critical: clean working directory after orphan branch creation
+	g.gitCommand(ctx, "clean", "-fd").Run()
 
-	return g.gitCommand(ctx, "push", "-u", g.remoteName, branchName).Run()
+	// Empty commit to initialize branch
+	commitCmd := g.gitCommand(ctx, "commit", "--allow-empty", "-m", "Initialize module branch")
+	var commitOut bytes.Buffer
+	commitCmd.Stdout = &commitOut
+	commitCmd.Stderr = &commitOut
+	if err := commitCmd.Run(); err != nil {
+		log.Printf("[Gitree] Warning: initial commit failed: %v", err)
+	}
+
+	if err := g.gitCommand(ctx, "push", "-u", g.remoteName, branchName).Run(); err != nil {
+		return fmt.Errorf("push module branch: %w", err)
+	}
+
+	// Switch back to main
+	if err := g.gitCommand(ctx, "checkout", "main").Run(); err != nil {
+		log.Printf("[Gitree] Warning: checkout main failed: %v", err)
+	}
+
+	return nil
 }
 
 func (g *Gitree) CommitAndPush(ctx context.Context, filePath, message string) error {

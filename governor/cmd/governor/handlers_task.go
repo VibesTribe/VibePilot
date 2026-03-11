@@ -110,7 +110,6 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	}
 
 	branchName := h.buildBranchName(taskNumber, taskID)
-	sourceBranch := h.getSourceBranch(sliceID)
 
 	attempts := 0
 	if v, ok := task["attempts"].(float64); ok {
@@ -122,7 +121,8 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		}
 	}
 
-	if createErr := h.git.CreateBranchFrom(ctx, branchName, sourceBranch); createErr != nil {
+	// Task branches are orphans - only contain task output, not from main/module
+	if createErr := h.git.CreateBranch(ctx, branchName); createErr != nil {
 		log.Printf("[TaskAvailable] Warning: branch creation failed for %s: %v", branchName, createErr)
 	}
 
