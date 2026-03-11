@@ -71,6 +71,10 @@ func (d *DB) Close() error {
 }
 
 func (d *DB) REST(ctx context.Context, method, path string, body interface{}) ([]byte, error) {
+	return d.RESTWithHeaders(ctx, method, path, body, nil)
+}
+
+func (d *DB) RESTWithHeaders(ctx context.Context, method, path string, body interface{}, extraHeaders map[string]string) ([]byte, error) {
 	var reqBody io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -90,6 +94,10 @@ func (d *DB) REST(ctx context.Context, method, path string, body interface{}) ([
 	req.Header.Set("Authorization", "Bearer "+d.key)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Prefer", "return=representation")
+
+	for k, v := range extraHeaders {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := d.client.Do(req)
 	if err != nil {
