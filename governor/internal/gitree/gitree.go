@@ -84,7 +84,9 @@ func (g *Gitree) isProtected(branchName string) bool {
 }
 
 func (g *Gitree) isTaskOrModuleBranch(branchName string) bool {
-	return strings.HasPrefix(branchName, "task/") || strings.HasPrefix(branchName, "module/")
+	return strings.HasPrefix(branchName, "task/") ||
+		strings.HasPrefix(branchName, "module/") ||
+		strings.HasPrefix(branchName, "TEST_MODULES/")
 }
 
 func (g *Gitree) CreateBranch(ctx context.Context, branchName string) error {
@@ -403,10 +405,9 @@ func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
 
-	branchName := "module/" + sliceID
+	branchName := "TEST_MODULES/" + sliceID
 	var out bytes.Buffer
 
-	// Ensure we start on main (force to handle uncommitted changes)
 	if err := g.gitCommand(ctx, "checkout", "-f", "main").Run(); err != nil {
 		log.Printf("[Gitree] Warning: checkout main failed: %v", err)
 	}
@@ -427,11 +428,9 @@ func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 	}
 
 	g.gitCommand(ctx, "rm", "-rf", "--cached", ".").Run()
-	// Critical: clean working directory after orphan branch creation
 	g.gitCommand(ctx, "clean", "-fd").Run()
 
-	// Empty commit to initialize branch
-	commitCmd := g.gitCommand(ctx, "commit", "--allow-empty", "-m", "Initialize module branch")
+	commitCmd := g.gitCommand(ctx, "commit", "--allow-empty", "-m", "Initialize TEST_MODULES/"+sliceID)
 	var commitOut bytes.Buffer
 	commitCmd.Stdout = &commitOut
 	commitCmd.Stderr = &commitOut
@@ -439,12 +438,10 @@ func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 		log.Printf("[Gitree] Warning: initial commit failed: %v", err)
 	}
 
-	// Force push orphan branch (may replace existing remote branch)
 	if err := g.gitCommand(ctx, "push", "-f", "-u", g.remoteName, branchName).Run(); err != nil {
 		return fmt.Errorf("push module branch: %w", err)
 	}
 
-	// Switch back to main (force to handle any changes)
 	if err := g.gitCommand(ctx, "checkout", "-f", "main").Run(); err != nil {
 		log.Printf("[Gitree] Warning: checkout main failed: %v", err)
 	}

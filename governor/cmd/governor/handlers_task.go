@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os/exec"
 	"time"
 
 	"github.com/vibepilot/governor/internal/core"
@@ -396,17 +395,10 @@ func (h *TaskHandler) buildBranchName(taskNumber, taskID string) string {
 }
 
 func (h *TaskHandler) getTargetBranch(sliceID string) string {
-	if sliceID != "" && sliceID != "default" && sliceID != "review" && sliceID != "testing" {
-		moduleBranch := "module/" + sliceID
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", moduleBranch)
-		cmd.Dir = h.cfg.GetRepoPath()
-		if output, err := cmd.Output(); err == nil && len(output) > 0 {
-			return moduleBranch
-		}
+	if sliceID == "" || sliceID == "default" || sliceID == "review" || sliceID == "testing" {
+		sliceID = "general"
 	}
-	return h.cfg.GetDefaultMergeTarget()
+	return "TEST_MODULES/" + sliceID
 }
 
 func (h *TaskHandler) deriveRoutingFlag(conn *runtime.ConnectorConfig) string {
