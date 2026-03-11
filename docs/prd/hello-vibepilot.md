@@ -1,4 +1,4 @@
-# PRD: Hello VibePilot Test
+# PRD: Hello VibePilot
 
 Priority: Low
 Complexity: Simple
