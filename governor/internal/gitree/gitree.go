@@ -128,7 +128,7 @@ func (g *Gitree) CreateBranchFrom(ctx context.Context, branchName, sourceBranch 
 			return fmt.Errorf("push branch: %w - %s", err, pushOut.String())
 		}
 
-		if err := g.gitCommand(ctx, "checkout", "main").Run(); err != nil {
+		if err := g.gitCommand(ctx, "checkout", "-f", "main").Run(); err != nil {
 			log.Printf("[Gitree] Warning: checkout main failed: %v", err)
 		}
 
@@ -141,7 +141,7 @@ func (g *Gitree) CreateBranchFrom(ctx context.Context, branchName, sourceBranch 
 
 	if err := cmd.Run(); err != nil {
 		if strings.Contains(out.String(), "already exists") {
-			if err := g.gitCommand(ctx, "checkout", branchName).Run(); err != nil {
+			if err := g.gitCommand(ctx, "checkout", "-f", branchName).Run(); err != nil {
 				return err
 			}
 			g.gitCommand(ctx, "clean", "-fd").Run()
@@ -191,23 +191,27 @@ func (g *Gitree) CommitOutput(ctx context.Context, branchName string, output int
 	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
 
+	// Force checkout to handle uncommitted changes
 	var checkoutOut bytes.Buffer
-	checkoutCmd := g.gitCommand(ctx, "checkout", branchName)
+	checkoutCmd := g.gitCommand(ctx, "checkout", "-f", branchName)
 	checkoutCmd.Stdout = &checkoutOut
 	checkoutCmd.Stderr = &checkoutOut
 	if err := checkoutCmd.Run(); err != nil {
 		if strings.Contains(checkoutOut.String(), "did not match") || strings.Contains(checkoutOut.String(), "not found") {
 			fetchCmd := g.gitCommand(ctx, "fetch", g.remoteName, branchName)
 			if fetchErr := fetchCmd.Run(); fetchErr == nil {
-				trackCmd := g.gitCommand(ctx, "checkout", "--track", "origin/"+branchName)
+				trackCmd := g.gitCommand(ctx, "checkout", "-f", "--track", "origin/"+branchName)
+				var trackOut bytes.Buffer
+				trackCmd.Stdout = &trackOut
+				trackCmd.Stderr = &trackOut
 				if trackErr := trackCmd.Run(); trackErr != nil {
-					return fmt.Errorf("checkout tracking branch: %w", trackErr)
+					return fmt.Errorf("checkout tracking branch: %w - %s", trackErr, trackOut.String())
 				}
 			} else {
-				return fmt.Errorf("checkout branch (not found locally or remotely): %w", err)
+				return fmt.Errorf("checkout branch (not found locally or remotely): %w - %s", err, checkoutOut.String())
 			}
 		} else {
-			return fmt.Errorf("checkout branch: %w", err)
+			return fmt.Errorf("checkout branch: %w - %s", err, checkoutOut.String())
 		}
 	}
 
@@ -402,8 +406,8 @@ func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 	branchName := "module/" + sliceID
 	var out bytes.Buffer
 
-	// Ensure we start on main
-	if err := g.gitCommand(ctx, "checkout", "main").Run(); err != nil {
+	// Ensure we start on main (force to handle uncommitted changes)
+	if err := g.gitCommand(ctx, "checkout", "-f", "main").Run(); err != nil {
 		log.Printf("[Gitree] Warning: checkout main failed: %v", err)
 	}
 
@@ -413,7 +417,7 @@ func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 
 	if err := cmd.Run(); err != nil {
 		if strings.Contains(out.String(), "already exists") {
-			if err := g.gitCommand(ctx, "checkout", branchName).Run(); err != nil {
+			if err := g.gitCommand(ctx, "checkout", "-f", branchName).Run(); err != nil {
 				return err
 			}
 			g.gitCommand(ctx, "clean", "-fd").Run()
@@ -440,8 +444,8 @@ func (g *Gitree) CreateModuleBranch(ctx context.Context, sliceID string) error {
 		return fmt.Errorf("push module branch: %w", err)
 	}
 
-	// Switch back to main
-	if err := g.gitCommand(ctx, "checkout", "main").Run(); err != nil {
+	// Switch back to main (force to handle any changes)
+	if err := g.gitCommand(ctx, "checkout", "-f", "main").Run(); err != nil {
 		log.Printf("[Gitree] Warning: checkout main failed: %v", err)
 	}
 
