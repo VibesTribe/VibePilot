@@ -176,22 +176,38 @@ If approaching 80% context (200k+ tokens):
 
 ## Session: 2026-03-12 Session 82
 
-### Cleanup
-1. Fixed RPC allowlist (`find_pending_resource_tasks` not in allowlist)
-2. Cleaned all test data from Supabase (tasks, task_runs, plans, events)
+### Cleanup & Fixes
+1. Fixed RPC allowlist (`find_pending_resource_tasks`) - applied migration 090 to Supabase
+2. Cleaned all test data from Supabase
 3. Removed test PRD/plan files
-4. Deleted TEST_MODULES branch
-5. Removed `pkg/hello/` test output
-6. Committed and pushed cleanup
-7. Restarted governor fresh
 
-### System Status After Cleanup
+### Test 1: Simple Greet Function
+- **PRD:** `test-simple.md`
+- **Result:** ✅ SUCCESS
+- **Duration:** 2m 26s end-to-end
+- **Output:** `governor/cmd/tools/greet.go` created
+- **Flow:** PRD → Plan → Supervisor → Task → Review → Testing → Merged
+
+### Dashboard Status Labels Fixed
+- Changed `review` → "Reviewing" (was "Needs Review")
+- Changed `testing` → "Testing"
+- Added `merged` → "Merged" (separate from complete)
+- Commits: `e0da8294`, `57731cf3` in vibeflow repo
+
+### Test 2: Dashboard Header Rename
+- **PRD:** `rename-dashboard-header.md`
+- **Result:** ❌ FAILED
+- **Issue:** Supervisor parse error - model returned markdown instead of JSON
+
+### Bugs Identified
+1. **Task Numbering Bug** - All tasks get T001, should increment
+2. **Supervisor JSON Parse Error** - Model returns narrative text instead of JSON
+
+### System Status
 - Governor: Running cleanly
 - Realtime: Connected
-- Tasks: 0
-- Plans: 0
-- No orphaned sessions
+- ResourceRecovery: Working (no more spam)
 
 ---
 
-*Last updated: 2026-03-12 Session 82*
+*Last updated: 2026-03-12 Session 82 End*
