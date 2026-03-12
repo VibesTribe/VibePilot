@@ -152,5 +152,46 @@ If approaching 80% context (200k+ tokens):
 
 ---
 
-*Last updated: 2026-02-14 16:00 UTC*
-*Next session: Start from "Next Steps" - likely Council Activation*
+## Session: 2026-03-11 Session 81
+
+### Issue: Prompts Missing from Task Branches
+- Governor binary runs from git working directory
+- When task executes, git switches to `task/T001` branch
+- Task branch doesn't include `prompts/` directory
+- Supervisor fails: "supervisor.md: no such file or directory"
+
+### Fix: Sync Prompts to Supabase
+- `89732bb7` fix: sync prompts from GitHub to Supabase on startup
+- `5664448f` feat: load prompts from Supabase with filesystem fallback
+- Prompts now synced to Supabase on governor startup
+- Agents load prompts from Supabase, not filesystem
+
+### Test Result
+- Task T001 executed successfully
+- Created `pkg/hello/hello.go`
+- Task reached `merged` status
+- Flow works end-to-end
+
+---
+
+## Session: 2026-03-12 Session 82
+
+### Cleanup
+1. Fixed RPC allowlist (`find_pending_resource_tasks` not in allowlist)
+2. Cleaned all test data from Supabase (tasks, task_runs, plans, events)
+3. Removed test PRD/plan files
+4. Deleted TEST_MODULES branch
+5. Removed `pkg/hello/` test output
+6. Committed and pushed cleanup
+7. Restarted governor fresh
+
+### System Status After Cleanup
+- Governor: Running cleanly
+- Realtime: Connected
+- Tasks: 0
+- Plans: 0
+- No orphaned sessions
+
+---
+
+*Last updated: 2026-03-12 Session 82*
