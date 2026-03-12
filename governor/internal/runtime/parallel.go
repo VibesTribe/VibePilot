@@ -166,6 +166,37 @@ func (p *AgentPool) ActiveCount() int {
 	return int(p.active.Load())
 }
 
+// HasCapacity checks if a slot is available for the given module/destination
+// without actually acquiring it. Returns true if a task can be submitted.
+func (p *AgentPool) HasCapacity(moduleID, destination string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Check total limit
+	if int(p.active.Load()) >= p.maxTotal {
+		return false
+	}
+
+	// Check per-module limit
+	if moduleCount, ok := p.perModule[moduleID]; ok {
+		if int(atomic.LoadInt32(moduleCount)) >= p.maxPerModule {
+			return false
+		}
+	}
+
+	// Check per-destination limit
+	if destination != "" && p.concurrency != nil {
+		destLimit := p.concurrency.GetLimit(destination)
+		if destCount, ok := p.perDest[destination]; ok {
+			if int(atomic.LoadInt32(destCount)) >= destLimit {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
 func (p *AgentPool) ModuleCount(moduleID string) int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
