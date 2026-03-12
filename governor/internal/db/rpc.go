@@ -78,8 +78,9 @@ var defaultRPCAllowlist = map[string]bool{
 	"create_maintenance_command": true,
 
 	// Session recovery
-	"find_orphaned_sessions":   true,
-	"recover_orphaned_session": true,
+	"find_orphaned_sessions":      true,
+	"recover_orphaned_session":    true,
+	"find_pending_resource_tasks": true,
 
 	// Event tracking
 	"get_event_checkpoint":    true,

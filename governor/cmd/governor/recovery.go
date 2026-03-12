@@ -120,6 +120,8 @@ func runProcessingRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 			recoverStaleProcessing(ctx, database, "test_results", timeout)
 			recoverStaleProcessing(ctx, database, "research_suggestions", timeout)
 			recoverStaleProcessing(ctx, database, "maintenance_commands", timeout)
+			// Also check for tasks waiting for resources
+			recoverPendingResources(ctx, database)
 		}
 	}
 }
@@ -252,4 +254,40 @@ func runCheckpointRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 	}
 
 	log.Printf("[CheckpointRecovery] Recovery complete - processed %d task(s)", len(tasks))
+}
+
+// recoverPendingResources checks for tasks in pending_resources status and moves them
+// back to available so they can be retried when resources are free.
+func recoverPendingResources(ctx context.Context, database *db.DB) {
+	result, err := database.RPC(ctx, "find_pending_resource_tasks", map[string]any{})
+	if err != nil {
+		log.Printf("[ResourceRecovery] Failed to find pending tasks: %v", err)
+		return
+	}
+
+	var tasks []map[string]any
+	if err := json.Unmarshal(result, &tasks); err != nil {
+		return
+	}
+
+	if len(tasks) == 0 {
+		return
+	}
+
+	for _, task := range tasks {
+		taskID, _ := task["id"].(string)
+		taskNumber, _ := task["task_number"].(string)
+
+		log.Printf("[ResourceRecovery] Task %s pending resources → available", taskNumber)
+
+		_, err := database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":    taskID,
+			"p_new_status": "available",
+		})
+		if err != nil {
+			log.Printf("[ResourceRecovery] Failed to transition task %s: %v", taskNumber, err)
+		}
+	}
+
+	log.Printf("[ResourceRecovery] Released %d tasks from pending_resources", len(tasks))
 }

@@ -112,6 +112,16 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	connConfig := h.cfg.GetConnector(connectorID)
 	routingFlag := h.deriveRoutingFlag(connConfig)
 
+	// Check pool capacity BEFORE claiming
+	if !h.pool.HasCapacity(sliceID, connectorID) {
+		log.Printf("[TaskAvailable] Task %s pending - no capacity (slice=%s, dest=%s)", truncateID(taskID), sliceID, connectorID)
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":    taskID,
+			"p_new_status": "pending_resources",
+		})
+		return
+	}
+
 	// Atomically claim task
 	workerID := fmt.Sprintf("executor:%s:%d", modelID, time.Now().UnixNano())
 	claimed, err := h.database.RPC(ctx, "claim_task", map[string]any{

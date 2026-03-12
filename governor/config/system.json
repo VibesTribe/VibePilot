@@ -91,9 +91,9 @@
     "timeout_seconds": 30
   },
   "recovery": {
-    "processing_timeout_seconds": 300,
-    "processing_recovery_interval_seconds": 60,
-    "orphan_threshold_seconds": 300
+    "processing_timeout_seconds": 60,
+    "processing_recovery_interval_seconds": 10,
+    "orphan_threshold_seconds": 60
   },
   "validation": {
     "min_task_confidence": 0.95,
