@@ -1,31 +1,43 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-12 Session 82 (00:40 UTC)
-**Status:** CLEAN - System reset and ready
+**Last Updated:** 2026-03-12 Session 82 End (02:10 UTC)
+**Status:** CLEAN - Two bugs identified for future fix
 
 ---
 
-## SESSION 81 (Previous)
+## SESSION 82 SUMMARY
 
-### Problem Found
-Prompts missing from task branches - governor switches to task branch, prompts/ directory not included, supervisor fails.
+### Completed
+1. Fixed RPC allowlist (`find_pending_resource_tasks`) - applied migration 090 to Supabase
+2. Cleaned all test data
+3. First test PRD: **SUCCESS** - task completed end-to-end in 2m 26s
+4. Dashboard status labels improved:
+   - `review` → "Reviewing" (was "Needs Review")
+   - `testing` → "Testing"
+   - `complete` → "Complete"
+   - `merged` → "Merged"
 
-### Fix Implemented
-- Synced prompts to Supabase on startup
-- Load prompts from Supabase with filesystem fallback
-- Commits: `89732bb7`, `5664448f`
+### Bugs Found (Second Test)
+1. **Task Numbering Bug** - All tasks get `T001`, should increment (T001, T002, etc.)
+2. **Supervisor Parse Error** - Model returns markdown instead of JSON, causes review loop
 
-### Test Result
-Task T001 completed end-to-end (merged status, hello.go created)
+### Test Results
+| Test | PRD | Result | Issue |
+|------|-----|--------|-------|
+| 1 | test-simple.md | ✅ SUCCESS | None - full flow worked |
+| 2 | rename-dashboard-header.md | ❌ FAILED | Parse error in supervisor review |
 
 ---
 
-## SESSION 82 (This Session)
+## KNOWN ISSUES (Need Fix in Governor)
 
-1. Fixed RPC allowlist (`find_pending_resource_tasks`)
-2. Cleaned all test data from Supabase
-3. Removed test PRD/plan files
-4. Deleted TEST_MODULES branch
-5. Restarted governor fresh
+1. **Task numbering not incrementing**
+   - Location: `governor/cmd/governor/handlers_plan.go` (createTasksFromApprovedPlan)
+   - All tasks get T001 instead of incrementing
+
+2. **Supervisor JSON parse error**
+   - Location: Supervisor prompt or response parsing
+   - Model returns narrative text instead of JSON
+   - Needs better error handling or prompt enforcement
 
 ---
 
@@ -33,13 +45,14 @@ Task T001 completed end-to-end (merged status, hello.go created)
 
 - Governor: Running
 - Realtime: Connected
-- 13 prompts synced
-- Tasks: 0
+- Tasks: 1 (T001 from first test, merged)
 - Plans: 0
 - No orphaned sessions
 
 ---
 
-## READY FOR
+## NEXT SESSION
 
-New PRDs or maintenance tasks.
+1. Fix task numbering bug in governor
+2. Fix supervisor JSON parsing (add fallback or better prompt)
+3. Re-test with vibeflow dashboard change PRD
