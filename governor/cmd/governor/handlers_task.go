@@ -336,8 +336,32 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 		decision, parseErr := runtime.ParseSupervisorDecision(result.Output)
 		if parseErr != nil {
-			log.Printf("[TaskReview] Parse error for %s: %v", truncateID(taskID), parseErr)
-			return nil
+			log.Printf("[TaskReview] Parse error for %s: %v, retrying...", truncateID(taskID), parseErr)
+
+			// Retry with explicit JSON enforcement
+			retrySession, retryErr := h.factory.CreateWithContext(ctx, "supervisor", "review")
+			if retryErr == nil {
+				retryResult, retryRunErr := retrySession.Run(ctx, map[string]any{
+					"previous_output": result.Output,
+					"parse_error":     parseErr.Error(),
+					"instruction":     "Your previous response was not valid JSON. Parse the previous output and respond with ONLY the JSON object. No markdown. No explanations.",
+				})
+				if retryRunErr == nil {
+					decision, parseErr = runtime.ParseSupervisorDecision(retryResult.Output)
+				}
+			}
+
+			if parseErr != nil {
+				log.Printf("[TaskReview] Retry also failed to parse for %s: %v", truncateID(taskID), parseErr)
+				// Set to failed status instead of leaving in limbo
+				h.database.RPC(ctx, "transition_task", map[string]any{
+					"p_task_id":        taskID,
+					"p_new_status":     "failed",
+					"p_failure_reason": fmt.Sprintf("JSON parse failed after retry: %v", parseErr),
+				})
+				return nil
+			}
+			log.Printf("[TaskReview] Retry succeeded for %s", truncateID(taskID))
 		}
 
 		log.Printf("[TaskReview] Task %s decision: %s", truncateID(taskID), decision.Decision)

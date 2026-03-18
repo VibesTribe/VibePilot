@@ -270,9 +270,27 @@ func runPlanReview(
 
 	review, err := runtime.ParseInitialReview(result.Output)
 	if err != nil {
-		log.Printf("[PlanReview] Failed to parse supervisor output: %v", err)
-		setPlanError(ctx, database, planID, "parse_failed")
-		return
+		log.Printf("[PlanReview] Failed to parse supervisor output: %v, retrying...", err)
+
+		// Retry with explicit JSON enforcement
+		retrySession, retryErr := factory.CreateWithContext(ctx, "supervisor", "review")
+		if retryErr == nil {
+			retryResult, retryRunErr := retrySession.Run(ctx, map[string]any{
+				"previous_output": result.Output,
+				"parse_error":     err.Error(),
+				"instruction":     "Your previous response was not valid JSON. Parse the previous output and respond with ONLY the JSON object. No markdown. No explanations.",
+			})
+			if retryRunErr == nil {
+				review, err = runtime.ParseInitialReview(retryResult.Output)
+			}
+		}
+
+		if err != nil {
+			log.Printf("[PlanReview] Retry also failed to parse: %v", err)
+			setPlanError(ctx, database, planID, "parse_failed")
+			return
+		}
+		log.Printf("[PlanReview] Retry succeeded")
 	}
 
 	log.Printf("[PlanReview] Supervisor decision: %s", review.Decision)

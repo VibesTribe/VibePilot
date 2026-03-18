@@ -110,6 +110,20 @@ Each task must have:
 
 ---
 
+## Slice and Task Numbering
+
+Your input may include an "Incomplete Slices" section showing existing slices with unfinished tasks.
+
+**If your PRD continues an existing slice:**
+- Use the same `slice_id`
+- Continue task numbering from where it left off (e.g., if last was T003, start at T004)
+
+**If your PRD is unrelated to existing slices:**
+- Create a new `slice_id` (descriptive, lowercase, hyphenated)
+- Start task numbering at T001
+
+---
+
 ## Prompt Packet Template
 
 The prompt packet should contain ONLY the instructions for the task. Expected Output goes in the separate section.

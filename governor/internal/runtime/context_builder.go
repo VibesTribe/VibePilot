@@ -23,6 +23,28 @@ func NewContextBuilder(db RPCQuerier) *ContextBuilder {
 func (b *ContextBuilder) BuildPlannerContext(ctx context.Context, projectType string) (string, error) {
 	var contextBuilder strings.Builder
 
+	// Query incomplete slices for task numbering context
+	slices, err := b.db.RPC(ctx, "get_slice_task_info", nil)
+	if err == nil {
+		var sliceList []map[string]any
+		if err := json.Unmarshal(slices, &sliceList); err == nil && len(sliceList) > 0 {
+			contextBuilder.WriteString("## Incomplete Slices\n\n")
+			contextBuilder.WriteString("If your PRD continues an existing slice, use that slice_id and continue numbering from the last task.\n")
+			contextBuilder.WriteString("Otherwise, create a new slice_id and start at T001.\n\n")
+			for _, s := range sliceList {
+				sliceID, _ := s["slice_id"].(string)
+				lastTask, _ := s["last_task_number"].(string)
+				count, _ := s["task_count"].(float64)
+				if sliceID != "" {
+					// Calculate next task number
+					nextNum := int(count) + 1
+					contextBuilder.WriteString(fmt.Sprintf("- %s: %d tasks, last %s → continue at T%03d\n", sliceID, int(count), lastTask, nextNum))
+				}
+			}
+			contextBuilder.WriteString("\n")
+		}
+	}
+
 	rules, err := b.db.RPC(ctx, "get_planner_rules", map[string]any{
 		"p_applies_to": projectType,
 		"p_limit":      20,
