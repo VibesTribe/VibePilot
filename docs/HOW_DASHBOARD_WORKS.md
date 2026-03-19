@@ -9,26 +9,29 @@
 The correct task flow in VibePilot:
 
 ```
-pending → in_progress → received → review (supervisor) → testing → complete → (auto-merge) → merged
-                                                                    ↓
-                                                              merge_pending (if merge fails)
+pending → in_progress → received → review (AI supervisor) → testing → complete → (auto-merge) → merged
+                                                                ↓
+                                                         merge_pending (if merge fails)
+                                                                ↓
+                                                         human_review (visual UI/UX only)
 ```
 
 **Status Meanings:**
 - `pending` - Task created, awaiting resources or dependencies
 - `in_progress` - Agent actively working on task
 - `received` - Task received by agent, execution starting
-- `review` - Supervisor checking task output against expected output (quality/security gate)
+- `review` - AI supervisor checking task output against expected output (quality/security gate)
 - `testing` - Automated tests running
+- `human_review` - Human must review (visual UI/UX changes ONLY)
 - `complete` - Tests passed, task successfully done (agent vanishes from active)
 - `merged` - Code merged to module branch
 - `merge_pending` - Tests passed but merge failed (counts as complete, will retry)
 
 **Important Notes:**
-- Supervisor is called ONCE after task execution, BEFORE testing
-- If tests pass → task is complete, NO more supervisor calls
+- AI Supervisor (`review`) is called ONCE after task execution, BEFORE testing
+- If tests pass → task is `complete`, NO more supervisor calls
 - Merge is automated background process, not a quality gate
-- Human review ONLY for visual UI/UX changes (rare)
+- Human review (`human_review`) ONLY for visual UI/UX changes - human has final say on all UI/UX
 
 ---
 
@@ -65,20 +68,22 @@ The dashboard subscribes to these Supabase tables via Realtime:
   - ✓ Complete (green): Tasks with status `complete`, `merged`, `merge_pending`
   - ↻ Active (blue): Tasks with status `in_progress`, `received`, `review`, `testing`
   - ⏳ Pending (yellow): Tasks with status `pending`, `available`, `assigned`
-  - 🚩 Review (red): Tasks with status `supervisor_review` (rare edge case)
+  - 🚩 Review (red): Tasks with status `human_review` (visual UI/UX needs human approval)
 
 **Task Flow:**
 ```
-pending → in_progress → received → review (supervisor checks output) → testing → complete → (auto-merge) → merged
-                                                                                                  ↓
-                                                                                           merge_pending (if merge fails)
+pending → in_progress → received → review (AI supervisor checks output) → testing → complete → (auto-merge) → merged
+                                                                                                           ↓
+                                                                                                    merge_pending (if merge fails)
+                                                                                                           ↓
+                                                                                                    human_review (visual UI/UX)
 ```
 
 **Key Points:**
-- Supervisor is called ONCE: after task execution, before testing
+- AI Supervisor (`review`) is called ONCE: after task execution, before testing
 - If tests pass → task is `complete` (agent done, no more supervisor calls)
 - Merge is automated background task
-- Human review ONLY for visual UI/UX changes (rare)
+- Human review (`human_review`) ONLY for visual UI/UX changes - human has final say
 
 - **Token Usage:** Total tokens used across all task_runs
   - Source: `task_runs.tokens_in + task_runs.tokens_out`
@@ -171,22 +176,22 @@ const SLICE_ACCENTS = {
 ```typescript
 // From vibepilotAdapter.ts - mapTaskStatus()
 const statusMap = {
-  pending: "pending",      // Awaiting dependencies or resources
-  available: "pending",    // Ready but waiting for model/connector
+  pending: "pending",           // Awaiting dependencies or resources
+  available: "pending",         // Ready but waiting for model/connector
   in_progress: "in_progress",   // Actively being worked on
-  review: "in_progress",   // Supervisor reviewing output
-  testing: "in_progress",  // Tests running
-  approval: "supervisor_approval",  // Ready for human review
-  merged: "complete",      // Successfully merged
-  complete: "complete",    // Task done
-  failed: "pending",       // Will retry
-  escalated: "pending",    // Will retry (no human needed)
+  review: "review",             // AI supervisor reviewing output
+  testing: "testing",           // Tests running
+  awaiting_human: "human_review", // Human review needed (visual UI/UX)
+  merged: "merged",             // Successfully merged
+  complete: "complete",         // Task done
+  merge_pending: "merge_pending", // Tests passed, merge pending retry
+  failed: "pending",            // Will retry
+  escalated: "pending",         // Will retry (no human needed)
 };
 ```
 
 **Human Review Required Only For:**
-1. Visual UI/UX changes (requires human aesthetic judgment)
-2. System researcher suggestions (after council review)
+1. Visual UI/UX changes (requires human aesthetic judgment - human has final say)
 3. Paid API key out of credit (requires human to add funds)
 
 All other failures are handled by AI - retries, model switching, etc.
@@ -290,10 +295,10 @@ SELECT * FROM platforms WHERE status IN ('active', 'paused');
 
 ### 6. Review Queue
 
-**Location:** Right side panel (slides in when tasks need review)
+**Location:** Right side panel (slides in when tasks need human review)
 
 **Displays:**
-- Tasks with `status = 'supervisor_review'` or `approval`
+- Tasks with `status = 'human_review'` (visual UI/UX changes only)
 - Each item shows:
   - Task title and number
   - Slice name
