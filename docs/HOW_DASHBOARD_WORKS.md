@@ -4,6 +4,34 @@
 
 ---
 
+## Task Status Flow
+
+The correct task flow in VibePilot:
+
+```
+pending → in_progress → received → review (supervisor) → testing → complete → (auto-merge) → merged
+                                                                    ↓
+                                                              merge_pending (if merge fails)
+```
+
+**Status Meanings:**
+- `pending` - Task created, awaiting resources or dependencies
+- `in_progress` - Agent actively working on task
+- `received` - Task received by agent, execution starting
+- `review` - Supervisor checking task output against expected output (quality/security gate)
+- `testing` - Automated tests running
+- `complete` - Tests passed, task successfully done (agent vanishes from active)
+- `merged` - Code merged to module branch
+- `merge_pending` - Tests passed but merge failed (counts as complete, will retry)
+
+**Important Notes:**
+- Supervisor is called ONCE after task execution, BEFORE testing
+- If tests pass → task is complete, NO more supervisor calls
+- Merge is automated background process, not a quality gate
+- Human review ONLY for visual UI/UX changes (rare)
+
+---
+
 ## Overview
 
 The Vibeflow dashboard is a React/TypeScript application that displays real-time mission control for VibePilot. It uses **Supabase Realtime (PostgreSQL Change Data Capture)** to receive instant updates when data changes - **NOT polling**.
@@ -34,10 +62,23 @@ The dashboard subscribes to these Supabase tables via Realtime:
 
 **Displays:**
 - **Status Pills:** 4 pills showing task counts
-  - ✓ Complete (green): Tasks with status `complete`, `merged`, `merge_pending`, `supervisor_approval`, `ready_to_merge`
-  - ↻ Active (blue): Tasks with status `in_progress`, `received`, `testing`
-  - ⏳ Pending (yellow): Tasks with status `pending`, `available`, `assigned`, `blocked`
-  - 🚩 Review (red): Tasks with status `review`, `supervisor_review`
+  - ✓ Complete (green): Tasks with status `complete`, `merged`, `merge_pending`
+  - ↻ Active (blue): Tasks with status `in_progress`, `received`, `review`, `testing`
+  - ⏳ Pending (yellow): Tasks with status `pending`, `available`, `assigned`
+  - 🚩 Review (red): Tasks with status `supervisor_review` (rare edge case)
+
+**Task Flow:**
+```
+pending → in_progress → received → review (supervisor checks output) → testing → complete → (auto-merge) → merged
+                                                                                                  ↓
+                                                                                           merge_pending (if merge fails)
+```
+
+**Key Points:**
+- Supervisor is called ONCE: after task execution, before testing
+- If tests pass → task is `complete` (agent done, no more supervisor calls)
+- Merge is automated background task
+- Human review ONLY for visual UI/UX changes (rare)
 
 - **Token Usage:** Total tokens used across all task_runs
   - Source: `task_runs.tokens_in + task_runs.tokens_out`
