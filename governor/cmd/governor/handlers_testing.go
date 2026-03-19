@@ -128,18 +128,27 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 
 		switch outcome {
 		case "approved", "passed", "pass":
-			// Tests passed → merge to module
+			// Tests passed → complete (agent done, visible in dashboard)
+			// Then attempt auto-merge
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "complete",
+			})
+			recordModelSuccess(ctx, h.database, routingResult.ModelID, taskType, duration)
+			log.Printf("[Testing] Task %s → complete (tests passed)", truncateID(taskID))
+
+			// Auto-merge step
 			targetBranch := h.getTargetBranch(sliceID)
 			if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
 				log.Printf("[Testing] Merge failed for %s: %v", branchName, err)
 				h.database.RPC(ctx, "transition_task", map[string]any{
 					"p_task_id":        taskID,
-					"p_new_status":     "approval",
-					"p_failure_reason": "merge_failed",
+					"p_new_status":     "merge_pending",
+					"p_failure_reason": "merge_failed: " + err.Error(),
 				})
-				recordModelFailure(ctx, h.database, routingResult.ModelID, taskID, "merge_failed")
+				log.Printf("[Testing] Task %s → merge_pending (merge failed, will retry)", truncateID(taskID))
 			} else {
-				// Success!
+				// Merge success!
 				h.git.DeleteBranch(ctx, branchName)
 				h.database.RPC(ctx, "transition_task", map[string]any{
 					"p_task_id":    taskID,
@@ -148,7 +157,6 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 				h.database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
 					"p_completed_task_id": taskID,
 				})
-				recordModelSuccess(ctx, h.database, routingResult.ModelID, taskType, duration)
 				log.Printf("[Testing] Task %s → merged to %s", truncateID(taskID), targetBranch)
 			}
 
