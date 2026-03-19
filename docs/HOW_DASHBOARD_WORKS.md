@@ -34,10 +34,10 @@ The dashboard subscribes to these Supabase tables via Realtime:
 
 **Displays:**
 - **Status Pills:** 4 pills showing task counts
-  - ✓ Complete (green): Tasks with status `merged`, `complete`, `supervisor_approval`, `ready_to_merge`
+  - ✓ Complete (green): Tasks with status `complete`, `merged`, `merge_pending`, `supervisor_approval`, `ready_to_merge`
   - ↻ Active (blue): Tasks with status `in_progress`, `received`, `testing`
-  - ⏳ Pending (yellow): Tasks with status `available`, `assigned`, `blocked`
-  - 🚩 Review (red): Tasks with status `review`
+  - ⏳ Pending (yellow): Tasks with status `pending`, `available`, `assigned`, `blocked`
+  - 🚩 Review (red): Tasks with status `review`, `supervisor_review`
 
 - **Token Usage:** Total tokens used across all task_runs
   - Source: `task_runs.tokens_in + task_runs.tokens_out`
