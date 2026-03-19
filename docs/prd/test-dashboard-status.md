@@ -18,3 +18,4 @@ Create a simple Go function in `governor/cmd/tools/` that prints "Hello from tes
 - File created with working Go code
 - Task flows through: pending → in_progress → review → testing → complete → merged
 - Dashboard shows correct status at each stage
+
