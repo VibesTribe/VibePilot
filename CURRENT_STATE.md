@@ -1,157 +1,129 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-19 Session 83 (01:55 UTC)
-**Status:** CLEAN - Major fixes deployed, system reset
-**GitHub:** Cleaned (test PRDs, plans, branches removed)
+**Last Updated:** 2026-03-19 Session 84 (04:30 UTC)
+**Status:** CLEAN - Critical bugs fixed, status naming clarified
+**GitHub:** All fixes pushed to main
 
 ---
 
-## SESSION 83 SUMMARY
+## SESSION 84 SUMMARY
 
- 
-GCE crashed, SSH session died mid dashboard session.
-Kilo session died.
-OpenCode session died.
-System is fresh and ready for testing.
- 
-### Fixes Deployed
-| Issue | Fix | Files Changed |
-|-------|-----|---------------|
-| Task flow broken | testing → complete → merged (was skipping complete) | `handlers_testing.go` |
-| Dashboard not showing merged as complete | Added merged/merge_pending to completed statuses | `mission.ts`, `MissionHeader.tsx`, `MissionModals.tsx`, `SliceHub.tsx`, `events.ts`, `types.ts` |
-| Task numbering always T001 | Added get_slice_task_info RPC + context_builder | `context_builder.go`, `091_get_slice_task_info.sql` |
-| Missing status constants | Added StatusComplete, StatusMergePending | `types.go` |
-| Supervisor JSON errors | Added retry logic on parse failure | `handlers_plan.go`, `handlers_task.go` |
- 
-### Task Flow (Corrected)
+### Critical Bug Fixed: Infinite Task Loop
+**Root Cause:** SQL `transition_task` function was missing `complete` and `merge_pending` statuses.
+- When Go called `transition_task` with "complete", it threw exception
+- Task stayed in `testing`, recovery found it stale, reset to `available` → infinite loop
+- Task ran 23+ times instead of completing once
+
+**Fix:** Migration 092 added all valid statuses to `transition_task` function.
+
+### Status Naming Cleanup
+**Problem:** `supervisor_review` was confusing - was it AI supervisor or human review?
+
+**Solution:** Renamed statuses for clarity:
+| Old | New | Meaning |
+|-----|-----|---------|
+| `supervisor_review` | `human_review` | Human must review (visual UI/UX only) |
+| `supervisor_approval` | (removed) | Not needed - human approval completes review |
+| `ready_to_merge` | (removed) | Not needed - `complete` covers this |
+| (new) | `review` | AI supervisor checking output |
+
+### Agent Visibility Fix
+**Problem:** Agent icons showed on slice cards for pending/queued tasks.
+
+**Fix:** Added `isTrulyActive()` check - agents only show for:
+- `in_progress`, `received`, `review`, `testing`, `human_review`
+- NOT for `pending`, `assigned`, `complete`, `merged`, `blocked`
+
+---
+
+## CORRECT TASK FLOW
+
 ```
-pending → in_progress → received → review (supervisor checks output) → testing → complete → (auto-merge) → merged
-                                                                                                   ↓
-                                                                                            merge_pending (if merge fails)
+pending → in_progress → received → review (AI supervisor) → testing → complete → merged
+                                                              ↓
+                                                       merge_pending (if merge fails)
+                                                              ↓
+                                                       human_review (visual UI/UX only)
 ```
- 
-**Key Points:**
-- Supervisor called ONCE: after task execution, BEFORE testing
-- Tests pass = complete (agent done, no more supervisor calls)
-- Merge is automated background process
-- Human review ONLY for visual UI/UX changes (rare)
- 
-### Status Categories
-| Category | Statuses |
-|----------|----------|
-| Complete | `complete`, `merged`, `merge_pending` |
-| Active | `in_progress`, `received`, `review`, `testing` |
-| Pending | `pending`, `available`, `assigned` |
-| Review | `review` (supervisor checking) |
- 
----
- 
-## SYSTEM STATUS
- 
-- Governor: Running (rebuilt with all fixes)
-- Realtime: Connected
-- Tasks: 0 (cleaned)
-- Plans: 0 (cleaned)
-- Task Runs: 0 (cleaned)
-- No orphaned sessions
- 
----
- 
-## COMMITS PUSHED (Session 83)
- 
-### vibepilot (6 commits)
-1. `b7f10ab4` - fix: correct task flow - testing passes → complete → merged
-2. `d2522508` - docs: update HOW_DASHBOARD_WORKS.md with correct status mappings
-3. `338ee42d` - fix: add StatusComplete and StatusMergePending constants
-4. `db16d76c` - docs: clarify task flow and status meanings
-5. `ad27ce2` - docs: update CURRENT_STATE.md with session 83 summary
-6. `e922bbe8` - chore: cleanup vibepilot (test PRDs, plans, branches removed)
- 
-### vibeflow (3 commits)
-1. `50729dfe` - fix: add merge_pending status and include in completed statuses
-2. `14e49ae9` - fix: add 'merged' to completed statuses
-3. `e922bbe8` - chore: cleanup vibeflow (test PRDs, plans, branches removed)
- 
----
- 
-## NEXT SESSION
- 
-System is clean and ready for testing:
- 
-1. Submit new PRD
-2. Verify planner starts at T001 (no incomplete slices)
-3. Watch status transitions: pending → in_progress → review → testing → complete → merged
-4. Verify dashboard shows agent active, then vanishes on complete
-5. Submit second PRD to same slice → should get T002
-6. If issues, check governor logs first, then dashboard expectations
- 
----
- 
-## KNOWN ISSUES (None blocking)
- 
-### Low Priority
-- Dashboard has legacy statuses not used by governor: `supervisor_approval`, `ready_to_merge`, `blocked`, `assigned`
-- These can be cleaned up later but don't affect functionality
- 
----
- 
-## ARCHITECTURE NOTES
- 
-### Sources of Truth
-1. **Supabase** - Database state
-2. **Dashboard** - Display expectations (HOW_DASHBOARD_WORKS.md)
-3. **GitHub** - Code and prompts
- 
-### Governor Role
-- Facilitator only - implements the flow
-- Does NOT define status meanings
-- Must match dashboard expectations
- 
-### Status Flow Authority
-- `HOW_DASHBOARD_WORKS.md` defines what statuses mean
-- Governor code must conform to doc
-- Dashboard code must match doc
+
+**Status Buckets:**
+- **Pending:** `pending`, `assigned`, `blocked`
+- **Active:** `in_progress`, `received`, `review`, `testing`
+- **Review (human):** `human_review` (visual UI/UX only)
+- **Complete:** `complete`, `merged`, `merge_pending`
+
+**Human Review Triggers:**
+- Visual UI/UX changes ONLY (requires human aesthetic judgment)
+- After visual testing agent (when available) or directly after testing
+- Human clicks approve → `complete` → auto-merge → `merged`
+
+**NOT Human Review:**
+- API credit issues (not tasks)
+- Research suggestions (council reviews, then human decides to make plan or not)
+- Regular task failures (AI handles retries, model switching)
 
 ---
 
-## COMMITS PUSHED
+## FILES CHANGED THIS SESSION
 
-### vibepilot (4 commits)
-1. `b7f10ab4` - fix: correct task flow - testing passes → complete → merged
-2. `d2522508` - docs: update HOW_DASHBOARD_WORKS.md with correct status mappings
-3. `338ee42d` - fix: add StatusComplete and StatusMergePending constants
-4. `db16d76c` - docs: clarify task flow and status meanings
+### Supabase (vibepilot)
+| File | Change |
+|------|--------|
+| `092_fix_transition_task_statuses.sql` | Added `complete`, `merge_pending`, `failed`, `pending_resources`, `council_review` to `transition_task` |
 
-### vibeflow (2 commits)
-1. `50729dfe` - fix: add merge_pending status and include in completed statuses
-2. `14e49ae9` - fix: add 'merged' to completed statuses
+### Dashboard (vibeflow)
+| File | Change |
+|------|--------|
+| `src/core/types.ts` | Renamed `supervisor_review` → `human_review`, added `review`, removed `supervisor_approval`, `ready_to_merge` |
+| `src/core/statusMap.ts` | Updated STATUS_ORDER |
+| `src/utils/events.ts` | Updated POSITIVE_STATUSES |
+| `apps/dashboard/lib/vibepilotAdapter.ts` | Map `review`→`review`, `awaiting_human`→`human_review` |
+| `apps/dashboard/components/MissionHeader.tsx` | Updated status sets and labels |
+| `apps/dashboard/components/SliceHub.tsx` | Updated ACTIVE_STATUSES and labels |
+| `apps/dashboard/components/SliceDock.tsx` | Updated STATUS_LABELS |
+| `apps/dashboard/components/Timeline.tsx` | Updated order array |
+| `apps/dashboard/components/modals/MissionModals.tsx` | Updated status sets, labels, isCompleted |
+| `apps/dashboard/utils/mission.ts` | Added `isTrulyActive()`, fixed `classifyTask()`, fixed agent visibility |
+
+---
+
+## COMMITS THIS SESSION
+
+### vibepilot (1 commit)
+1. `29c15b13` - Add migration 092: Fix transition_task missing complete/merge_pending statuses
+
+### vibeflow (4 commits)
+1. `ac33140a` - Rename supervisor_review to human_review, add review status for AI supervisor
+2. `a6ef9e66` - Fix agent icon showing for pending tasks
+3. `323e1057` - Fix remaining old status reference in MissionModals isCompleted
 
 ---
 
 ## NEXT SESSION
 
-System is clean and ready for testing:
+System is ready for testing:
 
-1. Submit new PRD
-2. Verify planner starts at T001 (no incomplete slices)
-3. Watch status transitions: pending → in_progress → review → testing → complete → merged
-4. Verify dashboard shows agent active, then vanishes on complete
-5. Submit second PRD to same slice → should get T002
+1. Start governor: `sudo systemctl start governor`
+2. Submit new PRD
+3. Verify task completes without infinite loop
+4. Verify dashboard shows correct status transitions
+5. Verify agent icon only shows when task is truly active
+6. Test visual UI/UX task goes to `human_review` after testing
 
 ---
 
 ## KNOWN ISSUES (None blocking)
 
-### Low Priority
-- Dashboard has legacy statuses not used by governor: `supervisor_approval`, `ready_to_merge`, `blocked`, `assigned`
-- These can be cleaned up later but don't affect functionality
+### Future Enhancements
+- Visual testing agent (when available) will run before `human_review` for UI/UX tasks
+- For now, visual UI/UX tasks go directly from `testing` → `human_review`
 
 ---
 
 ## ARCHITECTURE NOTES
 
 ### Sources of Truth
-1. **Supabase** - Database state
-2. **Dashboard** - Display expectations (HOW_DASHBOARD_WORKS.md)
+1. **Dashboard** - Display expectations (sacred, do not break)
+2. **Supabase** - Database state
 3. **GitHub** - Code and prompts
 
 ### Governor Role
@@ -160,6 +132,6 @@ System is clean and ready for testing:
 - Must match dashboard expectations
 
 ### Status Flow Authority
-- `HOW_DASHBOARD_WORKS.md` defines what statuses mean
-- Governor code must conform to doc
-- Dashboard code must match doc
+- Dashboard types define valid statuses
+- Adapter maps Governor statuses to Dashboard statuses
+- Human review ONLY for visual UI/UX
