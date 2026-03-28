@@ -1,26 +1,30 @@
 # VibePilot Current State
 **Last Updated:** 2026-03-28 Session 85
-**Status:** IN PROGRESS - Fixing tester prompt, preparing GitHub webhook
+**Status:** TESTING - Governor needs to run locally
 
-**Governor:** Rebuilt with restarted
+**Governor:** Needs to be started on Windows
 
 ## SESSION 85 summary
 
 ### Fixes Applied
 1. **testers_simple.md** - Made JSON requirement explicit and forceful
-   - Added "CRITICAL", "YOU MUST", "ONLY output"
-   - Added explicit example
-   - Added "Do not add any text outside the JSON"
-   - Added "Start your response with {"
 
-### Remaining Issues
-1. **GitHub webhook not triggering automatically** - need to configure webhook URL in GitHub
+2. **CURRENT_STATE.md** - Updated session info
+
+### Test Results
+✅ **GitHub Action** - PRD Dispatch ran successfully (8 seconds)
+✅ **Plan created in Supabase** - `a53bb89a-b56f-45a6-a4a8-80a3e586ad5f`
+
+### Issue Found
+⚠️ **Governor is NOT running** - Plan sits in Supabase waiting
+
+   - Plan ID: `a53bb89a-b56f-45a6-a4a8-80a3e586ad5f`
+   - Status: `draft` → waiting for planner agent
 
 ### Next Steps
-1. Configure GitHub webhook URL: `https://github.com/VibesTribe/VibePilot/settings/hooks`
-2. Ensure "Push events" is selected
-3. Content type: `application/json`
-4. Test with a new PRD to verify the flow works
+1. Build governor for Windows
+2. Run governor locally
+3. Watch dashboard for plan to be picked up and processed
 
 ### Previous Session (84)
 - SQL 092 migration - Added `complete`, `merge_pending` to `transition_task`
