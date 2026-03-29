@@ -15,15 +15,15 @@
       "notes": "Uses ~700MB RAM per session. Consider Kilo for lower memory footprint."
     },
     {
-      "id": "kilo",
-      "name": "Kilo CLI",
+      "id": "claude-code",
+      "name": "Claude Code CLI",
       "type": "cli",
       "status": "active",
-      "command": "kilo",
-      "cli_args": ["run", "-m", "zhipuai-coding-plan/glm-5"],
+      "command": "claude",
+      "cli_args": ["-p", "--output-format", "json"],
       "timeout_seconds": 300,
       "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep"],
-      "notes": "Fork of OpenCode with ~350MB RAM (50% less). Uses GLM-5 via Z.ai subscription."
+      "notes": "Claude Code CLI with GLM-5 model"
     },
     {
       "id": "kimi",

@@ -99,7 +99,7 @@ func handlePlanCreated(
 		return
 	}
 
-	session, err := factory.CreateWithContext(ctx, "planner", "planning")
+	session, err := factory.CreateWithConnector(ctx, "planner", "planning", routingResult.ConnectorID)
 	if err != nil {
 		log.Printf("[EventPlanCreated] Failed to create planner session: %v", err)
 		setPlanError(ctx, database, planID, "session_failed")
