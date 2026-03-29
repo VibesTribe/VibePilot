@@ -1,32 +1,53 @@
 # VibePilot Current State
-**Last Updated:** 2026-03-28 Session 85
-**Status:** TESTING - Governor needs to run locally
 
-**Governor:** Needs to be started on Windows
+**Session 87 - 2026-03-29**
 
-## SESSION 85 summary
+## Status: Governor running, flow partially working
 
-### Fixes Applied
-1. **testers_simple.md** - Made JSON requirement explicit and forceful
+### What's Working
+- ✅ Governor binary built (11MB, 52 Go files)
+- ✅ Governor connects to Supabase
+- ✅ Realtime subscriptions working
+- ✅ PRD push triggers GitHub Action
+- ✅ GitHub Action creates plan in Supabase
+- ✅ Governor picks up plan via Realtime
+- ✅ Router finds `claude-code` connector with `glm-5` model
+- ✅ Plan status changes from `draft` to `review`
 
-2. **CURRENT_STATE.md** - Updated session info
+### What's Not Working
+- ⚠️ Planner output has empty `plan_path` - plan stuck in review
+- The `claude -p --output-format json` call isn't returning valid JSON with plan_path
 
-### Test Results
-✅ **GitHub Action** - PRD Dispatch ran successfully (8 seconds)
-✅ **Plan created in Supabase** - `a53bb89a-b56f-45a6-a4a8-80a3e586ad5f`
+### Config Changes Made
+1. **connectors.json** - Added `claude-code` connector:
+   - `type: "cli"`, `status: "active"`
+   - `command: "claude"`
+   - `cli_args: ["-p", "--output-format", "json"]`
 
-### Issue Found
-⚠️ **Governor is NOT running** - Plan sits in Supabase waiting
+2. **models.json** - Changed glm-5 to use `claude-code`:
+   - `"access_via": ["claude-code"]`
 
-   - Plan ID: `a53bb89a-b56f-45a6-a4a8-80a3e586ad5f`
-   - Status: `draft` → waiting for planner agent
+3. **handlers_plan.go** - Fixed session creation:
+   - Changed `CreateWithContext` to `CreateWithConnector`
+   - Now passes `routingResult.ConnectorID` to session factory
+
+### Bootstrap Credentials Needed
+Governor needs these environment variables:
+- `SUPABASE_URL=https://qtpdzsinvifkgpxyxlaz.supabase.co`
+- `SUPABASE_SERVICE_KEY` (from GitHub secrets)
+- `VAULT_KEY` (from GitHub secrets - needed for webhook secret)
+
+### To Run Governor
+```powershell
+cd C:\Users\MJLOCKBOX\VibePilot\governor
+$env:SUPABASE_URL = "https://qtpdzsinvifkgpxyxlaz.supabase.co"
+$env:SUPABASE_SERVICE_KEY = "<from GitHub secrets>"
+$env:VAULT_KEY = "<from GitHub secrets>"
+.\governor.exe
+```
 
 ### Next Steps
-1. Build governor for Windows
-2. Run governor locally
-3. Watch dashboard for plan to be picked up and processed
-
-### Previous Session (84)
-- SQL 092 migration - Added `complete`, `merge_pending` to `transition_task`
-- Dashboard - Renamed `supervisor_review` → `human_review`
-- Agent visibility - Agents only show for truly active tasks
+1. Debug why planner output has empty `plan_path`
+2. Check if `claude -p` is actually receiving the prompt
+3. Verify JSON output format from claude CLI
+4. May need to adjust prompt format or CLI args
