@@ -1,5 +1,5 @@
 {
-  "prompts_dir": "/home/mjlockboxsocial/vibepilot/prompts",
+  "prompts_dir": "C:/Users/MJLOCKBOX/VibePilot/prompts",
   "database": {
     "type": "supabase",
     "url_env": "SUPABASE_URL",
@@ -13,7 +13,7 @@
   "git": {
     "host": "github",
     "repo_env": "GITHUB_REPO",
-    "repo_path": "/home/mjlockboxsocial/vibepilot",
+    "repo_path": "C:/Users/MJLOCKBOX/VibePilot",
     "token_env": "GITHUB_TOKEN",
     "protected_branches": ["main", "master", "research-considerations"],
     "default_timeout_seconds": 60,

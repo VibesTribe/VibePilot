@@ -1,53 +1,41 @@
 # VibePilot Current State
 
-**Session 87 - 2026-03-29**
+**Session 88 - 2026-03-29 21:52**
 
-## Status: Governor running, flow partially working
+## Status: BROKEN - Governor not running
 
-### What's Working
-- ✅ Governor binary built (11MB, 52 Go files)
-- ✅ Governor connects to Supabase
-- ✅ Realtime subscriptions working
-- ✅ PRD push triggers GitHub Action
-- ✅ GitHub Action creates plan in Supabase
-- ✅ Governor picks up plan via Realtime
-- ✅ Router finds `claude-code` connector with `glm-5` model
-- ✅ Plan status changes from `draft` to `review`
+### What's Broken
+- Governor needs `SUPABASE_SERVICE_KEY` and `VAULT_KEY` to start
+- These are in GitHub secrets - I cannot access them
+- Without governor running, no plans are processed, no tasks created
 
-### What's Not Working
-- ⚠️ Planner output has empty `plan_path` - plan stuck in review
-- The `claude -p --output-format json` call isn't returning valid JSON with plan_path
+### What I Changed (needs rebuild)
+- `governor/internal/connectors/runners.go` - Fixed CLIRunner to parse `claude` CLI output format
+- The existing `governor.exe` was built BEFORE this fix
 
-### Config Changes Made
-1. **connectors.json** - Added `claude-code` connector:
-   - `type: "cli"`, `status: "active"`
-   - `command: "claude"`
-   - `cli_args: ["-p", "--output-format", "json"]`
+### To Fix
+1. Set environment variables:
+   ```
+   SUPABASE_URL=https://qtpdzsinvifkgpxyxlaz.supabase.co
+   SUPABASE_SERVICE_KEY=<from GitHub secrets>
+   VAULT_KEY=<from GitHub secrets>
+   ```
 
-2. **models.json** - Changed glm-5 to use `claude-code`:
-   - `"access_via": ["claude-code"]`
+2. Rebuild governor (requires Go):
+   ```
+   cd C:\Users\MJLOCKBOX\VibePilot\governor
+   go build -o governor.exe ./cmd/governor/
+   ```
 
-3. **handlers_plan.go** - Fixed session creation:
-   - Changed `CreateWithContext` to `CreateWithConnector`
-   - Now passes `routingResult.ConnectorID` to session factory
+3. Run governor:
+   ```
+   ./governor.exe
+   ```
 
-### Bootstrap Credentials Needed
-Governor needs these environment variables:
-- `SUPABASE_URL=https://qtpdzsinvifkgpxyxlaz.supabase.co`
-- `SUPABASE_SERVICE_KEY` (from GitHub secrets)
-- `VAULT_KEY` (from GitHub secrets - needed for webhook secret)
+### Root Cause of Empty plan_path
+The CLIRunner expected NDJSON with `type: "text"` and `part.text`, but `claude -p --output-format json` outputs a single JSON object with `type: "result"` and text in `result` field.
 
-### To Run Governor
-```powershell
-cd C:\Users\MJLOCKBOX\VibePilot\governor
-$env:SUPABASE_URL = "https://qtpdzsinvifkgpxyxlaz.supabase.co"
-$env:SUPABASE_SERVICE_KEY = "<from GitHub secrets>"
-$env:VAULT_KEY = "<from GitHub secrets>"
-.\governor.exe
-```
-
-### Next Steps
-1. Debug why planner output has empty `plan_path`
-2. Check if `claude -p` is actually receiving the prompt
-3. Verify JSON output format from claude CLI
-4. May need to adjust prompt format or CLI args
+### Files Modified This Session
+- `governor/internal/connectors/runners.go` - CLIRunner parsing fix (NOT REBUILT)
+- `governor/config/connectors.json` - Added claude-code connector
+- `governor/config/models.json` - glm-5 uses claude-code connector

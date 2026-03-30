@@ -103,12 +103,41 @@ func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 
 		entryType, _ := entry["type"].(string)
 		switch entryType {
+		// Claude Code stream-json format: type "assistant" with message.content[].text
+		case "assistant":
+			if msg, ok := entry["message"].(map[string]interface{}); ok {
+				if contentArr, ok := msg["content"].([]interface{}); ok {
+					for _, item := range contentArr {
+						if itemMap, ok := item.(map[string]interface{}); ok {
+							if text, ok := itemMap["text"].(string); ok {
+								content.WriteString(text)
+							}
+						}
+					}
+				}
+			}
+		// Legacy format: type "text" with part.text
 		case "text":
 			if part, ok := entry["part"].(map[string]interface{}); ok {
 				if text, ok := part["text"].(string); ok {
 					content.WriteString(text)
 				}
 			}
+		// Claude Code result format with usage
+		case "result":
+			if usage, ok := entry["usage"].(map[string]interface{}); ok {
+				if in, ok := usage["input_tokens"].(float64); ok {
+					tokensIn = int(in)
+				}
+				if out, ok := usage["output_tokens"].(float64); ok {
+					tokensOut = int(out)
+				}
+			}
+			// Also check for result field as fallback text
+			if resultText, ok := entry["result"].(string); ok && content.Len() == 0 {
+				content.WriteString(resultText)
+			}
+		// Legacy step_finish format
 		case "step_finish":
 			if part, ok := entry["part"].(map[string]interface{}); ok {
 				if tokens, ok := part["tokens"].(map[string]interface{}); ok {
