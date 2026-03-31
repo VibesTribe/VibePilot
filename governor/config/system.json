@@ -91,7 +91,7 @@
     "timeout_seconds": 30
   },
   "recovery": {
-    "processing_timeout_seconds": 60,
+    "processing_timeout_seconds": 360,
     "processing_recovery_interval_seconds": 10,
     "orphan_threshold_seconds": 60
   },
