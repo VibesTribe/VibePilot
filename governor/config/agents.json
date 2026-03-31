@@ -12,6 +12,6 @@
     {"id":"researcher","name":"Researcher","prompt":"system_researcher.md","capabilities":["web_access"],"default_connector":"claude-code","description":"System improvements"},
     {"id":"tester","name":"Tester","prompt":"testers.md","capabilities":["file_access","sandbox_execution"],"default_connector":"claude-code","description":"Code validation"},
     {"id":"watcher","name":"Watcher","prompt":"watcher.md","capabilities":[],"default_connector":"claude-code","description":"Safety monitor"},
-    {"id":"task_runner","name":"Task Runner","prompt":"task_runner_consecutive.md","capabilities":["file_access"],"default_connector":"claude-code","description":"Executes tasks consecutively in one session"}
+    {"id":"task_runner","name":"Task Runner","prompt":"task_runner_simple.md","capabilities":["file_access"],"default_connector":"claude-code","description":"Executes tasks in one session"}
   ]
 }
