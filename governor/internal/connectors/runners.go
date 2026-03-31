@@ -68,8 +68,10 @@ func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 		defer cancel()
 	}
 
-	args := append(r.cliArgs, prompt)
-	cmd := exec.CommandContext(ctx, r.command, args...)
+	// FIX: Pass prompt via STDIN, not as command-line argument
+	// This works for all CLI tools that use -p flag (claude, kilo, etc.)
+	cmd := exec.CommandContext(ctx, r.command, r.cliArgs...)
+	cmd.Stdin = strings.NewReader(prompt)
 
 	if r.workDir != "" {
 		cmd.Dir = r.workDir
