@@ -1,5 +1,5 @@
 {
-  "prompts_dir": "C:/Users/MJLOCKBOX/VibePilot/prompts",
+  "prompts_dir": "/home/vibes/vibepilot/prompts",
   "database": {
     "type": "supabase",
     "url_env": "SUPABASE_URL",
@@ -13,7 +13,7 @@
   "git": {
     "host": "github",
     "repo_env": "GITHUB_REPO",
-    "repo_path": "C:/Users/MJLOCKBOX/VibePilot",
+    "repo_path": "/home/vibes/vibepilot",
     "token_env": "GITHUB_TOKEN",
     "protected_branches": ["main", "master", "research-considerations"],
     "default_timeout_seconds": 60,
@@ -52,16 +52,16 @@
     "timeout_seconds": 30
   },
 "runtime": {
-     "max_concurrent_per_module": 3,
-     "max_concurrent_total": 3,
+     "max_concurrent_per_module": 1,
+     "max_concurrent_total": 2,
      "agent_timeout_seconds": 300,
      "max_tool_turns": 10
    },
    "concurrency": {
      "limits": {
-       "kilo": 3
+       "kilo": 1
      },
-     "default_limit": 3
+     "default_limit": 1
    },
   "security": {
     "leak_detection_enabled": true,
