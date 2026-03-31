@@ -1,22 +1,39 @@
-# VibePilot Current State - 2026-03-31 18:05
+# VibePilot Current State - 2026-03-31 18:06
 
-## Status: 🔧 Slice-Based Task Numbering - DEPLOYED & AWAITING TEST
+## Status: ✅ Slice-Based Task Numbering - VERIFIED WORKING
 
-### ✅ Implementation Complete
+### ✅ Implementation Complete & Tested
 
 **GitHub Commits:**
 - `2cc3fb66` - Slice-based task numbering migration (093)
 - `7d33423d` - Code changes for slice numbering
 - `2ee57546` - Cleanup duplicate migration files
 - `ae06a8c0` - Documentation
+- `44c3dc59` - **Add get_next_task_number_for_slice to RPC allowlist** ✅
+- `78fb1791` - **Test PRD update to trigger validation** ✅
 
 **Migration Applied:** ✅ Supabase function `get_next_task_number_for_slice()` created
 
-**Governor Status:** Running (started 17:44)
+**Governor Status:** Running (restarted 18:00)
+- Binary rebuilt with RPC allowlist fix ✅
 - Webhooks listening on port 8080
 - Supabase connected
 - Realtime subscriptions active
-- **WARNING:** Webhook secret failing (may block webhooks)
+- **WARNING:** Webhook secret failing (non-critical)
+
+### ✅ Test Results - SUCCESSFUL
+
+**Test Plan:** `docs/prds/test-slice-numbering.md`
+- **Plan ID:** 5cfa202f-ee4f-4602-aeda-b1603c04929e
+- **Task Created:** T002 (not T001!) ✅
+- **Branch Name:** `task/general/T002` ✅
+- **Timestamp:** 2026-03-31 18:02:03
+
+**Logs Confirm:**
+```
+[createTasksFromApprovedPlan] Created task T002: Create Slice Numbering Test Script
+Branch created: task/general/T002
+```
 
 ### 🔧 What Was Fixed
 
@@ -38,58 +55,69 @@
 **Database (commit 2cc3fb66):**
 5. `docs/supabase-schema/093_slice_task_numbering.sql` - Migration (APPLIED ✅)
 
-**Binary:** Recompiled at 17:43, deployed
+**RPC Allowlist Fix (commit 44c3dc59):**
+6. `governor/internal/db/rpc.go` - Added `get_next_task_number_for_slice` to allowlist
+
+**Binary:** Recompiled at 18:00 with RPC fix ✅
 
 ### 🧪 Test Status
 
-**Test PRD:** `docs/prd/test-slice-numbering.md` (commit 1579f05b)
-- **Created:** 17:52
-- **Status:** Awaiting webhook (no plan created in Supabase yet)
-- **Expected:** Should get T002 (not T001), branch `task/general/T002`
+**Test PRD:** `docs/prds/test-slice-numbering.md` (commit 78fb1791)
+- **Created:** 18:01
+- **Status:** ✅ VERIFIED WORKING
+- **Result:** Got T002 (not T001), branch `task/general/T002` ✅
 
 ### 📊 Current Task State
 
-**Existing tasks in `general` slice:**
+**Tasks in `general` slice:**
 - T001 (merged) - Hello v2 ✅
-- T001 (available) - Consecutive test
-- T001 (available) - Config validation
+- T002 (in_progress) - Test slice numbering ✅ NEW!
 
 **Expected after fix:**
 - T001 (merged) - Hello v2 ✅
-- T002 (next) - Test slice numbering
+- T002 (current) - Test slice numbering ✅
 - T003 (next) - Config validation
 - T004 (next) - Future tasks
 
-### 🎯 Expected Behavior Once Webhook Fires
+### 🎯 Actual Behavior (Verified)
 
 ```
-[createTasksFromApprovedPlan] Assigned task number T002 for slice general (was T001)
-[createTasksFromApprovedPlan] Created task T002: Test Slice Numbering
-[TaskAvailable] Task claimed by glm-5
-Branch: task/general/T002
+[createTasksFromApprovedPlan] Created module branch: module/general
+[createTasksFromApprovedPlan] Created task T002: Create Slice Numbering Test Script
+[TaskAvailable] Task cff9789b claimed by glm-5
+Branch created: task/general/T002 ✅
 ```
 
 ### ⚠️ Current Issues
 
-1. **Webhook not received** - PRD pushed but no plan created
-   - Possible cause: Webhook secret decryption failing
-   - Governor shows: "Failed to get webhook secret from vault: decrypt secret webhook_secret: decrypt: cipher: message authentication failed"
+1. **Task executor stuck** - T002 stuck in "in_progress" state
+   - Task claimed by glm-5 but not executing
+   - Processing recovery marked task as stale after 61s
+   - **Not related to slice numbering fix** - executor configuration issue
 
 2. **Permission bypass wrapper** - Needs persistence across restarts
    - Created at `governor/claude-wrapper`
    - Working when tested directly
    - Gets lost on branch switches
 
-3. **Old stuck tasks** - 3 tasks with old T001 numbering need cleanup
+3. **Old stuck tasks** - 2 tasks with old T001 numbering need cleanup
+   - T001 (available) - Consecutive test
+   - T001 (available) - Config validation
 
-### 📈 Performance Expectations
+### 📈 Performance Metrics
+
+**Plan creation (measured):**
+- Time to plan: ~33 seconds (18:01:11 → 18:01:44)
+- Plan review: ~18 seconds (18:01:44 → 18:02:02)
+- Task creation: ~1 second (18:02:02 → 18:02:03)
+- **Total plan-to-task: ~52 seconds** ✅
 
 **Before fix:**
 - Plan creation: 25-30s
 - Task execution: ~8 minutes (multiple timeouts + collisions)
 - Total: ~11 minutes
 
-**After fix:**
+**After fix (expected):**
 - Plan creation: 25-30s
 - Task execution: ~90-120s (one session, no collisions)
 - **Total: ~2-3 minutes** (60% faster)
@@ -101,18 +129,20 @@ Branch: task/general/T002
 **Key Files:**
 - Migration: https://github.com/VibesTribe/VibePilot/blob/main/docs/supabase-schema/093_slice_task_numbering.sql
 - Implementation guide: https://github.com/VibesTribe/VibePilot/blob/main/SLICE_TASK_NUMBERING_IMPLEMENTED.md
-- Test PRD: https://github.com/VibesTribe/VibePilot/blob/main/docs/prd/test-slice-numbering.md
+- Test PRD: https://github.com/VibesTribe/VibePilot/blob/main/docs/prds/test-slice-numbering.md
+- RPC fix: https://github.com/VibesTribe/VibePilot/commit/44c3dc59
 
 ### 🚀 Next Steps
 
-1. **Fix webhook issue** - Investigate why webhook isn't firing
-2. **Verify task numbering** - Confirm T002 is assigned when plan processes
-3. **Test branch naming** - Verify `task/general/T002` is created
-4. **Full end-to-end test** - Validate entire pipeline
-5. **Clean up old tasks** - Remove 3 stuck T001 tasks
+1. **Fix executor issue** - Investigate why tasks get stuck in "in_progress"
+2. **Complete T002 test** - Ensure full task execution works
+3. **Clean up old tasks** - Remove 2 stuck T001 tasks
+4. **Test multiple plans** - Verify T003, T004 work correctly
+5. **Monitor branch naming** - Confirm no collisions occur
 
 ---
 
-**Last Updated:** 2026-03-31 18:05
-**Status:** Implementation complete, awaiting webhook to test
-**Governor:** Running since 17:44, awaiting plan creation trigger
+**Last Updated:** 2026-03-31 18:06
+**Status:** ✅ Slice-based numbering VERIFIED WORKING
+**Governor:** Running since 18:00, RPC allowlist fix deployed
+**Test:** T002 created with correct branch name `task/general/T002` ✅
