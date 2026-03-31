@@ -66,7 +66,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		return
 	}
 
-	branchName := h.buildBranchName(taskNumber, taskID)
+	branchName := h.buildBranchName(sliceID, taskNumber, taskID)
 
 	// Claim for testing
 	testerID := fmt.Sprintf("tester:%d", time.Now().UnixNano())
@@ -191,11 +191,19 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 	}
 }
 
-func (h *TestingHandler) buildBranchName(taskNumber, taskID string) string {
+func (h *TestingHandler) buildBranchName(sliceID, taskNumber, taskID string) string {
 	prefix := h.cfg.GetTaskBranchPrefix()
 	if prefix == "" {
 		prefix = "task/"
 	}
+
+	// Use slice-based naming: task/{slice_id}/{task_number}
+	// Example: task/general/T001, task/auth/T002
+	if sliceID != "" && taskNumber != "" {
+		return prefix + sliceID + "/" + taskNumber
+	}
+
+	// Fallback to task number only (for backwards compatibility)
 	if taskNumber != "" {
 		return prefix + taskNumber
 	}
