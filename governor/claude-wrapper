@@ -1,0 +1,16 @@
+#!/bin/bash
+# Claude Code wrapper with permission bypass for VibePilot Governor
+
+REAL_CLAUDE=$(which claude)
+
+if [ -z "$REAL_CLAUDE" ]; then
+  echo "Error: claude not found in PATH" >&2
+  exit 1
+fi
+
+# Check if permission bypass is already in args
+if [[ " $@" =~ "--permission-mode" ]]; then
+  exec "$REAL_CLAUDE" "$@"
+else
+  exec "$REAL_CLAUDE" --permission-mode bypassPermissions "$@"
+fi

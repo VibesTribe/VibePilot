@@ -168,9 +168,34 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 			maxAttempts = cfg.DefaultMaxAttempts
 		}
 
+		// Get slice-specific sequential task number to prevent collisions
+		taskNumber := task.TaskNumber
+		if task.SliceID != "" {
+			result, err := database.RPC(ctx, "get_next_task_number_for_slice", map[string]any{
+				"p_slice_id": task.SliceID,
+			})
+			if err != nil {
+				log.Printf("[createTasksFromApprovedPlan] Failed to get task number for slice %s: %v", task.SliceID, err)
+				return fmt.Errorf("get task number for slice %s: %w", task.SliceID, err)
+			}
+
+			// Parse RPC result
+			var rpcResult []map[string]any
+			if len(result) > 0 {
+				if err := json.Unmarshal(result, &rpcResult); err == nil {
+					if len(rpcResult) > 0 {
+						if num, ok := rpcResult[0]["get_next_task_number_for_slice"].(string); ok {
+							taskNumber = num
+							log.Printf("[createTasksFromApprovedPlan] Assigned task number %s for slice %s (was %s)", taskNumber, task.SliceID, task.TaskNumber)
+						}
+					}
+				}
+			}
+		}
+
 		taskData := map[string]any{
 			"plan_id":             planID,
-			"task_number":         task.TaskNumber,
+			"task_number":         taskNumber,
 			"title":               task.Title,
 			"type":                task.Type,
 			"status":              status,

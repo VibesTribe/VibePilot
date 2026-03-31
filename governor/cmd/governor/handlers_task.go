@@ -139,7 +139,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	log.Printf("[TaskAvailable] Task %s claimed by %s", truncateID(taskID), modelID)
 
 	// Setup branch
-	branchName := h.buildBranchName(taskNumber, taskID)
+	branchName := h.buildBranchName(sliceID, taskNumber, taskID)
 	attempts := 0
 	if v, ok := task["attempts"].(float64); ok {
 		attempts = int(v)
@@ -283,7 +283,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		return
 	}
 
-	branchName := h.buildBranchName(taskNumber, taskID)
+	branchName := h.buildBranchName(sliceID, taskNumber, taskID)
 
 	// Claim for review
 	reviewerID := fmt.Sprintf("supervisor:%d", time.Now().UnixNano())
@@ -449,14 +449,23 @@ func (h *TaskHandler) failTask(ctx context.Context, taskID, modelID, branchName,
 	log.Printf("[TaskHandler] Task %s failed: %s → available", truncateID(taskID), reason)
 }
 
-func (h *TaskHandler) buildBranchName(taskNumber, taskID string) string {
+func (h *TaskHandler) buildBranchName(sliceID, taskNumber, taskID string) string {
 	prefix := h.cfg.GetTaskBranchPrefix()
 	if prefix == "" {
 		prefix = "task/"
 	}
+
+	// Use slice-based naming: task/{slice_id}/{task_number}
+	// Example: task/general/T001, task/auth/T002
+	if sliceID != "" && taskNumber != "" {
+		return prefix + sliceID + "/" + taskNumber
+	}
+
+	// Fallback to task number only (for backwards compatibility)
 	if taskNumber != "" {
 		return prefix + taskNumber
 	}
+
 	return prefix + truncateID(taskID)
 }
 
