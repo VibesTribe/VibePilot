@@ -1,75 +1,62 @@
-# VibePilot Current State - 2026-03-31 18:35
+# VibePilot Current State - 2026-03-31 21:00
 
-## Status: ✅ CLEAN SLATE - Ready for New Task Testing
+## Status: ✅ CLEAN SLATE - Governor Fixes Deployed, Ready for Test
 
-### Cleanup Complete - All Test Artifacts Removed
+### 🔧 Governor Fixes Deployed (20:52)
 
-**GitHub Cleanup (commit 2903696f):**
-- ✅ All PRDs deleted from `docs/prd/` and `docs/prds/`
-- ✅ All plans deleted from `docs/plans/`
-- ✅ Task branches deleted: `task/T001`, `task/general/T002`
-- ✅ Committed and pushed to GitHub
+**Commit:** `0dd88be4` - Two critical bugs fixed
 
-**Supabase Cleanup:**
-- ✅ All tasks deleted (5 tasks removed)
-- ✅ All task_runs deleted
-- ✅ All plans deleted (33 plans removed)
+**Fix 1: CLI Runner STDIN Bug** 🐛→✅
+- **Problem:** Prompt passed as command-line argument: `claude -p "prompt"`
+- **Solution:** Prompt written to STDIN: `echo "prompt" | claude -p`
+- **File:** `governor/internal/connectors/runners.go`
+- **Impact:** Works with ALL CLI tools (claude, kilo, opencode)
 
-### Current State
+**Fix 2: Recovery Timeout** ⏱️→✅
+- **Problem:** 60s timeout killing 300s tasks
+- **Solution:** Increased to 360s (6 minutes)
+- **File:** `governor/config/system.json`
+- **Impact:** Tasks can complete without premature termination
+
+### Clean State ✅
 
 **GitHub:**
-- Clean `main` branch
-- Empty `docs/prd/` and `docs/prds/` directories
-- Empty `docs/plans/` directory
-- Only branches: `main`, `TEST_MODULES/general`
+- ✅ All PRDs deleted from `docs/prds/`
+- ✅ All plans deleted from `docs/plans/`
+- ✅ No task branches
 
 **Supabase:**
-- Empty `tasks` table
-- Empty `task_runs` table
-- Empty `plans` table
-- Fresh state for new task execution
+- ✅ All tasks deleted (3 tasks)
+- ✅ All task_runs deleted
+- ✅ Fresh state
 
-### Slice-Based Numbering Status
+**Governor:**
+- ✅ Running since 20:52
+- ✅ Both fixes deployed
+- ✅ Recovery timeout: 360s
+- ✅ Ready for fresh test
 
-**Implementation:** ✅ Complete and Verified
-- RPC allowlist fix deployed (commit 44c3dc59)
-- Governor binary rebuilt and running (PID 34771, started 18:00)
-- Test confirmed: T002 created with correct branch `task/general/T002`
+### Root Cause Analysis Summary
 
-**Migration Applied:**
-- `get_next_task_number_for_slice()` function created in Supabase
-- Each slice tracks its own task sequence independently
+**Why planner/supervisor worked but task_runner hung:**
 
-### System Status
+1. **CLI invocation bug** - Prompt passed as argument instead of STDIN
+   - Planner/Supervisor: Used different code path
+   - Task Runner: Used broken CLIRunner.Run()
 
-**Governor:** Running
-- Started: 18:00:34
-- PID: 34771
-- Webhooks: Listening on port 8080
-- Supabase: Connected
-- Realtime: 5 subscriptions active
+2. **Recovery system too aggressive** - Killed tasks after 60s
+   - Tasks needed 300s to complete
+   - Recovery marked them "stale" and killed Claude process
 
-**Git Configuration:**
-- User: vibesagentai@gmail.com
-- Default branch: main
-- Test branch: TEST_MODULES/general
+### Next Test
 
-### Next Task: Ready for Clean Test
-
-When creating a new test PRD:
-1. Create PRD in `docs/prds/` (triggers webhook)
-2. Governor will create plan from PRD
-3. Plan approved → Task created with **T001** (fresh sequence)
-4. Branch will be: `task/general/T001`
-5. Task executes → merges to `TEST_MODULES/general`
-
-Expected timeline with slice-based numbering:
-- Plan creation: ~30s
-- Task execution: ~90-120s (one session, no collisions)
-- Total: **~2-3 minutes** (60% faster than before)
+When ready, create a new simple PRD to verify:
+1. Task executes successfully
+2. Completes in reasonable time (< 2 minutes expected)
+3. No more hanging/timeout issues
 
 ---
 
-**Last Updated:** 2026-03-31 18:35
-**Status:** Clean slate, ready for new task
-**Governor:** Running with slice-based numbering fully functional
+**Last Updated:** 2026-03-31 21:00
+**Status:** Clean slate, governor fixes deployed, ready for test
+**Governor:** Running with STDIN fix + 360s timeout
