@@ -88,7 +88,7 @@
       "name": "Planner",
       "role": "Task breakdown and dependency mapping",
       "description": "Takes PRD and produces executable task graph with confidence scores.",
-      "model": "kimi-cli",
+      "model": "glm-5",
       "skills": [
         "plan"
       ],
