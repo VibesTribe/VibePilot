@@ -224,10 +224,27 @@ func (h *TaskHandler) executeTask(
 		summary = taskOutput.Summary
 	}
 
+	// Build execution result for supervisor review
+	executionResult := map[string]any{
+		"files": func() []map[string]any {
+			result := make([]map[string]any, len(files))
+			for i, f := range files {
+				result[i] = map[string]any{
+					"path":    f.Path,
+					"content": f.Content,
+				}
+			}
+			return result
+		}(),
+		"summary":    summary,
+		"raw_output": cleanOutput,
+		"status":     "complete",
+	}
+
 	// Commit output to branch
 	h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds())
 
-	// Record task run
+	// Record task run with execution result
 	costs := h.calculateCosts(ctx, modelID, tokensIn, tokensOut)
 	h.database.RPC(ctx, "create_task_run", map[string]any{
 		"p_task_id":                       taskID,
@@ -246,6 +263,7 @@ func (h *TaskHandler) executeTask(
 		"p_total_savings_usd":             costs.Savings,
 		"p_started_at":                    runStart,
 		"p_completed_at":                  time.Now(),
+		"p_result":                         executionResult,
 	})
 
 	// Atomically transition to review
