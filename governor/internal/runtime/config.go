@@ -1001,11 +1001,18 @@ func (c *Config) GetStrategyPriority(strategyName string) []string {
 
 func (c *Config) GetConnectorCategory(connID string) string {
 	if c.Routing == nil || c.Connectors == nil {
+		log.Printf("[GetConnectorCategory] %s: Routing or Connectors nil, returning 'internal'", connID)
 		return "internal"
 	}
 
 	conn := c.GetConnector(connID)
 	if conn == nil {
+		log.Printf("[GetConnectorCategory] %s: connector not found, returning 'internal'", connID)
+		return "internal"
+	}
+
+	if c.Routing.DestinationCategories == nil {
+		log.Printf("[GetConnectorCategory] %s: DestinationCategories nil, returning 'internal'", connID)
 		return "internal"
 	}
 
@@ -1023,25 +1030,33 @@ func (c *Config) GetConnectorCategory(connID string) string {
 
 		for _, v := range checkValues {
 			if vs, ok := v.(string); ok && vs == fieldValue {
+				log.Printf("[GetConnectorCategory] %s: matched category '%s' (field=%s value=%s)", connID, categoryName, checkField, fieldValue)
 				return categoryName
 			}
 		}
 	}
 
+	log.Printf("[GetConnectorCategory] %s: no category match, returning 'internal'", connID)
 	return "internal"
 }
 
 func (c *Config) GetConnectorsInCategory(category string) []ConnectorConfig {
 	if c.Connectors == nil {
+		log.Printf("[GetConnectorsInCategory] Connectors is nil, returning empty")
 		return nil
 	}
 
 	var result []ConnectorConfig
 	for _, conn := range c.Connectors.Connectors {
-		if c.GetConnectorCategory(conn.ID) == category && conn.Status == "active" {
+		connCategory := c.GetConnectorCategory(conn.ID)
+		statusMatch := conn.Status == "active"
+		log.Printf("[GetConnectorsInCategory] conn=%s type=%s status=%s category=%s matchedCategory=%v statusMatch=%v",
+			conn.ID, conn.Type, conn.Status, category, connCategory == category, statusMatch)
+		if connCategory == category && conn.Status == "active" {
 			result = append(result, conn)
 		}
 	}
+	log.Printf("[GetConnectorsInCategory] category=%s total=%d found=%d", category, len(c.Connectors.Connectors), len(result))
 	return result
 }
 

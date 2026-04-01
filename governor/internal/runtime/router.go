@@ -95,6 +95,16 @@ func (r *Router) tryWebRouting(ctx context.Context, req RoutingRequest) *Routing
 }
 
 func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*RoutingResult, error) {
+	// If routing for a specific agent (role), use that agent's configured model
+	var agentModelID string
+	if req.Role != "" {
+		agent := r.cfg.GetAgent(req.Role)
+		if agent != nil && agent.Model != "" {
+			agentModelID = agent.Model
+			log.Printf("[Router] Agent %s configured with model %s", req.Role, agentModelID)
+		}
+	}
+
 	connectors := r.cfg.GetConnectorsInCategory("internal")
 	if len(connectors) == 0 {
 		log.Printf("[Router] No internal connectors available")
@@ -107,6 +117,21 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 			continue
 		}
 
+		// If we have an agent-specific model, check if this connector can access it
+		if agentModelID != "" {
+			if r.canConnectorAccessModel(conn.ID, agentModelID) {
+				log.Printf("[Router] Internal routing: connector=%s model=%s (from agent %s)", conn.ID, agentModelID, req.Role)
+				return &RoutingResult{
+					ConnectorID: conn.ID,
+					ModelID:     agentModelID,
+					RoutingFlag: "internal",
+					Category:    "internal",
+				}, nil
+			}
+			continue
+		}
+
+		// Otherwise fall back to task-based model selection
 		modelID := r.selectModelForConnector(ctx, conn.ID, req.TaskType, req.TaskCategory)
 		if modelID == "" {
 			continue
@@ -284,6 +309,24 @@ func (r *Router) selectModelForConnector(ctx context.Context, connectorID string
 	}
 
 	return bestModel
+}
+
+func (r *Router) canConnectorAccessModel(connectorID string, modelID string) bool {
+	if r.cfg.Models == nil {
+		return false
+	}
+
+	for _, model := range r.cfg.Models.Models {
+		if model.ID == modelID {
+			for _, accessConn := range model.AccessVia {
+				if accessConn == connectorID {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	return false
 }
 
 func (r *Router) getModelScore(ctx context.Context, modelID string, taskType string, taskCategory string) float64 {
