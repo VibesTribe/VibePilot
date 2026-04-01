@@ -5,7 +5,7 @@
   "database": {
     "type": "supabase",
     "url_env": "SUPABASE_URL",
-    "key_env": "SUPABASE_KEY",
+    "key_env": "SUPABASE_SERVICE_KEY",
     "notes": "Swap type and env vars to change database. Add new driver to db/ package."
   },
   

@@ -2,7 +2,6 @@
   "version": "1.1",
   "description": "Agent definitions with capability declarations. Roles separated: decide vs execute. Only Maintenance has git write.",
   "last_updated": "2026-02-19",
-  
   "agents": [
     {
       "id": "vibes",
@@ -10,18 +9,27 @@
       "role": "Human consultation and project intelligence",
       "description": "Your key agent for updates, briefings, ROI analysis, and strategic decisions. Has full visibility into project state.",
       "model": "gemini-2.0-flash",
-      "skills": ["consult", "report", "research"],
-      "tools": ["supabase_query", "web_search", "file_read", "voice_stt", "voice_tts"],
-      "capabilities": {
-        "decide": false,
-        "execute": false,
-        "read_files": true,
-        "write_files": false,
-        "git_read": false,
-        "git_write": false
-      },
+      "skills": [
+        "consult",
+        "report",
+        "research"
+      ],
+      "tools": [
+        "supabase_query",
+        "web_search",
+        "file_read",
+        "voice_stt",
+        "voice_tts"
+      ],
+      "capabilities": [
+        "read_files"
+      ],
       "prompt": "prompts/vibes.md",
-      "channels": ["voice", "text", "email"],
+      "channels": [
+        "voice",
+        "text",
+        "email"
+      ],
       "notes": "Sits above orchestrator. Human's primary interface. Read-only access to system state."
     },
     {
@@ -30,16 +38,16 @@
       "role": "Strategic task routing and learning",
       "description": "Routes tasks based on availability, historical performance, and learned patterns. Tracks success rates, costs, model strengths. Gets smarter every day.",
       "model": "gemini-2.0-flash",
-      "skills": ["route"],
-      "tools": ["supabase_query", "supabase_write"],
-      "capabilities": {
-        "decide": true,
-        "execute": false,
-        "read_files": false,
-        "write_files": false,
-        "git_read": false,
-        "git_write": false
-      },
+      "skills": [
+        "route"
+      ],
+      "tools": [
+        "supabase_query",
+        "supabase_write"
+      ],
+      "capabilities": [
+        "decide"
+      ],
       "prompt": "prompts/orchestrator.md",
       "notes": "Strategic brain. Routes but does not execute. Database access only."
     },
@@ -49,16 +57,13 @@
       "role": "Continuous improvement and intelligence",
       "description": "Monitors new models, approaches, platform changes. Feeds intelligence to Orchestrator. Weekly briefings to Vibes.",
       "model": "gemini-2.0-flash",
-      "skills": ["research"],
-      "tools": ["web_search"],
-      "capabilities": {
-        "decide": false,
-        "execute": false,
-        "read_files": false,
-        "write_files": false,
-        "git_read": false,
-        "git_write": false
-      },
+      "skills": [
+        "research"
+      ],
+      "tools": [
+        "web_search"
+      ],
+      "capabilities": [],
       "prompt": "prompts/researcher.md",
       "notes": "Web research only. Suggests improvements but does not implement."
     },
@@ -68,16 +73,13 @@
       "role": "Interactive PRD generation",
       "description": "Works with human to clarify vision, gather requirements, and produce complete PRD.",
       "model": "gemini-2.0-flash",
-      "skills": ["consult"],
-      "tools": ["web_search"],
-      "capabilities": {
-        "decide": false,
-        "execute": false,
-        "read_files": false,
-        "write_files": false,
-        "git_read": false,
-        "git_write": false
-      },
+      "skills": [
+        "consult"
+      ],
+      "tools": [
+        "web_search"
+      ],
+      "capabilities": [],
       "prompt": "prompts/consultant.md",
       "notes": "Web-based consultation. Creates PRD documents. No system access."
     },
@@ -87,16 +89,17 @@
       "role": "Task breakdown and dependency mapping",
       "description": "Takes PRD and produces executable task graph with confidence scores.",
       "model": "kimi-cli",
-      "skills": ["plan"],
-      "tools": ["file_read", "git_read"],
-      "capabilities": {
-        "decide": false,
-        "execute": false,
-        "read_files": true,
-        "write_files": false,
-        "git_read": true,
-        "git_write": false
-      },
+      "skills": [
+        "plan"
+      ],
+      "tools": [
+        "file_read",
+        "git_read"
+      ],
+      "capabilities": [
+        "read_files",
+        "git_read"
+      ],
       "prompt": "prompts/planner.md",
       "notes": "READ-ONLY codebase access for planning. No write access."
     },
@@ -106,16 +109,17 @@
       "role": "Multi-perspective review",
       "description": "Reviews proposed solutions from architecture, security, and maintenance perspectives.",
       "model": "gemini-2.0-flash",
-      "skills": ["council_review"],
-      "tools": ["file_read", "web_search"],
-      "capabilities": {
-        "decide": true,
-        "execute": false,
-        "read_files": true,
-        "write_files": false,
-        "git_read": false,
-        "git_write": false
-      },
+      "skills": [
+        "council_review"
+      ],
+      "tools": [
+        "file_read",
+        "web_search"
+      ],
+      "capabilities": [
+        "decide",
+        "read_files"
+      ],
       "prompt": "prompts/council.md",
       "notes": "Read-only review. Can approve/reject but does not execute."
     },
@@ -125,17 +129,20 @@
       "role": "Quality gatekeeper - DECIDES but does NOT execute",
       "description": "Verifies output matches prompt, approves/rejects, commands Maintenance via queue. NO direct git access.",
       "model": "gemini-2.0-flash",
-      "skills": ["supervise", "command"],
-      "tools": ["supabase_query", "supabase_write"],
-      "capabilities": {
-        "decide": true,
-        "execute": false,
-        "read_files": true,
-        "write_files": false,
-        "git_read": true,
-        "git_write": false,
-        "commands_maintenance": true
-      },
+      "skills": [
+        "supervise",
+        "command"
+      ],
+      "tools": [
+        "supabase_query",
+        "supabase_write"
+      ],
+      "capabilities": [
+        "decide",
+        "read_files",
+        "git_read",
+        "commands_maintenance"
+      ],
       "prompt": "prompts/supervisor.md",
       "notes": "DECISION AGENT. Reads branches for review. Commands Maintenance via maintenance_commands table. NO direct git write."
     },
@@ -145,16 +152,15 @@
       "role": "Web platform execution",
       "description": "Executes tasks on web AI platforms. Returns chat_url for future revisions.",
       "model": "browser-use-gemini",
-      "skills": ["execute_courier"],
-      "tools": ["browser"],
-      "capabilities": {
-        "decide": false,
-        "execute": true,
-        "read_files": false,
-        "write_files": false,
-        "git_read": false,
-        "git_write": false
-      },
+      "skills": [
+        "execute_courier"
+      ],
+      "tools": [
+        "browser"
+      ],
+      "capabilities": [
+        "execute"
+      ],
       "prompt": "prompts/courier.md",
       "notes": "No codebase access. Returns code only. Does not commit."
     },
@@ -163,17 +169,18 @@
       "name": "Internal CLI",
       "role": "CLI-based execution with codebase access",
       "description": "Executes tasks via Kimi or OpenCode CLI. Has full codebase READ access. Returns code, does NOT commit.",
-      "model": "kimi-cli",
-      "skills": ["execute_internal_cli"],
-      "tools": ["cli", "file_read"],
-      "capabilities": {
-        "decide": false,
-        "execute": true,
-        "read_files": true,
-        "write_files": false,
-        "git_read": false,
-        "git_write": false
-      },
+      "model": "glm-5",
+      "skills": [
+        "execute_internal_cli"
+      ],
+      "tools": [
+        "cli",
+        "file_read"
+      ],
+      "capabilities": [
+        "execute",
+        "read_files"
+      ],
       "prompt": "prompts/internal_cli.md",
       "notes": "Returns code in response. NO git operations. NO direct file writes."
     },
@@ -183,16 +190,16 @@
       "role": "API-based execution (emergency/special)",
       "description": "Executes tasks via API. Has codebase READ access. Returns code, does NOT commit.",
       "model": "gemini-api",
-      "skills": ["execute_internal_api"],
-      "tools": ["file_read"],
-      "capabilities": {
-        "decide": false,
-        "execute": true,
-        "read_files": true,
-        "write_files": false,
-        "git_read": false,
-        "git_write": false
-      },
+      "skills": [
+        "execute_internal_api"
+      ],
+      "tools": [
+        "file_read"
+      ],
+      "capabilities": [
+        "execute",
+        "read_files"
+      ],
       "prompt": "prompts/internal_api.md",
       "notes": "Returns code only. NO git operations."
     },
@@ -202,16 +209,17 @@
       "role": "Code validation",
       "description": "Runs tests, lint, typecheck on generated code.",
       "model": "opencode",
-      "skills": ["test_code"],
-      "tools": ["cli", "file_read"],
-      "capabilities": {
-        "decide": false,
-        "execute": true,
-        "read_files": true,
-        "write_files": false,
-        "git_read": false,
-        "git_write": false
-      },
+      "skills": [
+        "test_code"
+      ],
+      "tools": [
+        "cli",
+        "file_read"
+      ],
+      "capabilities": [
+        "execute",
+        "read_files"
+      ],
       "prompt": "prompts/tester_code.md",
       "notes": "Read code, run tests. No write access."
     },
@@ -221,28 +229,58 @@
       "role": "Git operator and system implementer - ONLY agent with write access",
       "description": "ONLY agent with git write access. Polls command queue, executes git operations, implements approved system improvements.",
       "model": "opencode",
-      "skills": ["git_operations", "system_update", "implement"],
-      "tools": ["cli", "file_read", "file_write", "git"],
-      "capabilities": {
-        "decide": false,
-        "execute": true,
-        "read_files": true,
-        "write_files": true,
-        "git_read": true,
-        "git_write": true,
-        "polls_command_queue": true
-      },
+      "skills": [
+        "git_operations",
+        "system_update",
+        "implement"
+      ],
+      "tools": [
+        "cli",
+        "file_read",
+        "file_write",
+        "git"
+      ],
+      "capabilities": [
+        "execute",
+        "read_files",
+        "write_files",
+        "git_read",
+        "git_write",
+        "polls_command_queue"
+      ],
       "prompt": "prompts/maintenance.md",
       "notes": "SOLE GIT OPERATOR. Polls maintenance_commands table. Executes git operations per Supervisor commands. Also implements approved system improvements. NO self-initiated actions.",
       "command_queue_table": "maintenance_commands"
     }
   ],
-  
   "capability_summary": {
-    "decision_agents": ["orchestrator", "council", "supervisor"],
-    "execution_agents": ["courier", "internal_cli", "internal_api", "tester_code", "maintenance"],
-    "git_write_only": ["maintenance"],
-    "git_read_only": ["supervisor", "planner"],
-    "no_git_access": ["vibes", "orchestrator", "researcher", "consultant", "council", "courier", "tester_code"]
+    "decision_agents": [
+      "orchestrator",
+      "council",
+      "supervisor"
+    ],
+    "execution_agents": [
+      "courier",
+      "internal_cli",
+      "internal_api",
+      "tester_code",
+      "maintenance"
+    ],
+    "git_write_only": [
+      "maintenance"
+    ],
+    "git_read_only": [
+      "supervisor",
+      "planner"
+    ],
+    "no_git_access": [
+      "vibes",
+      "orchestrator",
+      "researcher",
+      "consultant",
+      "council",
+      "courier",
+      "tester_code"
+    ]
   }
 }
