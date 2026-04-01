@@ -1,8 +1,42 @@
-# VibePilot Current State - 2026-04-01 17:00
+# VibePilot Current State - 2026-04-01 18:45
 
-## Status: ✅ FIX APPLIED - Awaiting Deployment
+## Status: ✅ ROUTING FIX APPLIED - Governor Running
 
-### 🔧 Task Execution Result Fix Applied (17:00)
+## 🧹 CLEANUP PROCEDURES
+**Before testing:** See `docs/CLEANUP.md` for full cleanup guide.
+- Quick Supabase reset: `TRUNCATE task_runs, tasks, plan_revisions, plans CASCADE;`
+- Clean GitHub branches: `git branch | grep "task/" | xargs git branch -D`
+- Restart governor after cleanup
+
+## Status: ✅ ROUTING FIX APPLIED
+
+### 🔧 Internal Routing Fix Applied (18:45)
+
+**Commit:** `89c2452e` - Use agent's configured model for internal routing
+
+**Problem:** Router searched for models by taskType/taskCategory, returned empty for generic tasks
+- **Symptom:** `[Router] No internal routing available for role internal_cli`
+- **Root Cause:** `selectModelForConnector("claude-code", "", "")` → no model matched
+- **Impact:** Governor couldn't route tasks to internal_cli agent
+
+**Fix Applied:**
+1. ✅ **Router logic** (`governor/internal/runtime/router.go:97-127`)
+   - When `Role="internal_cli"`, get agent's configured model from agents.json
+   - `internal_cli` → `model: glm-5` → connector `claude-code` (in glm-5's `access_via`)
+   - Added `canConnectorAccessModel()` helper
+
+2. ✅ **Governor rebuilt and running**
+   - PID: 336590
+   - Connected to Supabase
+   - Listening on port 8080
+
+**Expected Flow:**
+1. Task available → router checks for courier (needs vision/browser)
+2. glm-5 (via claude-code CLI) lacks courier support → internal routing
+3. Internal routing: `internal_cli` → `glm-5` → `claude-code`
+4. Governor creates second Claude CLI session for task execution
+
+### Previous Fix: Task Execution Result (17:00)
 
 **Commit:** `8c328b6f` - Store task execution results in task_runs.result
 
@@ -38,31 +72,25 @@
 - Fixed RPC result parsing for slice-based task numbering
 - Tasks now numbered: T001, T002, T003... per slice
 
-### Deployment Steps
+### Current Status
 
-```bash
-# 1. Apply Supabase fix
-# Run docs/supabase-schema/fix_task_run_result.sql in Supabase SQL Editor
+**Governor:** Running (PID 336590)
+**Routing:** Fixed - uses agent's configured model
+**Waiting for:** Task to be created in Supabase to test execution flow
 
-# 2. Restart governor
-sudo systemctl restart vibepilot-governor
+### Next Test
 
-# 3. Verify
-systemctl status vibepilot-governor
-tail -f /home/vibes/vibepilot/governor.log
-```
+Create a task in Supabase to verify:
+1. Router finds internal_cli → glm-5 → claude-code ✅
+2. Governor creates second Claude CLI session ✅
+3. Task executes in second session
+4. Results stored in task_runs.result
 
-### Next Test (After Deployment)
-
-Create a simple PRD with 2-3 tasks to verify:
-1. Tasks numbered correctly (T001, T002, T003) ✅
-2. Tasks execute successfully 
-3. **Supervisor can review execution output** ⚠️ Needs deployment
-4. No more infinite retry loops
+**Before testing:** Run cleanup from `docs/CLEANUP.md`
 
 ---
 
-**Last Updated:** 2026-04-01 17:00
-**Status:** Fix applied and committed, awaiting deployment
-**Governor:** Old binary running, needs restart after Supabase update
-**Commit:** 8c328b6f
+**Last Updated:** 2026-04-01 18:45
+**Status:** Routing fix applied, governor running
+**Governor:** Running (PID 336590)
+**Latest Commit:** 89c2452e
