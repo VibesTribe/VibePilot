@@ -91,13 +91,13 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 
 	// Route to model
 	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-		AgentID:  "task_runner",
+		AgentID:  "internal_cli",
 		TaskID:   taskID,
 		TaskType: taskCategory,
 	})
 	if err != nil || routingResult == nil {
 		routingResult, _ = h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-			AgentID:  "task_runner",
+			AgentID:  "internal_cli",
 			TaskID:   taskID,
 			TaskType: taskType,
 		})
@@ -179,7 +179,7 @@ func (h *TaskHandler) executeTask(
 		json.Unmarshal(taskPacket.Context, &contextData)
 	}
 
-	session, err := h.factory.CreateWithConnector(ctx, "task_runner", taskCategory, connectorID)
+	session, err := h.factory.CreateWithConnector(ctx, "internal_cli", taskCategory, connectorID)
 	if err != nil {
 		h.failTask(ctx, taskID, modelID, branchName, "session_create_failed")
 		return err
