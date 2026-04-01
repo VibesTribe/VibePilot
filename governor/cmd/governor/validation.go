@@ -179,14 +179,20 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 				return fmt.Errorf("get task number for slice %s: %w", task.SliceID, err)
 			}
 
-			// Parse RPC result
-			var rpcResult []map[string]any
+			// Parse RPC result - function returns TEXT directly, not wrapped
 			if len(result) > 0 {
-				if err := json.Unmarshal(result, &rpcResult); err == nil {
-					if len(rpcResult) > 0 {
+				// Try parsing as direct string response
+				var directResult string
+				if err := json.Unmarshal(result, &directResult); err == nil && directResult != "" {
+					taskNumber = directResult
+					log.Printf("[createTasksFromApprovedPlan] Assigned task number %s for slice %s (was %s)", taskNumber, task.SliceID, task.TaskNumber)
+				} else {
+					// Fallback: try parsing as array of objects
+					var rpcResult []map[string]any
+					if err := json.Unmarshal(result, &rpcResult); err == nil && len(rpcResult) > 0 {
 						if num, ok := rpcResult[0]["get_next_task_number_for_slice"].(string); ok {
 							taskNumber = num
-							log.Printf("[createTasksFromApprovedPlan] Assigned task number %s for slice %s (was %s)", taskNumber, task.SliceID, task.TaskNumber)
+							log.Printf("[createTasksFromApprovedPlan] Assigned task number %s for slice %s (was %s) [fallback]", taskNumber, task.SliceID, task.TaskNumber)
 						}
 					}
 				}
