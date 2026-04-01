@@ -60,9 +60,9 @@
       "access_type": "cli_subscription",
       "context_limit": 128000,
       "capabilities": ["text", "code"],
-      "access_via": ["opencode"],
+      "access_via": ["opencode", "claude-code"],
       "strengths": ["reasoning", "planning", "architecture"],
-      "notes": "Available via OpenCode subscription. Text only, no browser. Good for internal tasks."
+      "notes": "Available via OpenCode subscription and Claude Code CLI. Text only, no browser. Good for internal tasks."
     },
     {
       "id": "kimi-internal",
