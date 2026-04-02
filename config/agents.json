@@ -128,7 +128,7 @@
       "name": "Supervisor",
       "role": "Quality gatekeeper - DECIDES but does NOT execute",
       "description": "Verifies output matches prompt, approves/rejects, commands Maintenance via queue. NO direct git access.",
-      "model": "gemini-2.0-flash",
+      "model": "glm-5",
       "skills": [
         "supervise",
         "command"
