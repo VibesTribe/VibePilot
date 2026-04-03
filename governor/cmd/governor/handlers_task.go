@@ -325,7 +325,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		return
 	}
 
-	session, err := h.factory.CreateWithContext(ctx, "supervisor", taskType)
+	session, err := h.factory.CreateWithConnector(ctx, "supervisor", taskType, routingResult.DestinationID)
 	if err != nil {
 		log.Printf("[TaskReview] Session error for %s: %v", truncateID(taskID), err)
 		return
@@ -357,7 +357,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			log.Printf("[TaskReview] Parse error for %s: %v, retrying...", truncateID(taskID), parseErr)
 
 			// Retry with explicit JSON enforcement
-			retrySession, retryErr := h.factory.CreateWithContext(ctx, "supervisor", "review")
+			retrySession, retryErr := h.factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.DestinationID)
 			if retryErr == nil {
 				retryResult, retryRunErr := retrySession.Run(ctx, map[string]any{
 					"previous_output": result.Output,

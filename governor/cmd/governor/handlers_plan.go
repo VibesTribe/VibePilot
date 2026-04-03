@@ -244,7 +244,7 @@ func runPlanReview(
 		return
 	}
 
-	session, err := factory.CreateWithContext(ctx, "supervisor", "review")
+	session, err := factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.ConnectorID)
 	if err != nil {
 		log.Printf("[PlanReview] Failed to create supervisor session: %v", err)
 		setPlanError(ctx, database, planID, "session_failed")
@@ -273,7 +273,7 @@ func runPlanReview(
 		log.Printf("[PlanReview] Failed to parse supervisor output: %v, retrying...", err)
 
 		// Retry with explicit JSON enforcement
-		retrySession, retryErr := factory.CreateWithContext(ctx, "supervisor", "review")
+		retrySession, retryErr := factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.ConnectorID)
 		if retryErr == nil {
 			retryResult, retryRunErr := retrySession.Run(ctx, map[string]any{
 				"previous_output": result.Output,
