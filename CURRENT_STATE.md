@@ -21,8 +21,15 @@ Fixed "connector not registered" errors in task and plan review handlers:
 
 ## How to Start Governor (IMPORTANT)
 
+### Governor Now Runs as Systemd User Service ✅
+
+The governor is now managed by systemd and will:
+- Auto-start on login
+- Restart on crash
+- Log to journal (view with `journalctl --user -u vibepilot-governor`)
+
 ### Bootstrap Credentials Location
-The 3 bootstrap credentials are stored in `/home/vibes/vibepilot-server/restart_governor.sh`:
+The 3 bootstrap credentials are stored in `~/.config/systemd/user/vibepilot-governor.service.d/override.conf`:
 
 1. **SUPABASE_URL** - Your Supabase project URL
 2. **SUPABASE_SERVICE_KEY** - Service role key (admin access)
@@ -30,32 +37,46 @@ The 3 bootstrap credentials are stored in `/home/vibes/vibepilot-server/restart_
 
 **These were set up during initial server installation and are NOT in GitHub Secrets.**
 
-### Starting Governor
+### Managing Governor Service
 
-**Method 1: Use the restart script (RECOMMENDED)**
+**Check status:**
 ```bash
-~/vibepilot-server/restart_governor.sh
+systemctl --user status vibepilot-governor
 ```
 
-**Method 2: Manual start**
+**View logs:**
+```bash
+journalctl --user -u vibepilot-governor -f
+```
+
+**Restart governor:**
+```bash
+systemctl --user restart vibepilot-governor
+```
+
+**Stop governor (won't restart):**
+```bash
+systemctl --user stop vibepilot-governor
+```
+
+**Kill process (systemd will auto-restart after 5s):**
+```bash
+pkill -f governor
+```
+
+**Check dashboard:**
+```bash
+open http://localhost:3000
+```
+
+### Manual Start (If Needed)
+If systemd is not available:
 ```bash
 cd ~/vibepilot/governor
 export SUPABASE_URL="https://qtpdzsinvifkgpxyxlaz.supabase.co"
 export SUPABASE_SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 export VAULT_KEY="P9jFR25vbjcNxG2S3lx4ZCyspfGLd7wZYliZWLjqKLc="
-nohup ./governor > /tmp/governor.out 2>&1 &
-```
-
-### Checking Governor Status
-```bash
-# Check if running
-ps aux | grep "[g]overnor"
-
-# View logs
-tail -f /tmp/governor.out
-
-# Check dashboard
-open http://localhost:3000
+./governor
 ```
 
 ---
