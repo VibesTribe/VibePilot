@@ -105,16 +105,20 @@ export VAULT_KEY="P9jFR25vbjcNxG2S3lx4ZCyspfGLd7wZYliZWLjqKLc="
 
 ## Current Governor Status
 
-**Running:** Yes (started 2026-04-03 19:58)
-**PID:** 350786
+**Running:** Yes (started 2026-04-03 20:07)
+**PID:** 351291
 **Config:**
 - Realtime connected to Supabase
 - 16 prompts synced
 - Webhooks on port 8080
-- Max 1 concurrent per module, 2 total
+- Max 2 concurrent per module, 4 total
 - Using glm-5 model via claude-code connector
+- Multi-instance protection: Kills existing governors before starting
 
-**Logs:** `/tmp/governor.out`
+**Logs:** `journalctl --user -u vibepilot-governor -f`
+
+**Protection Against Multiple Instances:**
+The systemd service includes `ExecStartPre` that kills any existing governor processes before starting, preventing multiple governors from running simultaneously.
 
 ---
 
