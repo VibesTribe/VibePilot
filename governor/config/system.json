@@ -108,7 +108,7 @@
     "max_id_display": 8
   },
   "webhooks": {
-    "enabled": true,
+    "enabled": false,
     "port": 8080,
     "path": "/webhooks",
     "secret_vault_key": "webhook_secret"
