@@ -1,10 +1,16 @@
 # Auto-generated. DO NOT EDIT.
-commit: daed1841
+commit: 0d7c419b
 branch: research-update-april2026
-generated: 2026-04-14T21:41:48Z
-boot_md_bytes: 6295
+generated: 2026-04-14T21:52:48Z
+boot_md_bytes: 6519
 map_md_bytes: 47247
 has_index_db: true
+has_docs_db: true
+indexes:
+  code: jCodeMunch SQLite - symbols, imports, call graph, AST
+  docs: jDocMunch tarball - all markdown sections, 8037 sections indexed
+  code_map: lean-ctx map mode - compressed function signatures
 tools:
   lean_ctx: "lean-ctx 3.1.2"
   jcodemunch: "installed"
+  jdocmunch: "installed"

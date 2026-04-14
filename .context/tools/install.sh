@@ -39,7 +39,7 @@ else
     echo "[.context-tools] lean-ctx installed: $(lean-ctx --version)"
 fi
 
-# 2. jCodeMunch
+# 2. jCodeMunch + jDocMunch
 if command -v jcodemunch-mcp >/dev/null 2>&1; then
     echo "[.context-tools] jCodeMunch already installed"
 else
@@ -53,10 +53,24 @@ else
     fi
 fi
 
+if command -v jdocmunch-mcp >/dev/null 2>&1; then
+    echo "[.context-tools] jDocMunch already installed"
+else
+    echo "[.context-tools] Installing jDocMunch..."
+    pipx install jdocmunch-mcp 2>/dev/null || pip install --user jdocmunch-mcp 2>/dev/null
+    if command -v jdocmunch-mcp >/dev/null 2>&1; then
+        echo "[.context-tools] jDocMunch installed"
+    else
+        echo "WARNING: jDocMunch install failed. docs.db will not be generated."
+        echo "Try manually: pipx install jdocmunch-mcp"
+    fi
+fi
+
 # 3. Verify
 echo ""
 echo "[.context-tools] Verification:"
 command -v lean-ctx >/dev/null 2>&1 && echo "  lean-ctx: $(lean-ctx --version 2>/dev/null)" || echo "  lean-ctx: MISSING"
 command -v jcodemunch-mcp >/dev/null 2>&1 && echo "  jCodeMunch: installed" || echo "  jCodeMunch: MISSING"
+command -v jdocmunch-mcp >/dev/null 2>&1 && echo "  jDocMunch: installed" || echo "  jDocMunch: MISSING"
 echo ""
 echo "[.context-tools] Run 'bash .context/build.sh' to generate the knowledge layer."
