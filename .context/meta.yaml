@@ -1,11 +1,10 @@
-# .context metadata - do not edit, auto-generated
-commit: ce326fe5
-generated: 2026-04-14T21:07:54Z
-files:
-  boot.md: bootstrap orientation (~2K tokens)
-  map.md: compressed code map (~12K tokens)
-  index.db: jCodeMunch SQLite search index
-  meta.yaml: this file
+# Auto-generated. DO NOT EDIT.
+commit: daed1841
+branch: research-update-april2026
+generated: 2026-04-14T21:41:48Z
+boot_md_bytes: 6295
+map_md_bytes: 47247
+has_index_db: true
 tools:
-  lean_ctx: lean-ctx 3.1.2
-  jcodemunch: installed
+  lean_ctx: "lean-ctx 3.1.2"
+  jcodemunch: "installed"
