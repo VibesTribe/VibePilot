@@ -101,22 +101,46 @@ nodes:
         Apply learned testing rules.
 
   # ── STAGE 5: Merge ─────────────────────────────────────────
-  - id: human-approval
-    description: "Human gates the merge"
+  # ── STAGE 5: Visual QA (UI/UX only) ────────────────────────
+  - id: visual-test
+    description: "Screenshot and compare visual changes"
     depends_on: [test-review]
-    when: "$test-review.output == 'pass'"
+    when: "$CATEGORY == 'ui-ux'"
+    agent:
+      role: visual-tester
+      task: |
+        Capture screenshots of the changed UI components.
+        Compare against baseline. Flag visual regressions.
+        Send results to human for review.
+
+  - id: human-visual-review
+    description: "Human reviews visual changes (UI/UX only)"
+    depends_on: [visual-test]
+    when: "$visual-test.output == 'changes_detected'"
     approval:
-      message: "All checks passed. Ready to merge?"
-      timeout: 3600  # 1 hour
+      message: "Visual changes detected. Approve UI/UX?"
+      timeout: 3600
       on_reject: cancel
 
+  # ── STAGE 6: Research Suggestions (council-initiated) ──────
+  - id: human-research-review
+    description: "Human reviews council research suggestions"
+    depends_on: [council-review]
+    when: "$council-review.output == 'research_suggested'"
+    approval:
+      message: "Council suggests new system research. Review?"
+      timeout: 86400  # 24 hours -- no rush on research
+      on_reject: skip
+
+  # ── STAGE 7: Merge ─────────────────────────────────────────
   - id: merge
     description: "Merge the task branch"
-    depends_on: [human-approval]
+    depends_on: [test-review]
+    when: "$test-review.output == 'pass'"
     bash:
       command: "cd $WORKDIR && git checkout main && git merge --no-ff task/$TASK_ID && git push"
 
-  # ── STAGE 6: Learning ──────────────────────────────────────
+  # ── STAGE 8: Learning ──────────────────────────────────────
   - id: record-outcomes
     description: "Record success/failure for learning"
     depends_on: [merge]
