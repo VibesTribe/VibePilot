@@ -25,9 +25,10 @@ A global, massively scalable, multilingual, multimedia social media platform whe
 
 ### Technical Constraints
 - **Codebase:** ~4-8k lines (fits in LLM context)
-- **Hosting:** e2-micro free tier (1GB RAM)
+- **Hosting:** ThinkPad X220 (16GB RAM, i5-2520M, 781GB disk free)
 - **Runtime:** Single Go binary (10-20MB)
 - **Architecture:** Plug-and-play modules
+- **Model Strategy:** Cloud free tier cascade (Groq, Google AI Studio, OpenRouter, SambaNova). Local inference too slow on this hardware.
 
 ---
 
@@ -77,13 +78,13 @@ VibePilot uses a **two-tier credential system**:
 
 | Credential Type | Location | Who Can Access |
 |-----------------|----------|----------------|
-| **Bootstrap Keys** | `/etc/systemd/system/governor.service.d/override.conf` | Root only (sudo) |
+| **Bootstrap Keys** | `~/.config/systemd/user/vibepilot-governor.service.d/override.conf` | User service (no sudo needed) |
 | **All Other Keys** | Supabase Vault (encrypted) | Via vault_manager.py |
 
-### Bootstrap Keys (Root Only)
+### Bootstrap Keys (User Service)
 ```bash
-# These are in the systemd override file (ROOT ONLY)
-sudo cat /etc/systemd/system/governor.service.d/override.conf
+# These are in the systemd user service override file
+cat ~/.config/systemd/user/vibepilot-governor.service.d/override.conf
 ```
 
 Contains:
@@ -93,76 +94,55 @@ Contains:
 
 ### ⛔ How to Access Supabase (Read This Carefully)
 
-**Method 1: Use the Running Governor (RECOMMENDED)**
-
-The governor binary has access to the environment. Use it to run database operations:
+**Method 1: Extract from User Service Environment**
 
 ```bash
-cd ~/vibepilot/governor
+# Get env vars from the user systemd service
+source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n" | grep -E "^(SUPABASE_URL|SUPABASE_SERVICE_KEY)=")
 
-# The governor process has the env vars. Create a simple query tool.
-# Or use the existing database connection in Go code.
-```
-
-**Method 2: Extract Env Vars and Use curl (WORKS)**
-
-```bash
-# Create a temporary script that sources the env
-sudo bash -c 'cat > /tmp/db_query.sh << "EOF"
-#!/bin/bash
-# Extract env vars from systemd
-source <(systemctl show governor -p Environment | sed "s/Environment=//" | tr " " "\n" | grep -E "^(SUPABASE_URL|SUPABASE_SERVICE_KEY)=")
-
-# Now use them
-curl -s "${SUPABASE_URL}/rest/v1/tasks?select=*" \
+# Query tasks
+curl -s "${SUPABASE_URL}/rest/v1/tasks?select=id,title,status" \
   -H "apikey: ${SUPABASE_SERVICE_KEY}" \
   -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
-EOF
-chmod +x /tmp/db_query.sh'
-sudo /tmp/db_query.sh
 ```
 
-**Method 3: Use Go with Sudo (WORKS)**
+**Method 2: Use the Running Governor (RECOMMENDED)**
 
-```bash
-cd ~/vibepilot/governor
+The governor binary has access to the environment. Use it to run database operations via Go code.
 
-# Create a simple Go program that reads env and queries
-sudo bash -c 'export $(systemctl show governor -p Environment | sed "s/Environment=//" | tr " " "\n" | grep -E "^(SUPABASE_URL|SUPABASE_SERVICE_KEY)=" | xargs) && go run ./cmd/tools/query.go'
-```
-
-**Method 4: Python with Vault Manager (IF IT EXISTS)**
+**Method 3: Python with Vault Manager (IF IT EXISTS)**
 
 ```bash
 # Check if vault_manager.py exists FIRST
-ls ~/vibepilot/scripts/vault_manager.py
+ls ~/VibePilot/scripts/vault_manager.py
 
 # If it exists, use it
-python3 ~/vibepilot/scripts/vault_manager.py --action get --key SOME_API_KEY
+python3 ~/VibePilot/scripts/vault_manager.py --action get --key SOME_API_KEY
 ```
 
 ### ⛔ What NOT to Do (Wastes Time)
 
 ❌ **DON'T look for .env files** - They don't exist
-❌ **DON'T try to read override.conf without sudo** - Permission denied
-❌ **DON'T create new Python scripts** - Use Go or curl
+❌ **DON'T use `sudo systemctl`** - It's a user service, use `systemctl --user`
+❌ **DON'T use `journalctl -u governor`** - Use `journalctl --user -u vibepilot-governor`
 ❌ **DON'T hardcode credentials** - Use the vault
 ❌ **DON'T guess** - Check what exists first
 
 ### ✅ Quick Reference: Database Operations
 
 ```bash
-# Check if cleanup script exists
-ls ~/vibepilot/scripts/cleanup*.sh
-
 # Check for query tools
-ls ~/vibepilot/governor/cmd/tools/
+ls ~/VibePilot/governor/cmd/tools/
 
-# Use the systemd environment
-sudo bash -c 'source <(systemctl show governor -p Environment | sed "s/Environment=//" | tr " " "\n") && echo "URL: $SUPABASE_URL"'
+# Use the systemd user environment
+source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n")
+echo "URL: $SUPABASE_URL"
 
 # Query Supabase via curl
-sudo bash -c 'source <(systemctl show governor -p Environment | sed "s/Environment=//" | tr " " "\n") && curl -s "${SUPABASE_URL}/rest/v1/tasks?select=id,title,status" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"'
+source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n")
+curl -s "${SUPABASE_URL}/rest/v1/tasks?select=id,title,status" \
+  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
 ```
 
 ### GitHub Access
@@ -173,7 +153,7 @@ gh auth status
 gh api repos/VibesTribe/VibePilot
 
 # Or use git directly
-cd ~/vibepilot
+cd ~/VibePilot
 git status
 git log --oneline -5
 ```
@@ -385,13 +365,14 @@ Fix the Go code that writes to Supabase.
 ### Architecture Components
 
 ```
-~/vibepilot/
+~/VibePilot/
 ├── governor/                 # Go backend (THE BRAIN)
 │   ├── cmd/governor/        # Main entry point
 │   ├── internal/            # Core logic
 │   │   ├── core/           # State machine, checkpointing
 │   │   ├── db/             # Supabase client, RPCs
 │   │   ├── runtime/        # Router, agents, sessions
+│   │   ├── dag/            # DAG engine, YAML workflow
 │   │   ├── gitree/         # Git operations
 │   │   └── security/       # Leak detection
 │   └── config/              # JSON configs (models, connectors, etc.)
@@ -403,9 +384,11 @@ Fix the Go code that writes to Supabase.
 │   ├── prompts/             # Agent system prompts
 │   └── *.md                 # Documentation
 │
+├── research/                # Model/provider research, landscape analysis
+│
 └── scripts/                 # Utility scripts
 
-~/vibeflow/                   # Dashboard (SEPARATE REPO)
+~/vibeflow/                   # Dashboard (SEPARATE REPO, Vercel auto-deploy)
 ├── apps/dashboard/          # React dashboard
 └── src/                     # Core types, agents
 ```
@@ -515,9 +498,9 @@ Webhooks failed. We switched to Supabase Live.
 | Check routing config | `governor/config/` | `routing.json` |
 | Find database schema | `docs/supabase-schema/` | `*.sql` files |
 | Understand dashboard | `docs/` | `HOW_DASHBOARD_WORKS.md` |
-| Query Supabase | Use sudo + systemctl | See Section 3 |
-| Check governor logs | System | `journalctl -u governor` |
-| Restart governor | System | `sudo systemctl restart governor` |
+| Query Supabase | Use systemctl --user | See Section 3 |
+| Check governor logs | System | `journalctl --user -u vibepilot-governor` |
+| Restart governor | System | `systemctl --user restart vibepilot-governor` |
 
 ### Governor Internal Structure
 
@@ -545,6 +528,10 @@ governor/
 │   │   ├── factory.go     # Session factory
 │   │   └── pool.go        # Agent pool
 │   │
+│   ├── dag/                # DAG engine
+│   │   ├── engine.go      # DAG execution engine
+│   │   └── workflow.go    # YAML workflow structs
+│   │
 │   ├── gitree/            # Git operations
 │   │   └── gitree.go      # Branch, commit, merge
 │   │
@@ -566,9 +553,11 @@ governor/
 | `governor/cmd/governor/handlers_task.go` | Task execution logic |
 | `governor/cmd/governor/handlers_plan.go` | Plan creation logic |
 | `governor/internal/runtime/router.go` | Routing logic (SelectDestination) |
+| `governor/internal/dag/engine.go` | DAG execution engine |
 | `governor/internal/db/supabase.go` | Database client |
 | `governor/config/models.json` | Model definitions |
 | `governor/config/connectors.json` | Connector definitions |
+| `research/2026-04-14-free-model-rolodex.md` | Verified free provider cascade |
 | `docs/HOW_DASHBOARD_WORKS.md` | Dashboard data flow |
 
 ---
@@ -609,9 +598,9 @@ governor/
 
 1. ✅ Read this file (VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md)
 2. ✅ Read CURRENT_STATE.md
-3. ✅ Check git branch: `git branch --show-current`
-4. ✅ Check governor status: `sudo systemctl status governor`
-5. ✅ Check recent logs: `journalctl -u governor -n 50`
+3. ✅ Check git branch: `cd ~/VibePilot && git branch --show-current`
+4. ✅ Check governor status: `systemctl --user status vibepilot-governor`
+5. ✅ Check recent logs: `journalctl --user -u vibepilot-governor -n 50`
 6. ✅ Verify you can access Supabase (see Section 3)
 
 ---
@@ -620,30 +609,39 @@ governor/
 
 ### Query Supabase
 ```bash
-sudo bash -c 'source <(systemctl show governor -p Environment | sed "s/Environment=//" | tr " " "\n") && curl -s "${SUPABASE_URL}/rest/v1/tasks?select=*" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"'
+source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n")
+curl -s "${SUPABASE_URL}/rest/v1/tasks?select=id,title,status" \
+  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
 ```
 
 ### Clean Up Test Data
 ```bash
-sudo bash -c 'source <(systemctl show governor -p Environment | sed "s/Environment=//" | tr " " "\n") && \
-curl -X DELETE "${SUPABASE_URL}/rest/v1/tasks?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" && \
-curl -X DELETE "${SUPABASE_URL}/rest/v1/task_runs?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" && \
-curl -X DELETE "${SUPABASE_URL}/rest/v1/plans?id=not.is.null" -H "apikey: ${SUPABASE_SERVICE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"'
+source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n")
+curl -X DELETE "${SUPABASE_URL}/rest/v1/tasks?id=not.is.null" \
+  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
+curl -X DELETE "${SUPABASE_URL}/rest/v1/task_runs?id=not.is.null" \
+  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
+curl -X DELETE "${SUPABASE_URL}/rest/v1/plans?id=not.is.null" \
+  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
 ```
 
 ### Rebuild and Restart Governor
 ```bash
-cd ~/vibepilot/governor && go build -o governor ./cmd/governor && sudo systemctl restart governor
+cd ~/VibePilot/governor && go build -o governor ./cmd/governor && systemctl --user restart vibepilot-governor
 ```
 
 ### Check Governor Logs
 ```bash
-journalctl -u governor --since "5 minutes ago" | tail -50
+journalctl --user -u vibepilot-governor --since "5 minutes ago" | tail -50
 ```
 
 ### Create a Test PRD
 ```bash
-cat > ~/vibepilot/docs/prd/test-feature.md << 'EOF'
+cat > ~/VibePilot/docs/prd/test-feature.md << 'EOF'
 # PRD: Test Feature
 
 Priority: Low
@@ -665,7 +663,7 @@ Test description.
 - Expected result
 EOF
 
-cd ~/vibepilot && git add docs/prd/test-feature.md && git commit -m "test: add test PRD" && git push origin main
+cd ~/VibePilot && git add docs/prd/test-feature.md && git commit -m "test: add test PRD" && git push origin main
 ```
 
 ---
@@ -677,7 +675,8 @@ cd ~/vibepilot && git add docs/prd/test-feature.md && git commit -m "test: add t
 - **No hardcoding** - Everything in config files
 - **GitHub = Code source of truth**
 - **Supabase = State source of truth**
-- **Use sudo + systemctl to access Supabase** - Don't waste time looking for .env files
+- **User service, not system** - `systemctl --user`, not `sudo systemctl`
+- **Cloud free tiers = primary** - Local inference too slow on x220
 
 **Need more detail?** See Section 9 for deep dive references.
 
