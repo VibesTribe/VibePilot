@@ -244,7 +244,7 @@ Result committed, metrics tracked
 ### Communication Protocol
 
 1. **Check before work:** Read `ACTIVE_SESSIONS.md`
-2. **Handoff notes:** Update `.handoff-to-glm.md` or `.handoff-to-kimi.md`
+2. **Handoff notes:** Update AGENT_CHAT.md or the active session file
 3. **Status updates:** Mark active/paused in ACTIVE_SESSIONS.md
 4. **Git safety:** Always `git status && git branch` before operations
 

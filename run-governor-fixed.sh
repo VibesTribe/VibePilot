@@ -1,5 +1,0 @@
-#!/bin/bash
-cd /home/vibes/vibepilot
-export SUPABASE_URL="https://qtpdzsinvifkgpxyxlaz.supabase.co"
-export SUPABASE_SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0cGR6c2ludmlma2dweHl4bGF6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDY2MTU3MCwiZXhwIjoyMDg2MjM3NTcwfQ.7ixiABm_tE91p1RoUtT2z4E8eLiwTfD7RgIk6E87_yQ"
-exec ./governor/governor "$@"
