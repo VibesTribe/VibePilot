@@ -225,6 +225,31 @@ Based on impact vs effort:
 
 ---
 
+## Hard Constraints for Implementation
+
+### The Planner Disaster Rule (April 2026)
+
+An AI agent shortened planner and supervisor prompts to save tokens. System broke for two days because it wasn't using correct prompts. Root cause: agents editing their own instructions without evidence or approval.
+
+**Constraint: Any file an agent reads at runtime must live on GitHub, version controlled.**
+
+Skills follow the same pattern as prompts:
+- Skills in `skills/*.md` on GitHub
+- Governor syncs at startup alongside prompts
+- Changes go through: propose (with evidence) -> supervisor review -> human approval -> git commit -> governor sync
+
+**Self-improvement is not auto-editing.** The cycle is:
+1. Agent runs N tasks, builds track record in task_runs
+2. Agent spots pattern with data ("3/5 code reviews missed security with current prompt")
+3. Agent proposes change to improvement_proposals with evidence
+4. Supervisor reviews evidence against execution history
+5. Human has final say on prompt/skill changes
+6. Approved -> committed to GitHub -> picked up on next sync
+
+An agent must demonstrate understanding before proposing changes. Not "I think this is better" but "here's the data showing X failed N times on pattern Y."
+
+---
+
 ## Cross-Reference: Other Research Sources
 
 This analysis complements findings from:
