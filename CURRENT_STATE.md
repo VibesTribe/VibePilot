@@ -1,152 +1,110 @@
-# VibePilot Current State - 2026-04-03
+# VibePilot Current State - 2026-04-14
 
-## Status: Governor Fixed and Running
+## Status: Infrastructure Optimized, Research Phase
 
-### Critical Fixes Applied ✅
-Fixed "connector not registered" errors in task and plan review handlers:
+### What's Running
+- **Governator:** systemd user service, running since April 7, active
+- **Cloudflared tunnel:** live at vibestribe.rocks, sacred (don't touch)
+- **Hermes agent:** accessible via dashboard chat through tunnel
+- **Chrome CDP:** port 9222 for browser automation
+- **TTS:** edge-tts (fast, free, no changes needed)
 
-**File: `governor/cmd/governor/handlers_task.go`**
-- Line 328: Changed `factory.CreateWithContext(ctx, "supervisor", taskType)` to `factory.CreateWithConnector(ctx, "supervisor", taskType, routingResult.DestinationID)`
-- Line 360: Changed retry session to use `factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.DestinationID)`
+### Hardware: ThinkPad X220
+- Intel i5-2520M (no AVX2, no GPU)
+- 16GB RAM (~10GB available)
+- 781GB disk free
+- Phone WiFi tethered
 
-**File: `governor/cmd/governor/handlers_plan.go`**
-- Line 247: Changed `factory.CreateWithContext(ctx, "supervisor", "review")` to `factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.ConnectorID)`
-- Line 276: Changed retry session to use `factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.ConnectorID)`
+### What Changed This Session (April 14)
+- **Ollama:** installed v0.20.4, daemon stopped/disabled. Tested qwen3:4b and qwen3-vl:4b -- too slow (2 tok/s) for real work. Cleaned out. Ready to pull models when landscape shifts.
+- **Kokoro TTS:** removed (9GB freed). Edge-tts is better for this hardware.
+- **Free model research:** verified 7 free API providers. Full rolodex in `research/2026-04-14-free-model-rolodex.md`.
+- **GitHub PAT:** rotated (done in earlier session).
 
-**Root Cause:** Supervisor sessions were using `CreateWithContext` which didn't pass the connector ID, causing "connector not registered" errors.
-
-**Committed:** `214a7eb8` - "fix: use CreateWithConnector for supervisor sessions"
+### Key Decisions
+1. **No local models** -- x220 can't run useful inference. Cloud free tiers are the path.
+2. **Edge-tts only** -- fastest free option, no reason to change.
+3. **RAM for agents, not models** -- parallel agent sessions are the priority.
+4. **Multiple free providers** -- cascade of Groq/Google/OpenRouter/SambaNova, never single-vendor dependency.
+5. **Real usage decides spending** -- run tasks on free tiers first, data tells where $10 credit is worth it.
 
 ---
 
-## How to Start Governor (IMPORTANT)
+## Verified Free API Providers (April 2026)
 
-### Governor Now Runs as Systemd User Service ✅
+| Provider | Card Needed | Best Free Models | Rate Limits |
+|---|---|---|---|
+| OpenRouter | NO | 24 free models, $0 cap | 50-1000 RPD |
+| Groq | NO | qwen3-32b, llama-4-scout, gpt-oss | 30 RPM, 100-500K TPD |
+| Google AI Studio | NO | Gemini 2.5 Flash, Gemma 4 | ~15 RPM |
+| SambaNova | NO | DeepSeek-V3.1, Llama-4-Maverick | 20 RPD |
+| NVIDIA NIM | NO | Nemotron 3 Super | Trial access |
+| SiliconFlow | NO (real-name) | Qwen, GLM, DeepSeek | 1000-10000 RPM |
+| HuggingFace | NO | Thousands of models | Varies |
 
-The governor is now managed by systemd and will:
-- Auto-start on login
-- Restart on crash
-- Log to journal (view with `journalctl --user -u vibepilot-governor`)
+**Status:** Only Google AI Studio key exists. Need to sign up for Groq, SambaNova, NVIDIA NIM.
 
-### Bootstrap Credentials Location
-The 3 bootstrap credentials are stored in `~/.config/systemd/user/vibepilot-governor.service.d/override.conf`:
+---
 
-1. **SUPABASE_URL** - Your Supabase project URL
-2. **SUPABASE_SERVICE_KEY** - Service role key (admin access)
-3. **VAULT_KEY** - Decrypts the Supabase vault
+## Repository State
 
-**These were set up during initial server installation and are NOT in GitHub Secrets.**
+**Branch:** `research-update-april2026` tracking origin
+**Recent commits:**
+- `9dd81ae9` - research: verified free model rolodex
+- `8b06a2c3` - research: JourneyKits landscape analysis
 
-### Managing Governor Service
+**Key files:**
+- `research/2026-04-14-free-model-rolodex.md` - Verified free providers + cascade plan
+- `research/2026-04-08-journeykits-landscape-analysis.md` - 95-kit gap analysis
+- `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` - Architecture bible (needs update)
+- `governor/` - Go governor source
+- `governor/config/` - JSON configs (models.json, connectors.json, routing.json, etc.)
 
-**Check status:**
+**Dashboard:** https://vibeflow-dashboard.vercel.app/ (sacred, deployed from ~/vibeflow)
+
+---
+
+## On Disk (relevant)
+
+| Path | Size | Purpose |
+|---|---|---|
+| ~/VibePilot/ | 165MB | Go governor + research |
+| ~/vibeflow/ | 173MB | Dashboard (Vercel auto-deploy) |
+| ~/vibepilot-server/ | 60KB | Restart scripts |
+| ~/browser-use-env/ | 429MB | Browser Use (Playwright + Chrome CDP) |
+
+**Stopped/disabled:**
+- Ollama daemon (stopped, disabled, ready if needed)
+- No local models pulled
+
+---
+
+## Next Steps
+
+1. **Get free API keys** for Groq, SambaNova, NVIDIA NIM (user signing up)
+2. **Build cascade into models.json** with verified providers
+3. **Wire cascade into governor** routing logic
+4. **Run real tasks** through cascade to learn what works
+5. **Update VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md** -- still references old state
+
+---
+
+## How to Start Governor
+
 ```bash
+# Check status
 systemctl --user status vibepilot-governor
-```
 
-**View logs:**
-```bash
+# View logs
 journalctl --user -u vibepilot-governor -f
-```
 
-**Restart governor:**
-```bash
+# Restart
 systemctl --user restart vibepilot-governor
-```
 
-**Stop governor (won't restart):**
-```bash
-systemctl --user stop vibepilot-governor
-```
-
-**Kill process (systemd will auto-restart after 5s):**
-```bash
-pkill -f governor
-```
-
-**Check dashboard:**
-```bash
-open http://localhost:3000
-```
-
-### Manual Start (If Needed)
-If systemd is not available:
-```bash
-cd ~/vibepilot/governor
-export SUPABASE_URL="https://qtpdzsinvifkgpxyxlaz.supabase.co"
-export SUPABASE_SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-export VAULT_KEY="P9jFR25vbjcNxG2S3lx4ZCyspfGLd7wZYliZWLjqKLc="
-./governor
+# Bootstrap credentials in:
+# ~/.config/systemd/user/vibepilot-governor.service.d/override.conf
 ```
 
 ---
 
-## Server Setup Information
-
-**Server:** Linux Mint Cinnamon on ThinkPad X220
-**Purpose:** VibePilot agent execution server
-**Setup Directory:** `/home/vibes/vibepilot-server/`
-
-**Key Setup Files:**
-- `restart_governor.sh` - Starts governor with credentials
-- `install.sh` - Initial server setup
-- `quick-status.sh` - Quick status check
-- `monitor.sh` - Monitoring tools
-
----
-
-## GitHub Workflow vs Local Script
-
-**Note:** The GitHub workflow `.github/workflows/deploy-governor.yml` references a `self-hosted` runner that is NOT configured on this server. Do NOT rely on that workflow for deployment.
-
-**Use the local restart script instead:** `~/vibepilot-server/restart_governor.sh`
-
----
-
-## Current Governor Status
-
-**Running:** Yes (started 2026-04-03 20:07)
-**PID:** 351291
-**Config:**
-- Realtime connected to Supabase
-- 16 prompts synced
-- Webhooks on port 8080
-- Max 2 concurrent per module, 4 total
-- Using glm-5 model via claude-code connector
-- Multi-instance protection: Kills existing governors before starting
-
-**Logs:** `journalctl --user -u vibepilot-governor -f`
-
-**Protection Against Multiple Instances:**
-The systemd service includes `ExecStartPre` that kills any existing governor processes before starting, preventing multiple governors from running simultaneously.
-
----
-
-## Important Notes for Next Session
-
-1. **DO NOT** look for credentials in:
-   - `.env` files (don't exist)
-   - systemd override files (not set up)
-   - GitHub Secrets (workflow requires self-hosted runner)
-
-2. **DO** use the restart script:
-   ```bash
-   ~/vibepilot-server/restart_governor.sh
-   ```
-
-3. **DO NOT** modify the credential values in `restart_governor.sh` unless you know what you're doing.
-
-4. **If governor crashes:** Run the restart script again.
-
-5. **To check what's working:** Open dashboard at `http://localhost:3000`
-
----
-
-## Recent Changes
-
-- **2026-04-03 19:58:** Governor restarted with credentials, operational
-- **2026-04-03 19:55:** Pushed fixes for CreateWithConnector to GitHub
-- **2026-04-03:** Fixed handler_task.go and handlers_plan.go connector issues
-
----
-**Last Updated:** 2026-04-03 20:00
+**Last Updated:** 2026-04-14
