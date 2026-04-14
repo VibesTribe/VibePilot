@@ -54,23 +54,14 @@ else
 fi
 
 # ============================================================
-# 2b. docs.db (jDocMunch - documentation sections)
+# 2b. knowledge.db (unified rules+prompts+configs+docs)
 # ============================================================
-HAS_DOC_MUNCH=true
-command -v jdocmunch-mcp >/dev/null 2>&1 || HAS_DOC_MUNCH=false
-if [ "$HAS_DOC_MUNCH" = true ]; then
-    echo "[.context] Generating docs.db (jDocMunch)..."
-    jdocmunch-mcp index-local --path "$REPO_ROOT" --name VibePilot >/dev/null 2>&1 || true
-    DOC_MANIFEST=$(ls -t ~/.doc-index/local/VibePilot.json 2>/dev/null | head -1)
-    if [ -n "$DOC_MANIFEST" ]; then
-        # Copy the doc index directory as a tarball (it's a folder of section files)
-        tar czf "$CTX_DIR/docs.db.tar.gz" -C ~/.doc-index/local VibePilot VibePilot.json 2>/dev/null
-        echo "[.context] docs.db.tar.gz: $(du -sh "$CTX_DIR/docs.db.tar.gz" | cut -f1)"
-    else
-        echo "[.context] SKIP docs.db (jDocMunch index failed)"
-    fi
+echo "[.context] Generating knowledge.db..."
+python3 "$CTX_DIR/tools/build-knowledge-db.py" "$REPO_ROOT" 2>/dev/null
+if [ -f "$CTX_DIR/knowledge.db" ]; then
+    echo "[.context] knowledge.db: $(du -sh "$CTX_DIR/knowledge.db" | cut -f1)"
 else
-    echo "[.context] SKIP docs.db (jDocMunch not found). Run .context/tools/install.sh"
+    echo "[.context] SKIP knowledge.db (build failed)"
 fi
 
 # ============================================================
@@ -147,8 +138,15 @@ $(echo "$SECTION_CONSTRAINTS")
 2. map.md = all function signatures, compressed (~12K tokens)
 3. index.db = jCodeMunch SQLite: code symbols, imports, call graph
    sqlite3 .context/index.db ".tables"  (see what's indexed)
-4. docs.db.tar.gz = jDocMunch tarball: all docs, markdown, sections
-   tar xzf .context/docs.db.tar.gz  (extract to query)
+4. knowledge.db = THE key file. Unified SQLite with:
+   - rules table: 36 rules, priority-ranked (critical/high/medium), deduplicated
+   - prompts table: 30 prompt templates across all directories
+   - configs table: 15 config files with purpose + key fields
+   - docs table: ~3000 documentation sections, full-text searchable
+   Quick queries:
+   sqlite3 .context/knowledge.db "SELECT title FROM rules WHERE priority='critical'"
+   sqlite3 .context/knowledge.db "SELECT name,role FROM prompts WHERE name LIKE '%supervisor%'"
+   sqlite3 .context/knowledge.db "SELECT title,file_path FROM docs WHERE title LIKE '%vault%'"
 5. Raw source = for implementation details only
 
 ## Current Status (from CURRENT_STATE.md)
@@ -171,15 +169,14 @@ generated: $TIMESTAMP
 boot_md_bytes: $BOOT_BYTES
 map_md_bytes: $MAP_BYTES
 has_index_db: $([ -f "$CTX_DIR/index.db" ] && echo true || echo false)
-has_docs_db: $([ -f "$CTX_DIR/docs.db.tar.gz" ] && echo true || echo false)
+has_knowledge_db: $([ -f "$CTX_DIR/knowledge.db" ] && echo true || echo false)
 indexes:
   code: jCodeMunch SQLite - symbols, imports, call graph, AST
-  docs: jDocMunch tarball - all markdown sections, 8037 sections indexed
+  knowledge: Unified SQLite - rules, prompts, configs, docs sections
   code_map: lean-ctx map mode - compressed function signatures
 tools:
   lean_ctx: "$([ "$HAS_LEAN_CTX" = true ] && lean-ctx --version 2>/dev/null || echo "MISSING - run .context/tools/install.sh")"
   jcodemunch: "$([ "$HAS_MUNCH" = true ] && echo "installed" || echo "MISSING - run .context/tools/install.sh")"
-  jdocmunch: "$([ "$HAS_DOC_MUNCH" = true ] && echo "installed" || echo "MISSING - run .context/tools/install.sh")"
 META_EOF
 
 echo ""

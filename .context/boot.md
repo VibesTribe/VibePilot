@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-14T22:02:15Z | Commit: 6de9b659 | Branch: research-update-april2026
+# Generated: 2026-04-14T22:24:02Z | Commit: 025b7978 | Branch: research-update-april2026
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -65,15 +65,22 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: research-update-april2026
-- Commit: 6de9b659
+- Commit: 025b7978
 
 ## How To Use .context/
 1. boot.md (this file) = orientation (~1.5K tokens)
 2. map.md = all function signatures, compressed (~12K tokens)
 3. index.db = jCodeMunch SQLite: code symbols, imports, call graph
    sqlite3 .context/index.db ".tables"  (see what's indexed)
-4. docs.db.tar.gz = jDocMunch tarball: all docs, markdown, sections
-   tar xzf .context/docs.db.tar.gz  (extract to query)
+4. knowledge.db = THE key file. Unified SQLite with:
+   - rules table: 36 rules, priority-ranked (critical/high/medium), deduplicated
+   - prompts table: 30 prompt templates across all directories
+   - configs table: 15 config files with purpose + key fields
+   - docs table: ~3000 documentation sections, full-text searchable
+   Quick queries:
+   sqlite3 .context/knowledge.db "SELECT title FROM rules WHERE priority='critical'"
+   sqlite3 .context/knowledge.db "SELECT name,role FROM prompts WHERE name LIKE '%supervisor%'"
+   sqlite3 .context/knowledge.db "SELECT title,file_path FROM docs WHERE title LIKE '%vault%'"
 5. Raw source = for implementation details only
 
 ## Current Status (from CURRENT_STATE.md)
