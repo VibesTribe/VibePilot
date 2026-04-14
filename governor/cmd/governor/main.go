@@ -12,6 +12,7 @@ import (
 	"github.com/vibepilot/governor/internal/core"
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/gitree"
+	govmcp "github.com/vibepilot/governor/internal/mcp"
 	"github.com/vibepilot/governor/internal/realtime"
 	"github.com/vibepilot/governor/internal/runtime"
 	"github.com/vibepilot/governor/internal/security"
@@ -106,6 +107,21 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Initialize MCP registry (connects to approved external MCP servers)
+	var mcpRegistry *govmcp.Registry
+	if len(cfg.System.MCPServers) > 0 {
+		mcpRegistry = govmcp.NewRegistry(cfg.System.MCPServers)
+		if err := mcpRegistry.Start(ctx); err != nil {
+			log.Printf("Warning: MCP registry startup had errors: %v", err)
+		}
+		// Wire MCP tools into agent context so agents know what's available
+		contextBuilder.SetMCPRegistry(mcpRegistry)
+		// Register MCP tools in the tool registry so agents can call them
+		mcpRegistry.RegisterToolsInRegistry(toolRegistry)
+	} else {
+		log.Println("[MCP] No MCP servers configured")
+	}
+
 	recoveryCfg := getRecoveryConfig(cfg)
 	runStartupRecovery(ctx, database, recoveryCfg)
 	runCheckpointRecovery(ctx, database, cfg, checkpointMgr)
@@ -170,6 +186,9 @@ func main() {
 	log.Println("Shutting down...")
 	cancel()
 	webhookServer.Shutdown(ctx)
+	if mcpRegistry != nil {
+		mcpRegistry.Shutdown()
+	}
 	if realtimeClient != nil {
 		realtimeClient.Close()
 	}

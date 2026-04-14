@@ -1,5 +1,4 @@
 package runtime
-
 import (
 	"context"
 	"encoding/json"
@@ -27,6 +26,19 @@ type SystemConfig struct {
 	Core        *CoreConfig            `json:"core,omitempty"`
 	Webhooks    *WebhooksConfig        `json:"webhooks,omitempty"`
 	PromptsDir  string                 `json:"prompts_dir"`
+	MCPServers  []MCPServerConfig      `json:"mcp_servers,omitempty"`
+}
+
+// MCPServerConfig defines an approved MCP server connection.
+// Only servers explicitly listed here are connected.
+type MCPServerConfig struct {
+	Name      string            `json:"name"`
+	Transport string            `json:"transport"` // "stdio" | "http" | "sse"
+	Command   string            `json:"command,omitempty"`
+	Args      []string          `json:"args,omitempty"`
+	URL       string            `json:"url,omitempty"`
+	Env       map[string]string `json:"env,omitempty"`
+	Enabled   bool              `json:"enabled"`
 }
 
 type WebhooksConfig struct {

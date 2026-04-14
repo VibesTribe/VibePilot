@@ -12,12 +12,31 @@ type RPCQuerier interface {
 	RPC(ctx context.Context, name string, params map[string]any) ([]byte, error)
 }
 
+// MCPToolLister provides discovered MCP tool info for agent context.
+// Implemented by internal/mcp.Registry.
+type MCPToolLister interface {
+	ListToolInfo() []MCPToolInfo
+}
+
+// MCPToolInfo describes a single MCP tool for agent context injection.
+type MCPToolInfo struct {
+	Name        string
+	Description string
+	ServerName  string
+}
+
 type ContextBuilder struct {
-	db RPCQuerier
+	db       RPCQuerier
+	mcpTools MCPToolLister
 }
 
 func NewContextBuilder(db RPCQuerier) *ContextBuilder {
 	return &ContextBuilder{db: db}
+}
+
+// SetMCPRegistry injects the MCP tool registry for context building.
+func (b *ContextBuilder) SetMCPRegistry(registry MCPToolLister) {
+	b.mcpTools = registry
 }
 
 func (b *ContextBuilder) BuildPlannerContext(ctx context.Context, projectType string) (string, error) {
@@ -78,6 +97,18 @@ func (b *ContextBuilder) BuildPlannerContext(ctx context.Context, projectType st
 				} else {
 					contextBuilder.WriteString(fmt.Sprintf("- %s (%d occurrences)\n", failureType, int(count)))
 				}
+			}
+		}
+	}
+
+	// Inject available MCP tools from approved servers
+	if b.mcpTools != nil {
+		tools := b.mcpTools.ListToolInfo()
+		if len(tools) > 0 {
+			contextBuilder.WriteString("\n## Available MCP Tools\n\n")
+			contextBuilder.WriteString("The following external tools are available from approved MCP servers:\n\n")
+			for _, t := range tools {
+				contextBuilder.WriteString(fmt.Sprintf("- **%s** (via %s): %s\n", t.Name, t.ServerName, t.Description))
 			}
 		}
 	}
