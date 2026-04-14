@@ -1,0 +1,125 @@
+# VibePilot Code Pipeline
+# The standard pipeline for taking a PRD to production code.
+# Edit this file to change the flow -- no Go code changes needed.
+
+name: code-pipeline
+description: |
+  PRD -> Plan -> QC Review -> Orchestrator -> Security -> Test -> Merge
+  The standard VibePilot pipeline for software development tasks.
+
+nodes:
+  # ── STAGE 1: Planning ──────────────────────────────────────
+  - id: generate-plan
+    description: "Generate task plan from PRD"
+    agent:
+      role: planner
+      task: |
+        Read the PRD at $PRD_PATH and generate a structured task plan.
+        For each task: assign task_number, title, description, category,
+        dependencies, expected_output, and confidence score.
+        Use slice context for numbering continuity.
+    model: planner
+
+  - id: council-review
+    description: "Multi-model council reviews the plan"
+    depends_on: [generate-plan]
+    agent:
+      role: council
+      task: |
+        Review the plan from $generate-plan.output using multiple models.
+        Evaluate: completeness, feasibility, risk, testability.
+        Each council member votes approve/revise/reject.
+        Consensus required to proceed. Revision feedback goes to planner.
+    model: council
+
+  - id: plan-revision-check
+    description: "Check if plan needs revision"
+    depends_on: [council-review]
+    when: "$council-review.output == 'revise'"
+    agent:
+      role: planner
+      task: |
+        The council requested revisions. Review feedback and regenerate
+        the plan addressing all concerns. Return revised plan.
+
+  # ── STAGE 2: Task Execution ────────────────────────────────
+  - id: orchestrator
+    description: "Assign tasks to agents based on routing"
+    depends_on: [council-review]
+    when: "$council-review.output == 'approve'"
+    agent:
+      role: orchestrator
+      task: |
+        Take the approved plan and create task assignments.
+        For each task: select agent role, connector, model via routing.
+        Respect concurrency limits and dependency ordering.
+        Emit task_available events for each ready task.
+
+  # ── STAGE 3: Quality Gate ──────────────────────────────────
+  - id: security-review
+    description: "Scan code for secrets and vulnerabilities"
+    depends_on: [orchestrator]
+    agent:
+      role: security
+      task: |
+        Review all code changes from the task execution.
+        Check for: leaked secrets, API keys, credential patterns,
+        unsafe operations, injection vulnerabilities.
+        Block merge if critical issues found.
+    model: security
+
+  - id: supervisor-review
+    description: "Single-model QC review of task output"
+    depends_on: [orchestrator]
+    agent:
+      role: supervisor
+      task: |
+        Review the task output against the expected output from the plan.
+        Check: correctness, completeness, code quality, edge cases.
+        Apply learned review rules. If issues found, provide specific feedback.
+        Score: approve / needs_fix / reject.
+    model: supervisor
+
+  # ── STAGE 4: Testing ───────────────────────────────────────
+  - id: run-tests
+    description: "Execute test suite for changed code"
+    depends_on: [security-review, supervisor-review]
+    trigger_rule: all_success
+    bash:
+      command: "cd $WORKDIR && go test ./... 2>&1"
+    when: "$security-review.output != 'blocked'"
+
+  - id: test-review
+    description: "Evaluate test results"
+    depends_on: [run-tests]
+    agent:
+      role: tester
+      task: |
+        Analyze test results from $run-tests.output.
+        If tests fail: diagnose root cause, suggest fix, update failure DB.
+        If tests pass: confirm coverage, update success metrics.
+        Apply learned testing rules.
+
+  # ── STAGE 5: Merge ─────────────────────────────────────────
+  - id: human-approval
+    description: "Human gates the merge"
+    depends_on: [test-review]
+    when: "$test-review.output == 'pass'"
+    approval:
+      message: "All checks passed. Ready to merge?"
+      timeout: 3600  # 1 hour
+      on_reject: cancel
+
+  - id: merge
+    description: "Merge the task branch"
+    depends_on: [human-approval]
+    bash:
+      command: "cd $WORKDIR && git checkout main && git merge --no-ff task/$TASK_ID && git push"
+
+  # ── STAGE 6: Learning ──────────────────────────────────────
+  - id: record-outcomes
+    description: "Record success/failure for learning"
+    depends_on: [merge]
+    emit:
+      event_type: task_completed
+      payload: "$merge.output"
