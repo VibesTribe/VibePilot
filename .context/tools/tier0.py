@@ -24,7 +24,8 @@ def build_tier0():
     c = conn.cursor()
 
     lines = []
-    lines.append("## TIER 0: NON-NEGOTIABLE RULES (READ FIRST, NO EXCEPTIONS)")
+    lines.append("# TIER 0: NON-NEGOTIABLE RULES — READ FIRST OR FAIL")
+    lines.append("Every session, every agent, every task. These are not suggestions.")
     lines.append("")
 
     # --- SECTION 1: The 5 Absolute Rules ---
@@ -78,7 +79,7 @@ def build_tier0():
 
     # --- SECTION 2: Philosophy in 4 bullets ---
     lines.append("")
-    lines.append("### Design Philosophy (violating these = rewrite)")
+    lines.append("### Core Philosophy (this is WHY we build this way)")
 
     philosophy_titles = [
         ("Zero Vendor Lock-In", "Can we replace [X] in one day with zero code changes?"),

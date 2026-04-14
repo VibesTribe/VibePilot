@@ -113,12 +113,14 @@ if [ -f "$REPO_ROOT/CURRENT_STATE.md" ]; then
     SECTION_STATUS=$(grep -v "^$" "$REPO_ROOT/CURRENT_STATE.md" | head -30)
 fi
 
-# Assemble boot.md
+# Assemble boot.md -- Tier 0 FIRST, details after
 cat > "$CTX_DIR/boot.md" << BOOT_EOF
 # VibePilot Bootstrap
 # Generated: $TIMESTAMP | Commit: $COMMIT | Branch: $BRANCH
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
+
+$(echo "$SECTION_CONSTRAINTS")
 
 ## What Is VibePilot
 Sovereign AI execution engine. Transforms PRDs -> production code via multi-agent orchestration.
@@ -130,8 +132,6 @@ $(echo -e "$SECTION_TREE")
 $(echo -e "$SECTION_CONFIG_JSON")
 ## Config: Prompt Templates (auto-discovered)
 $(echo -e "$SECTION_CONFIG_PROMPTS")
-## Constraints (auto-extracted)
-$(echo "$SECTION_CONSTRAINTS")
 
 ## Service Info
 - Service: vibepilot-governor (systemd --user)
@@ -140,7 +140,7 @@ $(echo "$SECTION_CONSTRAINTS")
 - Commit: $COMMIT
 
 ## How To Use .context/
-1. boot.md (this file) = orientation (~1.5K tokens)
+1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
 2. map.md = all function signatures, compressed (~12K tokens)
 3. index.db = jCodeMunch SQLite: code symbols, imports, call graph
    sqlite3 .context/index.db ".tables"  (see what's indexed)
