@@ -1,6 +1,6 @@
 # TIER 0: NON-NEGOTIABLE RULES
 # Hand-crafted. These exist because agents keep making these same mistakes.
-# Edit this file directly, not auto-generated.
+# Edit this file directly. Not auto-generated.
 # Located at: .context/tools/tier0-static.md
 # build.sh copies this into boot.md verbatim.
 
@@ -31,22 +31,29 @@ and cleanup work.
 
 4. **NEVER apply migrations directly.** Always go through GitHub first.
 
-5. **NEVER modify the dashboard to fix a display issue.**
-   Dashboard is the source of truth. If it looks wrong, the Go code is wrong.
-   Fix the backend, not the display.
+5. **ALWAYS push to GitHub.** Local-only work gets lost. Commit and push.
+   This has caused more lost work than anything else.
+
+6. **Go SERVES VibePilot's design. It does NOT invent new processes.**
+   Go is the plumbing that makes VibePilot's actual processes run.
+   It writes to Supabase in the format the dashboard expects.
+   Do NOT rewrite Go with hallucinated processes that aren't in the spec.
+   Do NOT modify Supabase schema to accommodate hallucinated Go code.
+   Supabase is the contract. Dashboard shows what VibePilot state IS.
+   Go conforms to both, not the other way around.
 
 ## Operational Rules (the DO)
 
-6. **Governor is a systemd user service.**
+7. **Governor is a systemd user service.**
    Use: systemctl --user (not sudo systemctl)
    Logs: journalctl --user -u vibepilot-governor (not journalctl -u governor)
    Getting stuck on this wastes entire sessions.
 
-7. **Roles are defined in config, not guessed.**
+8. **Roles are defined in config, not guessed.**
    Look them up. Human does 2 things. Council does 2 things. Supervisor does 3 things.
    Check config/agents.json and system.json for role definitions.
 
-8. **Read before you code.**
+9. **Read before you code.**
    Query knowledge.db for existing rules and patterns before starting any task.
    sqlite3 .context/knowledge.db "SELECT title,content FROM rules WHERE priority='high'"
    5 minutes of reading saves hours of rewriting.
