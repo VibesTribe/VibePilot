@@ -128,10 +128,23 @@ Expose VibePilot's tools as an MCP server so any agent (Hermes, Claude, Codex, e
 5. Add MCP tool execution path in session.go
 6. Test with a simple MCP server (echo or similar)
 
+## Safety: No Unauthorized Tool Use
+
+MCP tool discovery is NOT open-ended. The flow is:
+
+1. Human approves an MCP server by adding it to system.json with `enabled: true`
+2. Governor starts, connects ONLY to approved+enabled servers
+3. "Discovery" means the governor reads what tools that approved server offers
+4. Agents can only call tools from approved servers -- no roaming, no auto-connecting to random servers
+5. If a server offers tools we don't want used, either disable the server or add a tool whitelist later
+
+Agents NEVER choose their own MCP servers. Humans approve servers, agents use what's on the approved list. Period.
+
 ## Principles Alignment
 
 - **Config-driven** -- servers defined in system.json, no hardcoded providers
 - **Modular** -- each MCP server is independent, can be enabled/disabled
 - **Agnostic** -- works with any MCP-compliant server
+- **Human-gated** -- no server is connected without explicit config approval
 - **Graceful degradation** -- if an MCP server is down, agents continue without it
 - **Recoverable** -- MCP config lives in system.json which is in git
