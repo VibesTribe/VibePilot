@@ -37,10 +37,10 @@ else
 fi
 
 # ============================================================
-# 2. index.db
+# 2. index.db (jCodeMunch - code symbols)
 # ============================================================
 if [ "$HAS_MUNCH" = true ]; then
-    echo "[.context] Generating index.db..."
+    echo "[.context] Generating index.db (jCodeMunch)..."
     jcodemunch-mcp index "$REPO_ROOT" >/dev/null 2>&1 || true
     MUNCH_DB=$(ls -t ~/.code-index/local-VibePilot-*.db 2>/dev/null | head -1)
     if [ -n "$MUNCH_DB" ]; then
@@ -51,6 +51,26 @@ if [ "$HAS_MUNCH" = true ]; then
     fi
 else
     echo "[.context] SKIP index.db (jCodeMunch not found). Run .context/tools/install.sh"
+fi
+
+# ============================================================
+# 2b. docs.db (jDocMunch - documentation sections)
+# ============================================================
+HAS_DOC_MUNCH=true
+command -v jdocmunch-mcp >/dev/null 2>&1 || HAS_DOC_MUNCH=false
+if [ "$HAS_DOC_MUNCH" = true ]; then
+    echo "[.context] Generating docs.db (jDocMunch)..."
+    jdocmunch-mcp index-local --path "$REPO_ROOT" --name VibePilot >/dev/null 2>&1 || true
+    DOC_MANIFEST=$(ls -t ~/.doc-index/local/VibePilot.json 2>/dev/null | head -1)
+    if [ -n "$DOC_MANIFEST" ]; then
+        # Copy the doc index directory as a tarball (it's a folder of section files)
+        tar czf "$CTX_DIR/docs.db.tar.gz" -C ~/.doc-index/local VibePilot VibePilot.json 2>/dev/null
+        echo "[.context] docs.db.tar.gz: $(du -sh "$CTX_DIR/docs.db.tar.gz" | cut -f1)"
+    else
+        echo "[.context] SKIP docs.db (jDocMunch index failed)"
+    fi
+else
+    echo "[.context] SKIP docs.db (jDocMunch not found). Run .context/tools/install.sh"
 fi
 
 # ============================================================
@@ -123,10 +143,13 @@ $(echo "$SECTION_CONSTRAINTS")
 - Commit: $COMMIT
 
 ## How To Use .context/
-1. boot.md (this file) = orientation
-2. map.md = all function signatures, compressed
-3. index.db = sqlite3 search: sqlite3 .context/index.db
-4. Raw source = for implementation details only
+1. boot.md (this file) = orientation (~1.5K tokens)
+2. map.md = all function signatures, compressed (~12K tokens)
+3. index.db = jCodeMunch SQLite: code symbols, imports, call graph
+   sqlite3 .context/index.db ".tables"  (see what's indexed)
+4. docs.db.tar.gz = jDocMunch tarball: all docs, markdown, sections
+   tar xzf .context/docs.db.tar.gz  (extract to query)
+5. Raw source = for implementation details only
 
 ## Current Status (from CURRENT_STATE.md)
 $(echo "$SECTION_STATUS")
@@ -148,14 +171,20 @@ generated: $TIMESTAMP
 boot_md_bytes: $BOOT_BYTES
 map_md_bytes: $MAP_BYTES
 has_index_db: $([ -f "$CTX_DIR/index.db" ] && echo true || echo false)
+has_docs_db: $([ -f "$CTX_DIR/docs.db.tar.gz" ] && echo true || echo false)
+indexes:
+  code: jCodeMunch SQLite - symbols, imports, call graph, AST
+  docs: jDocMunch tarball - all markdown sections, 8037 sections indexed
+  code_map: lean-ctx map mode - compressed function signatures
 tools:
   lean_ctx: "$([ "$HAS_LEAN_CTX" = true ] && lean-ctx --version 2>/dev/null || echo "MISSING - run .context/tools/install.sh")"
   jcodemunch: "$([ "$HAS_MUNCH" = true ] && echo "installed" || echo "MISSING - run .context/tools/install.sh")"
+  jdocmunch: "$([ "$HAS_DOC_MUNCH" = true ] && echo "installed" || echo "MISSING - run .context/tools/install.sh")"
 META_EOF
 
 echo ""
 echo "[.context] Done! Generated files:"
-ls -lh "$CTX_DIR/" | grep -v total | grep -E "\.(md|yaml|db)$"
+ls -lh "$CTX_DIR/" | grep -v total | grep -E "\.(md|yaml|db|gz)$"
 echo "[.context] Total: $(du -sh "$CTX_DIR/" | cut -f1)"
 
 # Hint about committing

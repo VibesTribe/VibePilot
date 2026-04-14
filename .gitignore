@@ -98,4 +98,3 @@ governor/governor.yaml
 
 # Supabase migrations - keep specific files
 !docs/supabase-schema/081_fix_duplicate_create_task_functions.sql
-.context/index.db

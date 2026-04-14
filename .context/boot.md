@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-14T21:41:48Z | Commit: daed1841 | Branch: research-update-april2026
+# Generated: 2026-04-14T21:52:48Z | Commit: 0d7c419b | Branch: research-update-april2026
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -65,13 +65,16 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: research-update-april2026
-- Commit: daed1841
+- Commit: 0d7c419b
 
 ## How To Use .context/
-1. boot.md (this file) = orientation
-2. map.md = all function signatures, compressed
-3. index.db = sqlite3 search: sqlite3 .context/index.db
-4. Raw source = for implementation details only
+1. boot.md (this file) = orientation (~1.5K tokens)
+2. map.md = all function signatures, compressed (~12K tokens)
+3. index.db = jCodeMunch SQLite: code symbols, imports, call graph
+   sqlite3 .context/index.db ".tables"  (see what's indexed)
+4. docs.db.tar.gz = jDocMunch tarball: all docs, markdown, sections
+   tar xzf .context/docs.db.tar.gz  (extract to query)
+5. Raw source = for implementation details only
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State - 2026-04-14
