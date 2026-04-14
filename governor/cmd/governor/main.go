@@ -5,11 +5,13 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/vibepilot/governor/internal/connectors"
 	"github.com/vibepilot/governor/internal/core"
+	"github.com/vibepilot/governor/internal/dag"
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/gitree"
 	govmcp "github.com/vibepilot/governor/internal/mcp"
@@ -120,6 +122,17 @@ func main() {
 		mcpRegistry.RegisterToolsInRegistry(toolRegistry)
 	} else {
 		log.Println("[MCP] No MCP servers configured")
+	}
+
+	// Load pipeline workflows from config/pipelines/
+	pipelinesDir := filepath.Join(configDir, "pipelines")
+	dagRegistry := dag.NewRegistry(pipelinesDir)
+	if err := dagRegistry.LoadAll(); err != nil {
+		log.Printf("Warning: Failed to load pipelines: %v", err)
+	} else {
+		for _, name := range dagRegistry.List() {
+			log.Printf("[DAG] Loaded pipeline: %s", name)
+		}
 	}
 
 	recoveryCfg := getRecoveryConfig(cfg)
