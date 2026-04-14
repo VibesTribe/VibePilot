@@ -98,14 +98,8 @@ for f in $(find "$REPO_ROOT/config/prompts" -name "*.md" -not -name "README.md" 
 done
 
 SECTION_CONSTRAINTS=""
-if [ -f "$CTX_DIR/knowledge.db" ]; then
-    SECTION_CONSTRAINTS=$(python3 "$CTX_DIR/tools/tier0.py" "$REPO_ROOT" 2>/dev/null)
-fi
-if [ -z "$SECTION_CONSTRAINTS" ]; then
-    # Fallback to old grep method if knowledge.db not built yet
-    if [ -f "$REPO_ROOT/VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md" ]; then
-        SECTION_CONSTRAINTS=$(grep -iE "(NEVER|^.*NO .*(hardcode|local|env|card)|must|forbidden|sacred|don.t touch)"         "$REPO_ROOT/VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md" 2>/dev/null | head -15)
-    fi
+if [ -f "$CTX_DIR/tools/tier0-static.md" ]; then
+    SECTION_CONSTRAINTS=$(cat "$CTX_DIR/tools/tier0-static.md")
 fi
 
 SECTION_STATUS=""
