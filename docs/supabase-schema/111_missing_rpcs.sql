@@ -3,6 +3,10 @@
 -- Purpose: Create ALL missing RPCs that the governor binary calls
 -- Date: 2026-04-15
 --
+-- Pre-drop functions that changed return type (084 BOOLEAN → 111 JSONB)
+DROP FUNCTION IF EXISTS claim_task(UUID, TEXT, TEXT, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS claim_for_review(UUID, TEXT) CASCADE;
+--
 -- This migration closes the gap between Go code expectations and Supabase state.
 -- 42 RPCs were referenced in the Go codebase but never created in Supabase.
 -- Every function signature matches exactly what the Go RPC() calls pass.
