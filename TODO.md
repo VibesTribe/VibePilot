@@ -68,34 +68,49 @@ Need to wire it:
 - Posts findings to Supabase for Supervisor review
 - Supervisor approves minor, escalates major to Council -> Human
 
-### 9. JourneyKits implementation
-95 kits were scanned and mapped to VibePilot gaps (`research/2026-04-08-journeykits-landscape-analysis.md`).
-The 20 mapped kits have patterns we can use for courier agents, pipeline stages, etc.
-Need to go through them and decide which patterns to adopt.
+### 9. LogAct patterns (from Meta research)
+`research/2026-04-14-logact-agent-bus.md` -- maps directly to our architecture.
+Adopt after pipeline is working end-to-end:
+- Intent logging: record what agent PLANS to do before execution (not just state transitions)
+- Safety voter: use a different cheap model to cross-check intent before execution
+- Append-only task_events table in Supabase (currently we update rows in-place)
+- Stupidity diagnosis: agent reads own failed output from log, rewrites
+
+### 10. Pre-execution design preview (from orchestration research)
+`research/2026-04-14-orchestration-comparison.md` -- Visual QA moved upstream.
+For UI tasks, show human a design choice BEFORE writing code, not just after:
+- Courier generates mockup/plan, presents to human
+- Human picks direction, THEN agent writes code
+- Skip for non-UI tasks (conditional pipeline stage)
+- Superpowers was the only approach to one-shot tasks using this pattern
+
+### 11. JourneyKits implementation
+95 kits scanned, 20 mapped to VibePilot gaps (`research/2026-04-08-journeykits-landscape-analysis.md`).
+Need to go through them and decide which patterns to adopt for courier agents, pipeline stages, etc.
 
 ---
 
 ## Lower Priority
 
-### 10. Cloudflared tunnel for governor webhook
+### 12. Cloudflared tunnel for governor webhook
 Currently the governor can't receive external webhooks (GCE webhook is dead).
 Options:
 - Cloudflared tunnel to governor's HTTP port (sacred tunnel, add route)
 - Or polling-based: governor checks Supabase realtime instead of webhooks
 
-### 11. Ollama for fallback / air-gap
+### 13. Ollama for fallback / air-gap
 Installed but daemon disabled. When model landscape shifts:
 - Pull small models that work on i5 (no AVX2 constraint)
 - Use as last-resort fallback when all free tiers are rate-limited
 - Or for offline work when phone WiFi is down
 
-### 12. Kokoro TTS (or similar)
+### 14. Kokoro TTS (or similar)
 Edge-tts works fine for now. If voice quality matters later:
 - Kokoro is MIT licensed, runs locally
 - But 9GB+ and slow on x220
 - Revisit when hardware changes or if cloud TTS options appear
 
-### 13. Make .context/ hooks async
+### 15. Make .context/ hooks async
 Post-checkout, post-merge, pre-commit hooks rebuild entire knowledge layer synchronously.
 On x220 this causes command timeouts. Fix:
 - Run rebuild in background (don't block git)
