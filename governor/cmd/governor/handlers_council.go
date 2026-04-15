@@ -160,6 +160,9 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 				return
 			}
 
+			// Compact session for context history
+			h.factory.Compact(ctx, result, planID)
+
 			vote, parseErr := runtime.ParseCouncilVote(result.Output)
 			if parseErr != nil {
 				log.Printf("[CouncilReview] Failed to parse vote from member %d: %v", memberIndex+1, parseErr)
