@@ -24,11 +24,16 @@ A global, massively scalable, multilingual, multimedia social media platform whe
 | Dead on launch | Evolves with new models |
 
 ### Technical Constraints
-- **Codebase:** ~4-8k lines (fits in LLM context)
-- **Hosting:** ThinkPad X220 (16GB RAM, i5-2520M, 781GB disk free)
-- **Runtime:** Single Go binary (10-20MB)
-- **Architecture:** Plug-and-play modules
-- **Model Strategy:** Cloud free tier cascade (Groq, Google AI Studio, OpenRouter, SambaNova). Local inference too slow on this hardware.
+- **Codebase:** ~14k lines Go + config layer (14,419 lines across 13 packages)
+- **Hosting:** ThinkPad X220 (16GB RAM, i5-2520M Sandy Bridge, no AVX2, no GPU, 781GB disk free)
+- **Runtime:** Single Go binary (~12MB), systemd user service
+- **Network:** Phone USB tethered (wifi chip died during repaste), planning ethernet + headless
+- **Architecture:** Config-driven plug-and-play modules, YAML DAG pipeline
+- **Model Strategy:** Cloud free tier cascade (Groq, Google AI Studio, OpenRouter, SambaNova). Local inference too slow on this hardware (tested, 2 tok/s).
+- **Dashboard:** https://vibeflow-dashboard.vercel.app/ (sacred, Vercel auto-deploy)
+- **Tunnel:** vibestribe.rocks via cloudflared (sacred, don't touch)
+- **TTS:** edge-tts (fast, free, no API key)
+- **Two-laptop setup:** x220 = dedicated VibePilot server, other laptop (mjlockboxsocial) = main machine with Claude Code CLI
 
 ---
 
@@ -109,15 +114,16 @@ curl -s "${SUPABASE_URL}/rest/v1/tasks?select=id,title,status" \
 **Method 2: Use the Running Governor (RECOMMENDED)**
 
 The governor binary has access to the environment. Use it to run database operations via Go code.
+The Go vault package (`governor/internal/vault/vault.go`) handles all vault access.
 
-**Method 3: Python with Vault Manager (IF IT EXISTS)**
-
+**Method 3: Environment Variables from ~/.governor_env**
 ```bash
-# Check if vault_manager.py exists FIRST
-ls ~/VibePilot/scripts/vault_manager.py
+# Source the environment file
+source ~/.governor_env
+echo "URL: $SUPABASE_URL"
 
-# If it exists, use it
-python3 ~/VibePilot/scripts/vault_manager.py --action get --key SOME_API_KEY
+# Or extract from systemd user service
+source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n")
 ```
 
 ### ⛔ What NOT to Do (Wastes Time)
@@ -371,28 +377,60 @@ Merge problems are solved by agents, not human.
 ### Architecture Components
 
 ```
-~/VibePilot/
+~/VibePilot/                  # Main repo (also at ~/vibepilot/ -- running copy)
 ├── governor/                 # Go backend (THE BRAIN)
-│   ├── cmd/governor/        # Main entry point
+│   ├── cmd/governor/        # Main entry point + handlers
 │   ├── internal/            # Core logic
-│   │   ├── core/           # State machine, checkpointing
+│   │   ├── core/           # State machine, checkpointing, test runner
 │   │   ├── db/             # Supabase client, RPCs
-│   │   ├── runtime/        # Router, agents, sessions
-│   │   ├── dag/            # DAG engine, YAML workflow
-│   │   ├── gitree/         # Git operations
-│   │   └── security/       # Leak detection
-│   └── config/              # JSON configs (models, connectors, etc.)
+│   │   ├── runtime/        # Router, agents, sessions, context builder
+│   │   ├── dag/            # DAG engine, YAML workflow execution
+│   │   ├── gitree/         # Git branch management (orphan branches for parallel agents)
+│   │   ├── mcp/            # MCP protocol support
+│   │   ├── connectors/     # Courier agents, runner connectors
+│   │   ├── security/       # Leak detection
+│   │   ├── vault/          # Supabase vault access
+│   │   ├── webhooks/       # GitHub webhook handling
+│   │   ├── realtime/       # Supabase realtime subscriptions
+│   │   ├── maintenance/    # System maintenance operations
+│   │   └── tools/          # Tool registry (db, file, git, sandbox, vault, web)
+│   └── config/              # JSON configs + YAML pipelines
+│       ├── pipelines/      # DAG pipeline YAML (code-pipeline.yaml)
+│       ├── models.json     # Model definitions
+│       ├── connectors.json # Connector definitions
+│       ├── routing.json    # Routing strategy
+│       └── *.json          # agents, platforms, roles, skills, tools, etc.
+│
+├── .context/                 # Knowledge layer (auto-generated, agent boot material)
+│   ├── boot.md             # Agent orientation (~2837 tokens, Tier 0 first)
+│   ├── knowledge.db        # SQLite: 24 rules, 30 prompts, 15 configs, 3231 doc sections
+│   ├── map.md              # Full code map (functions, types, imports)
+│   ├── index.db            # Code index (functions, dependencies)
+│   └── tools/              # Build tools
+│       ├── tier0-static.md # Single source of truth for all rules
+│       └── build-knowledge-db.py  # Builds knowledge.db from tier0 + sources
+│
+├── prompts/                  # Agent system prompts (synced to Supabase on startup)
 │
 ├── docs/
 │   ├── prd/                 # Product Requirements (INPUT)
 │   ├── plans/               # Generated plans (OUTPUT)
-│   ├── supabase-schema/     # Database migrations
-│   ├── prompts/             # Agent system prompts
-│   └── *.md                 # Documentation
+│   ├── supabase-schema/     # Database migrations (109 files)
+│   ├── rate_limits/         # Multi-tier rate limit data (Gemini, DeepSeek, Kimi)
+│   └── research/            # Historical research reports
 │
-├── research/                # Model/provider research, landscape analysis
+├── research/                 # Current research (model rolodex, landscape analysis)
 │
-└── scripts/                 # Utility scripts
+├── scripts/                  # Utility scripts (all portable, no hardcoded paths)
+│
+├── agents/                   # Agent definitions, flow diagrams
+│
+├── config/                   # Top-level configs + prompts
+│   ├── prompts/             # Per-role prompt templates
+│   ├── roles.json           # 13 role definitions
+│   └── platforms.json       # Web AI platform configs
+│
+└── inbox/                    # Incoming research/ideas (from Kimi, etc.)
 
 ~/vibeflow/                   # Dashboard (SEPARATE REPO, Vercel auto-deploy)
 ├── apps/dashboard/          # React dashboard
@@ -416,7 +454,7 @@ Webhooks failed. We switched to Supabase Live.
 | PRDs | `docs/prd/*.md` | Human creates, Governor reads |
 | Plans | `docs/plans/*.md` | Governor creates, tracks progress |
 | Schema Migrations | `docs/supabase-schema/*.sql` | Human applies from GitHub |
-| Agent Prompts | `docs/prompts/*.md` | Configurable agent behavior |
+| Agent Prompts | `prompts/*.md` | Configurable agent behavior |
 | Config Files | `governor/config/*.json` | Models, connectors, routing |
 
 ### Supabase: State & Realtime Source of Truth
@@ -499,7 +537,7 @@ Webhooks failed. We switched to Supabase Live.
 | Check current state | Root | `CURRENT_STATE.md` |
 | Understand architecture | Root | `ARCHITECTURE.md` |
 | See recent changes | Root | `CHANGELOG.md` |
-| Find agent prompts | `docs/prompts/` | `planner.md`, `supervisor.md`, etc. |
+|| Find agent prompts | `prompts/` | `planner.md`, `supervisor.md`, etc. |
 | Check model config | `governor/config/` | `models.json` |
 | Check connector config | `governor/config/` | `connectors.json` |
 | Check routing config | `governor/config/` | `routing.json` |
@@ -516,56 +554,121 @@ governor/
 ├── cmd/
 │   ├── governor/           # Main entry point
 │   │   ├── main.go        # Starts everything
-│   │   ├── handlers_*.go  # Event handlers
-│   │   └── state.go       # State machine
-│   └── tools/             # Utility commands (if any)
+│   │   ├── adapters.go    # Agent adapters
+│   │   ├── handlers_*.go  # Event handlers (plan, task, council, testing, research, maint)
+│   │   ├── helpers.go     # Shared helpers
+│   │   ├── recovery.go    # Crash recovery
+│   │   ├── types.go       # Handler types
+│   │   └── validation.go  # Input validation
+│   ├── cleanup/            # Cleanup utility
+│   ├── encrypt_secret/     # Vault encryption
+│   └── migrate_vault/      # Vault migration
 │
 ├── internal/
 │   ├── core/              # Core orchestration
 │   │   ├── checkpoint.go  # Checkpoint management
-│   │   └── state.go       # State definitions
+│   │   ├── state.go       # State definitions
+│   │   ├── analyst.go     # Analysis logic
+│   │   └── test_runner.go # Test execution
 │   │
 │   ├── db/                # Database layer
 │   │   ├── supabase.go    # Client
-│   │   └── rpc.go         # RPC allowlist
+│   │   ├── rpc.go         # RPC allowlist
+│   │   └── state.go       # DB state tracking
 │   │
 │   ├── runtime/           # Agent runtime
 │   │   ├── router.go      # Model/connector routing
 │   │   ├── session.go     # Agent sessions
-│   │   ├── factory.go     # Session factory
-│   │   └── pool.go        # Agent pool
+│   │   ├── parallel.go    # Parallel execution
+│   │   ├── config.go      # Runtime config loading
+│   │   ├── context_builder.go  # Context assembly
+│   │   ├── model_loader.go     # Model config loading
+│   │   ├── usage_tracker.go    # Token/cost tracking
+│   │   └── tools.go       # Runtime tools
 │   │
 │   ├── dag/                # DAG engine
 │   │   ├── engine.go      # DAG execution engine
-│   │   └── workflow.go    # YAML workflow structs
+│   │   ├── workflow.go    # YAML workflow structs
+│   │   └── registry.go    # DAG node registry
 │   │
-│   ├── gitree/            # Git operations
-│   │   └── gitree.go      # Branch, commit, merge
+│   ├── gitree/            # Git branch management
+│   │   └── gitree.go      # Orphan branches, commit, merge, clear
 │   │
-│   └── security/          # Security
-│       └── leak_detector.go # Secret scanning
+│   ├── mcp/               # MCP protocol
+│   │   ├── executor.go    # MCP execution
+│   │   └── registry.go    # MCP server registry
+│   │
+│   ├── connectors/        # External connectors
+│   │   ├── courier.go     # Courier agent connector
+│   │   └── runners.go     # Runner connectors
+│   │
+│   ├── security/          # Security
+│   │   └── leak_detector.go # Secret scanning
+│   │
+│   ├── vault/             # Vault
+│   │   └── vault.go       # Supabase vault access
+│   │
+│   ├── webhooks/          # Webhooks
+│   │   ├── github.go      # GitHub webhook handler
+│   │   └── server.go      # Webhook HTTP server
+│   │
+│   ├── realtime/          # Realtime
+│   │   └── client.go      # Supabase realtime subscriptions
+│   │
+│   ├── maintenance/       # Maintenance
+│   │   ├── maintenance.go  # Maintenance operations
+│   │   ├── sandbox.go     # Sandbox management
+│   │   └── validation.go  # Maintenance validation
+│   │
+│   └── tools/             # Tools
+│       ├── registry.go    # Tool registry
+│       ├── db_tools.go    # Database tools
+│       ├── file_tools.go  # File tools
+│       ├── git_tools.go   # Git tools
+│       ├── sandbox_tools.go # Sandbox tools
+│       ├── vault_tools.go # Vault tools
+│       └── web_tools.go   # Web tools
 │
-└── config/                # JSON configs
-    ├── models.json        # Model profiles
-    ├── connectors.json    # CLI/API/Web destinations
-    ├── agents.json        # Agent definitions
-    └── routing.json       # Routing strategy
+├── config/                # JSON configs + YAML pipelines
+│   ├── pipelines/         # DAG pipeline YAML
+│   │   └── code-pipeline.yaml  # Main code pipeline
+│   ├── models.json        # Model definitions
+│   ├── connectors.json    # Connector definitions
+│   ├── agents.json        # Agent definitions
+│   ├── routing.json       # Routing strategy
+│   ├── roles.json         # Role definitions
+│   ├── skills.json        # Skill definitions
+│   ├── tools.json         # Tool definitions
+│   ├── platforms.json     # Platform definitions
+│   ├── destinations.json  # Destination definitions
+│   ├── system.json        # Runtime settings
+│   └── plan_lifecycle.json # Plan state machine
+│
+└── pkg/types/             # Shared types
+    └── types.go           # Common type definitions
 ```
 
 ### Key Files to Know
 
 | File | Purpose |
 |------|---------|
+| `.context/boot.md` | Agent orientation (~2837 tokens). Tier 0 rules first, then codebase map. Auto-generated. |
+| `.context/knowledge.db` | SQLite: 24 rules, 30 prompts, 15 configs, 3231 doc sections. Queryable by agents. |
+| `.context/tools/tier0-static.md` | Single source of truth for all principles, rules, roles. Hand-crafted. |
 | `governor/cmd/governor/main.go` | Entry point, starts all services |
 | `governor/cmd/governor/handlers_task.go` | Task execution logic |
 | `governor/cmd/governor/handlers_plan.go` | Plan creation logic |
 | `governor/internal/runtime/router.go` | Routing logic (SelectDestination) |
 | `governor/internal/dag/engine.go` | DAG execution engine |
+| `governor/internal/gitree/gitree.go` | Git branch management (orphan branches, parallel agents) |
 | `governor/internal/db/supabase.go` | Database client |
+| `governor/config/pipelines/code-pipeline.yaml` | YAML DAG pipeline definition |
 | `governor/config/models.json` | Model definitions |
 | `governor/config/connectors.json` | Connector definitions |
 | `research/2026-04-14-free-model-rolodex.md` | Verified free provider cascade |
-| `docs/HOW_DASHBOARD_WORKS.md` | Dashboard data flow |
+| `docs/rate_limits/` | Multi-tier rate limit data (RPM/TPM/RPD by tier) |
+| `TODO.md` | Current TODO list with priorities |
+| `CURRENT_STATE.md` | Honest current state assessment |
 
 ---
 
