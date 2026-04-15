@@ -28,6 +28,7 @@ type SystemConfig struct {
 	PromptsDir  string                 `json:"prompts_dir"`
 	MCPServers  []MCPServerConfig      `json:"mcp_servers,omitempty"`
 	GovernorMCP *GovernorMCPConfig     `json:"governor_mcp,omitempty"`
+	Worktrees   *WorktreeConfig        `json:"worktrees,omitempty"`
 }
 
 // GovernorMCPConfig configures the MCP server that exposes governor tools to external agents.
@@ -35,6 +36,12 @@ type GovernorMCPConfig struct {
 	Enabled   bool   `json:"enabled"`
 	Transport string `json:"transport"` // "stdio" | "sse"
 	Port      int    `json:"port"`      // for SSE mode (default 8081)
+}
+
+// WorktreeConfig configures git worktrees for parallel agent execution.
+type WorktreeConfig struct {
+	Enabled  bool   `json:"enabled"`
+	BasePath string `json:"base_path"` // e.g. /home/vibes/VibePilot-work
 }
 
 // MCPServerConfig defines an approved MCP server connection.

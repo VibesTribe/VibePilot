@@ -70,6 +70,14 @@ func main() {
 		RemoteName:        cfg.GetRemoteName(),
 	})
 
+	// Set up worktree manager for parallel agent execution
+	var _ *gitree.WorktreeManager // will be passed to handlers when parallel execution is wired
+	if cfg.System.Worktrees != nil && cfg.System.Worktrees.Enabled {
+		wm := gitree.NewWorktreeManager(git, cfg.System.Worktrees.BasePath)
+		_ = wm
+		log.Printf("[Worktrees] Enabled, base path: %s", cfg.System.Worktrees.BasePath)
+	}
+
 	v := vault.New(database)
 
 	leakDetector := security.NewLeakDetector()
