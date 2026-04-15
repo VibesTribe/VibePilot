@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-15T01:00:27Z | Commit: 387e342b | Branch: research-update-april2026
+# Generated: 2026-04-15T01:20:08Z | Commit: 2011dce4 | Branch: research-update-april2026
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -154,7 +154,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: research-update-april2026
-- Commit: 387e342b
+- Commit: 2011dce4
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -174,32 +174,32 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State - 2026-04-14
-## Status: Infrastructure Optimized, Research Phase
+## Status: Knowledge Layer Built, Needs Merge to Main
+### The Branch Situation (important)
+There are TWO repo copies on disk:
+| Location | Branch | Purpose | State |
+|---|---|---|---|
+| `~/vibepilot/` | `main` | RUNNING copy. Compiled binary lives here. | Stale (last commit Apr 7). Has OLD `.context/` (no knowledge.db). |
+| `~/VibePilot/` | `research-update-april2026` | DEVELOPMENT copy. All new work here. | 26 commits ahead of main. Has new `.context/`, tier0, aligned docs. |
+**GitHub main is also stale** -- same as `~/vibepilot/`. All real work is on the `research-update-april2026` branch.
+**Dead branch:** `research-considerations` -- 25 old research commits from February. 1286 commits behind main. Should be deleted or ignored.
+**Action needed:** Merge `research-update-april2026` into `main` and sync both disk copies. The compiled binary was built Apr 11 from the `~/vibepilot/` main source (which is older than the VibePilot/ source).
+---
 ### What's Running
-- **Governator:** systemd user service, running since April 7, active
+- **Governor:** systemd user service, active since April 7
+  - Binary: `~/vibepilot/governor/governor` (compiled Apr 11, 10.5MB)
+  - Service: `systemctl --user status vibepilot-governor`
+  - Logs: `journalctl --user -u vibepilot-governor -f`
+  - Note: No log activity in recent hours (idle, no tasks queued)
 - **Cloudflared tunnel:** live at vibestribe.rocks, sacred (don't touch)
 - **Hermes agent:** accessible via dashboard chat through tunnel
 - **Chrome CDP:** port 9222 for browser automation
-- **TTS:** edge-tts (fast, free, no changes needed)
+- **TTS:** edge-tts (fast, free)
 ### Hardware: ThinkPad X220
-- Intel i5-2520M (no AVX2, no GPU)
+- Intel i5-2520M (Sandy Bridge, no AVX2, no GPU)
 - 16GB RAM (~10GB available)
-- 781GB disk free
-- Phone WiFi tethered
-### What Changed This Session (April 14)
-- **Ollama:** installed v0.20.4, daemon stopped/disabled. Tested qwen3:4b and qwen3-vl:4b -- too slow (2 tok/s) for real work. Cleaned out. Ready to pull models when landscape shifts.
-- **Kokoro TTS:** removed (9GB freed). Edge-tts is better for this hardware.
-- **Free model research:** verified 7 free API providers. Full rolodex in `research/2026-04-14-free-model-rolodex.md`.
-- **GitHub PAT:** rotated (done in earlier session).
-### Key Decisions
-1. **No local models** -- x220 can't run useful inference. Cloud free tiers are the path.
-2. **Edge-tts only** -- fastest free option, no reason to change.
-3. **RAM for agents, not models** -- parallel agent sessions are the priority.
-4. **Multiple free providers** -- cascade of Groq/Google/OpenRouter/SambaNova, never single-vendor dependency.
-5. **Real usage decides spending** -- run tasks on free tiers first, data tells where $10 credit is worth it.
+- ~780GB disk free
+- Phone WiFi tethered (planning ethernet + headless mode)
 ---
-## Verified Free API Providers (April 2026)
-| Provider | Card Needed | Best Free Models | Rate Limits |
-|---|---|---|---|
-| OpenRouter | NO | 24 free models, $0 cap | 50-1000 RPD |
-| Groq | NO | qwen3-32b, llama-4-scout, gpt-oss | 30 RPM, 100-500K TPD |
+## What Got Built (April 2026)
+### 1. .context/ Knowledge Layer (new)

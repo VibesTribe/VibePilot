@@ -1,91 +1,172 @@
 # VibePilot Current State - 2026-04-14
 
-## Status: Infrastructure Optimized, Research Phase
+## Status: Knowledge Layer Built, Needs Merge to Main
+
+### The Branch Situation (important)
+
+There are TWO repo copies on disk:
+
+| Location | Branch | Purpose | State |
+|---|---|---|---|
+| `~/vibepilot/` | `main` | RUNNING copy. Compiled binary lives here. | Stale (last commit Apr 7). Has OLD `.context/` (no knowledge.db). |
+| `~/VibePilot/` | `research-update-april2026` | DEVELOPMENT copy. All new work here. | 26 commits ahead of main. Has new `.context/`, tier0, aligned docs. |
+
+**GitHub main is also stale** -- same as `~/vibepilot/`. All real work is on the `research-update-april2026` branch.
+
+**Dead branch:** `research-considerations` -- 25 old research commits from February. 1286 commits behind main. Should be deleted or ignored.
+
+**Action needed:** Merge `research-update-april2026` into `main` and sync both disk copies. The compiled binary was built Apr 11 from the `~/vibepilot/` main source (which is older than the VibePilot/ source).
+
+---
 
 ### What's Running
-- **Governator:** systemd user service, running since April 7, active
+
+- **Governor:** systemd user service, active since April 7
+  - Binary: `~/vibepilot/governor/governor` (compiled Apr 11, 10.5MB)
+  - Service: `systemctl --user status vibepilot-governor`
+  - Logs: `journalctl --user -u vibepilot-governor -f`
+  - Note: No log activity in recent hours (idle, no tasks queued)
 - **Cloudflared tunnel:** live at vibestribe.rocks, sacred (don't touch)
 - **Hermes agent:** accessible via dashboard chat through tunnel
 - **Chrome CDP:** port 9222 for browser automation
-- **TTS:** edge-tts (fast, free, no changes needed)
+- **TTS:** edge-tts (fast, free)
 
 ### Hardware: ThinkPad X220
-- Intel i5-2520M (no AVX2, no GPU)
+
+- Intel i5-2520M (Sandy Bridge, no AVX2, no GPU)
 - 16GB RAM (~10GB available)
-- 781GB disk free
-- Phone WiFi tethered
-
-### What Changed This Session (April 14)
-- **Ollama:** installed v0.20.4, daemon stopped/disabled. Tested qwen3:4b and qwen3-vl:4b -- too slow (2 tok/s) for real work. Cleaned out. Ready to pull models when landscape shifts.
-- **Kokoro TTS:** removed (9GB freed). Edge-tts is better for this hardware.
-- **Free model research:** verified 7 free API providers. Full rolodex in `research/2026-04-14-free-model-rolodex.md`.
-- **GitHub PAT:** rotated (done in earlier session).
-
-### Key Decisions
-1. **No local models** -- x220 can't run useful inference. Cloud free tiers are the path.
-2. **Edge-tts only** -- fastest free option, no reason to change.
-3. **RAM for agents, not models** -- parallel agent sessions are the priority.
-4. **Multiple free providers** -- cascade of Groq/Google/OpenRouter/SambaNova, never single-vendor dependency.
-5. **Real usage decides spending** -- run tasks on free tiers first, data tells where $10 credit is worth it.
+- ~780GB disk free
+- Phone WiFi tethered (planning ethernet + headless mode)
 
 ---
 
-## Verified Free API Providers (April 2026)
+## What Got Built (April 2026)
 
-| Provider | Card Needed | Best Free Models | Rate Limits |
-|---|---|---|---|
-| OpenRouter | NO | 24 free models, $0 cap | 50-1000 RPD |
-| Groq | NO | qwen3-32b, llama-4-scout, gpt-oss | 30 RPM, 100-500K TPD |
-| Google AI Studio | NO | Gemini 2.5 Flash, Gemma 4 | ~15 RPM |
-| SambaNova | NO | DeepSeek-V3.1, Llama-4-Maverick | 20 RPD |
-| NVIDIA NIM | NO | Nemotron 3 Super | Trial access |
-| SiliconFlow | NO (real-name) | Qwen, GLM, DeepSeek | 1000-10000 RPM |
-| HuggingFace | NO | Thousands of models | Varies |
+### 1. .context/ Knowledge Layer (new)
 
-**Status:** Only Google AI Studio key exists. Need to sign up for Groq, SambaNova, NVIDIA NIM.
+Replaces scattered docs with a 3-tier system agents can actually query:
 
----
-
-## Repository State
-
-**Branch:** `research-update-april2026` tracking origin
-**Recent commits:**
-- `9dd81ae9` - research: verified free model rolodex
-- `8b06a2c3` - research: JourneyKits landscape analysis
-
-**Key files:**
-- `research/2026-04-14-free-model-rolodex.md` - Verified free providers + cascade plan
-- `research/2026-04-08-journeykits-landscape-analysis.md` - 95-kit gap analysis
-- `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` - Architecture bible (needs update)
-- `governor/` - Go governor source
-- `governor/config/` - JSON configs (models.json, connectors.json, routing.json, etc.)
-
-**Dashboard:** https://vibeflow-dashboard.vercel.app/ (sacred, deployed from ~/vibeflow)
-
----
-
-## On Disk (relevant)
-
-| Path | Size | Purpose |
+| File | Size | Purpose |
 |---|---|---|
-| ~/VibePilot/ | 165MB | Go governor + research |
-| ~/vibeflow/ | 173MB | Dashboard (Vercel auto-deploy) |
-| ~/vibepilot-server/ | 60KB | Restart scripts |
-| ~/browser-use-env/ | 429MB | Browser Use (Playwright + Chrome CDP) |
+| `.context/boot.md` | 12KB (~2838 tok) | Agent orientation. Tier 0 rules first, then codebase map. |
+| `.context/knowledge.db` | 2.3MB | SQLite: 24 rules, 30 prompts, 15 configs, 2972 doc sections. |
+| `.context/map.md` | 47KB | Full code map (functions, types, imports). |
+| `.context/index.db` | 3.5MB | Code index (functions, dependencies). |
+| `.context/tools/tier0-static.md` | 4.5KB | Hand-crafted single source of truth for all rules. |
+| `.context/tools/build-knowledge-db.py` | Pure python3 | Builds knowledge.db from tier0 + supplementary sources. |
+| `.context/build.sh` | Shell | Rebuilds all `.context/` files. Runs as pre-commit hook. |
+
+**Tier 0** = non-negotiable rules baked into boot.md (always loaded). Includes:
+- 4 principles, 6 absolute rules, 3 operational rules, 5 human boundaries
+- Correct roles: Supervisor (plan review + output review + researcher approvals), Council (complex plans + architecture), Human (visual UX + architecture yes/no only)
+- Merge system: fully automated, zero human involvement
+
+### 2. Doc Alignment (all contradictions fixed)
+
+Every doc in the repo now tells the same story as tier0-static.md:
+- `agents/agent_definitions.md` -- flow diagram corrected (Supervisor before Council, auto-merge)
+- `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` -- human role, supervisor output review, dashboard description
+- `ARCHITECTURE.md` -- removed "approval" gate from task state machine
+- `config/prompts/supervisor.md` -- added plan review, auto-merge
+- `config/prompts/council.md` -- complex plans + architecture only, Supervisor-only escalation
+
+### 3. YAML Pipeline (DAG)
+
+`governor/config/pipelines/code-pipeline.yaml` -- event-driven pipeline config:
+- Flow A: Plan -> Supervisor review -> (Council if complex) -> Create tasks
+- Flow B: Execute task -> Supervisor output review -> Testing -> Auto-merge
+- Flow C: System research -> Supervisor -> (Council if architecture) -> Human yes/no
+- Conditional branches via `when:` expressions
+- Human approval gates ONLY for visual UI/UX and architecture decisions
+
+### 4. Gitree (git branch management)
+
+`governor/internal/gitree/gitree.go` (484 lines) -- solves parallel agent git conflicts:
+- Each task gets an orphan branch (`task/T001`) with clean empty workspace
+- Module branches (`TEST_MODULES/sliceID`) aggregate completed task branches
+- Protected branches (main) can't be directly modified
+- Branch operations: create, commit output, merge, delete, clear for retry
+- Agents never touch main -- task branches merge to module branches, modules merge to main
+- `CreateBranchFrom()` creates task branches FROM a source branch (not orphan)
+- `CommitOutput()` writes files and pushes atomically
+- `ClearBranch()` resets a branch for retry without deleting it
+
+### 5. Supabase Schema
+
+109 migration files in `docs/supabase-schema/`. Core tables: tasks, models, platforms.
+Schema versioning: v1.0 -> v1.1 (routing) -> v1.2 (platforms) -> v1.3 (config JSONB) -> v1.4 (ROI enhanced).
++ 93 numbered migrations for incremental changes.
+
+---
+
+## Go Governor Source
+
+14,419 lines of Go across these packages:
+
+| Package | Purpose |
+|---|---|
+| `internal/gitree` | Git branch management (orphan branches, parallel agents) |
+| `internal/dag` | YAML pipeline engine (configurable DAGs) |
+| `internal/core` | State machine, checkpointing |
+| `internal/db` | Supabase client, RPCs |
+| `internal/runtime` | Router, agents, sessions |
+| `internal/security` | Leak detection (API keys, secrets) |
+| `internal/vault` | Supabase vault access |
+| `internal/connectors` | API connector implementations |
+| `internal/realtime` | Supabase realtime subscriptions |
+| `internal/maintenance` | System maintenance operations |
+| `internal/mcp` | MCP protocol support |
+| `internal/webhooks` | Webhook handling |
+| `internal/tools` | Tool registry |
+| `cmd/governor/` | Main entry, handlers (plan, task, council, testing, research, maintenance) |
+
+---
+
+## Config Layer
+
+| File | Lines | Purpose |
+|---|---|---|
+| `config/roles.json` | 198 | 13 role definitions (Supervisor, Council, Courier, etc.) |
+| `config/agents.json` | 285 | Agent definitions with capabilities |
+| `config/models.json` | 146 | Model definitions |
+| `config/connectors.json` | 183 | API connector configs |
+| `config/destinations.json` | 490 | Destination platforms |
+| `config/platforms.json` | 649 | Web AI platform configs |
+| `config/routing.json` | 327 | Strategy configs (currently `kimi_priority` -- stale) |
+| `config/system.json` | 50 | Runtime settings (concurrency, timeouts) |
+| `config/plan_lifecycle.json` | 124 | Plan states, consensus rules |
+| `config/tools.json` | 176 | Tool definitions |
+| `config/skills.json` | 236 | Skill definitions |
+
+---
+
+## Research Done
+
+- `research/2026-04-14-free-model-rolodex.md` -- 7 free API providers verified (Groq, Google, OpenRouter, SambaNova, NVIDIA NIM, SiliconFlow, HuggingFace). Only Google AI Studio key exists.
+- `research/2026-04-08-journeykits-landscape-analysis.md` -- 95 kits scanned, 20 mapped to VibePilot gaps.
+
+---
+
+## Dashboard
+
+https://vibeflow-dashboard.vercel.app/ (sacred, deployed from ~/vibeflow)
+Source: `~/vibeflow/` (173MB, Vercel auto-deploy)
+
+---
+
+## On Disk
+
+| Path | Size | What |
+|---|---|---|
+| `~/vibepilot/` | 165MB | RUNNING copy (main branch, compiled binary) |
+| `~/VibePilot/` | 165MB | DEVELOPMENT copy (research-update-april2026, all new work) |
+| `~/vibeflow/` | 173MB | Dashboard (Vercel auto-deploy) |
+| `~/vibepilot-server/` | 60KB | Restart scripts |
+| `~/browser-use-env/` | 429MB | Browser Use (Playwright + Chrome CDP) |
 
 **Stopped/disabled:**
 - Ollama daemon (stopped, disabled, ready if needed)
-- No local models pulled
-
----
-
-## Next Steps
-
-1. **Get free API keys** for Groq, SambaNova, NVIDIA NIM (user signing up)
-2. **Build cascade into models.json** with verified providers
-3. **Wire cascade into governor** routing logic
-4. **Run real tasks** through cascade to learn what works
-5. **Update VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md** -- still references old state
+- No local models pulled (x220 can't run useful inference)
 
 ---
 
