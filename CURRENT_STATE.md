@@ -148,4 +148,32 @@ Source: `~/vibeflow/` (173MB, Vercel auto-deploy)
 
 ---
 
-**Last Updated:** 2026-04-15 (evening)
+---
+
+## ACTIVE WORK: Migration 111 (42 Missing RPCs)
+
+**Status:** IN PROGRESS. Migration written but has schema mismatches. Must rewrite before applying.
+
+**File:** `docs/supabase-schema/111_missing_rpcs.sql` (WRITTEN but WRONG column refs)
+**Detailed state:** `docs/SESSION_STATE_111.md` (READ THIS FIRST if resuming)
+
+### TL;DR
+Go governor calls 50 Supabase RPCs. Only 8 exist. Need to create 42 missing ones.
+Migration 111 was written but references wrong column names. Key fixes needed:
+- `maintenance_commands`: column is `command_type` not `type`
+- `council_reviews`: has `model_id` not `reviewer_model`, no `reasoning`/`mode`
+- `failure_records`: no `details` column
+- `plans`: has `review_notes` not `latest_feedback`, no `tasks_needing_revision`
+- `tasks`: has `failure_notes` but no `last_error`/`last_error_at`
+- `learned_heuristics`: no unique constraint on (task_type, preferred_model) - ON CONFLICT will fail
+
+### After migration is fixed:
+1. Apply to Supabase
+2. Verify all 50 RPCs
+3. Wire MemoryService into main.go
+4. Rebuild binary
+5. Push to GitHub
+
+---
+
+**Last Updated:** 2026-04-15 (late evening - migration 111 in progress)
