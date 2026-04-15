@@ -1,19 +1,25 @@
 #!/bin/bash
 # Deploy VibePilot Governor
 # Reads bootstrap keys from secure credential store and starts the service
+# Works on any machine -- paths derived from script location
 
 set -e
 
-CREDENTIALS_FILE="/etc/vibepilot/bootstrap.conf"
-GOVERNOR_DIR="/home/mjlockboxsocial/vibepilot/governor"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+GOVERNOR_DIR="$REPO_DIR/governor"
 SERVICE_NAME="vibepilot-governor"
+CURRENT_USER="$(whoami)"
+CREDENTIALS_FILE="/etc/v...conf"
 
 echo "=== VibePilot Governor Deploy ==="
+echo "Repo: $REPO_DIR"
+echo "User: $CURRENT_USER"
 
 # Check credentials file exists
 if [ ! -f "$CREDENTIALS_FILE" ]; then
     echo "ERROR: Bootstrap credentials not configured."
-    echo "Run: sudo scripts/setup-bootstrap.sh"
+    echo "Run: sudo ./scripts/setup-bootstrap.sh"
     exit 1
 fi
 
@@ -24,7 +30,7 @@ source "$CREDENTIALS_FILE"
 if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ] || [ -z "$VAULT_KEY" ]; then
     echo "ERROR: Missing bootstrap keys in $CREDENTIALS_FILE"
     echo "Required: SUPABASE_URL, SUPABASE_SERVICE_KEY, VAULT_KEY"
-    echo "Run: sudo scripts/setup-bootstrap.sh"
+    echo "Run: sudo ./scripts/setup-bootstrap.sh"
     exit 1
 fi
 
@@ -38,10 +44,14 @@ echo "✅ Build complete"
 
 # Install systemd service
 echo "Installing systemd service..."
-cp /home/mjlockboxsocial/vibepilot/scripts/governor.service /etc/systemd/system/
+cp "$REPO_DIR/scripts/governor.service" /etc/systemd/system/
+
+# Update service file for current user and path
+sed -i "s|/home/[^/]*|/home/$CURRENT_USER|g" /etc/systemd/system/vibepilot-governor.service
+sed -i "s|User=[^ ]*|User=$CURRENT_USER|g" /etc/systemd/system/vibepilot-governor.service
+sed -i "s|Group=[^ ]*|Group=$CURRENT_USER|g" /etc/systemd/system/vibepilot-governor.service
 
 # Create override file with environment variables
-# This is the secure way to pass env vars to systemd without EnvironmentFile
 mkdir -p /etc/systemd/system/$SERVICE_NAME.service.d
 cat > /etc/systemd/system/$SERVICE_NAME.service.d/override.conf << EOF
 [Service]
