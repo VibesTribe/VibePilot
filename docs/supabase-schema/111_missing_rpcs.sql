@@ -713,7 +713,7 @@ RETURNS JSONB AS $$
 BEGIN
   RETURN (
     SELECT COALESCE(jsonb_object_agg(
-      model_id,
+      preferred_model,
       jsonb_build_object(
         'success_count', success_count,
         'failure_count', failure_count,
