@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-15T01:26:45Z | Commit: 309d22b0 | Branch: research-update-april2026
+# Generated: 2026-04-15T01:56:09Z | Commit: 78f5c69e | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -153,8 +153,8 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Service Info
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
-- Branch: research-update-april2026
-- Commit: 309d22b0
+- Branch: main
+- Commit: 78f5c69e
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -174,16 +174,20 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State - 2026-04-14
-## Status: Knowledge Layer Built, Needs Merge to Main
-### The Branch Situation (important)
-There are TWO repo copies on disk:
-| Location | Branch | Purpose | State |
-|---|---|---|---|
-| `~/vibepilot/` | `main` | RUNNING copy. Compiled binary lives here. | Stale (last commit Apr 7). Has OLD `.context/` (no knowledge.db). |
-| `~/VibePilot/` | `research-update-april2026` | DEVELOPMENT copy. All new work here. | 26 commits ahead of main. Has new `.context/`, tier0, aligned docs. |
-**GitHub main is also stale** -- same as `~/vibepilot/`. All real work is on the `research-update-april2026` branch.
-**Dead branch:** `research-considerations` -- 25 old research commits from February. 1286 commits behind main. Should be deleted or ignored.
-**Action needed:** Merge `research-update-april2026` into `main` and sync both disk copies. The compiled binary was built Apr 11 from the `~/vibepilot/` main source (which is older than the VibePilot/ source).
+## Status: Knowledge Layer Built, Binary Needs Rebuild
+### The Repo Situation
+Two copies on disk, both synced to main:
+| Location | Purpose | State |
+|---|---|---|
+| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Scripts have local deploy tweaks. |
+| `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main). |
+**GitHub main is current** -- all work merged April 14.
+**Branches:** Only `main` exists locally. Remote has old `TEST_MODULES/general` (unused).
+**Previous branches (deleted April 14):**
+- `research-update-april2026` -- merged into main (29 commits fast-forward), then deleted
+- `research-considerations` -- valuable research cherry-picked (rate limits, reports, scripts), then deleted
+**Scripts are portable** -- no hardcoded usernames, work on any machine via `$(dirname "$0")`.
+**Action needed:** Rebuild governor binary. Running binary was compiled Apr 11 from older source.
 ---
 ### What's Running
 - **Governor:** systemd user service, active since April 7
@@ -199,7 +203,3 @@ There are TWO repo copies on disk:
 - Intel i5-2520M (Sandy Bridge, no AVX2, no GPU)
 - 16GB RAM (~10GB available)
 - ~780GB disk free
-- Phone WiFi tethered (planning ethernet + headless mode)
----
-## What Got Built (April 2026)
-### 1. .context/ Knowledge Layer (new)
