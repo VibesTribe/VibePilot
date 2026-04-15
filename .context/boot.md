@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-15T04:41:53Z | Commit: 3b38a5b8 | Branch: main
+# Generated: 2026-04-15T04:44:58Z | Commit: c2fbd926 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -194,7 +194,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 3b38a5b8
+- Commit: c2fbd926
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -213,28 +213,23 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 5. Raw source = for implementation details only
 
 ## Current Status (from CURRENT_STATE.md)
-# VibePilot Current State - 2026-04-14
-## Status: Knowledge Layer Built, Binary Needs Rebuild
+# VibePilot Current State - 2026-04-15
+## Status: MCP Server + Memory System Built, Governor Rebuilt
 ### The Repo Situation
 Two copies on disk, both synced to main:
 | Location | Purpose | State |
 |---|---|---|
-| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Scripts have local deploy tweaks. |
+| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Binary rebuilt Apr 15. |
 | `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main). |
-**GitHub main is current** -- all work merged April 14.
-**Branches:** Only `main` exists locally. Remote has old `TEST_MODULES/general` (unused).
-**Previous branches (deleted April 14):**
-- `research-update-april2026` -- merged into main (29 commits fast-forward), then deleted
-- `research-considerations` -- valuable research cherry-picked (rate limits, reports, scripts), then deleted
-**Scripts are portable** -- no hardcoded usernames, work on any machine via `$(dirname "$0")`.
-**Action needed:** Rebuild governor binary. Running binary was compiled Apr 11 from older source.
+**GitHub main is current** -- all work pushed April 15.
 ---
 ### What's Running
-- **Governor:** systemd user service, active since April 7
-  - Binary: `~/vibepilot/governor/governor` (compiled Apr 11, 10.5MB)
+- **Governor:** systemd user service, active
+  - Binary: `~/vibepilot/governor/governor` (compiled Apr 15, includes MCP server + memory)
   - Service: `systemctl --user status vibepilot-governor`
   - Logs: `journalctl --user -u vibepilot-governor -f`
-  - Note: No log activity in recent hours (idle, no tasks queued)
+  - MCP servers: jcodemunch (52 tools) + jdocmunch (15 tools) = 67 tools connected
+  - Governor MCP server: disabled in config (ready to enable for SSE port 8081)
 - **Cloudflared tunnel:** live at vibestribe.rocks, sacred (don't touch)
 - **Hermes agent:** accessible via dashboard chat through tunnel
 - **Chrome CDP:** port 9222 for browser automation
@@ -243,3 +238,8 @@ Two copies on disk, both synced to main:
 - Intel i5-2520M (Sandy Bridge, no AVX2, no GPU)
 - 16GB RAM (~10GB available)
 - ~780GB disk free
+- Phone WiFi tethered (planning ethernet + headless mode)
+---
+## What Got Built (April 2026)
+### 1. .context/ Knowledge Layer (new)
+Replaces scattered docs with a 3-tier system agents can actually query:

@@ -1,6 +1,6 @@
-# VibePilot Current State - 2026-04-14
+# VibePilot Current State - 2026-04-15
 
-## Status: Knowledge Layer Built, Binary Needs Rebuild
+## Status: MCP Server + Memory System Built, Governor Rebuilt
 
 ### The Repo Situation
 
@@ -8,30 +8,21 @@ Two copies on disk, both synced to main:
 
 | Location | Purpose | State |
 |---|---|---|
-| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Scripts have local deploy tweaks. |
+| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Binary rebuilt Apr 15. |
 | `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main). |
 
-**GitHub main is current** -- all work merged April 14.
-
-**Branches:** Only `main` exists locally. Remote has old `TEST_MODULES/general` (unused).
-
-**Previous branches (deleted April 14):**
-- `research-update-april2026` -- merged into main (29 commits fast-forward), then deleted
-- `research-considerations` -- valuable research cherry-picked (rate limits, reports, scripts), then deleted
-
-**Scripts are portable** -- no hardcoded usernames, work on any machine via `$(dirname "$0")`.
-
-**Action needed:** Rebuild governor binary. Running binary was compiled Apr 11 from older source.
+**GitHub main is current** -- all work pushed April 15.
 
 ---
 
 ### What's Running
 
-- **Governor:** systemd user service, active since April 7
-  - Binary: `~/vibepilot/governor/governor` (compiled Apr 11, 10.5MB)
+- **Governor:** systemd user service, active
+  - Binary: `~/vibepilot/governor/governor` (compiled Apr 15, includes MCP server + memory)
   - Service: `systemctl --user status vibepilot-governor`
   - Logs: `journalctl --user -u vibepilot-governor -f`
-  - Note: No log activity in recent hours (idle, no tasks queued)
+  - MCP servers: jcodemunch (52 tools) + jdocmunch (15 tools) = 67 tools connected
+  - Governor MCP server: disabled in config (ready to enable for SSE port 8081)
 - **Cloudflared tunnel:** live at vibestribe.rocks, sacred (don't touch)
 - **Hermes agent:** accessible via dashboard chat through tunnel
 - **Chrome CDP:** port 9222 for browser automation
@@ -97,7 +88,26 @@ Every doc in the repo now tells the same story as tier0-static.md:
 - `CommitOutput()` writes files and pushes atomically
 - `ClearBranch()` resets a branch for retry without deleting it
 
-### 5. Supabase Schema
+### 5. MCP Server Phase 2 (new Apr 15)
+
+`governor/internal/mcp/governor_server.go` -- exposes governor tools AS an MCP server:
+- Any external agent (Claude Code, Codex, OpenCode) can connect via MCP protocol
+- Two transport modes: stdio (pipe) and SSE (HTTP on port 8081)
+- Auto-registers all 20+ tools from the tool registry
+- Config in system.json under `governor_mcp` (disabled by default, ready to enable)
+- Graceful shutdown wired into main.go
+
+### 6. 3-Layer Memory System (new Apr 15)
+
+`governor/internal/memory/service.go` + `docs/supabase-schema/110_memory_system.sql`:
+- Layer 1 (short-term): `memory_sessions` -- per-agent-run context, TTL auto-expires
+- Layer 2 (mid-term): `memory_project` -- project-scoped key/value state
+- Layer 3 (long-term): `memory_rules` -- learned rules with confidence scoring
+- Go service: StoreShortTerm/GetShortTerm, StoreProjectState/GetProjectState, StoreRule/GetRulesByCategory
+- CleanExpired maintenance for session TTL
+- **Migration 110 needs to be applied via Supabase dashboard SQL editor** (no psql on x220)
+
+### 7. Supabase Schema
 
 109 migration files in `docs/supabase-schema/`. Core tables: tasks, models, platforms.
 Schema versioning: v1.0 -> v1.1 (routing) -> v1.2 (platforms) -> v1.3 (config JSONB) -> v1.4 (ROI enhanced).
@@ -121,7 +131,8 @@ Schema versioning: v1.0 -> v1.1 (routing) -> v1.2 (platforms) -> v1.3 (config JS
 | `internal/connectors` | API connector implementations |
 | `internal/realtime` | Supabase realtime subscriptions |
 | `internal/maintenance` | System maintenance operations |
-| `internal/mcp` | MCP protocol support |
+| `internal/mcp` | MCP protocol support (client + server) |
+| `internal/memory` | 3-layer memory service (short/mid/long-term) |
 | `internal/webhooks` | Webhook handling |
 | `internal/tools` | Tool registry |
 | `cmd/governor/` | Main entry, handlers (plan, task, council, testing, research, maintenance) |
@@ -194,4 +205,4 @@ systemctl --user restart vibepilot-governor
 
 ---
 
-**Last Updated:** 2026-04-14
+**Last Updated:** 2026-04-15
