@@ -595,10 +595,10 @@
 
   "cost_tiers": {
     "tier_0_free_local": {
-      "description": "Ollama + Gemma on local machine",
+      "description": "ABANDONED - x220 too weak for local inference (AVX-only, ~6 tok/s max with 1B models)",
       "cost": 0,
-      "use_for": ["research", "visual_qa", "audio_input"],
-      "notes": "X220 i5 16GB, ~3-8 tok/sec, fine for non-time-critical"
+      "use_for": [],
+      "notes": "Not viable. Cloud-only strategy. GitHub+Supabase for disaster recovery."
     },
     "tier_1_free_web": {
       "description": "Courier agents via Browser Use to free web AI platforms",
