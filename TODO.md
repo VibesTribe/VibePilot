@@ -29,14 +29,14 @@ The Go router needs to actually use the cascade config:
 - Track which models succeed/fail in Supabase for learning
 - Rate limit tracking across all time windows (RPM, RPD, TPM, TPD)
 
-### 4. Context Compaction (automate session summaries)
+### 4. Context Compaction -- DONE (April 15)
 Summary structs exist in decision.go but not automated.
 - Auto-generate session summaries after each agent run
 - Compress tool call history into key decisions/outcomes
 - Feed summary back into next agent's boot context
 - Reduces token consumption for follow-up sessions
 
-### 5. Git Worktrees for parallel agents
+### 5. Git Worktrees -- DONE (April 15)
 Git only allows one branch active per directory -- parallel agents overwrite each other.
 - Each task gets its own folder: `git worktree add ~/VibePilot-work/task-42 task/42`
 - Essential once parallel agent execution is active

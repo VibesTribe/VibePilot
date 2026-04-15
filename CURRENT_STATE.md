@@ -105,9 +105,28 @@ Every doc in the repo now tells the same story as tier0-static.md:
 - Layer 3 (long-term): `memory_rules` -- learned rules with confidence scoring
 - Go service: StoreShortTerm/GetShortTerm, StoreProjectState/GetProjectState, StoreRule/GetRulesByCategory
 - CleanExpired maintenance for session TTL
-- **Migration 110 needs to be applied via Supabase dashboard SQL editor** (no psql on x220)
+- **Migration 110 applied** -- tables live in Supabase
 
-### 7. Supabase Schema
+### 7. Context Compaction (new Apr 15)
+
+`governor/internal/memory/compactor.go` -- automatic session summary generation:
+- After every session.Run(), compresses result into SessionSummary struct
+- Tries all decision types: supervisor, task runner, planner, council, test
+- Stores summaries in short-term memory (1hr TTL)
+- BuildCompactionContext() feeds recent history to next agent's prompt
+- Non-blocking, never errors -- compaction failures don't break sessions
+- Wired into task execution, supervisor review, and council vote handlers
+
+### 8. Git Worktrees (new Apr 15)
+
+`governor/internal/gitree/worktree.go` -- parallel agent workspace isolation:
+- CreateWorktree(taskID, branch) -- each task gets its own checkout
+- RemoveWorktree(taskID) -- cleanup after completion
+- ListWorktrees, PruneWorktrees, CleanAllWorktrees
+- Base path: /home/vibes/VibePilot-work/ (configurable)
+- Disabled by default in system.json, ready to enable
+
+### 9. Supabase Schema
 
 109 migration files in `docs/supabase-schema/`. Core tables: tasks, models, platforms.
 Schema versioning: v1.0 -> v1.1 (routing) -> v1.2 (platforms) -> v1.3 (config JSONB) -> v1.4 (ROI enhanced).
@@ -132,7 +151,7 @@ Schema versioning: v1.0 -> v1.1 (routing) -> v1.2 (platforms) -> v1.3 (config JS
 | `internal/realtime` | Supabase realtime subscriptions |
 | `internal/maintenance` | System maintenance operations |
 | `internal/mcp` | MCP protocol support (client + server) |
-| `internal/memory` | 3-layer memory service (short/mid/long-term) |
+| `internal/memory` | 3-layer memory service (short/mid/long-term) + session compaction |
 | `internal/webhooks` | Webhook handling |
 | `internal/tools` | Tool registry |
 | `cmd/governor/` | Main entry, handlers (plan, task, council, testing, research, maintenance) |
