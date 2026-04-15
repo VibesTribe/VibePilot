@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/vibepilot/governor/internal/core"
@@ -23,6 +24,7 @@ type TaskHandler struct {
 	checkpointMgr *core.CheckpointManager
 	leakDetector  *security.LeakDetector
 	cfg           *runtime.Config
+	usageTracker  *runtime.UsageTracker
 }
 
 func NewTaskHandler(
@@ -34,6 +36,7 @@ func NewTaskHandler(
 	checkpointMgr *core.CheckpointManager,
 	leakDetector *security.LeakDetector,
 	cfg *runtime.Config,
+	usageTracker *runtime.UsageTracker,
 ) *TaskHandler {
 	return &TaskHandler{
 		database:      database,
@@ -44,6 +47,7 @@ func NewTaskHandler(
 		checkpointMgr: checkpointMgr,
 		leakDetector:  leakDetector,
 		cfg:           cfg,
+		usageTracker:  usageTracker,
 	}
 }
 
@@ -198,6 +202,14 @@ func (h *TaskHandler) executeTask(
 		"event":           "task_available",
 	})
 	if err != nil {
+		// Check for rate limit (HTTP 429)
+		if h.usageTracker != nil && modelID != "" {
+			if isRateLimitError(err) {
+				log.Printf("[TaskAvailable] Rate limit hit for model %s, recording cooldown", modelID)
+				h.usageTracker.RecordRateLimit(ctx, modelID)
+			}
+			h.usageTracker.RecordCompletion(ctx, modelID, taskCategory, time.Since(runStart).Seconds(), false)
+		}
 		h.failTask(ctx, taskID, modelID, branchName, "execution_error")
 		return err
 	}
@@ -215,6 +227,13 @@ func (h *TaskHandler) executeTask(
 	tokensIn := result.TokensIn
 	tokensOut := result.TokensOut
 	totalTokens := tokensIn + tokensOut
+
+	// Record usage with tracker
+	if h.usageTracker != nil {
+		if err := h.usageTracker.RecordUsage(ctx, modelID, tokensIn, tokensOut); err != nil {
+			log.Printf("[TaskAvailable] UsageTracker RecordUsage error for %s: %v", modelID, err)
+		}
+	}
 
 	// Parse output
 	taskOutput, parseErr := runtime.ParseTaskRunnerOutput(result.Output)
@@ -276,6 +295,12 @@ func (h *TaskHandler) executeTask(
 	})
 
 	h.recordSuccess(ctx, taskID, modelID, taskCategory, duration.Seconds(), totalTokens)
+
+	// Record successful completion with tracker
+	if h.usageTracker != nil {
+		h.usageTracker.RecordCompletion(ctx, modelID, taskCategory, duration.Seconds(), true)
+	}
+
 	h.deleteCheckpoint(ctx, taskID)
 
 	log.Printf("[TaskAvailable] Task %s → review", truncateID(taskID))
@@ -605,6 +630,18 @@ func (h *TaskHandler) calculateCosts(ctx context.Context, modelID string, tokens
 	return costResult{Theoretical: costs.TheoreticalCostUsd, Actual: costs.ActualCostUsd, Savings: costs.SavingsUsd}
 }
 
+func isRateLimitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "429") ||
+		strings.Contains(msg, "rate_limit") ||
+		strings.Contains(msg, "rate limit") ||
+		strings.Contains(msg, "too many requests") ||
+		strings.Contains(msg, "quota exceeded")
+}
+
 func setupTaskHandlers(
 	ctx context.Context,
 	router *runtime.EventRouter,
@@ -616,7 +653,8 @@ func setupTaskHandlers(
 	git *gitree.Gitree,
 	checkpointMgr *core.CheckpointManager,
 	leakDetector *security.LeakDetector,
+	usageTracker *runtime.UsageTracker,
 ) {
-	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg)
+	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg, usageTracker)
 	handler.Register(router)
 }

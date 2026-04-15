@@ -9,14 +9,16 @@ import (
 )
 
 type Router struct {
-	cfg      *Config
-	database *db.DB
+	cfg          *Config
+	database     *db.DB
+	usageTracker *UsageTracker
 }
 
-func NewRouter(cfg *Config, database *db.DB) *Router {
+func NewRouter(cfg *Config, database *db.DB, usageTracker *UsageTracker) *Router {
 	return &Router{
-		cfg:      cfg,
-		database: database,
+		cfg:          cfg,
+		database:     database,
+		usageTracker: usageTracker,
 	}
 }
 
@@ -111,14 +113,13 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 		return nil, nil
 	}
 
-	for i := range connectors {
-		conn := &connectors[i]
-		if !r.isConnectorExecutable(conn) {
-			continue
-		}
-
-		// If we have an agent-specific model, check if this connector can access it
-		if agentModelID != "" {
+	// If we have an agent-specific model, route directly to it
+	if agentModelID != "" {
+		for i := range connectors {
+			conn := &connectors[i]
+			if !r.isConnectorExecutable(conn) {
+				continue
+			}
 			if r.canConnectorAccessModel(conn.ID, agentModelID) {
 				log.Printf("[Router] Internal routing: connector=%s model=%s (from agent %s)", conn.ID, agentModelID, req.Role)
 				return &RoutingResult{
@@ -128,10 +129,22 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 					Category:    "internal",
 				}, nil
 			}
+		}
+	}
+
+	// Use cascade-aware model selection via UsageTracker
+	cascade := r.getModelCascade()
+	if r.usageTracker != nil && len(cascade) > 0 {
+		return r.selectByCascade(ctx, connectors, cascade)
+	}
+
+	// Fallback: original task-based model selection
+	for i := range connectors {
+		conn := &connectors[i]
+		if !r.isConnectorExecutable(conn) {
 			continue
 		}
 
-		// Otherwise fall back to task-based model selection
 		modelID := r.selectModelForConnector(ctx, conn.ID, req.TaskType, req.TaskCategory)
 		if modelID == "" {
 			continue
@@ -148,6 +161,87 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 	}
 
 	log.Printf("[Router] No internal routing available for role %s", req.Role)
+	return nil, nil
+}
+
+// getModelCascade returns the model cascade order from routing config.
+// It looks for a "free_cascade" strategy and falls back to "default" strategy priority.
+func (r *Router) getModelCascade() []string {
+	if r.cfg == nil || r.cfg.Routing == nil {
+		return nil
+	}
+
+	// Prefer "free_cascade" strategy if available
+	if strategy, ok := r.cfg.Routing.Strategies["free_cascade"]; ok && len(strategy.Priority) > 0 {
+		return strategy.Priority
+	}
+
+	// Fall back to default strategy
+	if r.cfg.Routing.DefaultStrategy != "" {
+		return r.cfg.GetStrategyPriority(r.cfg.Routing.DefaultStrategy)
+	}
+
+	return nil
+}
+
+// selectByCascade picks the first available model from the cascade that passes
+// UsageTracker rate limit checks, and finds a connector for it.
+// If all models are in cooldown, returns the one with shortest cooldown.
+func (r *Router) selectByCascade(ctx context.Context, connectors []ConnectorConfig, cascade []string) (*RoutingResult, error) {
+	var shortestCooldownModel string
+	var shortestCooldownSecs int = -1
+
+	for _, modelID := range cascade {
+		// Check if model is registered and can make a request
+		decision := r.usageTracker.CanMakeRequest(ctx, modelID, 0)
+		if decision.CanProceed {
+			// Find a connector that can access this model
+			connID := r.findConnectorForModel(modelID)
+			if connID == "" {
+				// Also check against our internal connectors list
+				for i := range connectors {
+					conn := &connectors[i]
+					if r.isConnectorExecutable(conn) && r.canConnectorAccessModel(conn.ID, modelID) {
+						connID = conn.ID
+						break
+					}
+				}
+			}
+			if connID != "" {
+				log.Printf("[Router] Cascade routing: model=%s connector=%s", modelID, connID)
+				return &RoutingResult{
+					ConnectorID: connID,
+					ModelID:     modelID,
+					RoutingFlag: "internal",
+					Category:    "internal",
+				}, nil
+			}
+			continue
+		}
+
+		// Track model with shortest cooldown for fallback
+		waitSecs := int(decision.WaitTime.Seconds())
+		if shortestCooldownSecs < 0 || waitSecs < shortestCooldownSecs {
+			shortestCooldownSecs = waitSecs
+			shortestCooldownModel = modelID
+		}
+	}
+
+	// All models in cooldown or unavailable — return best fallback
+	if shortestCooldownModel != "" {
+		connID := r.findConnectorForModel(shortestCooldownModel)
+		if connID != "" {
+			log.Printf("[Router] All models in cooldown, shortest wait: model=%s (%ds)", shortestCooldownModel, shortestCooldownSecs)
+			return &RoutingResult{
+				ConnectorID: connID,
+				ModelID:     shortestCooldownModel,
+				RoutingFlag: "internal",
+				Category:    "internal",
+			}, nil
+		}
+	}
+
+	log.Printf("[Router] No available models in cascade")
 	return nil, nil
 }
 

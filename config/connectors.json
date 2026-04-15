@@ -1,19 +1,8 @@
 {
   "$schema": "./schemas/destinations.schema.json",
-  "version": "2.0",
-  "description": "Destination configurations with native tool capabilities. CLI destinations provide tools, API destinations do other.",
+  "version": "3.0",
+  "description": "API and web connectors. To add a provider: add destination object, set status=active, reference api_key_ref. No code changes.",
   "destinations": [
-    {
-      "id": "opencode",
-      "name": "OpenCode CLI",
-      "type": "cli",
-      "status": "inactive",
-      "command": "opencode",
-      "cli_args": ["run", "--format", "json"],
-      "timeout_seconds": 300,
-      "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep"],
-      "notes": "Uses ~700MB RAM per session. Consider Kilo for lower memory footprint."
-    },
     {
       "id": "claude-code",
       "name": "Claude Code CLI",
@@ -23,7 +12,66 @@
       "cli_args": ["-p", "--output-format", "json"],
       "timeout_seconds": 300,
       "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep"],
-      "notes": "Claude Code CLI with GLM-5 model"
+      "notes": "Claude Code CLI. Currently using GLM-5.1 via ZAI until May 1."
+    },
+    {
+      "id": "gemini-api",
+      "name": "Gemini API",
+      "type": "api",
+      "status": "active",
+      "provider": "google",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+      "api_key_ref": "GEMINI_API_KEY",
+      "models_available": ["gemini-2.5-flash", "gemini-2.0-flash"],
+      "provides_tools": [],
+      "notes": "Primary API. Free tier. 15 RPM, 1500 RPD."
+    },
+    {
+      "id": "groq-api",
+      "name": "Groq Cloud API",
+      "type": "api",
+      "status": "active",
+      "provider": "groq",
+      "endpoint": "https://api.groq.com/openai/v1",
+      "api_key_ref": "GROQ_API_KEY",
+      "models_available": ["llama-3.1-8b-instant", "compound", "qwen3-32b", "llama-4-scout"],
+      "provides_tools": [],
+      "notes": "Fast inference. 30 RPM free tier. Key in .env."
+    },
+    {
+      "id": "nvidia-api",
+      "name": "NVIDIA NIM API",
+      "type": "api",
+      "status": "active",
+      "provider": "nvidia",
+      "endpoint": "https://integrate.api.nvidia.com/v1",
+      "api_key_ref": "NVIDIA_API_KEY",
+      "models_available": ["google/gemma-3-4b-it", "meta/llama-3.3-70b-instruct", "deepseek-ai/deepseek-v3.2", "google/gemma-4-31b-it", "qwen/qwen3-coder-480b-a35b-instruct"],
+      "provides_tools": [],
+      "notes": "131 models available. 12-month free tier. Verified working Apr 15."
+    },
+    {
+      "id": "openrouter-api",
+      "name": "OpenRouter API",
+      "type": "api",
+      "status": "active",
+      "provider": "openrouter",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "models_available": ["google/gemma-4-31b-it:free", "nvidia/nemotron-3-super-120b-a12b:free", "qwen/qwen3-coder-480b-a35b:free"],
+      "provides_tools": [],
+      "notes": "Free models only (:free suffix). Balance -17c but free models still work. Last resort."
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode CLI",
+      "type": "cli",
+      "status": "inactive",
+      "command": "opencode",
+      "cli_args": ["run", "--format", "json"],
+      "timeout_seconds": 300,
+      "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep"],
+      "notes": "Inactive. Uses ~700MB RAM per session."
     },
     {
       "id": "kimi",
@@ -34,19 +82,7 @@
       "cli_args": ["run", "--format", "json"],
       "timeout_seconds": 300,
       "provides_tools": ["read", "write", "bash", "websearch", "webfetch"],
-      "notes": "Web search enabled"
-    },
-    {
-      "id": "gemini-api",
-      "name": "Gemini API",
-      "type": "api",
-      "status": "inactive",
-      "provider": "google",
-      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
-      "api_key_ref": "GEMINI_API_KEY",
-      "models_available": ["gemini-2.0-flash", "gemini-1.5-pro"],
-      "provides_tools": [],
-      "notes": "Disabled - API key base64 decode error in vault"
+      "notes": "Inactive. Subscription ended."
     },
     {
       "id": "deepseek-api",
@@ -57,55 +93,8 @@
       "endpoint": "https://api.deepseek.com",
       "api_key_ref": "DEEPSEEK_API_KEY",
       "models_available": ["deepseek-chat", "deepseek-reasoner"],
-      "provides_tools": []
-    },
-    {
-      "id": "groq-api",
-      "name": "Groq Cloud API",
-      "type": "api",
-      "status": "pending_key",
-      "provider": "groq",
-      "endpoint": "https://api.groq.com/openai/v1",
-      "api_key_ref": "GROQ_API_KEY",
-      "models_available": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen3-32b"],
       "provides_tools": [],
-      "notes": "Need to add GROQ_API_KEY to vault"
-    },
-    {
-      "id": "openrouter-api",
-      "name": "OpenRouter API",
-      "type": "api",
-      "status": "emergency_fallback",
-      "provider": "openrouter",
-      "endpoint": "https://openrouter.ai/api/v1",
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "models_available": ["deepseek/deepseek-r1:free", "google/gemini-2.5-flash-preview:free"],
-      "provides_tools": [],
-      "notes": "EMERGENCY ONLY. Always use :free suffix. Set $0 spend limit in dashboard. Free models can fall back to paid without warning."
-    },
-    {
-      "id": "chatgpt-web",
-      "name": "ChatGPT Web",
-      "type": "web",
-      "status": "active",
-      "url": "https://chatgpt.com",
-      "provider": "openai",
-      "requires_auth": "browser_login",
-      "models_available": ["chatgpt-4o-mini"],
-      "provides_tools": [],
-      "notes": "Courier destination. Free tier: ~10 messages/3hrs. Manual or browser automation."
-    },
-    {
-      "id": "claude-web",
-      "name": "Claude Web",
-      "type": "web",
-      "status": "active",
-      "url": "https://claude.ai",
-      "provider": "anthropic",
-      "requires_auth": "browser_login",
-      "models_available": ["claude-sonnet"],
-      "provides_tools": [],
-      "notes": "Courier destination. Variable daily limits. Good for PRD review."
+      "notes": "Inactive. Paid API. Use DeepSeek via NVIDIA NIM instead (free)."
     },
     {
       "id": "gemini-web",
@@ -117,19 +106,7 @@
       "requires_auth": "browser_login",
       "models_available": ["gemini-2.5-flash", "gemini-2.5-pro"],
       "provides_tools": [],
-      "notes": "Courier destination. 1M tokens/day free tier."
-    },
-    {
-      "id": "copilot-web",
-      "name": "Copilot Web",
-      "type": "web",
-      "status": "unavailable",
-      "url": "https://copilot.microsoft.com",
-      "provider": "microsoft",
-      "requires_auth": "microsoft_account",
-      "models_available": ["copilot"],
-      "provides_tools": [],
-      "notes": "Requires Microsoft account. Not usable."
+      "notes": "Courier destination. Chrome CDP auto-login. 1M tokens/day."
     },
     {
       "id": "deepseek-web",
@@ -141,7 +118,31 @@
       "requires_auth": "optional",
       "models_available": ["deepseek-chat", "deepseek-r1"],
       "provides_tools": [],
-      "notes": "Courier destination. Generous free tier. Works without login."
+      "notes": "Courier destination. CloudFront blocks headless. Use CDP Chrome."
+    },
+    {
+      "id": "chatgpt-web",
+      "name": "ChatGPT Web",
+      "type": "web",
+      "status": "inactive",
+      "url": "https://chatgpt.com",
+      "provider": "openai",
+      "requires_auth": "browser_login",
+      "models_available": ["chatgpt-4o-mini"],
+      "provides_tools": [],
+      "notes": "Cloudflare blocks headless. CDP may work if logged in."
+    },
+    {
+      "id": "huggingchat-web",
+      "name": "HuggingChat",
+      "type": "web",
+      "status": "active",
+      "url": "https://huggingface.co/chat",
+      "provider": "huggingface",
+      "requires_auth": "none",
+      "models_available": ["various-opensource"],
+      "provides_tools": [],
+      "notes": "Courier destination. No login needed. Works in headless."
     },
     {
       "id": "qwen-web",
@@ -163,21 +164,9 @@
       "url": "https://chat.mistral.ai",
       "provider": "mistral",
       "requires_auth": "browser_login",
-      "models_available": ["mistral-large", "codestral", "pixtral"],
+      "models_available": ["mistral-large", "codestral"],
       "provides_tools": [],
-      "notes": "Courier destination. Free tier available. Good for code."
-    },
-    {
-      "id": "notegpt-web",
-      "name": "NoteGPT DeepSeek",
-      "type": "web",
-      "status": "active",
-      "url": "https://notegpt.io/chat-deepseek",
-      "provider": "notegpt",
-      "requires_auth": "none",
-      "models_available": ["deepseek-r1", "deepseek-v3"],
-      "provides_tools": [],
-      "notes": "Courier destination. Free DeepSeek R1 & V3. No login required. Good backup."
+      "notes": "Courier destination. Free tier."
     }
   ]
 }

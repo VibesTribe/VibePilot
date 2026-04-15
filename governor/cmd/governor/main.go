@@ -161,7 +161,7 @@ func main() {
 	runStartupRecovery(ctx, database, recoveryCfg)
 	runCheckpointRecovery(ctx, database, cfg, checkpointMgr)
 
-	connRouter := runtime.NewRouter(cfg, database)
+	connRouter := runtime.NewRouter(cfg, database, usageTracker)
 	eventRouter := runtime.NewEventRouter(nil)
 
 	// Initialize Realtime client (replaces broken pg_net webhooks)
@@ -203,7 +203,7 @@ func main() {
 
 	go runProcessingRecovery(ctx, database, cfg)
 
-	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector)
+	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker)
 
 	if err := webhookServer.Start(ctx); err != nil {
 		log.Fatalf("Failed to start webhook server: %v", err)
@@ -293,8 +293,8 @@ func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v 
 	}
 }
 
-func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector) {
-	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector)
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector, usageTracker *runtime.UsageTracker) {
+	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector, usageTracker)
 	setupPlanHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter, git)

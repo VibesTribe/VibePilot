@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-15T19:14:22Z | Commit: 6424120b | Branch: main
+# Generated: 2026-04-15T19:50:26Z | Commit: f7aa162f | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -158,7 +158,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Codebase Structure (auto-discovered)
 - governor/cmd/cleanup/ (1 files, 1 funcs, 0 types)
 - governor/cmd/encrypt_secret/ (1 files, 1 funcs, 0 types)
-- governor/cmd/governor/ (12 files, 93 funcs, 12 types)
+- governor/cmd/governor/ (12 files, 94 funcs, 12 types)
 - governor/cmd/migrate_vault/ (1 files, 5 funcs, 1 types)
 - governor/internal/connectors/ (2 files, 22 funcs, 8 types)
 - governor/internal/core/ (4 files, 35 funcs, 27 types)
@@ -169,7 +169,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
 - governor/internal/memory/ (2 files, 19 funcs, 5 types)
 - governor/internal/realtime/ (1 files, 23 funcs, 8 types)
-- governor/internal/runtime/ (10 files, 162 funcs, 92 types)
+- governor/internal/runtime/ (10 files, 164 funcs, 92 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 15 funcs, 4 types)
@@ -177,16 +177,16 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/pkg/types/ (1 files, 0 funcs, 9 types)
 ## Config: JSON (auto-discovered)
   config/agents.json - Agent definitions with capability declarations. Roles separated: decide vs execute. Only Maintenance has git write.
-  config/connectors.json - Destination configurations with native tool capabilities. CLI destinations provide tools, API destinations do other.
+  config/connectors.json - API and web connectors. To add a provider: add destination object, set status=active, reference api_key_ref. No code changes.
   config/destinations.json - WHERE tasks execute. CLI, Web platforms, API endpoints. All swappable.
   config/kilo-session.json - keys: max_sessions, max_concurrent_tasks_per_session, notes, memory_per_session_mb, reason
   config/maintenance_commands.json - Maintenance command configuration. Defines allowed git operations and validation rules.
-  config/models.json - WHO provides intelligence. Actual LLM models with their capabilities and access points.
+  config/models.json - Free-tier LLM models with verified rate limits. All costs are $0. Adding a model = add a JSON object + add to connectors.json. No code changes needed.
   config/plan_lifecycle.json - Plan lifecycle configuration - states, transitions, revision rules, complexity detection, consensus rules. All configurable.
   config/platforms.json - Web platforms and API models for VibePilot routing. Updated April 8, 2026 with verified OpenRouter data.
   config/roles.json - WHAT job is being done. Roles are job definitions. Model and destination assigned by orchestrator at runtime.
   config/routing_contract.json - Routing decision contract - what orchestrator returns when routing a task
-  config/routing.json - Routing strategy configuration. How VibePilot decides WHERE to send tasks. Fully configurable per user preference.
+  config/routing.json - Routing strategy. How VibePilot decides WHERE to send tasks. The free_cascade strategy uses UsageTracker to pick only currently-active providers.
   config/skills.json - All available skills in VibePilot. Add/remove skills here. Agents reference these by ID.
   config/system.json - System configuration - database, vault, git, runtime settings. All swappable.
   config/tools.json - Tool definitions for VibePilot runtime. Parameters + security + implementation.
@@ -208,7 +208,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 6424120b
+- Commit: f7aa162f
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
