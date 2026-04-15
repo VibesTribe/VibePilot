@@ -2,57 +2,7 @@
 -- VIBESPILOT SCHEMA MIGRATION 111
 -- Purpose: Create ALL missing RPCs that the governor binary calls
 -- Date: 2026-04-15
---
--- Pre-drop ALL functions we redefine, using EXACT live DB signatures.
--- IF EXISTS makes this safe for fresh installs too.
-DROP FUNCTION IF EXISTS claim_task(UUID, TEXT, TEXT, TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS claim_for_review(UUID, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS create_task_run(UUID, TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER, INTEGER, TEXT, INTEGER, NUMERIC, NUMERIC, NUMERIC, NUMERIC, TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH TIME ZONE) CASCADE;
-DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INTEGER, INTEGER, NUMERIC) CASCADE;
-DROP FUNCTION IF EXISTS create_plan(UUID, TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS update_plan_status(UUID, TEXT, JSONB, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS set_processing(UUID, TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS clear_processing(UUID, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS find_stale_processing(TEXT, INTEGER) CASCADE;
-DROP FUNCTION IF EXISTS recover_stale_processing(TEXT, UUID, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS record_model_success(TEXT, TEXT, NUMERIC, INTEGER) CASCADE;
-DROP FUNCTION IF EXISTS record_model_failure(TEXT, UUID, TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS record_failure(UUID, UUID, TEXT, TEXT, JSONB, TEXT, TEXT, UUID, TEXT, INTEGER, INTEGER) CASCADE;
-DROP FUNCTION IF EXISTS store_council_reviews(UUID, JSONB, TEXT, JSONB) CASCADE;
-DROP FUNCTION IF EXISTS set_council_consensus(UUID, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS create_maintenance_command(TEXT, JSONB, TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS update_maintenance_command_status(UUID, TEXT, JSONB) CASCADE;
-DROP FUNCTION IF EXISTS queue_maintenance_command(TEXT, JSONB, INT) CASCADE;
-DROP FUNCTION IF EXISTS update_research_suggestion_status(UUID, TEXT, JSONB) CASCADE;
-DROP FUNCTION IF EXISTS unlock_dependent_tasks(UUID) CASCADE;
-DROP FUNCTION IF EXISTS check_platform_availability(TEXT) CASCADE;
-DROP FUNCTION IF EXISTS get_model_performance() CASCADE;
-DROP FUNCTION IF EXISTS get_failure_patterns(INT) CASCADE;
-DROP FUNCTION IF EXISTS log_security_audit(TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS create_planner_rule(TEXT, TEXT, TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS record_planner_revision(UUID, JSONB, JSONB) CASCADE;
-DROP FUNCTION IF EXISTS record_revision_feedback(UUID, TEXT, JSONB, JSONB) CASCADE;
-DROP FUNCTION IF EXISTS store_memory(TEXT, TEXT, TEXT, INT) CASCADE;
-DROP FUNCTION IF EXISTS recall_memories(TEXT, TEXT, INT) CASCADE;
-DROP FUNCTION IF EXISTS recover_orphaned_session(UUID, TEXT) CASCADE;
---
--- This migration closes the gap between Go code expectations and Supabase state.
--- 42 RPCs were referenced in the Go codebase but never created in Supabase.
--- Every function signature matches exactly what the Go RPC() calls pass.
---
--- Tables these depend on (already exist):
---   tasks, plans, task_runs, task_checkpoints, council_reviews,
---   maintenance_commands, research_suggestions, test_results,
---   failure_records, learned_heuristics, problem_solutions,
---   lessons_learned, state_transitions, performance_metrics,
---   memory_sessions, memory_project, memory_rules
---
--- New tables created:
---   security_audit_log, planner_rules, revision_feedback
---
--- RLS: service_role bypasses all RLS. Anon key has read-only where needed.
 -- ============================================================================
-
 BEGIN;
 
 -- ============================================================================
@@ -110,6 +60,8 @@ CREATE POLICY "service_all_revision_feedback" ON revision_feedback FOR ALL USING
 
 -- claim_task: Atomically claim an available task for execution
 -- Go params: p_task_id UUID, p_worker_id TEXT, p_model_id TEXT, p_routing_flag TEXT, p_routing_reason TEXT
+DROP FUNCTION IF EXISTS claim_task(UUID, TEXT, TEXT, TEXT, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION claim_task(
   p_task_id UUID,
   p_worker_id TEXT,
@@ -150,6 +102,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- claim_for_review: Atomically claim a task for supervisor review
 -- Go params: p_task_id UUID, p_reviewer_id TEXT
+DROP FUNCTION IF EXISTS claim_for_review(UUID, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION claim_for_review(
   p_task_id UUID,
   p_reviewer_id TEXT
@@ -184,6 +138,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 --            p_courier_tokens, p_courier_cost_usd, p_platform_theoretical_cost_usd,
 --            p_total_actual_cost_usd, p_total_savings_usd, p_started_at, p_completed_at,
 --            p_result
+DROP FUNCTION IF EXISTS create_task_run(UUID, TEXT, TEXT, TEXT, TEXT, INT, INT, INT, TEXT, INT, FLOAT, FLOAT, FLOAT, FLOAT, TIMESTAMPTZ, TIMESTAMPTZ, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS create_task_run(UUID, TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER, INTEGER, TEXT, INTEGER, NUMERIC, NUMERIC, NUMERIC, NUMERIC, TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH TIME ZONE) CASCADE;
+
 CREATE OR REPLACE FUNCTION create_task_run(
   p_task_id UUID,
   p_model_id TEXT,
@@ -228,6 +185,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- calculate_run_costs: Calculate cost breakdown for a task run
 -- Go params: p_model_id, p_tokens_in, p_tokens_out, p_courier_cost_usd
+DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INT, INT, FLOAT) CASCADE;
+DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INTEGER, INTEGER, NUMERIC) CASCADE;
+
 CREATE OR REPLACE FUNCTION calculate_run_costs(
   p_model_id TEXT,
   p_tokens_in INT,
@@ -253,6 +213,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- create_plan: Create a new plan from a PRD trigger
 -- Go params: p_project_id, p_prd_path, p_plan_path
+DROP FUNCTION IF EXISTS create_plan(UUID, TEXT, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION create_plan(
   p_project_id UUID,
   p_prd_path TEXT,
@@ -274,6 +236,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- update_plan_status: Transition plan to new status with optional notes
 -- Go params: p_plan_id, p_status, p_review_notes
 -- NOTE: uses review_notes NOT latest_feedback (verified column name)
+DROP FUNCTION IF EXISTS update_plan_status(UUID, TEXT, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS update_plan_status(UUID, TEXT, JSONB, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION update_plan_status(
   p_plan_id UUID,
   p_status TEXT,
@@ -302,6 +267,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- set_processing: Atomically claim an item for processing
 -- Go params vary: sometimes (p_table, p_id, p_processing_by), sometimes (p_id, p_processing_by, p_table)
 -- Support BOTH parameter orders via overloading
+DROP FUNCTION IF EXISTS set_processing(TEXT, UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS set_processing(UUID, TEXT, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION set_processing(
   p_table TEXT,
   p_id UUID,
@@ -334,6 +302,9 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- clear_processing: Release processing lock on an item
+DROP FUNCTION IF EXISTS clear_processing(TEXT, UUID) CASCADE;
+DROP FUNCTION IF EXISTS clear_processing(UUID, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION clear_processing(
   p_table TEXT,
   p_id UUID
@@ -361,6 +332,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- find_stale_processing: Find items that have been processing too long
 -- Go params: p_table TEXT, p_timeout_seconds INT
+DROP FUNCTION IF EXISTS find_stale_processing(TEXT, INT) CASCADE;
+DROP FUNCTION IF EXISTS find_stale_processing(TEXT, INTEGER) CASCADE;
+
 CREATE OR REPLACE FUNCTION find_stale_processing(
   p_table TEXT,
   p_timeout_seconds INT DEFAULT 300
@@ -411,6 +385,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- recover_stale_processing: Release lock on stale item
 -- Go params: p_table TEXT, p_id UUID, p_reason TEXT
+DROP FUNCTION IF EXISTS recover_stale_processing(TEXT, UUID, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION recover_stale_processing(
   p_table TEXT,
   p_id UUID,
@@ -431,6 +407,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Go params: p_model_id, p_task_type, p_duration_seconds, p_tokens_used
 -- NOTE: learned_heuristics has NO unique constraint on (task_type, preferred_model).
 --       Using INSERT + separate UPDATE pattern instead of ON CONFLICT.
+DROP FUNCTION IF EXISTS record_model_success(TEXT, TEXT, FLOAT, INT) CASCADE;
+DROP FUNCTION IF EXISTS record_model_success(TEXT, TEXT, NUMERIC, INTEGER) CASCADE;
+
 CREATE OR REPLACE FUNCTION record_model_success(
   p_model_id TEXT,
   p_task_type TEXT,
@@ -463,6 +442,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- record_model_failure: Track failed model execution for learning
 -- Go params: p_model_id, p_task_id, p_failure_type, p_failure_category
 -- NOTE: failure_records has failure_category and failure_details columns (verified)
+DROP FUNCTION IF EXISTS record_model_failure(TEXT, UUID, TEXT, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION record_model_failure(
   p_model_id TEXT,
   p_task_id UUID DEFAULT NULL,
@@ -485,6 +466,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- record_failure: Detailed failure recording from task handler
 -- Go params: p_task_id, p_failure_type, p_failure_category, p_failure_details, p_model_id, p_task_type
 -- NOTE: column is failure_details (NOT details). tasks has failure_notes but NO last_error/last_error_at.
+DROP FUNCTION IF EXISTS record_failure(UUID, TEXT, TEXT, JSONB, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS record_failure(UUID, UUID, TEXT, TEXT, JSONB, TEXT, TEXT, UUID, TEXT, INTEGER, INTEGER) CASCADE;
+
 CREATE OR REPLACE FUNCTION record_failure(
   p_task_id UUID,
   p_failure_type TEXT,
@@ -520,6 +504,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- store_council_reviews: Store all council member reviews
 -- Go params: p_plan_id, p_reviews (JSONB array), p_mode TEXT, p_models JSONB
 -- NOTE: council_reviews has (plan_id, model_id, vote, concerns) - NO reviewer_model/reasoning/mode
+DROP FUNCTION IF EXISTS store_council_reviews(UUID, JSONB, TEXT, JSONB) CASCADE;
+
 CREATE OR REPLACE FUNCTION store_council_reviews(
   p_plan_id UUID,
   p_reviews JSONB,
@@ -554,6 +540,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- set_council_consensus: Record the consensus decision for a plan
 -- Go params: p_plan_id, p_consensus TEXT
 -- NOTE: uses review_notes NOT latest_feedback (verified)
+DROP FUNCTION IF EXISTS set_council_consensus(UUID, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION set_council_consensus(
   p_plan_id UUID,
   p_consensus TEXT
@@ -576,6 +564,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- create_maintenance_command: Queue a maintenance action
 -- Go params: p_command_type TEXT, p_payload JSONB, p_status TEXT
 -- NOTE: column is command_type (NOT type). Go passes p_status='pending'.
+DROP FUNCTION IF EXISTS create_maintenance_command(TEXT, JSONB, TEXT, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION create_maintenance_command(
   p_command_type TEXT,
   p_payload JSONB DEFAULT '{}',
@@ -595,6 +585,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- update_maintenance_command_status: Update maintenance command status
 -- Go params: p_id UUID, p_status TEXT, p_result_notes JSONB
+DROP FUNCTION IF EXISTS update_maintenance_command_status(UUID, TEXT, JSONB) CASCADE;
+
 CREATE OR REPLACE FUNCTION update_maintenance_command_status(
   p_id UUID,
   p_status TEXT,
@@ -618,6 +610,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- queue_maintenance_command: Alias used by db_tools.go
 -- Go params: p_command TEXT, p_params JSONB
+DROP FUNCTION IF EXISTS queue_maintenance_command(TEXT, JSONB, INT) CASCADE;
+
 CREATE OR REPLACE FUNCTION queue_maintenance_command(
   p_command TEXT,
   p_params JSONB DEFAULT '{}',
@@ -634,6 +628,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- update_research_suggestion_status: Transition research suggestion
 -- Go params: p_id UUID, p_status TEXT, p_review_notes JSONB
+DROP FUNCTION IF EXISTS update_research_suggestion_status(UUID, TEXT, JSONB) CASCADE;
+
 CREATE OR REPLACE FUNCTION update_research_suggestion_status(
   p_id UUID,
   p_status TEXT,
@@ -661,6 +657,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- unlock_dependent_tasks: Release tasks blocked by a completed task
 -- Go params: p_completed_task_id UUID
+DROP FUNCTION IF EXISTS unlock_dependent_tasks(UUID) CASCADE;
+
 CREATE OR REPLACE FUNCTION unlock_dependent_tasks(
   p_completed_task_id UUID
 ) RETURNS INT AS $$
@@ -686,6 +684,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- check_platform_availability: Check if a platform/connector is available
 -- Go params: p_platform_id TEXT
+DROP FUNCTION IF EXISTS check_platform_availability(TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION check_platform_availability(
   p_platform_id TEXT
 ) RETURNS JSONB AS $$
@@ -706,6 +706,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- get_model_performance: Get aggregated model performance stats
 -- No params
+DROP FUNCTION IF EXISTS get_model_performance() CASCADE;
+
 CREATE OR REPLACE FUNCTION get_model_performance()
 RETURNS JSONB AS $$
 BEGIN
@@ -727,6 +729,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- get_failure_patterns: Get recent failure patterns
 -- Go params: days INT
+DROP FUNCTION IF EXISTS get_failure_patterns(INT) CASCADE;
+
 CREATE OR REPLACE FUNCTION get_failure_patterns(
   days INT DEFAULT 7
 ) RETURNS JSONB AS $$
@@ -757,6 +761,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- log_security_audit: Record a vault security event
 -- Go params: p_operation TEXT, p_key_name TEXT, p_allowed BOOLEAN, p_reason TEXT
+DROP FUNCTION IF EXISTS log_security_audit(TEXT, TEXT, BOOLEAN, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS log_security_audit(TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION log_security_audit(
   p_operation TEXT,
   p_key_name TEXT DEFAULT NULL,
@@ -780,6 +787,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- create_planner_rule: Store a learned planner rule from council feedback
 -- Go params: p_applies_to TEXT, p_rule_type TEXT, p_rule_text TEXT, p_source TEXT
+DROP FUNCTION IF EXISTS create_planner_rule(TEXT, TEXT, TEXT, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION create_planner_rule(
   p_applies_to TEXT DEFAULT '*',
   p_rule_type TEXT DEFAULT 'general',
@@ -800,6 +809,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- record_planner_revision: Track plan revision for planner learning
 -- Go params: p_plan_id UUID, p_concerns JSONB, p_tasks_needing_revision JSONB
 -- NOTE: plans has NO tasks_needing_revision column. Uses review_notes NOT latest_feedback.
+DROP FUNCTION IF EXISTS record_planner_revision(UUID, JSONB, JSONB) CASCADE;
+
 CREATE OR REPLACE FUNCTION record_planner_revision(
   p_plan_id UUID,
   p_concerns JSONB DEFAULT '[]',
@@ -826,6 +837,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- record_revision_feedback: Store feedback from revision review
 -- Go params: p_plan_id UUID, p_source TEXT, p_feedback JSONB, p_tasks_needing_revision JSONB
+DROP FUNCTION IF EXISTS record_revision_feedback(UUID, TEXT, JSONB, JSONB) CASCADE;
+
 CREATE OR REPLACE FUNCTION record_revision_feedback(
   p_plan_id UUID,
   p_source TEXT DEFAULT 'supervisor',
@@ -857,6 +870,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- store_memory: Store a memory item in the appropriate layer
 -- Go params: p_layer TEXT, p_key TEXT, p_value TEXT, p_ttl_sec INT
+DROP FUNCTION IF EXISTS store_memory(TEXT, TEXT, TEXT, INT) CASCADE;
+
 CREATE OR REPLACE FUNCTION store_memory(
   p_layer TEXT,
   p_key TEXT,
@@ -895,6 +910,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- recall_memories: Retrieve memory items by layer and key prefix
 -- Go params: p_layer TEXT, p_query TEXT, p_limit INT
+DROP FUNCTION IF EXISTS recall_memories(TEXT, TEXT, INT) CASCADE;
+
 CREATE OR REPLACE FUNCTION recall_memories(
   p_layer TEXT,
   p_query TEXT DEFAULT '',
@@ -954,6 +971,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- recover_orphaned_session: Recover a single orphaned session
 -- Go params: p_session_id UUID, p_reason TEXT
+DROP FUNCTION IF EXISTS recover_orphaned_session(UUID, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION recover_orphaned_session(
   p_session_id UUID,
   p_reason TEXT DEFAULT 'timeout_recovery'
