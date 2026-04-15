@@ -1,123 +1,296 @@
 {
-  "version": "2.0",
-  "description": "WHO provides intelligence. Actual LLM models with their capabilities and access points.",
-  "last_updated": "2026-02-17",
+  "version": "3.0",
+  "description": "Free-tier LLM models with verified rate limits. All costs are $0. Adding a model = add a JSON object + add to connectors.json. No code changes needed.",
+  "last_updated": "2026-04-15",
 
   "models": [
-    {
-      "id": "gemini-2.0-flash",
-      "name": "Gemini 2.0 Flash",
-      "provider": "google",
-      "context_limit": 1000000,
-      "cost_input_per_1k_usd": 0,
-      "cost_output_per_1k_usd": 0,
-      "capabilities": ["text", "code", "vision", "browser_control"],
-      "access_via": ["gemini-api", "gemini-web"],
-      "api_key_ref": "GEMINI_API_KEY",
-      "notes": "Free via API. Best for browser-use driver. Also available on web."
-    },
     {
       "id": "gemini-2.5-flash",
       "name": "Gemini 2.5 Flash",
       "provider": "google",
+      "access_type": "api_free",
       "context_limit": 1000000,
       "cost_input_per_1k_usd": 0,
       "cost_output_per_1k_usd": 0,
       "capabilities": ["text", "code", "vision", "browser_control"],
-      "access_via": ["gemini-api", "gemini-web"],
+      "access_via": ["gemini-api"],
       "api_key_ref": "GEMINI_API_KEY",
-      "notes": "Newer version. Same free tier."
+      "status": "active",
+      "priority": 1,
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_day": 1000000
+      },
+      "throttle_behavior": "slow_down",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 4,
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 60,
+        "max_task_attempts": 3
+      },
+      "strengths": ["general", "code", "vision", "large_context"],
+      "notes": "Primary model. 1M context. Free tier. 15 RPM, 1500 RPD, 1M TPD."
     },
     {
-      "id": "deepseek-chat",
-      "name": "DeepSeek Chat",
-      "provider": "deepseek",
-      "context_limit": 128000,
-      "cost_input_per_1k_usd": 0.00028,
-      "cost_output_per_1k_usd": 0.00042,
-      "cost_input_per_1k_cached_usd": 0.000028,
-      "capabilities": ["text", "code", "reasoning", "browser_control"],
-      "access_via": ["deepseek-api", "deepseek-web"],
-      "api_key_ref": "DEEPSEEK_API_KEY",
-      "notes": "Extremely cheap API. Cache hits 90% cheaper. Can drive browser-use."
+      "id": "gemini-2.0-flash",
+      "name": "Gemini 2.0 Flash",
+      "provider": "google",
+      "access_type": "api_free",
+      "context_limit": 1000000,
+      "cost_input_per_1k_usd": 0,
+      "cost_output_per_1k_usd": 0,
+      "capabilities": ["text", "code", "vision", "browser_control"],
+      "access_via": ["gemini-api"],
+      "api_key_ref": "GEMINI_API_KEY",
+      "status": "active",
+      "priority": 2,
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_day": 1000000
+      },
+      "throttle_behavior": "slow_down",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 4,
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 60,
+        "max_task_attempts": 3
+      },
+      "strengths": ["general", "code", "vision"],
+      "notes": "Fallback for 2.5. Same API key, same limits."
     },
     {
-      "id": "deepseek-reasoner",
-      "name": "DeepSeek R1",
-      "provider": "deepseek",
+      "id": "llama-3.1-8b-instant",
+      "name": "Llama 3.1 8B Instant",
+      "provider": "groq",
+      "access_type": "api_free",
       "context_limit": 128000,
-      "cost_input_per_1k_usd": 0.00028,
-      "cost_output_per_1k_usd": 0.00042,
-      "capabilities": ["text", "reasoning"],
-      "access_via": ["deepseek-api", "deepseek-web"],
-      "api_key_ref": "DEEPSEEK_API_KEY",
-      "notes": "Reasoning model. Good for complex analysis."
-    },
-    {
-      "id": "glm-5",
-      "name": "GLM-5",
-      "provider": "zhipu",
-      "access_type": "cli_subscription",
-      "context_limit": 128000,
+      "cost_input_per_1k_usd": 0,
+      "cost_output_per_1k_usd": 0,
       "capabilities": ["text", "code"],
-      "access_via": ["opencode", "claude-code"],
-      "strengths": ["reasoning", "planning", "architecture"],
-      "notes": "Available via OpenCode subscription and Claude Code CLI. Text only, no browser. Good for internal tasks."
+      "access_via": ["groq-api"],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      "priority": 3,
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_day": 14400,
+        "tokens_per_day": 500000
+      },
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 2,
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 60,
+        "max_task_attempts": 3
+      },
+      "strengths": ["speed", "code"],
+      "weaknesses": ["small_model", "no_vision"],
+      "notes": "Fastest model. 30 RPM, 14.4K RPD. Good for quick tasks."
     },
     {
-      "id": "kimi-internal",
-      "name": "Kimi (Moonshot)",
-      "provider": "moonshot",
-      "access_type": "cli_subscription",
-      "context_limit": 200000,
-      "capabilities": ["text", "code", "vision", "browser_control", "computer_use"],
-      "access_via": ["kimi"],
-      "strengths": ["research", "code", "large_context", "multimodal", "parallel_agents"],
-      "notes": "CLI subscription. Multimodal with browser/computer use. Can run 100 parallel subagents. PRIORITY: Maximize usage, only 9 days left at $0.99."
-    },
-    {
-      "id": "gpt-4o-mini",
-      "name": "GPT-4o Mini",
-      "provider": "openai",
+      "id": "compound",
+      "name": "Groq Compound",
+      "provider": "groq",
+      "access_type": "api_free",
       "context_limit": 128000,
-      "cost_input_per_1k_usd": 0.00015,
-      "cost_output_per_1k_usd": 0.00060,
-      "capabilities": ["text", "code", "vision"],
-      "access_via": ["chatgpt-web"],
-      "notes": "Web only (no API key). Free tier on ChatGPT."
+      "cost_input_per_1k_usd": 0,
+      "cost_output_per_1k_usd": 0,
+      "capabilities": ["text", "code", "tool_use"],
+      "access_via": ["groq-api"],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      "priority": 4,
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_day": 250,
+        "tokens_per_day": 70000
+      },
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 2,
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 60,
+        "max_task_attempts": 3
+      },
+      "strengths": ["agentic", "tool_use", "reasoning"],
+      "weaknesses": ["no_vision"],
+      "notes": "Agentic model. Lower daily limits (250 RPD). Good for complex tasks."
     },
     {
-      "id": "gpt-4o",
-      "name": "GPT-4o",
-      "provider": "openai",
+      "id": "google/gemma-3-4b-it",
+      "name": "Gemma 3 4B IT",
+      "provider": "nvidia",
+      "access_type": "api_free",
       "context_limit": 128000,
-      "cost_input_per_1k_usd": 0.0025,
-      "cost_output_per_1k_usd": 0.01,
-      "capabilities": ["text", "code", "vision"],
-      "access_via": ["chatgpt-web", "copilot-web"],
-      "notes": "Web only. Free via Copilot with session limits."
-    },
-    {
-      "id": "claude-sonnet-4-5",
-      "name": "Claude Sonnet 4.5",
-      "provider": "anthropic",
-      "context_limit": 200000,
-      "cost_input_per_1k_usd": 0.003,
-      "cost_output_per_1k_usd": 0.015,
-      "capabilities": ["text", "code", "vision", "reasoning"],
-      "access_via": ["claude-web"],
-      "notes": "Web only (no API key). Excellent for coding."
-    },
-    {
-      "id": "claude-haiku-4-5",
-      "name": "Claude Haiku 4.5",
-      "provider": "anthropic",
-      "context_limit": 200000,
-      "cost_input_per_1k_usd": 0.001,
-      "cost_output_per_1k_usd": 0.005,
+      "cost_input_per_1k_usd": 0,
+      "cost_output_per_1k_usd": 0,
       "capabilities": ["text", "code"],
-      "access_via": ["claude-web"],
-      "notes": "Web only. Faster, cheaper than Sonnet."
+      "access_via": ["nvidia-api"],
+      "api_key_ref": "NVIDIA_API_KEY",
+      "status": "active",
+      "priority": 5,
+      "rate_limits": {
+        "requests_per_minute": 10,
+        "requests_per_day": 1000,
+        "tokens_per_day": 500000
+      },
+      "throttle_behavior": "slow_down",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 6,
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 60,
+        "max_task_attempts": 3
+      },
+      "strengths": ["code", "fast"],
+      "weaknesses": ["small_model"],
+      "notes": "NVIDIA NIM free tier. Verified working. 131 models available."
+    },
+    {
+      "id": "meta/llama-3.3-70b-instruct",
+      "name": "Llama 3.3 70B Instruct",
+      "provider": "nvidia",
+      "access_type": "api_free",
+      "context_limit": 128000,
+      "cost_input_per_1k_usd": 0,
+      "cost_output_per_1k_usd": 0,
+      "capabilities": ["text", "code", "reasoning"],
+      "access_via": ["nvidia-api"],
+      "api_key_ref": "NVIDIA_API_KEY",
+      "status": "active",
+      "priority": 6,
+      "rate_limits": {
+        "requests_per_minute": 10,
+        "requests_per_day": 1000,
+        "tokens_per_day": 500000
+      },
+      "throttle_behavior": "slow_down",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 6,
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 60,
+        "max_task_attempts": 3
+      },
+      "strengths": ["reasoning", "code", "large_model"],
+      "notes": "70B model on NVIDIA NIM. Good for complex reasoning tasks."
+    },
+    {
+      "id": "deepseek-ai/deepseek-v3.2",
+      "name": "DeepSeek V3.2",
+      "provider": "nvidia",
+      "access_type": "api_free",
+      "context_limit": 128000,
+      "cost_input_per_1k_usd": 0,
+      "cost_output_per_1k_usd": 0,
+      "capabilities": ["text", "code", "reasoning"],
+      "access_via": ["nvidia-api"],
+      "api_key_ref": "NVIDIA_API_KEY",
+      "status": "active",
+      "priority": 7,
+      "rate_limits": {
+        "requests_per_minute": 10,
+        "requests_per_day": 1000,
+        "tokens_per_day": 500000
+      },
+      "throttle_behavior": "slow_down",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 6,
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 60,
+        "max_task_attempts": 3
+      },
+      "strengths": ["reasoning", "code", "general"],
+      "notes": "Latest DeepSeek on NVIDIA NIM."
+    },
+    {
+      "id": "google/gemma-4-31b-it:free",
+      "name": "Gemma 4 31B (OpenRouter)",
+      "provider": "openrouter",
+      "access_type": "api_free",
+      "context_limit": 128000,
+      "cost_input_per_1k_usd": 0,
+      "cost_output_per_1k_usd": 0,
+      "capabilities": ["text", "code"],
+      "access_via": ["openrouter-api"],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "priority": 8,
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 30,
+        "max_task_attempts": 3
+      },
+      "notes": "OpenRouter free tier. Balance is -17c but :free models work."
+    },
+    {
+      "id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "name": "Nemotron 3 Super 120B (OpenRouter)",
+      "provider": "openrouter",
+      "access_type": "api_free",
+      "context_limit": 128000,
+      "cost_input_per_1k_usd": 0,
+      "cost_output_per_1k_usd": 0,
+      "capabilities": ["text", "code"],
+      "access_via": ["openrouter-api"],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "priority": 9,
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 30,
+        "max_task_attempts": 3
+      },
+      "notes": "OpenRouter free. 120B MoE model."
+    },
+    {
+      "id": "qwen/qwen3-coder-480b-a35b:free",
+      "name": "Qwen3 Coder 480B (OpenRouter)",
+      "provider": "openrouter",
+      "access_type": "api_free",
+      "context_limit": 128000,
+      "cost_input_per_1k_usd": 0,
+      "cost_output_per_1k_usd": 0,
+      "capabilities": ["text", "code"],
+      "access_via": ["openrouter-api"],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "priority": 10,
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 30,
+        "max_task_attempts": 3
+      },
+      "strengths": ["code"],
+      "notes": "OpenRouter free. 480B code specialist. Last resort."
     }
   ],
 
@@ -126,21 +299,23 @@
     "code": "Can write and understand code",
     "vision": "Can process images/screenshots",
     "reasoning": "Strong at complex logical reasoning",
-    "browser_control": "Can drive browser-use for web automation"
+    "browser_control": "Can drive browser-use for web automation",
+    "tool_use": "Can call functions/tools"
   },
 
-  "browser_control_capable": ["gemini-2.0-flash", "gemini-2.5-flash", "deepseek-chat"],
+  "browser_control_capable": ["gemini-2.5-flash", "gemini-2.0-flash"],
 
   "limit_policy": {
     "pause_at_percent": 80,
-    "description": "Pause usage when reaching 80% of limits to prevent cutoff mid-task."
+    "description": "Never exceed 80% of any rate limit. UsageTracker enforces this via buffer_pct per model."
   },
 
   "notes": [
-    "Models are LLMs. Destinations (CLI/Web/API) are in destinations.json.",
-    "access_via links models to their available destinations.",
-    "browser_control capability required for courier driver model.",
-    "API costs are theoretical for web-only models (used in ROI calculations).",
-    "Subscription costs are in destinations.json, not here."
+    "All models are FREE. Zero cost. No credit card.",
+    "To add a model: add JSON object here + add to connectors.json access_via. No code changes.",
+    "Rate limits from provider docs. buffer_pct=80 means governor stops at 80% of stated limit.",
+    "ZAI/GLM subscription ends May 1. After that, only these models remain.",
+    "Priority field determines cascade order (1=highest).",
+    "NVIDIA NIM has 131 models available -- these are the best picks for our use case."
   ]
 }
