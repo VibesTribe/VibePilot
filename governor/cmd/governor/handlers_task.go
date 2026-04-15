@@ -202,6 +202,9 @@ func (h *TaskHandler) executeTask(
 		return err
 	}
 
+	// Compact session for context history
+	h.factory.Compact(ctx, result, taskID)
+
 	// Security scan
 	cleanOutput, leaks := h.leakDetector.Scan(result.Output)
 	if len(leaks) > 0 {
@@ -351,6 +354,9 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			log.Printf("[TaskReview] Session failed for %s: %v", truncateID(taskID), err)
 			return err
 		}
+
+		// Compact session for context history
+		h.factory.Compact(ctx, result, taskID)
 
 		decision, parseErr := runtime.ParseSupervisorDecision(result.Output)
 		if parseErr != nil {

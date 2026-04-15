@@ -87,10 +87,25 @@ func (s *Session) Run(ctx context.Context, input map[string]any) (*SessionResult
 	}, nil
 }
 
+// Compact stores a session summary via the factory's compactor (if set).
+// Call this after parsing the session result. Non-blocking, never errors.
+func (f *SessionFactory) Compact(ctx context.Context, result *SessionResult, taskID string) {
+	if f.compactor != nil {
+		f.compactor.CompactSession(ctx, result, taskID)
+	}
+}
+
 type SessionFactory struct {
 	config         *Config
 	connectors     map[string]ConnectorRunner
 	contextBuilder *ContextBuilder
+	compactor      SessionCompactor
+}
+
+// SessionCompactor compresses session results into summaries.
+// Implemented by memory.Compactor. Nil = no compaction.
+type SessionCompactor interface {
+	CompactSession(ctx context.Context, result *SessionResult, taskID string)
 }
 
 func NewSessionFactory(cfg *Config) *SessionFactory {
@@ -102,6 +117,10 @@ func NewSessionFactory(cfg *Config) *SessionFactory {
 
 func (f *SessionFactory) SetContextBuilder(cb *ContextBuilder) {
 	f.contextBuilder = cb
+}
+
+func (f *SessionFactory) SetCompactor(c SessionCompactor) {
+	f.compactor = c
 }
 
 func (f *SessionFactory) RegisterConnector(id string, runner ConnectorRunner) {

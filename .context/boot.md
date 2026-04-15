@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-15T04:44:58Z | Commit: c2fbd926 | Branch: main
+# Generated: 2026-04-15T05:10:57Z | Commit: 86c91e7e | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -35,6 +35,20 @@ and cleanup work.
    Read the existing code, query knowledge.db, check what's there before inventing.
 
 4. **NEVER apply migrations directly.** Always go through GitHub first.
+   Supabase REST API cannot run DDL (CREATE TABLE, ALTER TABLE, etc).
+   There is no programmatic way to apply migrations from this machine.
+   The ONLY path: write the SQL file, push to GitHub, human applies via Dashboard.
+   
+   When creating a schema migration:
+   - Check existing files: ls ~/VibePilot/docs/supabase-schema/ to find the next number
+   - Write the file to ~/VibePilot/docs/supabase-schema/NNN_name.sql (dev repo)
+   - Commit and push to GitHub main (VibesTribe/VibePilot repo, main branch only)
+   - Then pull into ~/vibepilot/ (running copy): cd ~/vibepilot && git pull
+   - Tell the human explicitly: "Apply migration NNN via Supabase SQL Editor"
+   - Provide the direct GitHub link: https://github.com/VibesTribe/VibePilot/blob/main/docs/supabase-schema/NNN_name.sql
+   - Human clicks link, copies SQL, pastes into Supabase Dashboard > SQL Editor, runs it
+   - Do NOT skip this. Do NOT apply via REST. Do NOT assume it's done.
+   - Every time an agent got this wrong, the human had to redo it manually.
 
 5. **ALWAYS push to GitHub.** Local-only work gets lost. Commit and push.
    This has caused more lost work than anything else.
@@ -153,9 +167,9 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/gitree/ (1 files, 14 funcs, 2 types)
 - governor/internal/maintenance/ (3 files, 31 funcs, 7 types)
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
-- governor/internal/memory/ (1 files, 13 funcs, 3 types)
+- governor/internal/memory/ (2 files, 19 funcs, 5 types)
 - governor/internal/realtime/ (1 files, 23 funcs, 8 types)
-- governor/internal/runtime/ (10 files, 160 funcs, 90 types)
+- governor/internal/runtime/ (10 files, 162 funcs, 91 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 15 funcs, 4 types)
@@ -194,7 +208,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: c2fbd926
+- Commit: 86c91e7e
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)

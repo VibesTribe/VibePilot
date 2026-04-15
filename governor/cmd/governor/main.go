@@ -15,6 +15,7 @@ import (
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/gitree"
 	govmcp "github.com/vibepilot/governor/internal/mcp"
+	"github.com/vibepilot/governor/internal/memory"
 	"github.com/vibepilot/governor/internal/realtime"
 	"github.com/vibepilot/governor/internal/runtime"
 	"github.com/vibepilot/governor/internal/security"
@@ -92,6 +93,10 @@ func main() {
 
 	contextBuilder := runtime.NewContextBuilder(database)
 	sessionFactory.SetContextBuilder(contextBuilder)
+
+	// Wire compactor for automatic session summary generation
+	compactor := memory.NewCompactor(database)
+	sessionFactory.SetCompactor(compactor)
 
 	pool := runtime.NewAgentPoolWithConcurrency(
 		cfg.System.Runtime.MaxConcurrentPerModule,
