@@ -58,155 +58,143 @@ def extract_between_heading(text, heading_line, headings):
 # ============================================================
 
 def extract_rules():
-    """Extract all rules from all sources, deduplicate, prioritize."""
+    """Extract all rules from all sources, deduplicate, prioritize.
+    
+    Primary source: .context/tools/tier0-static.md (hand-crafted, curated)
+    Supplementary: coding rules, guardrails from other docs (no role/principle duplication)
+    """
     rules = []
     
-    # Source 1: WYNTK - the primary rules doc
-    wyntk = (REPO_ROOT / "VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md").read_text()
-    headings = md_headings(wyntk)
-    
-    # Critical rules (⛔ marked)
-    critical_sections = [
-        ("NEVER Hardcode Anything", "hardcode"),
-        ("NO Type 1 Errors", "architecture"),
-        ("Dashboard is SACRED", "dashboard"),
-        ("STOP. READ THIS", "vault"),
-        ("How to Access Supabase", "supabase"),
-        ("What NOT to Do", "general"),
-        ("Dashboard is READ-ONLY", "dashboard"),
-        ("No Webhooks", "architecture"),
-    ]
-    
-    for title_keyword, category in critical_sections:
-        for level, title, lineno in headings:
-            if title_keyword.lower() in title.lower():
-                content = extract_between_heading(wyntk, lineno, headings)
-                if content:
-                    rules.append({
-                        "priority": "critical",
-                        "category": category,
-                        "title": title.lstrip("⛔ ").strip(),
-                        "content": content[:500],
-                        "source": "VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md",
-                        "source_line": lineno,
-                    })
-    
-    # "What NOT to Do" items - parse as individual rules
-    not_todo = re.findall(r'❌ \*\*(.+?)\*\* - (.+)', wyntk)
-    for rule, reason in not_todo:
-        rules.append({
-            "priority": "critical",
-            "category": "general",
-            "title": rule,
-            "content": reason,
-            "source": "VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md",
-            "source_line": 0,
-        })
-    
-    # Never apply migrations
-    if "NEVER apply migrations directly" in wyntk:
-        rules.append({
-            "priority": "critical",
-            "category": "database",
-            "title": "Never apply migrations directly",
-            "content": "Always go through GitHub first.",
-            "source": "VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md",
-            "source_line": 0,
-        })
-    
-    # Human NEVER
-    human_never = re.findall(r'Human NEVER:.*?\n([\s\S]*?)(?=\n#[^#]|\n\*\*Human|\Z)', wyntk)
-    # Broader search
-    for m in re.finditer(r'Human NEVER:(.*?)(?:\n\n|\n\*\*)', wyntk, re.DOTALL):
-        lines = m.group(1).strip().split("\n")
-        for line in lines:
-            line = line.strip().lstrip("- ").strip()
-            if line:
+    # ============================================================
+    # PRIMARY SOURCE: tier0-static.md -- hand-crafted, no garbage
+    # ============================================================
+    tier0_path = REPO_ROOT / ".context" / "tools" / "tier0-static.md"
+    if tier0_path.exists():
+        tier0 = tier0_path.read_text()
+        
+        # Parse the structured sections
+        current_section = ""
+        for line in tier0.split("\n"):
+            # Detect sections
+            if line.startswith("## Core Principles"):
+                current_section = "principle"
+                continue
+            elif line.startswith("## Absolute Rules"):
+                current_section = "absolute"
+                continue
+            elif line.startswith("## Operational Rules"):
+                current_section = "operational"
+                continue
+            elif line.startswith("## Human Boundaries"):
+                current_section = "human"
+                continue
+            elif line.startswith("## ") or line.startswith("# "):
+                current_section = ""
+                continue
+            
+            # Skip non-content lines
+            if not line.strip() or line.startswith("#") or line.startswith("Every rule"):
+                continue
+            
+            # Parse numbered rules: "1. **TITLE.** Description"
+            num_match = re.match(r'^(\d+)\.\s+\*\*(.+?)\*\*[.:]\s*(.*)', line)
+            if not num_match:
+                # Try without trailing punctuation after **
+                num_match = re.match(r'^(\d+)\.\s+\*\*(.+?)\*\*\s*(.*)', line)
+            if num_match:
+                num, title, desc = num_match.groups()
+                # Gather continuation lines (indented under the numbered rule)
+                # desc might be empty, that's fine
+                priority = "critical" if current_section == "absolute" else "high"
+                category = current_section
                 rules.append({
-                    "priority": "critical",
-                    "category": "human",
-                    "title": f"Human boundary: {line[:60]}",
-                    "content": line,
-                    "source": "VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md",
+                    "priority": priority,
+                    "category": category,
+                    "title": title.strip(),
+                    "content": desc.strip() if desc else title.strip(),
+                    "source": ".context/tools/tier0-static.md",
                     "source_line": 0,
                 })
-    
-    # Source 2: ARCHITECTURE.md - coding rules
-    arch = (REPO_ROOT / "ARCHITECTURE.md").read_text()
-    headings_arch = md_headings(arch)
-    
-    arch_rules_sections = [
-        ("What NOT To Do", "coding"),
-        ("Coding Rules", "coding"),
-        ("JSONB Rules", "database"),
-        ("The Inviolable Rules", "architecture"),
-    ]
-    for title_keyword, category in arch_rules_sections:
-        for level, title, lineno in headings_arch:
-            if title_keyword.lower() in title.lower():
-                content = extract_between_heading(arch, lineno, headings_arch)
-                if content:
+                continue
+            
+            # Parse bullet principles: "- **Title** -- description"
+            bullet_match = re.match(r'^-\s+\*\*(.+?)\*\*\s*--\s*(.*)', line)
+            if bullet_match and current_section == "principle":
+                title, desc = bullet_match.groups()
+                rules.append({
+                    "priority": "high",
+                    "category": "principle",
+                    "title": title.strip(),
+                    "content": desc.strip(),
+                    "source": ".context/tools/tier0-static.md",
+                    "source_line": 0,
+                })
+                continue
+            
+            # Human boundary bullets
+            bullet_match2 = re.match(r'^-\s+(.*)', line)
+            if bullet_match2 and current_section == "human":
+                text = bullet_match2.group(1).strip()
+                if len(text) > 15:
                     rules.append({
                         "priority": "high",
-                        "category": category,
+                        "category": "human",
+                        "title": f"Human boundary: {text[:60]}",
+                        "content": text,
+                        "source": ".context/tools/tier0-static.md",
+                        "source_line": 0,
+                    })
+                    continue
+    
+    # ============================================================
+    # SUPPLEMENTARY: Coding rules from ARCHITECTURE.md
+    # (no principles/roles -- those come from tier0 only)
+    # ============================================================
+    arch_path = REPO_ROOT / "ARCHITECTURE.md"
+    if arch_path.exists():
+        arch = arch_path.read_text()
+        headings_arch = md_headings(arch)
+        
+        coding_sections = [
+            ("Coding Rules", "coding"),
+            ("JSONB Rules", "database"),
+        ]
+        for title_keyword, category in coding_sections:
+            for level, title, lineno in headings_arch:
+                if title_keyword.lower() in title.lower():
+                    content = extract_between_heading(arch, lineno, headings_arch)
+                    if content:
+                        rules.append({
+                            "priority": "medium",
+                            "category": category,
+                            "title": title,
+                            "content": content[:500],
+                            "source": "ARCHITECTURE.md",
+                            "source_line": lineno,
+                        })
+    
+    # ============================================================
+    # SUPPLEMENTARY: Guardrails from guardrails.md
+    # ============================================================
+    gl_path = REPO_ROOT / ".context" / "guardrails.md"
+    if gl_path.exists():
+        gl = gl_path.read_text()
+        headings_gl = md_headings(gl)
+        
+        for level, title, lineno in headings_gl:
+            if level <= 3 and any(kw in title.lower() for kw in ["gate", "checklist", "protocol"]):
+                content = extract_between_heading(gl, lineno, headings_gl)
+                if content and len(content) > 20:
+                    rules.append({
+                        "priority": "medium",
+                        "category": "guardrail",
                         "title": title,
                         "content": content[:500],
-                        "source": "ARCHITECTURE.md",
+                        "source": ".context/guardrails.md",
                         "source_line": lineno,
                     })
     
-    # Source 3: ARCHITECTURE_PRINCIPLES.md
-    ap = (REPO_ROOT / "docs" / "ARCHITECTURE_PRINCIPLES.md").read_text()
-    headings_ap = md_headings(ap)
-    
-    for level, title, lineno in headings_ap:
-        if any(kw in title.lower() for kw in ["non-negotiable", "core rule", "one-day swap", "no vendor"]):
-            content = extract_between_heading(ap, lineno, headings_ap)
-            if content:
-                rules.append({
-                    "priority": "high",
-                    "category": "architecture",
-                    "title": title,
-                    "content": content[:500],
-                    "source": "docs/ARCHITECTURE_PRINCIPLES.md",
-                    "source_line": lineno,
-                })
-    
-    # Source 4: core_philosophy.md
-    cp = (REPO_ROOT / "docs" / "core_philosophy.md").read_text()
-    headings_cp = md_headings(cp)
-    
-    for level, title, lineno in headings_cp:
-        if any(kw in title.lower() for kw in ["inviolable", "zero vendor", "exit ready", "can't be undone"]):
-            content = extract_between_heading(cp, lineno, headings_cp)
-            if content:
-                rules.append({
-                    "priority": "high",
-                    "category": "philosophy",
-                    "title": title,
-                    "content": content[:500],
-                    "source": "docs/core_philosophy.md",
-                    "source_line": lineno,
-                })
-    
-    # Source 5: guardrails.md
-    gl = (REPO_ROOT / ".context" / "guardrails.md").read_text()
-    headings_gl = md_headings(gl)
-    
-    for level, title, lineno in headings_gl:
-        if level <= 3 and any(kw in title.lower() for kw in ["gate", "checklist", "rule", "protocol"]):
-            content = extract_between_heading(gl, lineno, headings_gl)
-            if content and len(content) > 20:
-                rules.append({
-                    "priority": "medium",
-                    "category": "guardrail",
-                    "title": title,
-                    "content": content[:500],
-                    "source": ".context/guardrails.md",
-                    "source_line": lineno,
-                })
-    
-    # Deduplicate by title similarity
+    # Deduplicate by title (exact match, case-insensitive)
     seen_titles = set()
     deduped = []
     for r in rules:

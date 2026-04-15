@@ -49,9 +49,28 @@ and cleanup work.
    Logs: journalctl --user -u vibepilot-governor (not journalctl -u governor)
    Getting stuck on this wastes entire sessions.
 
-8. **Roles are defined in config, not guessed.**
-   Look them up. Human does 2 things. Council does 2 things. Supervisor does 3 things.
-   Check config/agents.json and system.json for role definitions.
+8. **Roles are defined in config, not guessed.** Look them up, don't invent.
+
+   **Supervisor (3 responsibilities):**
+   - Reviews task plans against PRD for alignment + plan quality. Calls Council for complex plans.
+   - Reviews task output against task prompt + expected output + quality/security. Approved -> testing -> auto-merge if pass.
+   - Approves basic researcher suggestions (new platform/model). Complex architecture -> Council -> Human.
+
+   **Council (2 responsibilities):**
+   - Reviews complex task plans escalated by Supervisor.
+   - Reviews complex architecture changes escalated by Supervisor.
+
+   **Human (Vibes) -- NOT technical. Does NOT code, merge, debug, or review code:**
+   - Reviews visual UI/UX after visual testing. Requests changes or approves.
+   - Receives Council-reviewed architecture suggestions. Asks questions. Final yes/no.
+
+   **Merge system -- fully automated, zero human involvement:**
+   - Supervisor approves output -> testing phase -> auto-merge on pass
+   - Task branch created, merged to module branch, task branch deleted
+   - Module branch merged after further Supervisor + Tester review
+   - Merge problems are solved by agents, not human
+
+   **Maintenance -- ONLY agent with git write access. No approval = no change.**
 
 9. **Read before you code.**
    Query knowledge.db for existing rules and patterns before starting any task.
@@ -60,8 +79,10 @@ and cleanup work.
 
 ## Human Boundaries
 
-- Human reviews code and merges code. That's it.
-- Human does NOT debug agent code, write agent code, or figure out architecture.
+- Human is NOT technical. Never assume technical knowledge.
+- Human sees visual outputs and makes aesthetic/UX decisions.
+- Human makes strategic architecture decisions after Council review.
+- Human does NOT code, merge, debug, review code, or fix merge conflicts.
 - Respect human time: batch questions together, don't ask one at a time.
 
 ## Going Deeper
