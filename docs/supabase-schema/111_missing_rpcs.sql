@@ -3,24 +3,24 @@
 -- Purpose: Create ALL missing RPCs that the governor binary calls
 -- Date: 2026-04-15
 --
--- Pre-drop ALL functions we redefine (24 overlap with prior migrations).
+-- Pre-drop ALL functions we redefine, using EXACT live DB signatures.
 -- IF EXISTS makes this safe for fresh installs too.
 DROP FUNCTION IF EXISTS claim_task(UUID, TEXT, TEXT, TEXT, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS claim_for_review(UUID, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS create_task_run(UUID, TEXT, TEXT, JSONB, JSONB, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INT, INT, FLOAT) CASCADE;
+DROP FUNCTION IF EXISTS create_task_run(UUID, TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER, INTEGER, TEXT, INTEGER, NUMERIC, NUMERIC, NUMERIC, NUMERIC, TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH TIME ZONE) CASCADE;
+DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INTEGER, INTEGER, NUMERIC) CASCADE;
 DROP FUNCTION IF EXISTS create_plan(UUID, TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS update_plan_status(UUID, TEXT, JSONB) CASCADE;
-DROP FUNCTION IF EXISTS set_processing(TEXT, UUID, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS clear_processing(TEXT, UUID) CASCADE;
-DROP FUNCTION IF EXISTS find_stale_processing(TEXT, INT) CASCADE;
+DROP FUNCTION IF EXISTS update_plan_status(UUID, TEXT, JSONB, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS set_processing(UUID, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS clear_processing(UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS find_stale_processing(TEXT, INTEGER) CASCADE;
 DROP FUNCTION IF EXISTS recover_stale_processing(TEXT, UUID, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS record_model_success(TEXT, TEXT, FLOAT, INT) CASCADE;
+DROP FUNCTION IF EXISTS record_model_success(TEXT, TEXT, NUMERIC, INTEGER) CASCADE;
 DROP FUNCTION IF EXISTS record_model_failure(TEXT, UUID, TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS record_failure(UUID, TEXT, TEXT, JSONB, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS record_failure(UUID, UUID, TEXT, TEXT, JSONB, TEXT, TEXT, UUID, TEXT, INTEGER, INTEGER) CASCADE;
 DROP FUNCTION IF EXISTS store_council_reviews(UUID, JSONB, TEXT, JSONB) CASCADE;
 DROP FUNCTION IF EXISTS set_council_consensus(UUID, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS create_maintenance_command(TEXT, JSONB, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS create_maintenance_command(TEXT, JSONB, TEXT, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS update_maintenance_command_status(UUID, TEXT, JSONB) CASCADE;
 DROP FUNCTION IF EXISTS queue_maintenance_command(TEXT, JSONB, INT) CASCADE;
 DROP FUNCTION IF EXISTS update_research_suggestion_status(UUID, TEXT, JSONB) CASCADE;
@@ -28,7 +28,7 @@ DROP FUNCTION IF EXISTS unlock_dependent_tasks(UUID) CASCADE;
 DROP FUNCTION IF EXISTS check_platform_availability(TEXT) CASCADE;
 DROP FUNCTION IF EXISTS get_model_performance() CASCADE;
 DROP FUNCTION IF EXISTS get_failure_patterns(INT) CASCADE;
-DROP FUNCTION IF EXISTS log_security_audit(TEXT, TEXT, BOOLEAN, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS log_security_audit(TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS create_planner_rule(TEXT, TEXT, TEXT, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS record_planner_revision(UUID, JSONB, JSONB) CASCADE;
 DROP FUNCTION IF EXISTS record_revision_feedback(UUID, TEXT, JSONB, JSONB) CASCADE;
@@ -579,13 +579,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION create_maintenance_command(
   p_command_type TEXT,
   p_payload JSONB DEFAULT '{}',
-  p_status TEXT DEFAULT 'pending'
+  p_source TEXT DEFAULT 'auto',
+  p_approved_by TEXT DEFAULT NULL
 ) RETURNS UUID AS $$
 DECLARE
   v_id UUID;
 BEGIN
-  INSERT INTO maintenance_commands (command_type, payload, status, created_at, updated_at)
-  VALUES (p_command_type, p_payload, p_status, NOW(), NOW())
+  INSERT INTO maintenance_commands (command_type, payload, source, approved_by, status, created_at, updated_at)
+  VALUES (p_command_type, p_payload, p_source, p_approved_by, 'pending', NOW(), NOW())
   RETURNING id INTO v_id;
 
   RETURN v_id;
@@ -616,13 +617,14 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- queue_maintenance_command: Alias used by db_tools.go
+-- Go params: p_command TEXT, p_params JSONB
 CREATE OR REPLACE FUNCTION queue_maintenance_command(
-  p_command_type TEXT,
-  p_payload JSONB DEFAULT '{}',
+  p_command TEXT,
+  p_params JSONB DEFAULT '{}',
   p_priority INT DEFAULT 5
 ) RETURNS UUID AS $$
 BEGIN
-  RETURN create_maintenance_command(p_command_type, p_payload);
+  RETURN create_maintenance_command(p_command, p_params);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -754,16 +756,21 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================================
 
 -- log_security_audit: Record a vault security event
--- Go params: p_operation TEXT, p_key_name TEXT, p_allowed BOOLEAN
+-- Go params: p_operation TEXT, p_key_name TEXT, p_allowed BOOLEAN, p_reason TEXT
 CREATE OR REPLACE FUNCTION log_security_audit(
   p_operation TEXT,
   p_key_name TEXT DEFAULT NULL,
   p_allowed BOOLEAN DEFAULT true,
-  p_metadata JSONB DEFAULT '{}'
-) RETURNS VOID AS $$
+  p_reason TEXT DEFAULT NULL
+) RETURNS UUID AS $$
+DECLARE
+  v_id UUID;
 BEGIN
   INSERT INTO security_audit_log (operation, key_name, allowed, metadata, created_at)
-  VALUES (p_operation, p_key_name, p_allowed, p_metadata, NOW());
+  VALUES (p_operation, p_key_name, p_allowed, 
+    jsonb_build_object('reason', p_reason), NOW())
+  RETURNING id INTO v_id;
+  RETURN v_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
