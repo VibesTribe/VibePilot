@@ -995,7 +995,212 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
--- 16. GRANTS
+-- 16. MODEL SCORING RPC (replaces migration 033 version)
+-- ============================================================================
+
+-- get_model_score_for_task: Compute a 0.0-1.0 score for how well a model
+-- handles a given task type and category.
+--
+-- Go params (router.go:431):
+--   p_model_id      TEXT   - model identifier (e.g. "claude-3.5-sonnet")
+--   p_task_type     TEXT   - task type (e.g. "code", "review", "test")
+--   p_task_category TEXT   - task category (e.g. "bugfix", "feature", "refactor")
+--
+-- Go expects JSONB with: { "score": 0.75 }
+-- Falls back to 0.5 (neutral) when no data exists.
+--
+-- Scoring formula (weighted blend):
+--   1. Success rate from task_runs (40%) - raw success/fail ratio
+--   2. Recency bonus (20%) - recent runs weighted more heavily
+--   3. Learned heuristic confidence (25%) - from learned_heuristics table
+--   4. Model strengths match (15%) - from models.strengths array
+--
+-- Migration 033 had only 2 params (p_model_id, p_task_type). The Go router
+-- sends 3 params including p_task_category, which caused a "function not
+-- found" error and every call fell back to 0.5. This replacement fixes that.
+DROP FUNCTION IF EXISTS get_model_score_for_task(TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS get_model_score_for_task(TEXT, TEXT, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION get_model_score_for_task(
+  p_model_id      TEXT,
+  p_task_type     TEXT DEFAULT NULL,
+  p_task_category TEXT DEFAULT NULL
+) RETURNS JSONB AS $$
+DECLARE
+  v_success_count   INT := 0;
+  v_failure_count   INT := 0;
+  v_total           INT := 0;
+  v_base_score      FLOAT := 0.5;
+
+  -- Recency-weighted success rate components
+  v_recent_success  INT := 0;
+  v_recent_failure  INT := 0;
+  v_recent_total    INT := 0;
+  v_recency_score   FLOAT := 0.5;
+
+  -- Heuristic confidence
+  v_heuristic_conf  FLOAT := NULL;
+  v_heuristic_score FLOAT := 0.5;
+
+  -- Strengths/weaknesses match
+  v_strengths       TEXT[] := '{}';
+  v_weaknesses      TEXT[] := '{}';
+  v_strength_score  FLOAT := 0.5;
+
+  -- Final blended score
+  v_final_score     FLOAT := 0.5;
+
+  -- Normalisation constants
+  v_weight_base     FLOAT := 0.40;
+  v_weight_recency  FLOAT := 0.20;
+  v_weight_heuristic FLOAT := 0.25;
+  v_weight_strength FLOAT := 0.15;
+BEGIN
+  -- ------------------------------------------------------------------
+  -- 1. BASE SCORE: overall success rate from task_runs
+  -- ------------------------------------------------------------------
+  SELECT
+    COUNT(*) FILTER (WHERE tr.status = 'success'),
+    COUNT(*) FILTER (WHERE tr.status IN ('failed', 'timeout'))
+  INTO v_success_count, v_failure_count
+  FROM task_runs tr
+  JOIN tasks t ON t.id = tr.task_id
+  WHERE tr.model_id = p_model_id
+    AND (p_task_type IS NULL OR t.type = p_task_type)
+    AND (p_task_category IS NULL OR t.category = p_task_category);
+
+  v_total := v_success_count + v_failure_count;
+
+  IF v_total > 0 THEN
+    v_base_score := v_success_count::FLOAT / v_total::FLOAT;
+  ELSE
+    v_base_score := 0.5;
+  END IF;
+
+  -- ------------------------------------------------------------------
+  -- 2. RECENCY SCORE: success rate from last 7 days only
+  -- ------------------------------------------------------------------
+  SELECT
+    COUNT(*) FILTER (WHERE tr.status = 'success'),
+    COUNT(*) FILTER (WHERE tr.status IN ('failed', 'timeout'))
+  INTO v_recent_success, v_recent_failure
+  FROM task_runs tr
+  JOIN tasks t ON t.id = tr.task_id
+  WHERE tr.model_id = p_model_id
+    AND (p_task_type IS NULL OR t.type = p_task_type)
+    AND (p_task_category IS NULL OR t.category = p_task_category)
+    AND tr.started_at > NOW() - INTERVAL '7 days';
+
+  v_recent_total := v_recent_success + v_recent_failure;
+
+  IF v_recent_total >= 3 THEN
+    -- Enough recent data to trust it
+    v_recency_score := v_recent_success::FLOAT / v_recent_total::FLOAT;
+  ELSIF v_recent_total > 0 THEN
+    -- Very few recent runs: blend with 0.5 to avoid overreaction
+    v_recency_score := (v_recent_success::FLOAT / v_recent_total::FLOAT) * 0.5 + 0.25;
+  ELSE
+    -- No recent data: fall back to base score (not neutral 0.5)
+    v_recency_score := v_base_score;
+  END IF;
+
+  -- ------------------------------------------------------------------
+  -- 3. HEURISTIC SCORE: confidence from learned_heuristics
+  -- ------------------------------------------------------------------
+  -- Look for a heuristic that prefers this model for this task type
+  SELECT lh.confidence INTO v_heuristic_conf
+  FROM learned_heuristics lh
+  WHERE lh.preferred_model = p_model_id
+    AND (lh.task_type IS NULL OR lh.task_type = p_task_type)
+    AND (lh.expires_at IS NULL OR lh.expires_at > NOW())
+  ORDER BY lh.confidence DESC, lh.last_applied_at DESC NULLS LAST
+  LIMIT 1;
+
+  IF v_heuristic_conf IS NOT NULL THEN
+    v_heuristic_score := v_heuristic_conf;
+  ELSE
+    v_heuristic_score := 0.5;
+  END IF;
+
+  -- ------------------------------------------------------------------
+  -- 4. STRENGTH/WEAKNESS MATCH: from models table
+  -- ------------------------------------------------------------------
+  SELECT m.strengths, m.weaknesses
+  INTO v_strengths, v_weaknesses
+  FROM models m
+  WHERE m.id = p_model_id
+    AND m.status = 'active';
+
+  IF v_strengths = '{}' AND v_weaknesses = '{}' THEN
+    -- No strength data available
+    v_strength_score := 0.5;
+  ELSE
+    DECLARE
+      v_match_count   INT := 0;
+      v_weak_match    INT := 0;
+      v_total_tags    INT := 0;
+    BEGIN
+      -- Check how many strength tags match the task type or category
+      SELECT
+        COUNT(*) FILTER (WHERE s = p_task_type OR s = p_task_category
+                         OR p_task_type ILIKE '%' || s || '%'
+                         OR p_task_category ILIKE '%' || s || '%'),
+        COUNT(*)
+      INTO v_match_count, v_total_tags
+      FROM unnest(v_strengths) AS s;
+
+      -- Check weakness overlap
+      SELECT COUNT(*)
+      INTO v_weak_match
+      FROM unnest(v_weaknesses) AS w
+      WHERE w = p_task_type OR w = p_task_category
+         OR p_task_type ILIKE '%' || w || '%'
+         OR p_task_category ILIKE '%' || w || '%';
+
+      IF v_total_tags + array_length(v_weaknesses, 1) > 0 THEN
+        v_strength_score := 0.5
+          + (v_match_count::FLOAT / GREATEST(v_total_tags, 1)) * 0.3
+          - (v_weak_match::FLOAT / GREATEST(array_length(v_weaknesses, 1), 1)) * 0.3;
+        v_strength_score := GREATEST(0.0, LEAST(1.0, v_strength_score));
+      ELSE
+        v_strength_score := 0.5;
+      END IF;
+    END;
+  END IF;
+
+  -- ------------------------------------------------------------------
+  -- 5. BLENDED FINAL SCORE
+  -- ------------------------------------------------------------------
+  IF v_total = 0 AND v_heuristic_conf IS NULL THEN
+    -- Absolutely no data for this model+task combo: return neutral
+    v_final_score := 0.5;
+  ELSE
+    v_final_score :=
+      v_base_score     * v_weight_base +
+      v_recency_score  * v_weight_recency +
+      v_heuristic_score * v_weight_heuristic +
+      v_strength_score * v_weight_strength;
+
+    -- Clamp to [0.0, 1.0]
+    v_final_score := GREATEST(0.0, LEAST(1.0, v_final_score));
+  END IF;
+
+  RETURN jsonb_build_object(
+    'score',          ROUND(v_final_score::numeric, 4),
+    'base_score',     ROUND(v_base_score::numeric, 4),
+    'recency_score',  ROUND(v_recency_score::numeric, 4),
+    'heuristic_score',ROUND(v_heuristic_score::numeric, 4),
+    'strength_score', ROUND(v_strength_score::numeric, 4),
+    'success_count',  v_success_count,
+    'failure_count',  v_failure_count,
+    'total_runs',     v_total,
+    'recent_runs',    v_recent_total
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 17. GRANTS
 -- ============================================================================
 
 -- All RPCs use SECURITY DEFINER so they run as table owner.
@@ -1004,4 +1209,4 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_
 
 COMMIT;
 
-SELECT 'Migration 111 complete: 42 missing RPCs created' AS status;
+SELECT 'Migration 111 complete: 42 missing RPCs + enhanced get_model_score_for_task' AS status;
