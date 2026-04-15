@@ -1,16 +1,18 @@
 # Hermes Agent Memories
 # Auto-backed up from Hermes memory store. Do not edit manually.
-# Last updated: 2026-04-15
+# Last updated: 2026-04-15 (evening)
 
 ## MEMORY
 
-VP: Gov v2.0.0, main branch only. TWO copies: ~/VibePilot/ (dev) + ~/vibepilot/ (running). x220=server (wifi dead, USB tethered). 15,000+ lines Go, 60 files, 16 pkgs. WYNTK updated Apr 15. MCP LIVE: jcodemunch(52 tools)+jdocmunch(15 tools)=67 tools in governor. jdatamunch failed(transport error), disabled. MCP Server Phase 2 DONE: governor_server.go exposes tools via stdio/SSE. 3-Layer Memory DONE: service.go + migration 110 applied. Context Compaction DONE: compactor.go auto-summarizes sessions. Git Worktrees DONE: worktree.go for parallel agent isolation. tier0 rules: rule4(explicit migration workflow+GitHub link), rule6(no shortcuts). tier0 rules now 10 items incl post-task discipline.
+VP: Gov v2.0.0, main branch only. TWO copies: ~/VibePilot/ (dev) + ~/vibepilot/ (running). x220=server (wifi dead, USB tethered). 15,000+ lines Go, 60 files, 16 pkgs. WYNTK updated Apr 15. MCP LIVE: jcodemunch(52 tools)+jdocmunch(15 tools)=67 tools in governor. jdatamunch failed(transport error), disabled. MCP Server Phase 2 DONE. 3-Layer Memory DONE + migration 110. Context Compaction DONE. Git Worktrees DONE. tier0 rules 10 items incl post-task discipline.
 
-Chrome CDP port 9222. BROWSER-FIRST for email/Docs/web AI. Google blocks fresh sign-in on CDP Chrome. Manual first-login needed in chrome-debug window, cookies persist after. Same pattern for courier agents -- manual first-login each platform, then Browser Use takes over.
+CHROME CDP: Port 9222. Wrapper /usr/bin/google-chrome-stable has --remote-debugging-port=9222 + --user-data-dir=$HOME/.config/chrome-debug. Bind mount active. User auto-logged into Gmail/Gemini/Sheets. browser_navigate=Playwright HEADLESS (not real Chrome). For logged-in sites use Python Playwright connect_over_cdp + browser.contexts[0]. No --disable-blink-features (causes warning). Hermes restart needed to pick up BROWSER_CDP_URL from .env.
+
+FREE API KEYS (all verified): Google AI Studio (primary) + Groq (fallback 1-2) + NVIDIA NIM 131 models (fallback 3-4, includes DeepSeek-v3.2/Llama-4/Qwen3-coder) + OpenRouter free-only (fallback 5-7). ZAI/GLM ends May 1. NOT FREE: SiliconFlow, SambaNova, Together AI. Governor config files (models.json/connectors.json/routing.json) still stale -- need updating with real free providers.
 
 TTS: edge-tts only (fast, free). Kokoro removed (too slow). Cache: ~/.hermes/audio_cache/
 
-OLLAMA v0.20.4, AVX-only(no AVX2). llama3.2:1b(1.3GB,no vision,no thinking) WORKS at ~6tok/s via /v1 endpoint. Enabled on boot. qwen3.5:0.8b FAILS via /v1 (thinking eats all tokens, only works with native API think:false). Hermes fallback updated to llama3.2:1b. No vision locally -- use cloud APIs for vision.
+OLLAMA: ABANDONED. x220 (AVX-only, no AVX2) max 6tok/s. Service disabled, no models. Cloud-only strategy.
 
 EMAIL: himalaya reads OK (app password "vibes"), use Python smtplib fallback for sending (himalaya raw send crashes on MIME parsing). Gmail browser needs manual login once, cookies to chrome-debug profile.
 
