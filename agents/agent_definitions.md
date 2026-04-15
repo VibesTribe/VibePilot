@@ -402,17 +402,22 @@ BLOCKERS
 │  └────────┬────────┘                                                        │
 │           │ PLAN (JSON with task packets)                                   │
 │           ▼                                                                  │
-│  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐        │
-│  │ COUNCIL MEMBER  │     │ COUNCIL MEMBER  │     │ COUNCIL MEMBER  │        │
-│  │ (User Lens)     │     │ (Arch Lens)     │     │ (Feasibility)   │        │
-│  └────────┬────────┘     └────────┬────────┘     └────────┬────────┘        │
-│           │                       │                       │                  │
-│           └───────────────────────┼───────────────────────┘                  │
+│                           ┌─────────────────┐                                │
+│                           │   SUPERVISOR    │  ← Reviews ALL plans first     │
+│                           │   (Plan Review) │    Simple: approve directly    │
+│                           └────────┬────────┘    Complex: → Council          │
+│                                    │                                          │
+│                    ┌───────────────┴───────────────┐                          │
+│                    │ (complex only)                 │ (simple)                 │
+│                    ▼                               ▼                          │
+│  ┌─────────────────┐     ┌─────────────────┐   Approved                      │
+│  │ COUNCIL MEMBER  │     │ COUNCIL MEMBER  │                                  │
+│  │ (User Lens)     │     │ (Arch Lens)     │                                  │
+│  └────────┬────────┘     └────────┬────────┘                                  │
+│           │                       │                                            │
+│           └───────────────────────┘ Council consensus                         │
 │                                   │ FEEDBACK (JSON)                          │
 │                                   ▼                                          │
-│                           ┌─────────────────┐                                │
-│                           │   SUPERVISOR    │  ← Autonomous (validates,     │
-│                           └────────┬────────┘    locks, merges)             │
 │                                    │                                          │
 │                                    ▼                                          │
 │                           ┌─────────────────┐                                │
@@ -437,18 +442,23 @@ BLOCKERS
 │                                    │                                          │
 │                    ┌───────────────┼───────────────┐                         │
 │                    ▼               ▼               ▼                         │
-│             ┌───────────┐   ┌───────────┐   ┌───────────┐                    │
-│             │   CODE    │   │  VISUAL   │   │  HUMAN    │                    │
-│             │  TESTER   │   │  TESTER   │   │  REVIEW   │                    │
-│             └─────┬─────┘   └─────┬─────┘   └─────┬─────┘                    │
-│                   │               │               │                          │
-│                   └───────────────┼───────────────┘                          │
-│                                   │ PASS/FAIL                                │
+│             ┌───────────┐   ┌───────────┐                                  │
+│             │   CODE    │   │  VISUAL   │  ← Visual Tester captures          │
+│             │  TESTER   │   │  TESTER   │    screenshots, detects changes     │
+│             └─────┬─────┘   └─────┬─────┘                                     │
+│                   │               │                                            │
+│                   │         ┌─────┴─────┐  (visual changes only)              │
+│                   │         │  HUMAN    │  ← Reviews visual UI/UX only        │
+│                   │         │  VISUAL   │    NOT code, NOT merge, NOT general  │
+│                   │         └─────┬─────┘                                      │
+│                   │               │                                            │
+│                   └───────────────┘                                            │
+│                                   │ PASS/FAIL (auto-merge on pass)            │
 │                                   ▼                                          │
 │                           ┌─────────────────┐                                │
-│                           │   SUPERVISOR    │  ← Final merge                 │
-│                           │   (Merge)       │                                │
-│                           └─────────────────┘                                │
+│                           │   AUTO-MERGE    │  ← Automated (zero human)       │
+│                           │  (Task→Module)  │    Supervisor approves, system   │
+│                           └─────────────────┘    merges on test pass           │
 │                                                                              │
 │  BACKGROUND (Always Running):                                                │
 │  ┌─────────────────┐   ┌─────────────────┐                                  │

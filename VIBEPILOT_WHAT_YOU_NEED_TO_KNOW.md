@@ -311,10 +311,12 @@ Fix the Go code that writes to Supabase.
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 8. SUPERVISOR REVIEWS OUTPUT                                │
-│    - Simple task → Quick review                             │
-│    - Complex task → Council review                          │
+│    - Supervisor reviews ALL outputs                         │
+│    - Check against task prompt + expected output            │
 │    - Approve → testing                                      │
 │    - Reject → back to task runner                           │
+│    (Council reviews PLANS, not outputs. Supervisor owns all │
+│     output review. Council is only for plan/architecture.)  │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -347,19 +349,23 @@ Fix the Go code that writes to Supabase.
 
 ## ⚠️ HUMAN ROLE (VERY LIMITED)
 
-**Human ONLY reviews these 3 things:**
+**Human ONLY does these 2 things:**
 
-1. **Visual UI/UX changes** - Need human eyes on design
-2. **Paid API credit exhaustion** - Need human wallet
-3. **Complex researcher suggestions** - After council review, if it changes how the system works
+1. **Visual UI/UX review** - Looks at visual tester output. Requests changes or approves.
+2. **Architecture decisions** - Receives Council-reviewed suggestions. Asks questions. Final yes/no.
 
 **Human NEVER:**
 - Reviews code
 - Merges code
 - Maintains the system
 - Writes code
+- Debugs code
+- Fixes merge conflicts
+- Does anything technical
 
-**The system is 100% self-learning, self-improving, self-maintaining.**
+**Merge system: fully automated, zero human involvement.**
+Supervisor approves output -> testing -> auto-merge if tests pass.
+Merge problems are solved by agents, not human.
 ```
 
 ### Architecture Components
@@ -466,7 +472,8 @@ Webhooks failed. We switched to Supabase Live.
 │                                                              │
 │  - READ-ONLY view of Supabase                               │
 │  - Displays task status, model assignment, ROI              │
-│  - Human reviews and approves here                          │
+│  - Human reviews visual UI/UX changes here ONLY             │
+│    (NOT code, NOT merge, NOT general approval)              │
 └─────────────────────────────────────────────────────────────┘
 ```
 

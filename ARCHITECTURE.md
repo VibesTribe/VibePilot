@@ -261,18 +261,23 @@ ConnectorRunner.Run(prompt)
 ├─────────────────────────────────────────────────────────────────────┤
 │ 24. EventTestResults → Test Runner                                  │
 │ 25. Tests run (if configured)                                       │
-│ 26. Pass → Merge to module branch → Merge to main                   │
+│ 26. Pass → Auto-merge to module branch (no human gate)              │
 │ 27. Fail → Back to revision                                         │
-│ 28. Cleanup: Delete task/module branches                            │
+│ 28. Cleanup: Delete task branches                                   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Task States
 
 ```
-pending → locked → available → in_progress → review → testing → approval → merged
-          (has deps) (unlocked)  (dispatched)  (done)   (tests)  (waiting)  (complete)
+pending → locked → available → in_progress → review → testing → merged
+          (has deps) (unlocked)  (dispatched)  (done)   (tests)  (auto-merge)
                                ↘ escalated (3 failures)
+```
+
+Note: No human approval gate between testing and merged. On test pass, system
+auto-merges task branch → module branch. Supervisor approves the OUTPUT before
+testing; merge is automated on test success.
 ```
 
 ### Plan States
