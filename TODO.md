@@ -29,13 +29,9 @@
     29|- Track which models succeed/fail in Supabase for learning
     30|- Rate limit tracking across all time windows (RPM, RPD, TPM, TPD)
     31|
-    32|### 4. Update WYNTK (VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md)
-    33|Still references old state in many sections:
-    34|- Architecture components list is outdated
-    35|- Config file paths may be stale
-    36|- Missing .context/ knowledge layer documentation
-    37|- Missing gitree / orphan branch documentation
-    38|- Missing pipeline YAML documentation
+### 4. Update WYNTK (VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md)
+Done April 14. Architecture tree, knowledge layer, governor structure, file paths all current.
+Still needs: clean stale `kimi_priority` reference from routing.json section.
     39|
     40|---
     41|
