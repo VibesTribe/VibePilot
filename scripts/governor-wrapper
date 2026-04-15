@@ -1,13 +1,15 @@
 #!/bin/bash
 # Governor wrapper - ensures only one instance runs
 # Usage: ./governor-wrapper [start|stop|status|restart]
+# Paths derived from script location -- works on any machine
 
-GOVERNOR_BIN="/home/mjlockboxsocial/vibepilot/governor/governor"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+GOVERNOR_BIN="$REPO_DIR/governor/governor"
 PID_FILE="/tmp/governor.pid"
-LOG_FILE="/home/mjlockboxsocial/vibepilot/governor/governor.log"
+LOG_FILE="/tmp/governor.out"
 
 get_pid() {
-    # First check PID file
     if [ -f "$PID_FILE" ]; then
         local pid=$(cat "$PID_FILE" 2>/dev/null)
         if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
@@ -15,7 +17,6 @@ get_pid() {
             return
         fi
     fi
-    # Fall back to checking running process
     pgrep -f "$GOVERNOR_BIN" 2>/dev/null
 }
 
@@ -24,20 +25,7 @@ is_running() {
     [ -n "$pid" ]
 }
 
-is_running() {
-    local pid=$(get_pid)
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-        return 0
-    fi
-    # Also check for any governor process
-    if pgrep -f "$GOVERNOR_BIN" >/dev/null 2>&1; then
-        return 0
-    fi
-    return 1
-}
-
 kill_all_governors() {
-    # Kill all governor processes (in case of orphans)
     pkill -9 -f "$GOVERNOR_BIN" 2>/dev/null
     rm -f "$PID_FILE"
 }
@@ -47,16 +35,15 @@ start() {
         echo "Governor already running (PID: $(get_pid))"
         return 1
     fi
-    
-    # Clean up any stale PID file or orphan processes
+
     kill_all_governors 2>/dev/null
-    
+
     echo "Starting governor..."
-    cd /home/mjlockboxsocial/vibepilot/governor
+    cd "$(dirname "$GOVERNOR_BIN")"
     nohup "$GOVERNOR_BIN" >> "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
     sleep 1
-    
+
     if is_running; then
         echo "Governor started (PID: $(get_pid))"
     else
@@ -72,13 +59,12 @@ stop() {
         kill "$pid" 2>/dev/null
         sleep 2
     fi
-    
-    # Force kill if still running
+
     if is_running; then
         echo "Force killing..."
         kill_all_governors
     fi
-    
+
     echo "Governor stopped"
 }
 
