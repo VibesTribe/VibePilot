@@ -3,9 +3,38 @@
 -- Purpose: Create ALL missing RPCs that the governor binary calls
 -- Date: 2026-04-15
 --
--- Pre-drop functions that changed return type (084 BOOLEAN → 111 JSONB)
+-- Pre-drop ALL functions we redefine (24 overlap with prior migrations).
+-- IF EXISTS makes this safe for fresh installs too.
 DROP FUNCTION IF EXISTS claim_task(UUID, TEXT, TEXT, TEXT, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS claim_for_review(UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS create_task_run(UUID, TEXT, TEXT, JSONB, JSONB, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INT, INT, FLOAT) CASCADE;
+DROP FUNCTION IF EXISTS create_plan(UUID, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS update_plan_status(UUID, TEXT, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS set_processing(TEXT, UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS clear_processing(TEXT, UUID) CASCADE;
+DROP FUNCTION IF EXISTS find_stale_processing(TEXT, INT) CASCADE;
+DROP FUNCTION IF EXISTS recover_stale_processing(TEXT, UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS record_model_success(TEXT, TEXT, FLOAT, INT) CASCADE;
+DROP FUNCTION IF EXISTS record_model_failure(TEXT, UUID, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS record_failure(UUID, TEXT, TEXT, JSONB, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS store_council_reviews(UUID, JSONB, TEXT, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS set_council_consensus(UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS create_maintenance_command(TEXT, JSONB, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS update_maintenance_command_status(UUID, TEXT, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS queue_maintenance_command(TEXT, JSONB, INT) CASCADE;
+DROP FUNCTION IF EXISTS update_research_suggestion_status(UUID, TEXT, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS unlock_dependent_tasks(UUID) CASCADE;
+DROP FUNCTION IF EXISTS check_platform_availability(TEXT) CASCADE;
+DROP FUNCTION IF EXISTS get_model_performance() CASCADE;
+DROP FUNCTION IF EXISTS get_failure_patterns(INT) CASCADE;
+DROP FUNCTION IF EXISTS log_security_audit(TEXT, TEXT, BOOLEAN, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS create_planner_rule(TEXT, TEXT, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS record_planner_revision(UUID, JSONB, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS record_revision_feedback(UUID, TEXT, JSONB, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS store_memory(TEXT, TEXT, TEXT, INT) CASCADE;
+DROP FUNCTION IF EXISTS recall_memories(TEXT, TEXT, INT) CASCADE;
+DROP FUNCTION IF EXISTS recover_orphaned_session(UUID, TEXT) CASCADE;
 --
 -- This migration closes the gap between Go code expectations and Supabase state.
 -- 42 RPCs were referenced in the Go codebase but never created in Supabase.
