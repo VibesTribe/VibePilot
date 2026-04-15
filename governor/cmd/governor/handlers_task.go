@@ -25,6 +25,7 @@ type TaskHandler struct {
 	leakDetector  *security.LeakDetector
 	cfg           *runtime.Config
 	usageTracker  *runtime.UsageTracker
+	worktreeMgr   *gitree.WorktreeManager
 }
 
 func NewTaskHandler(
@@ -37,6 +38,7 @@ func NewTaskHandler(
 	leakDetector *security.LeakDetector,
 	cfg *runtime.Config,
 	usageTracker *runtime.UsageTracker,
+	worktreeMgr *gitree.WorktreeManager,
 ) *TaskHandler {
 	return &TaskHandler{
 		database:      database,
@@ -48,6 +50,7 @@ func NewTaskHandler(
 		leakDetector:  leakDetector,
 		cfg:           cfg,
 		usageTracker:  usageTracker,
+		worktreeMgr:   worktreeMgr,
 	}
 }
 
@@ -654,7 +657,8 @@ func setupTaskHandlers(
 	checkpointMgr *core.CheckpointManager,
 	leakDetector *security.LeakDetector,
 	usageTracker *runtime.UsageTracker,
+	worktreeMgr *gitree.WorktreeManager,
 ) {
-	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg, usageTracker)
+	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg, usageTracker, worktreeMgr)
 	handler.Register(router)
 }

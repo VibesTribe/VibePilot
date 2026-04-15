@@ -3,9 +3,12 @@ package gitree
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 )
 
 // WorktreeManager manages git worktrees for parallel agent execution.
@@ -37,7 +40,8 @@ func NewWorktreeManager(g *Gitree, basePath string) *WorktreeManager {
 }
 
 // CreateWorktree creates a git worktree for a task.
-// The worktree is a full checkout at basePath/taskID on the given branch.
+// The worktree is a full checkout at basePath/taskID on a task/{id}-{slug} branch.
+// branchName should be generated via TaskBranchName(taskID, slug).
 func (wm *WorktreeManager) CreateWorktree(ctx context.Context, taskID, branchName string) (*WorktreeInfo, error) {
 	if taskID == "" {
 		return nil, fmt.Errorf("task ID required for worktree")
@@ -80,6 +84,11 @@ func (wm *WorktreeManager) CreateWorktree(ctx context.Context, taskID, branchNam
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("git worktree add %s %s: %w\n%s", worktreePath, branchName, err, string(output))
+	}
+
+	// Bootstrap: symlink shared resources (env, config, caches)
+	if err := wm.BootstrapWorktree(ctx, worktreePath); err != nil {
+		log.Printf("[Worktrees] Warning: bootstrap failed for %s: %v", taskID, err)
 	}
 
 	return &WorktreeInfo{
@@ -207,4 +216,154 @@ func (wm *WorktreeManager) parseWorktreeList(output string) []WorktreeInfo {
 	}
 
 	return worktrees
+}
+
+// TaskBranchName generates a standardized branch name for a task.
+// Convention: task/{id}-{slug} (e.g. task/abc123-fix-auth-bug)
+func TaskBranchName(taskID, slug string) string {
+	if slug == "" {
+		return "task/" + taskID
+	}
+	// Sanitize slug: lowercase, replace spaces/special with hyphens
+	slug = strings.ToLower(slug)
+	reg := regexp.MustCompile(`[^a-z0-9]+`)
+	slug = reg.ReplaceAllString(slug, "-")
+	slug = strings.Trim(slug, "-")
+	// Truncate to keep branch name reasonable
+	if len(slug) > 40 {
+		slug = slug[:40]
+	}
+	return "task/" + taskID + "-" + slug
+}
+
+// ShadowMergeResult holds the result of a test merge.
+type ShadowMergeResult struct {
+	HasConflicts bool     `json:"has_conflicts"`
+	ConflictFiles []string `json:"conflict_files,omitempty"`
+	CanAutoMerge  bool     `json:"can_auto_merge"`
+}
+
+// ShadowMerge performs a dry-run merge to detect conflicts before the real merge.
+// This implements the "Parallel Quality Gates" pattern from the Gemini strategy.
+func (wm *WorktreeManager) ShadowMerge(ctx context.Context, sourceBranch, targetBranch string) (*ShadowMergeResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// Fetch latest
+	if err := wm.gitree.gitCommand(ctx, "fetch", wm.gitree.remoteName).Run(); err != nil {
+		return nil, fmt.Errorf("fetch before shadow merge: %w", err)
+	}
+
+	// Use git merge-tree (or merge --no-commit --no-ff) to test
+	// First, check for conflicts using git merge-tree (available in git 2.38+)
+	cmd := wm.gitree.gitCommand(ctx, "merge-tree", wm.gitree.remoteName+"/"+targetBranch, wm.gitree.remoteName+"/"+sourceBranch)
+	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+
+	if err != nil {
+		// merge-tree might not exist in older git, fall back to diff check
+		return wm.shadowMergeFallback(ctx, sourceBranch, targetBranch)
+	}
+
+	// merge-tree output contains "changed in both" for conflicts
+	result := &ShadowMergeResult{
+		HasConflicts:  strings.Contains(outputStr, "changed in both") || strings.Contains(outputStr, "CONFLICT"),
+		CanAutoMerge:  true,
+	}
+
+	if result.HasConflicts {
+		result.CanAutoMerge = false
+		// Extract conflict file names
+		for _, line := range strings.Split(outputStr, "\n") {
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, "changed in both") || strings.Contains(line, "CONFLICT") {
+				// Try to extract filename from the line
+				parts := strings.Fields(line)
+				if len(parts) > 0 {
+					result.ConflictFiles = append(result.ConflictFiles, parts[len(parts)-1])
+				}
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// shadowMergeFallback uses git diff to check for potential conflicts
+// when merge-tree is not available.
+func (wm *WorktreeManager) shadowMergeFallback(ctx context.Context, sourceBranch, targetBranch string) (*ShadowMergeResult, error) {
+	// Get list of files changed in source vs target
+	cmd := wm.gitree.gitCommand(ctx, "diff", "--name-only", 
+		wm.gitree.remoteName+"/"+targetBranch+"..."+wm.gitree.remoteName+"/"+sourceBranch)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return &ShadowMergeResult{CanAutoMerge: true}, nil // Assume OK if we can't check
+	}
+
+	changedFiles := strings.Split(strings.TrimSpace(string(output)), "\n")
+	var conflicts []string
+
+	for _, file := range changedFiles {
+		if file == "" {
+			continue
+		}
+		// Check if file was also modified on target
+		diffCmd := wm.gitree.gitCommand(ctx, "log", "--oneline", "-1",
+			wm.gitree.remoteName+"/"+targetBranch, "--", file)
+		diffOut, _ := diffCmd.CombinedOutput()
+		if len(strings.TrimSpace(string(diffOut))) > 0 {
+			conflicts = append(conflicts, file)
+		}
+	}
+
+	result := &ShadowMergeResult{
+		HasConflicts:  len(conflicts) > 0,
+		ConflictFiles: conflicts,
+		CanAutoMerge:  len(conflicts) == 0,
+	}
+
+	return result, nil
+}
+
+// BootstrapWorktree symlinks shared resources into a new worktree.
+// This implements the "Strategic Context Injection" pattern from Gemini.
+// It ensures agents have API keys, caches, and config available immediately.
+func (wm *WorktreeManager) BootstrapWorktree(ctx context.Context, worktreePath string) error {
+	// Shared resources to symlink from main repo into worktree
+	sharedFiles := []string{
+		".governor_env",        // API keys
+		"config/models.json",   // Model definitions
+		"config/vibepilot.yaml", // Runtime config
+	}
+
+	// Find main repo path (parent of worktrees)
+	mainRepoPath := wm.gitree.repoPath
+
+	for _, shared := range sharedFiles {
+		source := filepath.Join(mainRepoPath, shared)
+		target := filepath.Join(worktreePath, shared)
+
+		// Skip if source doesn't exist
+		if _, err := os.Stat(source); os.IsNotExist(err) {
+			continue
+		}
+
+		// Skip if target already exists (don't overwrite)
+		if _, err := os.Stat(target); err == nil {
+			continue
+		}
+
+		// Ensure target directory exists
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			log.Printf("[Worktrees] Warning: mkdir for %s: %v", target, err)
+			continue
+		}
+
+		// Create symlink
+		if err := os.Symlink(source, target); err != nil {
+			log.Printf("[Worktrees] Warning: symlink %s -> %s: %v", source, target, err)
+		}
+	}
+
+	return nil
 }

@@ -71,11 +71,12 @@ func main() {
 	})
 
 	// Set up worktree manager for parallel agent execution
-	var _ *gitree.WorktreeManager // will be passed to handlers when parallel execution is wired
+	var worktreeMgr *gitree.WorktreeManager
 	if cfg.System.Worktrees != nil && cfg.System.Worktrees.Enabled {
-		wm := gitree.NewWorktreeManager(git, cfg.System.Worktrees.BasePath)
-		_ = wm
+		worktreeMgr = gitree.NewWorktreeManager(git, cfg.System.Worktrees.BasePath)
 		log.Printf("[Worktrees] Enabled, base path: %s", cfg.System.Worktrees.BasePath)
+	} else {
+		log.Printf("[Worktrees] Disabled (no worktrees config or enabled=false)")
 	}
 
 	v := vault.New(database)
@@ -203,7 +204,7 @@ func main() {
 
 	go runProcessingRecovery(ctx, database, cfg)
 
-	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker)
+	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr)
 
 	if err := webhookServer.Start(ctx); err != nil {
 		log.Fatalf("Failed to start webhook server: %v", err)
@@ -229,6 +230,10 @@ func main() {
 	}
 	if realtimeClient != nil {
 		realtimeClient.Close()
+	}
+	if worktreeMgr != nil {
+		log.Println("[Worktrees] Cleaning up worktrees...")
+		worktreeMgr.CleanAllWorktrees(context.Background())
 	}
 	pool.Wait()
 
@@ -293,8 +298,8 @@ func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v 
 	}
 }
 
-func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector, usageTracker *runtime.UsageTracker) {
-	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector, usageTracker)
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector, usageTracker *runtime.UsageTracker, worktreeMgr *gitree.WorktreeManager) {
+	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector, usageTracker, worktreeMgr)
 	setupPlanHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter, git)
