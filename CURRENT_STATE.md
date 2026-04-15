@@ -201,8 +201,8 @@ Source: `~/vibeflow/` (173MB, Vercel auto-deploy)
 | `~/browser-use-env/` | 429MB | Browser Use (Playwright + Chrome CDP) |
 
 **Stopped/disabled:**
-- Ollama daemon (stopped, disabled, ready if needed)
-- No local models pulled (x220 can't run useful inference)
+- Ollama daemon (stopped, disabled -- ABANDONED, x220 too weak for useful local inference)
+- No local models (even 1B models too slow/unreliable, cloud-only strategy)
 
 ---
 

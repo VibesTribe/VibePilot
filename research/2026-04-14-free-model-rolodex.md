@@ -149,10 +149,8 @@ TIER 3 - Alternates (different providers, avoid single-vendor dependency)
 ├── OpenRouter (glm-4.5-air:free)            -- Agent-centric GLM
 └── OpenRouter (minimax-m2.5:free)           -- Chinese frontier
 
-TIER 4 - Local Safety Net (offline, unlimited)
-├── Ollama (gemma-3n-e4b-it)                -- 8K ctx, fits in 10GB RAM
-├── Ollama (qwen2.5:0.5b)                   -- Already pulled
-└── Ollama (gemma-4-e4b when available)      -- Future, needs AVX2?
+TIER 4 - ABANDONED (local LLM not viable on x220)
+└── See below: x220 (i5-2520M, AVX-only) maxes at ~6 tok/s with 1B models. Dead end.
 
 TIER 5 - Last Resort
 ├── SiliconFlow (Qwen, GLM models)          -- Needs real-name verify
@@ -172,7 +170,7 @@ TIER 5 - Last Resort
 3. **SambaNova is safe at $0** - no payment method = free tier automatically
 4. **Google AI Studio is safe** - free tier, no card on file
 5. **Multi-provider is ESSENTIAL** - don't rely on any single one
-6. **Local Ollama is the ultimate safety net** - works offline, unlimited
+6. **Local Ollama ABANDONED** - x220 (AVX-only, no AVX2) too weak. Even 1B models unreliable. Cloud-only + GitHub/Supabase DR.
 
 ## Gemini "Hallucination" Assessment
 
@@ -192,4 +190,4 @@ The strategic recommendations (cascade, phase routing, multi-key vault) were sou
 3. **Implement cascade logic** in Go governor: try T1 -> T2 -> T3 -> T4
 4. **Store all keys in Supabase Vault** (already have infrastructure)
 5. **Implement rate limit tracking** - respect each provider's limits
-6. **Local Ollama setup** - pull gemma-3n-e4b for offline fallback
+6. ~~Local Ollama setup~~ ABANDONED - x220 too weak for local inference

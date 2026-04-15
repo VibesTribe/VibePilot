@@ -133,7 +133,7 @@ On x220 this causes command timeouts. Fix:
 
 ## Not Viable (abandoned)
 
-- [x] Ollama + local models -- tested qwen3:4b and qwen3-vl:4b, 2 tok/s on i5, unusable. Models deleted, daemon disabled. Cloud free tiers are the path.
+- [x] Ollama + local models -- ABANDONED. x220 (i5-2520M, AVX-only, no AVX2) maxes out at ~6 tok/s even with 1B models. No model small enough to be useful. Ollama stopped, disabled, no models. Cloud free tiers + GitHub+Supabase DR are the path.
 - [x] Kokoro TTS -- 9GB, too slow on x220. Edge-tts works fine.
 
 ---
