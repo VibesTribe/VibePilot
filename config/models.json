@@ -1,321 +1,782 @@
 {
-  "version": "3.0",
-  "description": "Free-tier LLM models with verified rate limits. All costs are $0. Adding a model = add a JSON object + add to connectors.json. No code changes needed.",
-  "last_updated": "2026-04-15",
-
+  "$schema": "./schemas/models.schema.json",
+  "version": "2.0",
+  "description": "Model profiles with rate limits, costs, and recovery config. Source of truth synced to Supabase.",
   "models": [
+    {
+      "id": "glm-5",
+      "name": "GLM-5",
+      "provider": "zhipu",
+      "access_type": "cli_subscription",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tools"
+      ],
+      "access_via": [
+        "claude-code"
+      ],
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null,
+        "requests_per_day": null,
+        "tokens_per_day": null
+      },
+      "throttle_behavior": "slow_down",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": null,
+        "output_per_1m_usd": null
+      },
+      "subscription": {
+        "cost_usd": null,
+        "period": "monthly"
+      },
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 600,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "code",
+        "reasoning",
+        "tools"
+      ],
+      "weaknesses": [],
+      "notes": "Subscription via OpenCode. Throttles by slowing down, not hard cutoff."
+    },
     {
       "id": "gemini-2.5-flash",
       "name": "Gemini 2.5 Flash",
       "provider": "google",
-      "access_type": "api_free",
+      "access_type": "api",
       "context_limit": 1000000,
-      "cost_input_per_1k_usd": 0,
-      "cost_output_per_1k_usd": 0,
-      "capabilities": ["text", "code", "vision", "browser_control"],
-      "access_via": ["gemini-api"],
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal"
+      ],
+      "access_via": [
+        "gemini-api"
+      ],
       "api_key_ref": "GEMINI_API_KEY",
       "status": "active",
-      "priority": 1,
       "rate_limits": {
         "requests_per_minute": 15,
-        "requests_per_day": 1500,
+        "requests_per_hour": 150,
+        "requests_per_day": 150,
+        "tokens_per_minute": 250000,
         "tokens_per_day": 1000000
       },
-      "throttle_behavior": "slow_down",
+      "throttle_behavior": "hard_cutoff",
       "buffer_pct": 80,
-      "spacing_min_seconds": 4,
+      "spacing_min_seconds": 6,
+      "api_pricing": {
+        "input_per_1m_usd": 0.3,
+        "output_per_1m_usd": 2.5
+      },
       "recovery": {
         "on_rate_limit": "cooldown",
         "cooldown_minutes": 60,
-        "max_task_attempts": 3
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
       },
-      "strengths": ["general", "code", "vision", "large_context"],
-      "notes": "Primary model. 1M context. Free tier. 15 RPM, 1500 RPD, 1M TPD."
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "long_context",
+        "multimodal",
+        "vision",
+        "fast"
+      ],
+      "weaknesses": [
+        "strict_rate_limits"
+      ],
+      "notes": "Best free tier but strict rate limits. Space requests 5s apart minimum."
     },
     {
-      "id": "gemini-2.0-flash",
-      "name": "Gemini 2.0 Flash",
-      "provider": "google",
-      "access_type": "api_free",
-      "context_limit": 1000000,
-      "cost_input_per_1k_usd": 0,
-      "cost_output_per_1k_usd": 0,
-      "capabilities": ["text", "code", "vision", "browser_control"],
-      "access_via": ["gemini-api"],
-      "api_key_ref": "GEMINI_API_KEY",
+      "id": "deepseek-chat",
+      "name": "DeepSeek Chat",
+      "provider": "deepseek",
+      "access_type": "api",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "deepseek-api"
+      ],
+      "api_key_ref": "DEEPSEEK_API_KEY",
       "status": "active",
-      "priority": 2,
       "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_day": 1000000
+        "requests_per_minute": 30,
+        "requests_per_hour": 3600,
+        "requests_per_day": null,
+        "tokens_per_day": null
       },
-      "throttle_behavior": "slow_down",
+      "throttle_behavior": "hard_cutoff",
       "buffer_pct": 80,
-      "spacing_min_seconds": 4,
+      "spacing_min_seconds": 1,
+      "api_pricing": {
+        "input_per_1m_usd": 0.28,
+        "output_per_1m_usd": 0.42,
+        "input_per_1m_cached_usd": 0.028
+      },
+      "cache_supported": true,
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 1,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "coding",
+        "reasoning",
+        "cheap"
+      ],
+      "weaknesses": [],
+      "notes": "Cheapest API. Cache hits 90% cheaper."
+    },
+    {
+      "id": "deepseek-reasoner",
+      "name": "DeepSeek Reasoner",
+      "provider": "deepseek",
+      "access_type": "api",
+      "context_limit": 128000,
+      "capabilities": [
+        "reasoning"
+      ],
+      "access_via": [
+        "deepseek-api"
+      ],
+      "api_key_ref": "DEEPSEEK_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_hour": 3600,
+        "requests_per_day": null,
+        "tokens_per_day": null
+      },
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 1,
+      "api_pricing": {
+        "input_per_1m_usd": 0.28,
+        "output_per_1m_usd": 0.42
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 1,
+        "timeout_seconds": 600,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "reasoning",
+        "planning"
+      ],
+      "weaknesses": [
+        "slower"
+      ],
+      "notes": "R1 model for complex reasoning tasks."
+    },
+    {
+      "id": "chatgpt-4o-mini",
+      "name": "ChatGPT 4o Mini",
+      "provider": "openai",
+      "access_type": "web",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision"
+      ],
+      "access_via": [
+        "chatgpt-web"
+      ],
+      "status": "benched",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null,
+        "requests_per_day": null,
+        "tokens_per_day": null,
+        "messages_per_3_hours": 10
+      },
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 0.15,
+        "output_per_1m_usd": 0.6
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 180,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "reasoning",
+        "coding",
+        "general"
+      ],
+      "weaknesses": [
+        "strict_free_tier_limits"
+      ],
+      "notes": "Free tier: 10 messages per 3 hours. Attachments may reduce limits."
+    },
+    {
+      "id": "claude-sonnet",
+      "name": "Claude Sonnet 4.5",
+      "provider": "anthropic",
+      "access_type": "web",
+      "context_limit": 200000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision"
+      ],
+      "access_via": [
+        "claude-web"
+      ],
+      "status": "benched",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null,
+        "requests_per_day": null,
+        "tokens_per_day": null,
+        "messages_per_hour": "varies"
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 3.0,
+        "output_per_1m_usd": 15.0
+      },
       "recovery": {
         "on_rate_limit": "cooldown",
         "cooldown_minutes": 60,
-        "max_task_attempts": 3
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
       },
-      "strengths": ["general", "code", "vision"],
-      "notes": "Fallback for 2.5. Same API key, same limits."
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "coding",
+        "reasoning",
+        "honesty",
+        "long_context"
+      ],
+      "weaknesses": [
+        "variable_rate_limits"
+      ],
+      "notes": "Rate limits vary by system demand. 5-8 hour reset period."
+    },
+    {
+      "id": "gemini-web",
+      "name": "Gemini Web",
+      "provider": "google",
+      "access_type": "web",
+      "context_limit": 1000000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal"
+      ],
+      "access_via": [
+        "gemini-web"
+      ],
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null,
+        "requests_per_day": null,
+        "tokens_per_day": 1000000
+      },
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 0.3,
+        "output_per_1m_usd": 2.5
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 1440,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "long_context",
+        "multimodal",
+        "vision"
+      ],
+      "weaknesses": [
+        "daily_token_limit"
+      ],
+      "notes": "1M tokens/day free tier. Dies fast if exceeded - use with caution."
+    },
+    {
+      "id": "copilot",
+      "name": "Microsoft Copilot",
+      "provider": "microsoft",
+      "access_type": "web",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "web_search",
+        "image_generation"
+      ],
+      "access_via": [
+        "copilot-web"
+      ],
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null,
+        "requests_per_day": null,
+        "tokens_per_day": null,
+        "messages_per_session": 30
+      },
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 2.5,
+        "output_per_1m_usd": 10.0
+      },
+      "recovery": {
+        "on_rate_limit": "new_session",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "free_gpt4",
+        "web_search",
+        "image_generation"
+      ],
+      "weaknesses": [
+        "session_limits"
+      ],
+      "notes": "Free GPT-4 access. 30 messages per session, unlimited sessions."
+    },
+    {
+      "id": "deepseek-web",
+      "name": "DeepSeek Web",
+      "provider": "deepseek",
+      "access_type": "web",
+      "context_limit": 64000,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "deepseek-web"
+      ],
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null,
+        "requests_per_day": null,
+        "tokens_per_day": null
+      },
+      "throttle_behavior": "slow_down",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 0.28,
+        "output_per_1m_usd": 0.42
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 30,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "coding",
+        "reasoning",
+        "generous_free_tier"
+      ],
+      "weaknesses": [],
+      "notes": "Generous free tier. Good for bulk courier tasks."
+    },
+    {
+      "id": "llama-3.3-70b-versatile",
+      "name": "Llama 3.3 70B (Groq)",
+      "provider": "meta",
+      "access_type": "api",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tools"
+      ],
+      "access_via": [
+        "groq-api"
+      ],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_hour": null,
+        "requests_per_day": 6000,
+        "tokens_per_minute": 12000,
+        "tokens_per_day": 100000
+      },
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 2,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 180
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "ultra_fast",
+        "code",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "lower_context_than_gemini"
+      ],
+      "notes": "Groq free tier. Ultra fast inference. Good for quick decisions."
     },
     {
       "id": "llama-3.1-8b-instant",
-      "name": "Llama 3.1 8B Instant",
-      "provider": "groq",
-      "access_type": "api_free",
+      "name": "Llama 3.1 8B Instant (Groq)",
+      "provider": "meta",
+      "access_type": "api",
       "context_limit": 128000,
-      "cost_input_per_1k_usd": 0,
-      "cost_output_per_1k_usd": 0,
-      "capabilities": ["text", "code"],
-      "access_via": ["groq-api"],
+      "capabilities": [
+        "code",
+        "chat"
+      ],
+      "access_via": [
+        "groq-api"
+      ],
       "api_key_ref": "GROQ_API_KEY",
       "status": "active",
-      "priority": 3,
       "rate_limits": {
         "requests_per_minute": 30,
+        "requests_per_hour": null,
         "requests_per_day": 14400,
+        "tokens_per_minute": 6000,
         "tokens_per_day": 500000
       },
       "throttle_behavior": "hard_cutoff",
       "buffer_pct": 80,
       "spacing_min_seconds": 2,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
       "recovery": {
         "on_rate_limit": "cooldown",
-        "cooldown_minutes": 60,
-        "max_task_attempts": 3
+        "cooldown_minutes": 2,
+        "timeout_seconds": 60,
+        "heartbeat_interval_seconds": 15,
+        "orphan_threshold_seconds": 120
       },
-      "strengths": ["speed", "code"],
-      "weaknesses": ["small_model", "no_vision"],
-      "notes": "Fastest model. 30 RPM, 14.4K RPD. Good for quick tasks."
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "ultra_fast",
+        "simple_tasks",
+        "chat"
+      ],
+      "weaknesses": [
+        "smaller_model"
+      ],
+      "notes": "Groq free tier. Fastest. Good for micro-decisions."
     },
     {
-      "id": "compound",
-      "name": "Groq Compound",
-      "provider": "groq",
-      "access_type": "api_free",
+      "id": "qwen3-32b",
+      "name": "Qwen 3 32B (Groq)",
+      "provider": "alibaba",
+      "access_type": "api",
       "context_limit": 128000,
-      "cost_input_per_1k_usd": 0,
-      "cost_output_per_1k_usd": 0,
-      "capabilities": ["text", "code", "tool_use"],
-      "access_via": ["groq-api"],
+      "capabilities": [
+        "code",
+        "reasoning",
+        "multilingual"
+      ],
+      "access_via": [
+        "groq-api"
+      ],
       "api_key_ref": "GROQ_API_KEY",
       "status": "active",
-      "priority": 4,
       "rate_limits": {
         "requests_per_minute": 30,
-        "requests_per_day": 250,
-        "tokens_per_day": 70000
+        "requests_per_hour": null,
+        "requests_per_day": 1000,
+        "tokens_per_minute": 6000,
+        "tokens_per_day": 500000
       },
       "throttle_behavior": "hard_cutoff",
       "buffer_pct": 80,
-      "spacing_min_seconds": 2,
+      "spacing_min_seconds": 1,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
       "recovery": {
         "on_rate_limit": "cooldown",
-        "cooldown_minutes": 60,
-        "max_task_attempts": 3
+        "cooldown_minutes": 2,
+        "timeout_seconds": 120,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 180
       },
-      "strengths": ["agentic", "tool_use", "reasoning"],
-      "weaknesses": ["no_vision"],
-      "notes": "Agentic model. Lower daily limits (250 RPD). Good for complex tasks."
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "multilingual",
+        "code",
+        "fast"
+      ],
+      "weaknesses": [],
+      "notes": "Groq free tier. Strong multilingual support."
     },
     {
-      "id": "google/gemma-3-4b-it",
-      "name": "Gemma 3 4B IT",
-      "provider": "nvidia",
-      "access_type": "api_free",
-      "context_limit": 128000,
-      "cost_input_per_1k_usd": 0,
-      "cost_output_per_1k_usd": 0,
-      "capabilities": ["text", "code"],
-      "access_via": ["nvidia-api"],
-      "api_key_ref": "NVIDIA_API_KEY",
+      "id": "kimi-k2-instruct",
+      "name": "Kimi K2 (OpenRouter/Groq)",
+      "provider": "moonshot",
+      "access_type": "api",
+      "context_limit": 500000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tools",
+        "long_horizon"
+      ],
+      "access_via": [
+        "groq-api",
+        "openrouter-api"
+      ],
+      "api_key_ref": "GROQ_API_KEY",
       "status": "active",
-      "priority": 5,
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_hour": null,
+        "requests_per_day": 1000,
+        "tokens_per_minute": 10000,
+        "tokens_per_day": 300000
+      },
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 1,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "long_horizon",
+        "tool_chaining",
+        "complex_reasoning",
+        "500k_context"
+      ],
+      "weaknesses": [],
+      "notes": "Available on Groq (free) and OpenRouter. 200+ tool call chains. Best for complex agentic tasks."
+    },
+    {
+      "id": "meta/llama-4-maverick-17b-128e-instruct",
+      "name": "Llama 4 Maverick 17B",
+      "provider": "nvidia",
+      "api_key_ref": "NVIDIA_API_KEY",
+      "tier": "free",
+      "status": "active",
+      "strengths": [
+        "coding",
+        "reasoning",
+        "multilingual"
+      ],
+      "weaknesses": [],
       "rate_limits": {
         "requests_per_minute": 10,
+        "requests_per_hour": null,
         "requests_per_day": 1000,
-        "tokens_per_day": 500000
-      },
-      "throttle_behavior": "slow_down",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 6,
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 60,
-        "max_task_attempts": 3
-      },
-      "strengths": ["code", "fast"],
-      "weaknesses": ["small_model"],
-      "notes": "NVIDIA NIM free tier. Verified working. 131 models available."
-    },
-    {
-      "id": "meta/llama-3.3-70b-instruct",
-      "name": "Llama 3.3 70B Instruct",
-      "provider": "nvidia",
-      "access_type": "api_free",
-      "context_limit": 128000,
-      "cost_input_per_1k_usd": 0,
-      "cost_output_per_1k_usd": 0,
-      "capabilities": ["text", "code", "reasoning"],
-      "access_via": ["nvidia-api"],
-      "api_key_ref": "NVIDIA_API_KEY",
-      "status": "active",
-      "priority": 6,
-      "rate_limits": {
-        "requests_per_minute": 10,
-        "requests_per_day": 1000,
-        "tokens_per_day": 500000
-      },
-      "throttle_behavior": "slow_down",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 6,
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 60,
-        "max_task_attempts": 3
-      },
-      "strengths": ["reasoning", "code", "large_model"],
-      "notes": "70B model on NVIDIA NIM. Good for complex reasoning tasks."
-    },
-    {
-      "id": "deepseek-ai/deepseek-v3.2",
-      "name": "DeepSeek V3.2",
-      "provider": "nvidia",
-      "access_type": "api_free",
-      "context_limit": 128000,
-      "cost_input_per_1k_usd": 0,
-      "cost_output_per_1k_usd": 0,
-      "capabilities": ["text", "code", "reasoning"],
-      "access_via": ["nvidia-api"],
-      "api_key_ref": "NVIDIA_API_KEY",
-      "status": "active",
-      "priority": 7,
-      "rate_limits": {
-        "requests_per_minute": 10,
-        "requests_per_day": 1000,
-        "tokens_per_day": 500000
-      },
-      "throttle_behavior": "slow_down",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 6,
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 60,
-        "max_task_attempts": 3
-      },
-      "strengths": ["reasoning", "code", "general"],
-      "notes": "Latest DeepSeek on NVIDIA NIM."
-    },
-    {
-      "id": "google/gemma-4-31b-it:free",
-      "name": "Gemma 4 31B (OpenRouter)",
-      "provider": "openrouter",
-      "access_type": "api_free",
-      "context_limit": 128000,
-      "cost_input_per_1k_usd": 0,
-      "cost_output_per_1k_usd": 0,
-      "capabilities": ["text", "code"],
-      "access_via": ["openrouter-api"],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "priority": 8,
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
+        "tokens_per_day": null
       },
       "throttle_behavior": "queue",
       "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "recovery": {
-        "on_rate_limit": "wait_and_retry",
-        "cooldown_minutes": 30,
-        "max_task_attempts": 3
-      },
-      "notes": "OpenRouter free tier. Balance is -17c but :free models work."
+      "cooldown_seconds": 5,
+      "max_concurrent": 1,
+      "notes": "NVIDIA NIM free tier. 1000 RPD cap."
     },
     {
-      "id": "nvidia/nemotron-3-super-120b-a12b:free",
-      "name": "Nemotron 3 Super 120B (OpenRouter)",
-      "provider": "openrouter",
-      "access_type": "api_free",
-      "context_limit": 128000,
-      "cost_input_per_1k_usd": 0,
-      "cost_output_per_1k_usd": 0,
-      "capabilities": ["text", "code"],
-      "access_via": ["openrouter-api"],
-      "api_key_ref": "OPENROUTER_API_KEY",
+      "id": "deepseek-ai/deepseek-r1",
+      "name": "DeepSeek R1 (NVIDIA NIM)",
+      "provider": "nvidia",
+      "api_key_ref": "NVIDIA_API_KEY",
+      "tier": "free",
       "status": "active",
-      "priority": 9,
+      "strengths": [
+        "reasoning",
+        "math",
+        "coding"
+      ],
+      "weaknesses": [
+        "slow"
+      ],
       "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
+        "requests_per_minute": 10,
+        "requests_per_hour": null,
+        "requests_per_day": 1000,
+        "tokens_per_day": null
       },
       "throttle_behavior": "queue",
       "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "recovery": {
-        "on_rate_limit": "wait_and_retry",
-        "cooldown_minutes": 30,
-        "max_task_attempts": 3
-      },
-      "notes": "OpenRouter free. 120B MoE model."
+      "cooldown_seconds": 5,
+      "max_concurrent": 1,
+      "notes": "NVIDIA NIM free tier. Reasoning powerhouse."
     },
     {
-      "id": "qwen/qwen3-coder-480b-a35b:free",
-      "name": "Qwen3 Coder 480B (OpenRouter)",
-      "provider": "openrouter",
-      "access_type": "api_free",
-      "context_limit": 128000,
-      "cost_input_per_1k_usd": 0,
-      "cost_output_per_1k_usd": 0,
-      "capabilities": ["text", "code"],
-      "access_via": ["openrouter-api"],
-      "api_key_ref": "OPENROUTER_API_KEY",
+      "id": "qwen/qwen3-235b-a22b",
+      "name": "Qwen3 235B (NVIDIA NIM)",
+      "provider": "nvidia",
+      "api_key_ref": "NVIDIA_API_KEY",
+      "tier": "free",
       "status": "active",
-      "priority": 10,
+      "strengths": [
+        "reasoning",
+        "coding",
+        "instruction_following"
+      ],
+      "weaknesses": [],
       "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
+        "requests_per_minute": 10,
+        "requests_per_hour": null,
+        "requests_per_day": 1000,
+        "tokens_per_day": null
       },
       "throttle_behavior": "queue",
       "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "recovery": {
-        "on_rate_limit": "wait_and_retry",
-        "cooldown_minutes": 30,
-        "max_task_attempts": 3
-      },
-      "strengths": ["code"],
-      "notes": "OpenRouter free. 480B code specialist. Last resort."
+      "cooldown_seconds": 5,
+      "max_concurrent": 1,
+      "notes": "NVIDIA NIM free tier. MoE 235B params."
     }
   ],
-
-  "capability_definitions": {
-    "text": "Can process and generate text",
-    "code": "Can write and understand code",
-    "vision": "Can process images/screenshots",
-    "reasoning": "Strong at complex logical reasoning",
-    "browser_control": "Can drive browser-use for web automation",
-    "tool_use": "Can call functions/tools"
-  },
-
-  "browser_control_capable": ["gemini-2.5-flash", "gemini-2.0-flash"],
-
-  "limit_policy": {
-    "pause_at_percent": 80,
-    "description": "Never exceed 80% of any rate limit. UsageTracker enforces this via buffer_pct per model."
-  },
-
-  "notes": [
-    "All models are FREE. Zero cost. No credit card.",
-    "To add a model: add JSON object here + add to connectors.json access_via. No code changes.",
-    "Rate limits from provider docs. buffer_pct=80 means governor stops at 80% of stated limit.",
-    "ZAI/GLM subscription ends May 1. After that, only these models remain.",
-    "Priority field determines cascade order (1=highest).",
-    "NVIDIA NIM has 131 models available -- these are the best picks for our use case."
-  ]
+  "defaults": {
+    "throttle_behavior": "slow_down",
+    "buffer_pct": 80,
+    "recovery": {
+      "on_rate_limit": "cooldown",
+      "cooldown_minutes": 30,
+      "timeout_seconds": 300,
+      "heartbeat_interval_seconds": 30,
+      "orphan_threshold_seconds": 300,
+      "max_task_attempts": 3,
+      "model_failure_threshold": 3
+    },
+    "spacing_min_seconds": 1
+  }
 }

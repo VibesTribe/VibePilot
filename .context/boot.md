@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-15T23:30:43Z | Commit: e44f29a0 | Branch: main
+# Generated: 2026-04-15T23:52:18Z | Commit: 7419cba1 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -181,7 +181,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
   config/destinations.json - WHERE tasks execute. CLI, Web platforms, API endpoints. All swappable.
   config/kilo-session.json - keys: max_sessions, max_concurrent_tasks_per_session, notes, memory_per_session_mb, reason
   config/maintenance_commands.json - Maintenance command configuration. Defines allowed git operations and validation rules.
-  config/models.json - Free-tier LLM models with verified rate limits. All costs are $0. Adding a model = add a JSON object + add to connectors.json. No code changes needed.
+  config/models.json - Model profiles with rate limits, costs, and recovery config. Source of truth synced to Supabase.
   config/plan_lifecycle.json - Plan lifecycle configuration - states, transitions, revision rules, complexity detection, consensus rules. All configurable.
   config/platforms.json - Web platforms and API models for VibePilot routing. Updated April 8, 2026 with verified OpenRouter data.
   config/roles.json - WHAT job is being done. Roles are job definitions. Model and destination assigned by orchestrator at runtime.
@@ -208,7 +208,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: e44f29a0
+- Commit: 7419cba1
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
