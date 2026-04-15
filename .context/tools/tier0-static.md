@@ -30,6 +30,18 @@ and cleanup work.
    Read the existing code, query knowledge.db, check what's there before inventing.
 
 4. **NEVER apply migrations directly.** Always go through GitHub first.
+   Supabase REST API cannot run DDL (CREATE TABLE, ALTER TABLE, etc).
+   There is no programmatic way to apply migrations from this machine.
+   The ONLY path: write the SQL file to docs/supabase-schema/NNN_name.sql,
+   push to GitHub, then the human applies it via Supabase Dashboard SQL Editor.
+   
+   When creating a schema migration:
+   - Check existing files: ls docs/supabase-schema/ to find the next number
+   - Write the file to docs/supabase-schema/ with correct numbering
+   - Push to GitHub main so the human can open it and copy-paste
+   - Tell the human explicitly: "Apply migration NNN via Supabase SQL Editor"
+   - Do NOT skip this. Do NOT apply via REST. Do NOT assume it's done.
+   - Every time an agent got this wrong, the human had to redo it manually.
 
 5. **ALWAYS push to GitHub.** Local-only work gets lost. Commit and push.
    This has caused more lost work than anything else.
