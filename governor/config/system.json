@@ -141,5 +141,10 @@
       "args": ["serve"],
       "enabled": true
     }
-  ]
+  ],
+  "governor_mcp": {
+    "enabled": false,
+    "transport": "sse",
+    "port": 8081
+  }
 }

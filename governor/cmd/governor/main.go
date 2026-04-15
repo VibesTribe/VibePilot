@@ -124,6 +124,15 @@ func main() {
 		log.Println("[MCP] No MCP servers configured")
 	}
 
+	// Start MCP server to expose governor tools to external agents
+	var govMCPServer *govmcp.GovernorServer
+	if cfg.System.GovernorMCP != nil && cfg.System.GovernorMCP.Enabled {
+		govMCPServer = govmcp.NewGovernorServer(toolRegistry, cfg, *cfg.System.GovernorMCP)
+		if err := govMCPServer.Start(ctx); err != nil {
+			log.Printf("Warning: Governor MCP server failed to start: %v", err)
+		}
+	}
+
 	// Load pipeline workflows from config/pipelines/
 	pipelinesDir := filepath.Join(configDir, "pipelines")
 	dagRegistry := dag.NewRegistry(pipelinesDir)
@@ -201,6 +210,9 @@ func main() {
 	webhookServer.Shutdown(ctx)
 	if mcpRegistry != nil {
 		mcpRegistry.Shutdown()
+	}
+	if govMCPServer != nil {
+		govMCPServer.Shutdown()
 	}
 	if realtimeClient != nil {
 		realtimeClient.Close()
