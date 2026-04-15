@@ -40,7 +40,8 @@ and cleanup work.
    - Commit and push to GitHub main (VibesTribe/VibePilot repo, main branch only)
    - Then pull into ~/vibepilot/ (running copy): cd ~/vibepilot && git pull
    - Tell the human explicitly: "Apply migration NNN via Supabase SQL Editor"
-   - Human opens the file on GitHub, copies SQL, pastes into Supabase Dashboard > SQL Editor
+   - Provide the direct GitHub link: https://github.com/VibesTribe/VibePilot/blob/main/docs/supabase-schema/NNN_name.sql
+   - Human clicks link, copies SQL, pastes into Supabase Dashboard > SQL Editor, runs it
    - Do NOT skip this. Do NOT apply via REST. Do NOT assume it's done.
    - Every time an agent got this wrong, the human had to redo it manually.
 
