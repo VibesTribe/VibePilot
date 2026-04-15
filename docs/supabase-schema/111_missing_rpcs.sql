@@ -783,7 +783,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION create_planner_rule(
   p_applies_to TEXT DEFAULT '*',
   p_rule_type TEXT DEFAULT 'general',
-  p_rule_text TEXT,
+  p_rule_text TEXT DEFAULT '',
   p_source TEXT DEFAULT 'auto'
 ) RETURNS UUID AS $$
 DECLARE
