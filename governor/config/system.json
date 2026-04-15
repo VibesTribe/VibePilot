@@ -118,5 +118,28 @@
     "checkpoint_interval_percent": 25,
     "state_sync_interval_seconds": 60,
     "recovery_enabled": true
-  }
+  },
+  "mcp_servers": [
+    {
+      "name": "jcodemunch",
+      "transport": "stdio",
+      "command": "/home/vibes/.local/bin/jcodemunch-mcp",
+      "args": ["serve"],
+      "enabled": true
+    },
+    {
+      "name": "jdocmunch",
+      "transport": "stdio",
+      "command": "/home/vibes/.local/bin/jdocmunch-mcp",
+      "args": ["serve"],
+      "enabled": true
+    },
+    {
+      "name": "jdatamunch",
+      "transport": "stdio",
+      "command": "/home/vibes/.local/bin/jdatamunch-mcp",
+      "args": ["serve"],
+      "enabled": true
+    }
+  ]
 }

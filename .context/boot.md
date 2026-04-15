@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-15T02:57:38Z | Commit: ebf15277 | Branch: main
+# Generated: 2026-04-15T04:16:35Z | Commit: e0e3c9c9 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -97,6 +97,37 @@ When you need more than these basics:
 - All prompts: sqlite3 .context/knowledge.db "SELECT name,role FROM prompts"
 - Search docs: sqlite3 .context/knowledge.db "SELECT title,file_path FROM docs WHERE title LIKE '%<topic>%'"
 - Full code map: cat .context/map.md
+- Context layer explained: docs/CONTEXT_KNOWLEDGE_LAYER.md
+
+## Post-Task Update Discipline (NON-OPTIONAL)
+
+After completing any significant task (new feature, bug fix, config change, research, doc update),
+you MUST update the relevant docs to prevent the next agent from flying blind:
+
+1. **CURRENT_STATE.md** -- Update the section(s) affected by your work.
+   If you changed anything real, the state doc must reflect it.
+
+2. **WYNTK (VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md)** -- If your change affects:
+   - Architecture (new packages, moved files, new config files)
+   - File paths (anything moved or renamed)
+   - How something works (new procedures, changed commands)
+   - Technical constraints (new hardware info, changed limits)
+   Then update the relevant section. Don't rewrite the whole file -- patch what changed.
+
+3. **tier0-static.md** -- If you discovered a new rule that agents keep violating,
+   add it here. This is the single source of truth for rules.
+
+4. **This TODO list** -- Mark items done, add new items discovered during work.
+
+5. **Commit and push** -- Local-only work gets lost. Always push.
+
+The .context/ layer (boot.md, knowledge.db, map.md) auto-rebuilds on commit.
+But the SOURCE docs it reads from (tier0-static.md, CURRENT_STATE.md, WYNTK, etc.)
+only get updated if you update them. The auto-build is useless if sources are stale.
+
+**Why this matters:** Agents swap frequently. Each new agent starts from these docs.
+A gap here means the next agent repeats mistakes, wastes time, or breaks things.
+The prevention system only works if we maintain the prevention system.
 
 ## What Is VibePilot
 Sovereign AI execution engine. Transforms PRDs -> production code via multi-agent orchestration.
@@ -154,7 +185,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: ebf15277
+- Commit: e0e3c9c9
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
