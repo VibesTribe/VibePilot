@@ -46,5 +46,13 @@
     "level": "info",
     "format": "json",
     "audit_table": "orchestrator_events"
+  },
+  
+  "worktrees": {
+    "enabled": true,
+    "base_path": "/home/vibes/VibePilot-work",
+    "max_active": 5,
+    "auto_cleanup": true,
+    "notes": "One worktree per parallel agent task. Auto-cleanup on shutdown. Shadow merge before real merge."
   }
 }
