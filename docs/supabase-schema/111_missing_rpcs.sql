@@ -76,11 +76,13 @@ CREATE POLICY "service_all_revision_feedback" ON revision_feedback FOR ALL USING
 -- ============================================================================
 
 -- claim_task: Atomically claim an available task for execution
--- Go params: p_task_id UUID, p_worker_id TEXT, p_model_id TEXT
+-- Go params: p_task_id UUID, p_worker_id TEXT, p_model_id TEXT, p_routing_flag TEXT, p_routing_reason TEXT
 CREATE OR REPLACE FUNCTION claim_task(
   p_task_id UUID,
   p_worker_id TEXT,
-  p_model_id TEXT
+  p_model_id TEXT,
+  p_routing_flag TEXT DEFAULT NULL,
+  p_routing_reason TEXT DEFAULT NULL
 ) RETURNS JSONB AS $$
 DECLARE
   v_result JSONB;
@@ -91,6 +93,8 @@ BEGIN
       processing_by = p_worker_id,
       processing_at = NOW(),
       started_at = COALESCE(started_at, NOW()),
+      routing_flag = COALESCE(p_routing_flag, routing_flag),
+      routing_flag_reason = COALESCE(p_routing_reason, routing_flag_reason),
       updated_at = NOW()
   WHERE id = p_task_id
     AND status IN ('available', 'pending_resources')
@@ -145,12 +149,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Go params: p_task_id, p_model_id, p_courier, p_platform, p_status,
 --            p_tokens_in, p_tokens_out, p_tokens_used, p_courier_model_id,
 --            p_courier_tokens, p_courier_cost_usd, p_platform_theoretical_cost_usd,
---            p_total_actual_cost_usd, p_total_savings_usd
+--            p_total_actual_cost_usd, p_total_savings_usd, p_started_at, p_completed_at,
+--            p_result
 CREATE OR REPLACE FUNCTION create_task_run(
   p_task_id UUID,
   p_model_id TEXT,
   p_courier TEXT,
-  p_platform TEXT,
+  p_platform TEXT DEFAULT 'internal',
   p_status TEXT DEFAULT 'success',
   p_tokens_in INT DEFAULT 0,
   p_tokens_out INT DEFAULT 0,
@@ -160,7 +165,10 @@ CREATE OR REPLACE FUNCTION create_task_run(
   p_courier_cost_usd FLOAT DEFAULT 0,
   p_platform_theoretical_cost_usd FLOAT DEFAULT 0,
   p_total_actual_cost_usd FLOAT DEFAULT 0,
-  p_total_savings_usd FLOAT DEFAULT 0
+  p_total_savings_usd FLOAT DEFAULT 0,
+  p_started_at TIMESTAMPTZ DEFAULT NOW(),
+  p_completed_at TIMESTAMPTZ DEFAULT NULL,
+  p_result JSONB DEFAULT NULL
 ) RETURNS UUID AS $$
 DECLARE
   v_run_id UUID;
@@ -170,12 +178,14 @@ BEGIN
     tokens_in, tokens_out, tokens_used,
     courier_model_id, courier_tokens, courier_cost_usd,
     platform_theoretical_cost_usd, total_actual_cost_usd, total_savings_usd,
+    started_at, completed_at, result,
     created_at
   ) VALUES (
     p_task_id, p_model_id, p_courier, p_platform, p_status,
     p_tokens_in, p_tokens_out, p_tokens_used,
     p_courier_model_id, p_courier_tokens, p_courier_cost_usd,
     p_platform_theoretical_cost_usd, p_total_actual_cost_usd, p_total_savings_usd,
+    p_started_at, p_completed_at, p_result,
     NOW()
   ) RETURNING id INTO v_run_id;
 
@@ -230,6 +240,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- update_plan_status: Transition plan to new status with optional notes
 -- Go params: p_plan_id, p_status, p_review_notes
+-- NOTE: uses review_notes NOT latest_feedback (verified column name)
 CREATE OR REPLACE FUNCTION update_plan_status(
   p_plan_id UUID,
   p_status TEXT,
@@ -242,7 +253,7 @@ BEGIN
   SET status = p_status,
       processing_by = NULL,
       processing_at = NULL,
-      latest_feedback = COALESCE(p_review_notes, latest_feedback),
+      review_notes = COALESCE(p_review_notes, review_notes),
       updated_at = NOW()
   WHERE id = p_plan_id;
 
@@ -385,29 +396,40 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- record_model_success: Track successful model execution for learning
 -- Go params: p_model_id, p_task_type, p_duration_seconds, p_tokens_used
+-- NOTE: learned_heuristics has NO unique constraint on (task_type, preferred_model).
+--       Using INSERT + separate UPDATE pattern instead of ON CONFLICT.
 CREATE OR REPLACE FUNCTION record_model_success(
   p_model_id TEXT,
   p_task_type TEXT,
   p_duration_seconds FLOAT DEFAULT NULL,
   p_tokens_used INT DEFAULT NULL
 ) RETURNS VOID AS $$
+DECLARE
+  v_existing INT;
 BEGIN
-  -- Upsert into learned_heuristics to track success
-  INSERT INTO learned_heuristics (task_type, preferred_model, source, confidence, success_count, created_at)
-  VALUES (p_task_type, p_model_id, 'statistical', 0.5, 1, NOW())
-  ON CONFLICT DO NOTHING;
-
-  -- Increment success count
-  UPDATE learned_heuristics
-  SET success_count = COALESCE(success_count, 0) + 1,
-      confidence = LEAST(1.0, COALESCE(success_count, 0)::FLOAT / NULLIF(COALESCE(success_count, 0) + COALESCE(failure_count, 0), 0)),
-      last_applied_at = NOW()
+  -- Check if a heuristic already exists for this task_type + model
+  SELECT COUNT(*) INTO v_existing
+  FROM learned_heuristics
   WHERE task_type = p_task_type AND preferred_model = p_model_id;
+
+  IF v_existing = 0 THEN
+    -- Insert new heuristic
+    INSERT INTO learned_heuristics (task_type, preferred_model, source, confidence, success_count, created_at)
+    VALUES (p_task_type, p_model_id, 'statistical', 0.5, 1, NOW());
+  ELSE
+    -- Increment success count and recalculate confidence
+    UPDATE learned_heuristics
+    SET success_count = COALESCE(success_count, 0) + 1,
+        confidence = LEAST(1.0, COALESCE(success_count, 0)::FLOAT / NULLIF(COALESCE(success_count, 0) + COALESCE(failure_count, 0), 0)),
+        last_applied_at = NOW()
+    WHERE task_type = p_task_type AND preferred_model = p_model_id;
+  END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- record_model_failure: Track failed model execution for learning
 -- Go params: p_model_id, p_task_id, p_failure_type, p_failure_category
+-- NOTE: failure_records has failure_category and failure_details columns (verified)
 CREATE OR REPLACE FUNCTION record_model_failure(
   p_model_id TEXT,
   p_task_id UUID DEFAULT NULL,
@@ -415,10 +437,9 @@ CREATE OR REPLACE FUNCTION record_model_failure(
   p_failure_category TEXT DEFAULT 'unknown'
 ) RETURNS VOID AS $$
 BEGIN
-  -- Record the failure
-  INSERT INTO failure_records (task_id, failure_type, model_id, created_at)
-  VALUES (p_task_id, p_failure_type, p_model_id, NOW())
-  ON CONFLICT DO NOTHING;
+  -- Record the failure with all available columns
+  INSERT INTO failure_records (task_id, failure_type, failure_category, model_id, created_at)
+  VALUES (p_task_id, p_failure_type, p_failure_category, p_model_id, NOW());
 
   -- Decrement confidence for this model
   UPDATE learned_heuristics
@@ -430,6 +451,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- record_failure: Detailed failure recording from task handler
 -- Go params: p_task_id, p_failure_type, p_failure_category, p_failure_details, p_model_id, p_task_type
+-- NOTE: column is failure_details (NOT details). tasks has failure_notes but NO last_error/last_error_at.
 CREATE OR REPLACE FUNCTION record_failure(
   p_task_id UUID,
   p_failure_type TEXT,
@@ -442,17 +464,15 @@ DECLARE
   v_id UUID;
 BEGIN
   INSERT INTO failure_records (
-    task_id, failure_type, model_id, details, created_at
+    task_id, failure_type, failure_category, failure_details, model_id, created_at
   ) VALUES (
-    p_task_id, p_failure_type, p_model_id, p_failure_details, NOW()
+    p_task_id, p_failure_type, p_failure_category, p_failure_details, p_model_id, NOW()
   ) RETURNING id INTO v_id;
 
-  -- Append to task failure notes
+  -- Append to task failure notes (NO last_error/last_error_at columns exist)
   UPDATE tasks
   SET failure_notes = COALESCE(failure_notes || E'\n', '') ||
-                      p_failure_type || ' (' || p_failure_category || ') at ' || NOW()::text,
-      last_error = p_failure_type || ': ' || COALESCE(p_failure_details->>'description', ''),
-      last_error_at = NOW(),
+                      p_failure_type || ' (' || COALESCE(p_failure_category, 'unknown') || ') at ' || NOW()::text,
       updated_at = NOW()
   WHERE id = p_task_id;
 
@@ -465,11 +485,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================================
 
 -- store_council_reviews: Store all council member reviews
--- Go params: p_plan_id, p_reviews (JSONB array), p_mode TEXT
+-- Go params: p_plan_id, p_reviews (JSONB array), p_mode TEXT, p_models JSONB
+-- NOTE: council_reviews has (plan_id, model_id, vote, concerns) - NO reviewer_model/reasoning/mode
 CREATE OR REPLACE FUNCTION store_council_reviews(
   p_plan_id UUID,
   p_reviews JSONB,
-  p_mode TEXT DEFAULT 'sequential_same_model'
+  p_mode TEXT DEFAULT 'sequential_same_model',
+  p_models JSONB DEFAULT NULL
 ) RETURNS VOID AS $$
 DECLARE
   review JSONB;
@@ -477,32 +499,35 @@ BEGIN
   FOR review IN SELECT * FROM jsonb_array_elements(p_reviews)
   LOOP
     INSERT INTO council_reviews (
-      plan_id, reviewer_model, vote, reasoning, concerns, mode, created_at
+      plan_id, model_id, vote, concerns, created_at
     ) VALUES (
       p_plan_id,
       COALESCE(review->>'reviewer', review->>'model_id', 'unknown'),
       COALESCE(review->>'vote', review->>'decision', 'unknown'),
-      COALESCE(review->>'reasoning', ''),
       COALESCE(review->'concerns', '[]'::jsonb),
-      p_mode,
       NOW()
     );
   END LOOP;
 
-  -- Update plan with council mode
-  UPDATE plans SET council_mode = p_mode, updated_at = NOW() WHERE id = p_plan_id;
+  -- Update plan with council mode and models used
+  UPDATE plans
+  SET council_mode = p_mode,
+      council_models = COALESCE(p_models, council_models),
+      updated_at = NOW()
+  WHERE id = p_plan_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- set_council_consensus: Record the consensus decision for a plan
 -- Go params: p_plan_id, p_consensus TEXT
+-- NOTE: uses review_notes NOT latest_feedback (verified)
 CREATE OR REPLACE FUNCTION set_council_consensus(
   p_plan_id UUID,
   p_consensus TEXT
 ) RETURNS VOID AS $$
 BEGIN
   UPDATE plans
-  SET latest_feedback = jsonb_build_object(
+  SET review_notes = jsonb_build_object(
         'consensus', p_consensus,
         'updated_at', NOW()::text
       ),
@@ -516,16 +541,18 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================================
 
 -- create_maintenance_command: Queue a maintenance action
--- Go params: p_command_type TEXT, p_payload JSONB
+-- Go params: p_command_type TEXT, p_payload JSONB, p_status TEXT
+-- NOTE: column is command_type (NOT type). Go passes p_status='pending'.
 CREATE OR REPLACE FUNCTION create_maintenance_command(
   p_command_type TEXT,
-  p_payload JSONB DEFAULT '{}'
+  p_payload JSONB DEFAULT '{}',
+  p_status TEXT DEFAULT 'pending'
 ) RETURNS UUID AS $$
 DECLARE
   v_id UUID;
 BEGIN
-  INSERT INTO maintenance_commands (type, payload, status, created_at)
-  VALUES (p_command_type, p_payload, 'pending', NOW())
+  INSERT INTO maintenance_commands (command_type, payload, status, created_at, updated_at)
+  VALUES (p_command_type, p_payload, p_status, NOW(), NOW())
   RETURNING id INTO v_id;
 
   RETURN v_id;
@@ -732,6 +759,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- record_planner_revision: Track plan revision for planner learning
 -- Go params: p_plan_id UUID, p_concerns JSONB, p_tasks_needing_revision JSONB
+-- NOTE: plans has NO tasks_needing_revision column. Uses review_notes NOT latest_feedback.
 CREATE OR REPLACE FUNCTION record_planner_revision(
   p_plan_id UUID,
   p_concerns JSONB DEFAULT '[]',
@@ -740,8 +768,7 @@ CREATE OR REPLACE FUNCTION record_planner_revision(
 BEGIN
   UPDATE plans
   SET revision_round = COALESCE(revision_round, 0) + 1,
-      tasks_needing_revision = p_tasks_needing_revision,
-      latest_feedback = jsonb_build_object(
+      review_notes = jsonb_build_object(
         'concerns', p_concerns,
         'tasks_needing_revision', p_tasks_needing_revision,
         'revised_at', NOW()::text
@@ -774,9 +801,9 @@ BEGIN
           NOW())
   RETURNING id INTO v_id;
 
-  -- Also update plan's latest feedback
+  -- Also update plan's review notes
   UPDATE plans
-  SET latest_feedback = p_feedback,
+  SET review_notes = p_feedback,
       updated_at = NOW()
   WHERE id = p_plan_id;
 
@@ -840,29 +867,38 @@ BEGIN
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object('key', session_id, 'value', context->>'value', 'created_at', created_at)
     ), '[]'::jsonb) INTO v_result
-    FROM memory_sessions
-    WHERE (p_query = '' OR session_id LIKE p_query || '%')
-      AND expires_at > NOW()
-    ORDER BY created_at DESC
-    LIMIT p_limit;
+    FROM (
+      SELECT session_id, context, created_at
+      FROM memory_sessions
+      WHERE (p_query = '' OR session_id LIKE p_query || '%')
+        AND expires_at > NOW()
+      ORDER BY created_at DESC
+      LIMIT p_limit
+    ) sub;
 
   ELSIF p_layer = 'mid_term' THEN
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object('key', key, 'value', value->>'value', 'updated_at', updated_at)
     ), '[]'::jsonb) INTO v_result
-    FROM memory_project
-    WHERE (p_query = '' OR key LIKE p_query || '%')
-    ORDER BY updated_at DESC
-    LIMIT p_limit;
+    FROM (
+      SELECT key, value, updated_at
+      FROM memory_project
+      WHERE (p_query = '' OR key LIKE p_query || '%')
+      ORDER BY updated_at DESC
+      LIMIT p_limit
+    ) sub;
 
   ELSIF p_layer = 'long_term' THEN
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object('key', category, 'value', rule_text, 'source', source, 'confidence', confidence)
     ), '[]'::jsonb) INTO v_result
-    FROM memory_rules
-    WHERE (p_query = '' OR category LIKE p_query || '%')
-    ORDER BY priority DESC, updated_at DESC
-    LIMIT p_limit;
+    FROM (
+      SELECT category, rule_text, source, confidence, priority, updated_at
+      FROM memory_rules
+      WHERE (p_query = '' OR category LIKE p_query || '%')
+      ORDER BY priority DESC, updated_at DESC
+      LIMIT p_limit
+    ) sub;
 
   ELSE
     v_result := '[]'::jsonb;
