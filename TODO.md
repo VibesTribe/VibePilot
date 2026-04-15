@@ -92,25 +92,7 @@ Need to go through them and decide which patterns to adopt for courier agents, p
 
 ## Lower Priority
 
-### 12. Cloudflared tunnel for governor webhook
-Currently the governor can't receive external webhooks (GCE webhook is dead).
-Options:
-- Cloudflared tunnel to governor's HTTP port (sacred tunnel, add route)
-- Or polling-based: governor checks Supabase realtime instead of webhooks
-
-### 13. Ollama for fallback / air-gap
-Installed but daemon disabled. When model landscape shifts:
-- Pull small models that work on i5 (no AVX2 constraint)
-- Use as last-resort fallback when all free tiers are rate-limited
-- Or for offline work when phone WiFi is down
-
-### 14. Kokoro TTS (or similar)
-Edge-tts works fine for now. If voice quality matters later:
-- Kokoro is MIT licensed, runs locally
-- But 9GB+ and slow on x220
-- Revisit when hardware changes or if cloud TTS options appear
-
-### 15. Make .context/ hooks async
+### 12. Make .context/ hooks async
 Post-checkout, post-merge, pre-commit hooks rebuild entire knowledge layer synchronously.
 On x220 this causes command timeouts. Fix:
 - Run rebuild in background (don't block git)
@@ -130,7 +112,6 @@ On x220 this causes command timeouts. Fix:
 - [x] Free model research (7 providers verified)
 - [x] JourneyKits landscape analysis (95 kits, 20 mapped)
 - [x] GitHub PAT rotated
-- [x] Ollama installed (daemon disabled, no models pulled)
 - [x] 25 stale files cleaned from repo root
 - [x] research-update-april2026 merged into main (fast-forward, 29 commits)
 - [x] research-considerations cherry-picked (rate limits, research reports, scripts) then deleted
@@ -138,8 +119,15 @@ On x220 this causes command timeouts. Fix:
 - [x] Scripts made portable (no hardcoded usernames)
 - [x] Dead branches deleted locally and remotely
 - [x] CURRENT_STATE.md rewritten with honest assessment
-- [x] TODO.md created
 - [x] Rate limit research preserved as templates (Gemini 4-tier, DeepSeek, Kimi 5-tier)
+- [x] LogAct + orchestration research analyzed and saved
+- [x] Cloudflared tunnel live (vibestribe.rocks, dashboard chat works, sacred)
+- [x] TTS working (edge-tts, fast, free, no API key needed)
+
+## Not Viable (abandoned)
+
+- [x] Ollama + local models -- tested qwen3:4b and qwen3-vl:4b, 2 tok/s on i5, unusable. Models deleted, daemon disabled. Cloud free tiers are the path.
+- [x] Kokoro TTS -- 9GB, too slow on x220. Edge-tts works fine.
 
 ---
 
