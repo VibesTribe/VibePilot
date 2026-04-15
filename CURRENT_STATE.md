@@ -1,21 +1,27 @@
 # VibePilot Current State - 2026-04-14
 
-## Status: Knowledge Layer Built, Needs Merge to Main
+## Status: Knowledge Layer Built, Binary Needs Rebuild
 
-### The Branch Situation (important)
+### The Repo Situation
 
-There are TWO repo copies on disk:
+Two copies on disk, both synced to main:
 
-| Location | Branch | Purpose | State |
-|---|---|---|---|
-| `~/vibepilot/` | `main` | RUNNING copy. Compiled binary lives here. | Stale (last commit Apr 7). Has OLD `.context/` (no knowledge.db). |
-| `~/VibePilot/` | `research-update-april2026` | DEVELOPMENT copy. All new work here. | 26 commits ahead of main. Has new `.context/`, tier0, aligned docs. |
+| Location | Purpose | State |
+|---|---|---|
+| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Scripts have local deploy tweaks. |
+| `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main). |
 
-**GitHub main is also stale** -- same as `~/vibepilot/`. All real work is on the `research-update-april2026` branch.
+**GitHub main is current** -- all work merged April 14.
 
-**Dead branch:** `research-considerations` -- 25 old research commits from February. 1286 commits behind main. Should be deleted or ignored.
+**Branches:** Only `main` exists locally. Remote has old `TEST_MODULES/general` (unused).
 
-**Action needed:** Merge `research-update-april2026` into `main` and sync both disk copies. The compiled binary was built Apr 11 from the `~/vibepilot/` main source (which is older than the VibePilot/ source).
+**Previous branches (deleted April 14):**
+- `research-update-april2026` -- merged into main (29 commits fast-forward), then deleted
+- `research-considerations` -- valuable research cherry-picked (rate limits, reports, scripts), then deleted
+
+**Scripts are portable** -- no hardcoded usernames, work on any machine via `$(dirname "$0")`.
+
+**Action needed:** Rebuild governor binary. Running binary was compiled Apr 11 from older source.
 
 ---
 
