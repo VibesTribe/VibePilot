@@ -1,50 +1,42 @@
-# VibePilot TODO - 2026-04-15
+# VibePilot TODO - 2026-04-15 (evening update)
 
 ## Critical (do first)
 
-### 1. Get free API keys (user action)
-Currently only Google AI Studio key exists. These are free, no card needed:
-- Groq (fast inference: qwen3-32b, llama-4-scout) -- https://console.groq.com
-- SambaNova (DeepSeek-V3.1, Llama-4-Maverick) -- https://cloud.sambanova.ai
-- SiliconFlow (Qwen, GLM, DeepSeek) -- https://cloud.siliconflow.cn
-- Sign up, get keys, add to Supabase vault
+### 1. Free API keys -- DONE
+Keys obtained, verified, and wired into Hermes fallback chain:
+- Google AI Studio (Gemini) -- WORKING, primary
+- Groq -- WORKING, fallback #1-2 (llama-3.1-8b-instant, compound)
+- NVIDIA NIM -- VERIFIED, wired as fallback #3-4 (gemma-3-4b-it, llama-3.3-70b). 131 models available.
+- OpenRouter -- WORKING, free-models-only (fallback #5-7)
 
----
+Not free (removed from consideration):
+- SiliconFlow: paid only, key needs credit deposit
+- SambaNova: all models paid
+- Together AI: credits only, then paid
 
-## High Priority
+**CRITICAL: ZAI/GLM subscription ends May 1.** The fallback chain above is the safety net. Do NOT let it lapse without testing every fallback.
 
-### 2. Build model cascade into config
-The free model rolodex is researched (`research/2026-04-14-free-model-rolodex.md`).
-Rate limit templates exist (`docs/rate_limits/` -- multi-tier RPM/TPM/RPD data).
-Need to wire it into the config layer:
-- Update `config/models.json` with verified free models + rate limits
-- Update `config/connectors.json` with new provider endpoints
-- Update `config/routing.json` -- replace stale `kimi_priority` with cascade strategy
-- Define fallback order: Groq -> Google AI Studio -> SambaNova -> OpenRouter free
+### 2. Update governor config files for real providers
+The governor reads models.json, connectors.json, routing.json but they're stale:
+- **models.json**: has 10 models including GPT-4o, Claude, Kimi, paid DeepSeek -- none free
+- **connectors.json**: has 15 connectors but no NVIDIA NIM, Groq has no base_url
+- **routing.json**: current_strategy is still `kimi_priority` -- stale
+- Need to: add NVIDIA NIM connector, add free models (Groq/NVIDIA/OpenRouter), replace kimi_priority with cascade strategy
 
 ### 3. Wire cascade into governor routing
-The Go router needs to actually use the cascade config:
+The Go router needs to actually use the updated cascade config:
 - Read routing strategy from `config/routing.json`
 - Try primary provider, fallback on rate limit/error
 - Track which models succeed/fail in Supabase for learning
 - Rate limit tracking across all time windows (RPM, RPD, TPM, TPD)
 
-### 4. Context Compaction -- DONE (April 15)
-Summary structs exist in decision.go but not automated.
-- Auto-generate session summaries after each agent run
-- Compress tool call history into key decisions/outcomes
-- Feed summary back into next agent's boot context
-- Reduces token consumption for follow-up sessions
-
-### 5. Git Worktrees -- DONE (April 15)
-Git only allows one branch active per directory -- parallel agents overwrite each other.
-- Each task gets its own folder: `git worktree add ~/VibePilot-work/task-42 task/42`
-- Essential once parallel agent execution is active
-- Wire into gitree branch management
-
 ---
 
-## Medium Priority
+## High Priority
+
+### 4. Context Compaction -- DONE (April 15)
+
+### 5. Git Worktrees -- DONE (April 15)
 
 ### 6. Test the pipeline end-to-end
 The YAML pipeline is written but never tested against real governor:
@@ -59,6 +51,10 @@ The YAML pipeline is written but never tested against real governor:
 - Present to human for UI/UX yes/no
 - This is the courier pattern applied to our own app
 
+---
+
+## Medium Priority
+
 ### 8. Daily landscape research cron
 The researcher prompt exists (`prompts/daily_landscape_researcher.md`).
 Need to wire it:
@@ -70,7 +66,7 @@ Need to wire it:
 ### 9. LogAct patterns (from Meta research)
 `research/2026-04-14-logact-agent-bus.md` -- maps directly to our architecture.
 Adopt after pipeline is working end-to-end:
-- Intent logging: record what agent PLANS to do before execution (not just state transitions)
+- Intent logging: record what agent PLANS to do before execution
 - Safety voter: use a different cheap model to cross-check intent before execution
 - Append-only task_events table in Supabase (currently we update rows in-place)
 - Stupidity diagnosis: agent reads own failed output from log, rewrites
@@ -81,11 +77,10 @@ For UI tasks, show human a design choice BEFORE writing code, not just after:
 - Courier generates mockup/plan, presents to human
 - Human picks direction, THEN agent writes code
 - Skip for non-UI tasks (conditional pipeline stage)
-- Superpowers was the only approach to one-shot tasks using this pattern
 
 ### 11. JourneyKits implementation
 95 kits scanned, 20 mapped to VibePilot gaps (`research/2026-04-08-journeykits-landscape-analysis.md`).
-Need to go through them and decide which patterns to adopt for courier agents, pipeline stages, etc.
+Need to go through them and decide which patterns to adopt.
 
 ---
 
@@ -98,6 +93,10 @@ On x220 this causes command timeouts. Fix:
 - Or skip if source files haven't changed since last build
 - Or both
 
+### 13. Add NVIDIA NIM to governor system.json
+The governor MCP server is disabled by default (ready to enable for SSE port 8081).
+NVIDIA NIM should also be added as a connector destination.
+
 ---
 
 ## Done (April 2026)
@@ -108,12 +107,14 @@ On x220 this causes command timeouts. Fix:
 - [x] YAML pipeline config (code-pipeline.yaml)
 - [x] Gitree branch management (parallel agent git isolation)
 - [x] Supabase schema (110 migrations, 4 version bumps)
-- [x] Free model research (7 providers verified)
+- [x] Free model research (4 providers verified and working)
+- [x] Free API keys obtained (Google, Groq, NVIDIA NIM, OpenRouter)
+- [x] NVIDIA NIM tested and wired into Hermes fallback chain
 - [x] JourneyKits landscape analysis (95 kits, 20 mapped)
 - [x] GitHub PAT rotated
 - [x] 25 stale files cleaned from repo root
 - [x] research-update-april2026 merged into main (fast-forward, 29 commits)
-- [x] research-considerations cherry-picked (rate limits, research reports, scripts) then deleted
+- [x] research-considerations cherry-picked then deleted
 - [x] Both disk copies synced on main
 - [x] Scripts made portable (no hardcoded usernames)
 - [x] Dead branches deleted locally and remotely
@@ -127,15 +128,20 @@ On x220 this causes command timeouts. Fix:
 - [x] MCP Server Phase 2 -- governor exposes tools as MCP server (stdio + SSE)
 - [x] 3-Layer Memory System -- short/mid/long-term tables in Supabase + Go service
 - [x] Migration 110 applied to Supabase (memory_sessions, memory_project, memory_rules)
+- [x] Context Compaction -- compactor.go auto-summarizes sessions
+- [x] Git Worktrees -- worktree.go for parallel agent isolation
 - [x] Tier0 rule 4 expanded -- explicit migration workflow with GitHub links
 - [x] Tier0 rule 6 added -- no shortcuts, full work only
 - [x] WYNTK updated (architecture tree, knowledge layer, governor structure, file paths)
+- [x] Chrome CDP working (port 9222, bind mount, auto-login to Gmail/Gemini/Sheets)
 
 ## Not Viable (abandoned)
 
-- [x] Ollama + local models -- ABANDONED. x220 (i5-2520M, AVX-only, no AVX2) maxes out at ~6 tok/s even with 1B models. No model small enough to be useful. Ollama stopped, disabled, no models. Cloud free tiers + GitHub+Supabase DR are the path.
+- [x] Ollama + local models -- ABANDONED. x220 (i5-2520M, AVX-only, no AVX2) maxes at ~6 tok/s. Cloud-only.
 - [x] Kokoro TTS -- 9GB, too slow on x220. Edge-tts works fine.
+- [x] SiliconFlow -- paid only, not free tier.
+- [x] SambaNova -- all models paid ($0.10-$7.00/M tokens).
 
 ---
 
-**Last Updated:** 2026-04-15
+**Last Updated:** 2026-04-15 (evening)
