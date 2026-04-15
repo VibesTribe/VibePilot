@@ -34,7 +34,15 @@ and cleanup work.
 5. **ALWAYS push to GitHub.** Local-only work gets lost. Commit and push.
    This has caused more lost work than anything else.
 
-6. **Go SERVES VibePilot's design. It does NOT invent new processes.**
+6. **NEVER take shortcuts or "do it later."** Every shortcut becomes a bigger problem later.
+   "I'll just hardcode this for now" = days of cleanup later.
+   "I'll skip the config and bake it in" = can't swap without rewrite.
+   "I'll just put this here temporarily" = permanent technical debt.
+   "I'll wire it later" = the wiring never happens and the next agent is blind.
+   If you can't do it properly right now, stop and say so. Don't half-do it.
+   The right amount of work is the full amount. Not a TODO comment that becomes someone else's crisis.
+
+7. **Go SERVES VibePilot's design. It does NOT invent new processes.**
    Go is the plumbing that makes VibePilot's actual processes run.
    It writes to Supabase in the format the dashboard expects.
    Do NOT rewrite Go with hallucinated processes that aren't in the spec.
@@ -44,12 +52,12 @@ and cleanup work.
 
 ## Operational Rules (the DO)
 
-7. **Governor is a systemd user service.**
+8. **Governor is a systemd user service.**
    Use: systemctl --user (not sudo systemctl)
    Logs: journalctl --user -u vibepilot-governor (not journalctl -u governor)
    Getting stuck on this wastes entire sessions.
 
-8. **Roles are defined in config, not guessed.** Look them up, don't invent.
+9. **Roles are defined in config, not guessed.** Look them up, don't invent.
 
    **Supervisor (3 responsibilities):**
    - Reviews task plans against PRD for alignment + plan quality. Calls Council for complex plans.
@@ -72,7 +80,7 @@ and cleanup work.
 
    **Maintenance -- ONLY agent with git write access. No approval = no change.**
 
-9. **Read before you code.**
+10. **Read before you code.**
    Query knowledge.db for existing rules and patterns before starting any task.
    sqlite3 .context/knowledge.db "SELECT title,content FROM rules WHERE priority='high'"
    5 minutes of reading saves hours of rewriting.
