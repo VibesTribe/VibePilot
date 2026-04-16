@@ -1,6 +1,6 @@
-# VibePilot Current State - 2026-04-15 (night)
+# VibePilot Current State - 2026-04-16
 
-## Status: Fully operational. Schema deployed, vault stocked, connectors wired, worktrees live.
+## Status: Fully operational. Schema deployed, vault stocked, worktrees WIRED AND LIVE.
 
 ### The Repo Situation
 
@@ -8,22 +8,22 @@ Two copies on disk, both synced to main:
 
 | Location | Purpose | State |
 |---|---|---|
-| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Binary rebuilt Apr 15 20:19. |
+| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Binary rebuilt Apr 16 00:05. |
 | `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main). |
 
-**GitHub main is current** -- 12 commits pushed April 15 evening session.
+**GitHub main is current** -- all changes pushed.
 
 ---
 
 ### What's Running
 
-- **Governor:** systemd user service, active (running since Apr 15 20:19)
-  - Binary: `~/vibepilot/governor/governor` (compiled Apr 15, includes worktree wiring + MCP + memory)
+- **Governor:** systemd user service, active (running since Apr 16 00:05)
+  - Binary: `~/vibepilot/governor/governor` (compiled Apr 16, includes worktree wiring)
   - Service: `systemctl --user status vibepilot-governor`
   - Logs: `journalctl --user -u vibepilot-governor -f`
-  - MCP servers: jcodemunch (52 tools) + jdocmunch (15 tools) = 67 tools connected
+  - MCP servers: jcodemunch only (51 tools). jDocMunch + jDataMunch REMOVED.
   - Governor MCP server: disabled in config (ready to enable for SSE port 8081)
-  - **Worktrees: ENABLED** -- base path `/home/vibes/VibePilot-work/`, auto-cleanup on shutdown
+  - **Worktrees: ENABLED AND WIRED** -- base path `/home/vibes/VibePilot-work/`
   - **Connectors registered:** claude-code (cli), gemini-api (api), groq-api (api), nvidia-api (api)
 - **Cloudflared tunnel:** live at vibestribe.rocks, sacred (don't touch)
 - **Hermes agent:** accessible via dashboard chat through tunnel
@@ -72,9 +72,9 @@ Two copies on disk, both synced to main:
 ### Supabase Schema (fully deployed)
 
 - **111 migrations applied**, all RPCs live and verified
-  - `get_model_performance()` -- returns heuristics by model (uses correct `preferred_model` column)
-  - `get_model_score_for_task(model, type, category)` -- weighted scoring (40% base + 20% recency + 25% heuristic + 15% strengths)
-  - `check_platform_availability()` -- verified returns `{"available": true}`
+  - `get_model_performance()` -- returns heuristics by model
+  - `get_model_score_for_task(model, type, category)` -- weighted scoring
+  - `check_platform_availability()` -- returns `{"available": true}`
   - All maintenance/planner/revision/security RPCs deployed with idempotent drops
 - **Secrets vault:** 10 keys stored (all encrypted AES-256-GCM)
   - GITHUB_TOKEN, GROQ_API_KEY, NVIDIA_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY
@@ -107,26 +107,35 @@ Primary:  Gemini 2.5 Flash (Google AI Studio)
 
 ## What Got Built (April 2026)
 
-### 1. .context/ Knowledge Layer
+### 1. .context/ Knowledge Layer (three systems, zero overlap)
 
-| File | Size | Purpose |
+| System | File | Size | Covers |
+|---|---|---|---|
+| lean-ctx | `.context/map.md` | 51KB | Go function signatures only (compressed) |
+| jCodeMunch | `.context/index.db` | 3.7MB | ALL code symbols: Go(811) + SQL(389) + YAML(334) + JSON(220) + Python(97) = 1974 |
+| knowledge.db | `.context/knowledge.db` | 2.8MB | Prose+structure: 30 rules, 30 prompts, 15 configs, 3337 docs, 364 SQL schema objects, 17 pipeline stages |
+
+| Other files | Size | Purpose |
 |---|---|---|
-| `.context/boot.md` | 14KB | Agent orientation. Tier 0 rules first, then codebase map. |
-| `.context/knowledge.db` | 2.5MB | SQLite: rules, prompts, configs, doc sections. |
-| `.context/map.md` | 51KB | Full code map (functions, types, files, packages). |
-| `.context/index.db` | 3.7MB | jCodeMunch index for MCP tool queries. |
+| `.context/boot.md` | 15KB | Agent orientation (~3800 tokens boot) |
 
 ### 2. Governor (Go, ~15k lines, 16 packages)
 
 - Event-driven runtime with session factory, agent pool, connection router
-- MCP client connects 67 tools from jcodemunch + jdocmunch
+- MCP client connects 51 tools from jcodemunch (jDocMunch/jDataMunch removed)
 - MCP server exposes governor tools via stdio/SSE
 - 3-layer memory (short/mid/long-term) in Supabase
 - Context compaction (auto-summarizes long sessions)
 - **Gitree** -- full git abstraction (branch, commit, merge, rebase, conflict detection, protected branches)
-- **Worktrees** -- parallel agent isolation (wired into handlers, shadow merge, bootstrap symlinks, auto-cleanup)
-- **Model router** -- UsageTracker with per-model cooldowns, rate limiting, cascade fallback, 80% buffer
-- **Connectors** -- 4 active API/CLI connectors + 7 web couriers, all configurable via connectors.json
+- **Worktrees WIRED INTO PIPELINE:**
+  - `handleTaskAvailable`: CreateWorktree + BootstrapWorktree on task claim
+  - `executeTask`: passes worktree_path + repo_path to agent session
+  - `handleTaskReview`: RemoveWorktree on fail/needs_revision/reroute
+  - `handleTaskTesting`: ShadowMerge before real merge (conflict detection), RemoveWorktree after merge
+  - `failTask`: RemoveWorktree cleanup on any failure
+  - BootstrapWorktree symlinks: governor/config/*.json, .hermes.md, .context/*, prompts/, pipelines/
+- **Model router** -- UsageTracker with per-model cooldowns, rate limiting, cascade fallback
+- **Connectors** -- 4 active API/CLI connectors + 7 web couriers
 
 ### 3. Supabase Schema (111 migrations)
 
@@ -136,15 +145,27 @@ Primary:  Gemini 2.5 Flash (Google AI Studio)
 - RPCs: check_platform_availability, get_model_performance, get_model_score_for_task, plus maintenance/planner/revision functions
 - All idempotent with inline per-function DROPs
 
-### 4. Worktree Architecture (Gemini Strategic Patterns)
+### 4. Worktree Architecture (LIVE)
 
 - **One Worktree Per Agent:** isolated directories under `~/VibePilot-work/`
-- **Shadow Merge:** dry-run conflict detection before real merge
-- **Bootstrap Symlinks:** auto-links `.governor_env`, `models.json`, `vibepilot.yaml` into new worktrees
-- **Standardized Branches:** `task/{id}-{slug}` naming convention
-- **Auto-cleanup:** `CleanAllWorktrees()` on governor shutdown
+- **Shadow Merge:** dry-run conflict detection before real merge (handlers_testing.go)
+- **Bootstrap Symlinks:** auto-links governor/config/, .hermes.md, .context/, prompts/, pipelines/ into worktrees
+- **Standardized Branches:** `task/{slice}/{number}` naming convention
+- **Auto-cleanup:** `CleanAllWorktrees()` on governor shutdown, `RemoveWorktree()` on task fail/merge
+- **Fallback:** if worktree creation fails, falls back to legacy single-dir branch mode
+
+### 5. Architecture Documentation
+
+- `docs/ARCHITECTURE_TASK_LIFECYCLE.md` -- full task flow (current vs target), worktree wiring map
+- `docs/STARTUP_GUIDE.md` -- setup, rebuild, restore instructions
+- `.hermes.md` -- enforcement rules + three-system knowledge map
+- `backup/` -- local config backups with templated secrets
 
 ---
+
+## Rate Limits to Watch
+
+- **GLM via Z.AI:** max 3 concurrent sessions or hit limits. Nemotron-3-free from OpenRouter as fallback.
 
 ## Known Issues
 
@@ -158,4 +179,4 @@ Primary:  Gemini 2.5 Flash (Google AI Studio)
 
 ---
 
-**Last Updated:** 2026-04-15 (night)
+**Last Updated:** 2026-04-16

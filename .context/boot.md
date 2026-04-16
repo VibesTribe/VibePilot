@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-16T04:06:25Z | Commit: 9c636c58 | Branch: main
+# Generated: 2026-04-16T04:13:41Z | Commit: d353e74d | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -221,7 +221,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 9c636c58
+- Commit: d353e74d
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -240,24 +240,24 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 5. Raw source = for implementation details only
 
 ## Current Status (from CURRENT_STATE.md)
-# VibePilot Current State - 2026-04-15 (night)
-## Status: Fully operational. Schema deployed, vault stocked, connectors wired, worktrees live.
+# VibePilot Current State - 2026-04-16
+## Status: Fully operational. Schema deployed, vault stocked, worktrees WIRED AND LIVE.
 ### The Repo Situation
 Two copies on disk, both synced to main:
 | Location | Purpose | State |
 |---|---|---|
-| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Binary rebuilt Apr 15 20:19. |
+| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Binary rebuilt Apr 16 00:05. |
 | `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main). |
-**GitHub main is current** -- 12 commits pushed April 15 evening session.
+**GitHub main is current** -- all changes pushed.
 ---
 ### What's Running
-- **Governor:** systemd user service, active (running since Apr 15 20:19)
-  - Binary: `~/vibepilot/governor/governor` (compiled Apr 15, includes worktree wiring + MCP + memory)
+- **Governor:** systemd user service, active (running since Apr 16 00:05)
+  - Binary: `~/vibepilot/governor/governor` (compiled Apr 16, includes worktree wiring)
   - Service: `systemctl --user status vibepilot-governor`
   - Logs: `journalctl --user -u vibepilot-governor -f`
-  - MCP servers: jcodemunch (52 tools) + jdocmunch (15 tools) = 67 tools connected
+  - MCP servers: jcodemunch only (51 tools). jDocMunch + jDataMunch REMOVED.
   - Governor MCP server: disabled in config (ready to enable for SSE port 8081)
-  - **Worktrees: ENABLED** -- base path `/home/vibes/VibePilot-work/`, auto-cleanup on shutdown
+  - **Worktrees: ENABLED AND WIRED** -- base path `/home/vibes/VibePilot-work/`
   - **Connectors registered:** claude-code (cli), gemini-api (api), groq-api (api), nvidia-api (api)
 - **Cloudflared tunnel:** live at vibestribe.rocks, sacred (don't touch)
 - **Hermes agent:** accessible via dashboard chat through tunnel
