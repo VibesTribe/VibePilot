@@ -176,6 +176,9 @@ Primary:  Gemini 2.5 Flash (Google AI Studio)
 - **No visual QA agent** -- courier pattern for dashboard screenshots not built yet
 - **GLM-5 has no api_key_ref** -- accessed via Z.AI browser, not direct API
 - **copilot-web marked unavailable** -- requires Microsoft account
+- **Dashboard failures/mergeCandidates always empty** -- not populated from Supabase
+- **Task status `failed`/`escalated` maps to `pending`** -- distinction invisible in dashboard
+- **Per-task costUsd hardcoded 0** -- ROI shows aggregate but not per-task
 
 ---
 
