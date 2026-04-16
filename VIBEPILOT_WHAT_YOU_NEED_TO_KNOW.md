@@ -716,6 +716,7 @@ governor/
 | Document | When to Read | What It Contains |
 |----------|--------------|------------------|
 | [docs/HOW_DASHBOARD_WORKS.md](docs/HOW_DASHBOARD_WORKS.md) | Fixing dashboard display issues | Full dashboard data flow, all sections, field mappings |
+| [docs/DASHBOARD_AUDIT.md](docs/DASHBOARD_AUDIT.md) | **CONTRACT: what dashboard needs from Supabase** | Exact columns, types, status maps, computed fields, mismatches, Go↔Dash contract |
 | [docs/DATA_FLOW_MAPPING.md](docs/DATA_FLOW_MAPPING.md) | Understanding what Go code writes where | Dashboard → Supabase → Go code mapping, current gaps |
 | [docs/supabase-schema/](docs/supabase-schema/) | Making schema changes | All database migrations, numbered SQL files |
 | [docs/core_philosophy.md](docs/core_philosophy.md) | Understanding the "why" | Strategic mindset, principles, decision framework |
