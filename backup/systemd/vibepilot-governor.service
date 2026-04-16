@@ -1,0 +1,20 @@
+[Unit]
+Description=VibePilot Go Governor Service
+Documentation=https://github.com/vibepilot/vibepilot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/vibes/vibepilot/governor
+ExecStart=/home/vibes/vibepilot/governor/governor
+ExecStartPre=-/bin/bash -c 'pkill -f "./governor" || true'
+PIDFile=/home/vibes/.config/vibepilot/governor.pid
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vibepilot-governor
+
+[Install]
+WantedBy=default.target

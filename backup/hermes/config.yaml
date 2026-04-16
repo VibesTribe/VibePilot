@@ -1,0 +1,55 @@
+model:
+  provider: zai
+  default: "glm-5.1"
+  auto_approve: true
+
+# Working directory for context file discovery (.hermes.md, AGENTS.md, etc.)
+cwd: "/home/vibes/VibePilot"
+
+# Fallback chain: tried in order when primary is rate-limited or fails
+# Only using genuinely FREE providers
+fallback_providers:
+  # Tier 2: Groq free (fastest, 30 RPM, 14.4K RPD)
+  - provider: groq
+    model: "llama-3.1-8b-instant"
+  # Tier 3: Groq compound (agentic)
+  - provider: groq
+    model: "compound"
+  # Tier 4: NVIDIA NIM (131 models, 12mo free)
+  - provider: nvidia
+    model: "google/gemma-3-4b-it"
+  - provider: nvidia
+    model: "meta/llama-3.3-70b-instruct"
+  # Tier 5: OpenRouter free models (balance at -17c, only $0 models work)
+  - provider: openrouter
+    model: "google/gemma-4-31b-it:free"
+  - provider: openrouter
+    model: "nvidia/nemotron-3-super-120b-a12b:free"
+  - provider: openrouter
+    model: "qwen/qwen3-coder-480b-a35b:free"
+
+
+display:
+  tool_progress: off
+
+providers:
+  zai:
+    base_url: "https://api.z.ai/api/coding/paas/v4"
+  groq:
+    base_url: "https://api.groq.com/openai/v1"
+  nvidia:
+    base_url: "https://integrate.api.nvidia.com/v1"
+
+platform_toolsets:
+  telegram:
+    - memory
+    - web
+    - terminal
+    - file
+    - browser
+    - delegation
+    - tts
+    - vision
+    - session_search
+    - todo
+    - skills
