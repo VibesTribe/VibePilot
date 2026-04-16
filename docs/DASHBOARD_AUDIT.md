@@ -339,20 +339,21 @@ previewUrl?, entry, task?, restore?
 **LIVE at:** https://vibeflow-dashboard.vercel.app/ (Vercel auto-deploy from vibeflow repo)
 **Source:** ~/vibeflow/ (separate repo from VibePilot)
 **Read-only on Supabase** -- all writes come from Go governor.
-
-The dashboard is deployed on Vercel. The `.env.local` with Supabase credentials lives in Vercel's environment config (not in the local repo -- only `.env.example` is committed). Vite bakes `VITE_*` env vars at build time, so Vercel injects them during build.
+**Realtime subscriptions** -- dashboard updates instantly on Supabase changes, no refresh needed.
+**Env vars** live in Vercel config (not in local repo -- only `.env.example` is committed). Vite bakes `VITE_*` env vars at build time.
 
 ---
 
-### What's LIVE from Supabase:
-| Component | Table | Status |
-|-----------|-------|--------|
-| Task cards | tasks | LIVE -- real tasks from governor |
-| Agent hangar | models + platforms | LIVE -- real agents, status, tiers, cooldowns |
-| Task runs / ROI | task_runs | LIVE -- token counts, costs, savings |
-| Timeline | orchestrator_events | LIVE -- state transitions |
-| Slice grouping | tasks.slice_id | LIVE -- tasks grouped by slice |
-| Currency conversion | exchange_rates | LIVE -- rates for ROI display |
+### What's LIVE from Supabase (all via realtime subscriptions):
+| Component | Table(s) | Status |
+|-----------|----------|--------|
+| Task cards (status, assignment, dependencies, prompt packet) | tasks | LIVE -- realtime updates |
+| Agent hangar (status, tier, cooldown, subscription) | models + platforms | LIVE -- realtime updates |
+| Task runs / ROI / cost tracking | task_runs | LIVE -- realtime updates |
+| Timeline / quality map | orchestrator_events | LIVE -- realtime updates |
+| Slice grouping and counts | tasks.slice_id | LIVE -- computed from task data |
+| Currency conversion (USD↔CAD) | exchange_rates | LIVE -- fetched from API, cached in Supabase |
+| Status summary (complete/active/pending/review) | tasks (aggregated) | LIVE -- realtime computed |
 
 ### What's NOT YET BUILT / NOT SHOWING:
 | Component | Status | Why |
