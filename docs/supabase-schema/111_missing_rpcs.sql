@@ -65,6 +65,8 @@ CREATE POLICY "service_all_revision_feedback" ON revision_feedback FOR ALL USING
 
 -- claim_task: Atomically claim an available task for execution
 -- Go params: p_task_id UUID, p_worker_id TEXT, p_model_id TEXT, p_routing_flag TEXT, p_routing_reason TEXT
+-- IMPORTANT: Must drop ALL old signatures before recreating with new return type (BOOLEAN -> JSONB)
+DROP FUNCTION IF EXISTS claim_task(UUID, TEXT, TEXT, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS claim_task(UUID, TEXT, TEXT, TEXT, TEXT) CASCADE;
 
 CREATE OR REPLACE FUNCTION claim_task(
