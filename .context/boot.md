@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-16T02:04:54Z | Commit: 0be84e81 | Branch: main
+# Generated: 2026-04-16T03:16:38Z | Commit: 1213c46e | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -61,8 +61,10 @@ and cleanup work.
    Do NOT attempt REST, curl, RPC, psql, or any other method for DDL. They waste time and tokens.
    Do NOT skip the GitHub link. If it's not on GitHub with the right number, it won't get applied.
 
-5. **ALWAYS push to GitHub.** Local-only work gets lost. Commit and push.
+5. **ALWAYS push to GitHub.** Local-only work gets lost.
    This has caused more lost work than anything else.
+   Local config files MUST be backed up to backup/ in the repo.
+   If it only exists on this machine, it doesn't exist.
 
 6. **NEVER take shortcuts or "do it later."** Every shortcut becomes a bigger problem later.
    "I'll just hardcode this for now" = days of cleanup later.
@@ -219,7 +221,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 0be84e81
+- Commit: 1213c46e
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)

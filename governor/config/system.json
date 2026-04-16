@@ -15,7 +15,11 @@
     "repo_env": "GITHUB_REPO",
     "repo_path": "/home/vibes/vibepilot",
     "token_env": "GITHUB_TOKEN",
-    "protected_branches": ["main", "master", "research-considerations"],
+    "protected_branches": [
+      "main",
+      "master",
+      "research-considerations"
+    ],
     "default_timeout_seconds": 60,
     "default_merge_target": "main",
     "branch_name_pattern": "^[a-zA-Z0-9_/.-]+$",
@@ -51,32 +55,55 @@
   "courier": {
     "timeout_seconds": 30
   },
-"runtime": {
-     "max_concurrent_per_module": 2,
-     "max_concurrent_total": 4,
-     "agent_timeout_seconds": 300,
-     "max_tool_turns": 10
-   },
-   "concurrency": {
-     "limits": {
-       "claude-code": 2,
-       "general": 2
-     },
-     "default_limit": 2
-   },
+  "runtime": {
+    "max_concurrent_per_module": 2,
+    "max_concurrent_total": 4,
+    "agent_timeout_seconds": 300,
+    "max_tool_turns": 10
+  },
+  "concurrency": {
+    "limits": {
+      "claude-code": 2,
+      "general": 2
+    },
+    "default_limit": 2
+  },
   "security": {
     "leak_detection_enabled": true,
-    "http_allowlist": ["api.supabase.co", "api.github.com", "github.com"]
+    "http_allowlist": [
+      "api.supabase.co",
+      "api.github.com",
+      "github.com"
+    ]
   },
   "events": {
-    "task_statuses_available": ["available"],
-    "task_statuses_review": ["review"],
-    "task_statuses_completed": ["testing", "approved", "merged", "merge_pending"],
-    "plan_statuses_draft": ["draft"],
-    "plan_statuses_review": ["review"],
-    "plan_statuses_council": ["council_review"],
-    "plan_statuses_pending_human": ["pending_human"],
-    "plan_statuses_approved": ["approved"],
+    "task_statuses_available": [
+      "available"
+    ],
+    "task_statuses_review": [
+      "review"
+    ],
+    "task_statuses_completed": [
+      "testing",
+      "approved",
+      "merged",
+      "merge_pending"
+    ],
+    "plan_statuses_draft": [
+      "draft"
+    ],
+    "plan_statuses_review": [
+      "review"
+    ],
+    "plan_statuses_council": [
+      "council_review"
+    ],
+    "plan_statuses_pending_human": [
+      "pending_human"
+    ],
+    "plan_statuses_approved": [
+      "approved"
+    ],
     "maintenance_status": "pending",
     "test_results_status": "pending_review"
   },
@@ -124,21 +151,9 @@
       "name": "jcodemunch",
       "transport": "stdio",
       "command": "/home/vibes/.local/bin/jcodemunch-mcp",
-      "args": ["serve"],
-      "enabled": true
-    },
-    {
-      "name": "jdocmunch",
-      "transport": "stdio",
-      "command": "/home/vibes/.local/bin/jdocmunch-mcp",
-      "args": ["serve"],
-      "enabled": true
-    },
-    {
-      "name": "jdatamunch",
-      "transport": "stdio",
-      "command": "/home/vibes/.local/bin/jdatamunch-mcp",
-      "args": ["serve"],
+      "args": [
+        "serve"
+      ],
       "enabled": true
     }
   ],
