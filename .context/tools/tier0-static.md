@@ -56,8 +56,10 @@ and cleanup work.
    Do NOT attempt REST, curl, RPC, psql, or any other method for DDL. They waste time and tokens.
    Do NOT skip the GitHub link. If it's not on GitHub with the right number, it won't get applied.
 
-5. **ALWAYS push to GitHub.** Local-only work gets lost. Commit and push.
+5. **ALWAYS push to GitHub.** Local-only work gets lost.
    This has caused more lost work than anything else.
+   Local config files MUST be backed up to backup/ in the repo.
+   If it only exists on this machine, it doesn't exist.
 
 6. **NEVER take shortcuts or "do it later."** Every shortcut becomes a bigger problem later.
    "I'll just hardcode this for now" = days of cleanup later.
