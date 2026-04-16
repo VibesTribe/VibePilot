@@ -330,5 +330,64 @@ previewUrl?, entry, task?, restore?
 
 ---
 
+---
+
+## 10. LIVE vs MOCK vs STUBBED vs BROKEN
+
+### Data Source Selection (useMissionData.ts lines 103-187)
+
+The dashboard has TWO modes:
+- **Supabase mode**: When `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` are set in `.env.local`
+- **Mock mode**: Falls back to `data/state/dashboard.mock.json` + `data/state/events.log.jsonl`
+
+**CURRENT STATE: NO `.env.local` EXISTS. Dashboard runs on MOCK DATA.**
+
+There is no `.env.local` file anywhere in ~/vibeflow/. Only `.env.example` with placeholder values.
+The dashboard has NEVER connected to live Supabase.
+
+---
+
+### What's LIVE from Supabase: NOTHING
+All 5 table queries (tasks, task_runs, models, platforms, orchestrator_events) are code-ready but never executed because env vars are missing.
+
+### What's MOCK DATA (hardcoded JSON from Nov 2025):
+| Component | Source | Status |
+|-----------|--------|--------|
+| Tasks (16 items) | dashboard.mock.json | Mock -- fake IDs (task-184, task-205...), fake titles ("Ship orchestrator auto-run flow"), fake statuses (supervisor_approval, ready_to_merge -- NOT real VibePilot statuses) |
+| Agents (9 items) | dashboard.mock.json | Mock -- fake agents (GPT-5 Turbo, Roo IDE, Cursor, Cline, Inductor), wrong tiers (DeepSeek marked Q instead of W), fake names |
+| Slices (6 items) | dashboard.mock.json | Mock -- fake names (Data Ingestion, Signal Analysis, Auth & RBAC...), fake counts |
+| Metrics | dashboard.mock.json | Mock -- hardcoded tokens_used: 274000 |
+| Events (9 lines) | events.log.jsonl | Mock -- scripted event sequence |
+
+### What's STUBBED (empty arrays, never populated):
+| Component | Source | Status |
+|-----------|--------|--------|
+| Failures panel | Hardcoded `[]` (line 130) | EMPTY -- no data source exists for failures |
+| Merge Candidates panel | Hardcoded `[]` (line 131) | EMPTY -- no data source exists for merge candidates |
+| Review Queue | useReviewData.ts reads from `data/state/reviews/*.json` files | EMPTY -- no review JSON files exist |
+| Restore records | useReviewData.ts reads from `data/state/restores/*.json` files | EMPTY -- no restore JSON files exist |
+
+### What's STRUCTURALLY BROKEN:
+| Issue | Details |
+|-------|---------|
+| **Mock uses wrong status values** | Mock has `supervisor_approval`, `ready_to_merge`, `supervisor_review`, `received`, `assigned`, `working` -- NONE of these match real VibePilot statuses. When Supabase goes live, the adapter would map them to pending/in_progress. |
+| **ROI calculation untested** | calculateROI, calculateSliceROI, calculateModelROI, calculateSubscriptionROI all run on mock task_runs data. Never tested with real Supabase data. |
+| **Review system file-based** | Reviews use static JSON files, not Supabase. ReviewQueue and ReviewPanel components will never show data from the live pipeline. |
+| **No failures data source** | FailureSnapshot type exists, Failures.tsx component exists, but nothing populates it. No Supabase query, no RPC, no mock data. |
+| **No merge candidates source** | MergeCandidate type exists, ReadyToMerge.tsx component exists, but nothing populates it. No Supabase query, no RPC. |
+| **Agent status mapping fragile** | Mock has `working`, `received` statuses that don't map to any real VibePilot status. Live adapter maps from models.status which is `active`/`paused` only. |
+
+### TO GO LIVE:
+1. Create `~/vibeflow/apps/dashboard/.env.local` with:
+   ```
+   VITE_SUPABASE_URL=https://qtpdzsinvifkgpxyxlaz.supabase.co
+   VITE_SUPABASE_ANON_KEY=<anon key from Supabase project settings>
+   ```
+2. Rebuild dashboard
+3. Verify data flows through vibepilotAdapter.ts correctly
+4. Fix any status mismatches between Go governor writes and adapter expectations
+
+---
+
 **This document is the CONTRACT between Go governor, Supabase schema, and Vibeflow dashboard.**
 **Any schema change, Go edit, or migration MUST be checked against this document.**
