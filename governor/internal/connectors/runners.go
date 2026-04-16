@@ -68,10 +68,23 @@ func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 		defer cancel()
 	}
 
-	// FIX: Pass prompt via STDIN, not as command-line argument
-	// This works for all CLI tools that use -p flag (claude, kilo, etc.)
-	cmd := exec.CommandContext(ctx, r.command, r.cliArgs...)
-	cmd.Stdin = strings.NewReader(prompt)
+	// If {PROMPT} placeholder exists in cliArgs, replace it with the prompt.
+	// Otherwise pass prompt via stdin (works for claude, kilo, opencode, etc.)
+	args := make([]string, len(r.cliArgs))
+	promptInArgs := false
+	for i, arg := range r.cliArgs {
+		if arg == "{PROMPT}" {
+			args[i] = prompt
+			promptInArgs = true
+		} else {
+			args[i] = arg
+		}
+	}
+
+	cmd := exec.CommandContext(ctx, r.command, args...)
+	if !promptInArgs {
+		cmd.Stdin = strings.NewReader(prompt)
+	}
 
 	if r.workDir != "" {
 		cmd.Dir = r.workDir
@@ -156,10 +169,49 @@ func (r *CLIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 
 	result := content.String()
 	if result == "" {
-		return output, len(prompt) / 4, len(output) / 4, nil
+		// For non-JSON-output CLIs (hermes, opencode, etc.), strip UI chrome
+		raw := stripUICrhome(output)
+		return raw, len(prompt) / 4, len(raw) / 4, nil
 	}
 
 	return result, tokensIn, tokensOut, nil
+}
+
+// stripUICrhome removes common CLI agent UI decorations (box borders, session IDs, etc.)
+func stripUICrhome(output string) string {
+	lines := strings.Split(output, "\n")
+	var clean []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Skip Hermes box borders (╭─, ╰─)
+		if strings.HasPrefix(trimmed, "╭") || strings.HasPrefix(trimmed, "╰") {
+			continue
+		}
+		// Skip box content lines (│ at start and end) -- extract inner content
+		if strings.HasPrefix(trimmed, "│") {
+			// Remove leading │ and trailing │ plus any border characters
+			inner := trimmed
+			inner = strings.TrimPrefix(inner, "│")
+			if idx := strings.LastIndex(inner, "│"); idx != -1 {
+				inner = inner[:idx]
+			}
+			inner = strings.TrimSpace(inner)
+			if inner != "" {
+				clean = append(clean, inner)
+			}
+			continue
+		}
+		// Skip session_id lines
+		if strings.HasPrefix(trimmed, "session_id:") || strings.HasPrefix(trimmed, "session:") {
+			continue
+		}
+		// Skip empty lines
+		if trimmed == "" {
+			continue
+		}
+		clean = append(clean, line)
+	}
+	return strings.Join(clean, "\n")
 }
 
 func (r *CLIRunner) RunWithSystemPrompt(ctx context.Context, systemPrompt, userPrompt string, timeout int) (string, int, int, error) {
