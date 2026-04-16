@@ -394,6 +394,234 @@ def extract_docs():
 
 
 # ============================================================
+# SCHEMA EXTRACTION (SQL migrations)
+# ============================================================
+
+def extract_schema():
+    """Extract all SQL schema objects from migration files.
+    
+    Parses CREATE TABLE, CREATE OR REPLACE FUNCTION, CREATE INDEX,
+    CREATE TYPE, CREATE TRIGGER, CREATE POLICY from numbered migration files.
+    """
+    objects = []
+    schema_dir = REPO_ROOT / "docs" / "supabase-schema"
+    if not schema_dir.exists():
+        return objects
+    
+    # Patterns for different SQL object types
+    patterns = [
+        # CREATE OR REPLACE FUNCTION name(args)
+        (re.compile(r"CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(\w+)\s*\(([^)]*)\)", re.I), "function"),
+        # CREATE TABLE name
+        (re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)", re.I), "table"),
+        # CREATE INDEX name
+        (re.compile(r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)", re.I), "index"),
+        # CREATE TYPE name
+        (re.compile(r"CREATE\s+TYPE\s+(\w+)", re.I), "type"),
+        # CREATE TRIGGER name
+        (re.compile(r"CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER\s+(\w+)", re.I), "trigger"),
+        # CREATE POLICY name
+        (re.compile(r"CREATE\s+POLICY\s+\"?(\w+)\"?", re.I), "policy"),
+        # ALTER TABLE ... ADD COLUMN (for tracking column additions)
+        (re.compile(r"ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)", re.I), "column_add"),
+    ]
+    
+    for sql_file in sorted(schema_dir.glob("*.sql")):
+        text = sql_file.read_text(errors="replace")
+        rel_path = str(sql_file.relative_to(REPO_ROOT))
+        migration_name = sql_file.stem  # e.g. 111_missing_rpcs
+        lines = text.split("\n")
+        
+        for pat, kind in patterns:
+            for match in pat.finditer(text):
+                name = match.group(1)
+                
+                # Find the start line
+                pos = match.start()
+                line_no = text[:pos].count("\n") + 1
+                
+                # Extract the definition (up to next ; or $$..$$ block)
+                start_pos = match.start()
+                # Look for $$ blocks (function bodies)
+                dollar_start = text.find("$$", start_pos)
+                if dollar_start != -1 and dollar_start < start_pos + 200:
+                    dollar_end = text.find("$$", dollar_start + 2)
+                    if dollar_end != -1:
+                        definition = text[start_pos:dollar_end + 2]
+                    else:
+                        definition = text[start_pos:start_pos + 500]
+                else:
+                    # Regular statement ending with ;
+                    semi = text.find(";", start_pos)
+                    if semi != -1:
+                        definition = text[start_pos:semi + 1]
+                    else:
+                        definition = text[start_pos:start_pos + 500]
+                
+                # Truncate long definitions
+                if len(definition) > 1000:
+                    definition = definition[:1000] + "\n-- ... truncated"
+                
+                # Extract dependencies from the definition
+                deps = set()
+                dep_patterns = [
+                    re.compile(r'\bFROM\s+(\w+)', re.I),
+                    re.compile(r'\bJOIN\s+(\w+)', re.I),
+                    re.compile(r'\bREFERENCES\s+(\w+)', re.I),
+                    re.compile(r'\bON\s+(\w+)', re.I),
+                ]
+                for dp in dep_patterns:
+                    for dm in dp.finditer(definition):
+                        dep_name = dm.group(1).lower()
+                        if dep_name not in ('select', 'insert', 'update', 'delete', 'create', 'set', 'null', 'true', 'false', 'now', 'coalesce'):
+                            deps.add(dep_name)
+                
+                # Build summary
+                if kind == "function":
+                    args = match.group(2) if match.lastindex >= 2 else ""
+                    summary = f"FUNCTION {name}({args[:80]})" if args else f"FUNCTION {name}()"
+                elif kind == "column_add":
+                    table = match.group(1)
+                    summary = f"COLUMN {table}.{name}"
+                    name = f"{table}.{name}"
+                else:
+                    summary = f"{kind.upper()} {name}"
+                
+                objects.append({
+                    "name": name,
+                    "kind": kind,
+                    "migration": migration_name,
+                    "file_path": rel_path,
+                    "definition": definition.strip(),
+                    "depends_on": ",".join(sorted(deps)) if deps else None,
+                    "line_start": line_no,
+                    "summary": summary,
+                })
+    
+    # Deduplicate by name (later migrations may override earlier ones)
+    latest = {}
+    for obj in objects:
+        key = f"{obj['kind']}:{obj['name']}"
+        # Keep the latest definition (higher migration number = newer)
+        if key not in latest or obj["migration"] > latest[key]["migration"]:
+            latest[key] = obj
+    
+    return list(latest.values())
+
+
+# ============================================================
+# PIPELINE EXTRACTION (YAML configs)
+# ============================================================
+
+def extract_pipelines():
+    """Extract pipeline stages from YAML config files."""
+    stages = []
+    pipeline_dir = REPO_ROOT / "governor" / "config" / "pipelines"
+    if not pipeline_dir.exists():
+        return stages
+    
+    for yaml_file in sorted(pipeline_dir.glob("*.yaml")):
+        text = yaml_file.read_text(errors="replace")
+        rel_path = str(yaml_file.relative_to(REPO_ROOT))
+        pipeline_name = yaml_file.stem
+        
+        try:
+            # Parse YAML manually to avoid pyyaml dependency
+            # Supports both "stages:" with "- name:" and "nodes:" with "- id:"
+            current_stage = {}
+            in_stages = False
+            stage_key = None  # "name" or "id"
+            
+            for line in text.split("\n"):
+                stripped = line.strip()
+                
+                # Detect stages or nodes section
+                if stripped.startswith("stages:") or stripped.startswith("nodes:"):
+                    in_stages = True
+                    stage_key = "name" if stripped.startswith("stages:") else "id"
+                    continue
+                
+                if not in_stages:
+                    continue
+                
+                # New stage/node entry (list item)
+                if stripped.startswith("- name:") or stripped.startswith("- id:"):
+                    # Save previous stage if any
+                    if current_stage.get("_key"):
+                        stages.append({
+                            "pipeline": pipeline_name,
+                            "stage": current_stage.get("name") or current_stage.get("id", ""),
+                            "agent": current_stage.get("agent") or current_stage.get("role"),
+                            "model": current_stage.get("model") or current_stage.get("model_family"),
+                            "prompt_file": current_stage.get("prompt_file") or current_stage.get("prompt"),
+                            "depends_on": current_stage.get("depends_on") or current_stage.get("after"),
+                            "file_path": rel_path,
+                            "summary": current_stage.get("description", f"{pipeline_name}: {current_stage.get('name') or current_stage.get('id', '')}"),
+                        })
+                    current_stage = {"_key": True}
+                    
+                    # Extract name/id from the list item line
+                    if ":" in stripped:
+                        _, _, val = stripped.partition(":")
+                        val = val.strip().strip("\"'")
+                        if val:
+                            current_stage[stage_key] = val
+                
+                # Nested agent: section: "role: planner" etc
+                elif stripped.startswith("agent:") or stripped.startswith("role:"):
+                    key, _, val = stripped.partition(":")
+                    val = val.strip().strip("\"'")
+                    if val:
+                        current_stage["agent"] = val
+                    else:
+                        # agent: with no value means next lines are nested
+                        current_stage["_in_agent"] = True
+                        continue
+                
+                elif current_stage.get("_in_agent") and stripped.startswith("role:"):
+                    _, _, val = stripped.partition(":")
+                    val = val.strip().strip("\"'")
+                    if val:
+                        current_stage["agent"] = val
+                    current_stage.pop("_in_agent", None)
+                
+                # Key-value pairs within a stage/node
+                elif ":" in stripped and not stripped.startswith("-"):
+                    key, _, val = stripped.partition(":")
+                    key = key.strip().lower().replace(" ", "_")
+                    val = val.strip().strip("\"'")
+                    if val:
+                        current_stage[key] = val
+            
+            # Save last stage
+            if current_stage.get("_key"):
+                stages.append({
+                    "pipeline": pipeline_name,
+                    "stage": current_stage.get("name") or current_stage.get("id", ""),
+                    "agent": current_stage.get("agent") or current_stage.get("role"),
+                    "model": current_stage.get("model") or current_stage.get("model_family"),
+                    "prompt_file": current_stage.get("prompt_file") or current_stage.get("prompt"),
+                    "depends_on": current_stage.get("depends_on") or current_stage.get("after"),
+                    "file_path": rel_path,
+                    "summary": current_stage.get("description", f"{pipeline_name}: {current_stage.get('name') or current_stage.get('id', '')}"),
+                })
+        except Exception:
+            # If YAML parsing fails, add a raw entry
+            stages.append({
+                "pipeline": pipeline_name,
+                "stage": "(parse failed)",
+                "agent": None,
+                "model": None,
+                "prompt_file": None,
+                "depends_on": None,
+                "file_path": rel_path,
+                "summary": text[:200].replace("\n", " "),
+            })
+    
+    return stages
+
+
+# ============================================================
 # BUILD THE DATABASE
 # ============================================================
 
@@ -448,6 +676,30 @@ def build_db():
         content TEXT
     )""")
     
+    c.execute("""CREATE TABLE schema_objects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL,        -- table, function, index, type, trigger, policy
+        migration TEXT NOT NULL,   -- e.g. 111_missing_rpcs.sql
+        file_path TEXT NOT NULL,
+        definition TEXT,           -- the SQL CREATE/FUNCTION body
+        depends_on TEXT,           -- comma-separated list of referenced objects
+        line_start INTEGER,
+        summary TEXT
+    )""")
+    
+    c.execute("""CREATE TABLE pipeline_stages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pipeline TEXT NOT NULL,    -- pipeline filename (stem)
+        stage TEXT NOT NULL,       -- stage name from YAML
+        agent TEXT,                -- agent role for this stage
+        model TEXT,                -- model or model_family
+        prompt_file TEXT,          -- prompt template path
+        depends_on TEXT,           -- comma-separated stage names
+        file_path TEXT NOT NULL,
+        summary TEXT
+    )""")
+    
     # Create indexes
     c.execute("CREATE INDEX idx_rules_priority ON rules(priority)")
     c.execute("CREATE INDEX idx_rules_category ON rules(category)")
@@ -455,6 +707,11 @@ def build_db():
     c.execute("CREATE INDEX idx_configs_name ON configs(name)")
     c.execute("CREATE INDEX idx_docs_file ON docs(file_path)")
     c.execute("CREATE INDEX idx_docs_title ON docs(title)")
+    c.execute("CREATE INDEX idx_schema_name ON schema_objects(name)")
+    c.execute("CREATE INDEX idx_schema_kind ON schema_objects(kind)")
+    c.execute("CREATE INDEX idx_schema_migration ON schema_objects(migration)")
+    c.execute("CREATE INDEX idx_pipeline_name ON pipeline_stages(pipeline)")
+    c.execute("CREATE INDEX idx_pipeline_stage ON pipeline_stages(stage)")
     
     # Insert rules
     print("[knowledge] Extracting rules...")
@@ -488,6 +745,22 @@ def build_db():
                   (d["title"], d["file_path"], d["level"], d["line_start"], d["line_end"], d["summary"], d["content"]))
     print(f"[knowledge] Docs: {len(docs)} sections")
     
+    # Insert schema objects
+    print("[knowledge] Extracting SQL schema...")
+    schema_objects = extract_schema()
+    for obj in schema_objects:
+        c.execute("INSERT INTO schema_objects (name, kind, migration, file_path, definition, depends_on, line_start, summary) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  (obj["name"], obj["kind"], obj["migration"], obj["file_path"], obj["definition"], obj["depends_on"], obj["line_start"], obj["summary"]))
+    print(f"[knowledge] Schema: {len(schema_objects)} objects")
+    
+    # Insert pipeline stages
+    print("[knowledge] Extracting pipelines...")
+    pipeline_stages = extract_pipelines()
+    for st in pipeline_stages:
+        c.execute("INSERT INTO pipeline_stages (pipeline, stage, agent, model, prompt_file, depends_on, file_path, summary) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  (st["pipeline"], st["stage"], st["agent"], st["model"], st["prompt_file"], st["depends_on"], st["file_path"], st["summary"]))
+    print(f"[knowledge] Pipelines: {len(pipeline_stages)} stages")
+    
     # Metadata
     c.execute("""CREATE TABLE meta (
         key TEXT PRIMARY KEY,
@@ -505,13 +778,15 @@ def build_db():
     c.execute("INSERT INTO meta VALUES ('prompts_count', ?)", (str(len(prompts)),))
     c.execute("INSERT INTO meta VALUES ('configs_count', ?)", (str(len(configs)),))
     c.execute("INSERT INTO meta VALUES ('docs_count', ?)", (str(len(docs)),))
+    c.execute("INSERT INTO meta VALUES ('schema_count', ?)", (str(len(schema_objects)),))
+    c.execute("INSERT INTO meta VALUES ('pipeline_count', ?)", (str(len(pipeline_stages)),))
     
     conn.commit()
     
     db_size = DB_PATH.stat().st_size
     print(f"\n[knowledge] Built {DB_PATH}")
     print(f"[knowledge] Size: {db_size / 1024:.0f} KB")
-    print(f"[knowledge] Total: {len(rules)} rules, {len(prompts)} prompts, {len(configs)} configs, {len(docs)} doc sections")
+    print(f"[knowledge] Total: {len(rules)} rules, {len(prompts)} prompts, {len(configs)} configs, {len(docs)} docs, {len(schema_objects)} schema, {len(pipeline_stages)} pipeline stages")
     
     conn.close()
 
