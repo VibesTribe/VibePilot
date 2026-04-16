@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-16T04:13:41Z | Commit: d353e74d | Branch: main
+# Generated: 2026-04-16T04:24:01Z | Commit: 61c21d2f | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -221,7 +221,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: d353e74d
+- Commit: 61c21d2f
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
