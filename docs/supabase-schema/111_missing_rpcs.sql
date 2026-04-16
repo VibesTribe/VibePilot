@@ -49,6 +49,11 @@ ALTER TABLE security_audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE planner_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE revision_feedback ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "service_all_security_audit" ON security_audit_log;
+DROP POLICY IF EXISTS "service_all_planner_rules" ON planner_rules;
+DROP POLICY IF EXISTS "anon_read_planner_rules" ON planner_rules;
+DROP POLICY IF EXISTS "service_all_revision_feedback" ON revision_feedback;
+
 CREATE POLICY "service_all_security_audit" ON security_audit_log FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "service_all_planner_rules" ON planner_rules FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "anon_read_planner_rules" ON planner_rules FOR SELECT USING (true);
