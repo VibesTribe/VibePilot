@@ -15,7 +15,12 @@ It contains:
 3. Query `.context/index.db` for code lookups
 4. `CURRENT_STATE.md` and `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` for current state
 
+**For humans:**
+- Setup, startup, and rebuild instructions: `docs/STARTUP_GUIDE.md`
+- All commands, config locations, and the two-copy system explained there
+
 **For agents that can't read local files**, these are also on GitHub:
 - https://github.com/VibesTribe/VibePilot/blob/main/.hermes.md
+- https://github.com/VibesTribe/VibePilot/blob/main/docs/STARTUP_GUIDE.md
 - https://github.com/VibesTribe/VibePilot/blob/main/CURRENT_STATE.md
 - https://github.com/VibesTribe/VibePilot/blob/main/VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md
