@@ -408,6 +408,8 @@ Merge problems are solved by agents, not human.
 ├── .context/                 # Knowledge layer (auto-generated, agent boot material)
 │   ├── boot.md             # Agent orientation (~3764 tokens, Tier 0 first)
 │   ├── knowledge.db        # SQLite: 30 rules, 30 prompts, 15 configs, 3337 docs, 364 schema, 17 pipelines
+│   │                       # + schema_current (49 tables, 668 cols with Go/Dash cross-ref)
+│   │                       # + schema_functions (148 RPCs, 49 traced to Go callers)
 │   ├── map.md              # Full code map (functions, types, imports)
 │   ├── index.db            # Code index (functions, dependencies)
 │   └── tools/              # Build tools
