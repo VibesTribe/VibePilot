@@ -126,7 +126,7 @@
         "deepseek-api"
       ],
       "api_key_ref": "DEEPSEEK_API_KEY",
-      "status": "active",
+      "status": "benched",
       "rate_limits": {
         "requests_per_minute": 30,
         "requests_per_hour": 3600,
@@ -162,7 +162,7 @@
         "cheap"
       ],
       "weaknesses": [],
-      "notes": "Cheapest API. Cache hits 90% cheaper."
+      "notes": "Cheapest API. Cache hits 90% cheaper. API out of credits. Use deepseek-web courier or NVIDIA NIM deepseek-r1."
     },
     {
       "id": "deepseek-reasoner",
@@ -177,7 +177,7 @@
         "deepseek-api"
       ],
       "api_key_ref": "DEEPSEEK_API_KEY",
-      "status": "active",
+      "status": "benched",
       "rate_limits": {
         "requests_per_minute": 30,
         "requests_per_hour": 3600,
@@ -212,7 +212,7 @@
       "weaknesses": [
         "slower"
       ],
-      "notes": "R1 model for complex reasoning tasks."
+      "notes": "R1 model for complex reasoning tasks. API out of credits. Use deepseek-web courier or NVIDIA NIM deepseek-r1."
     },
     {
       "id": "chatgpt-4o-mini",

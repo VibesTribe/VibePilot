@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-16T00:14:05Z | Commit: 0e2385cb | Branch: main
+# Generated: 2026-04-16T00:19:20Z | Commit: 5754cec5 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -177,7 +177,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/pkg/types/ (1 files, 0 funcs, 9 types)
 ## Config: JSON (auto-discovered)
   config/agents.json - Agent definitions with capability declarations. Roles separated: decide vs execute. Only Maintenance has git write.
-  config/connectors.json - API and web connectors. To add a provider: add destination object, set status=active, reference api_key_ref. No code changes.
+  config/connectors.json - Destination configurations with native tool capabilities. CLI destinations provide tools, API destinations do other.
   config/destinations.json - WHERE tasks execute. CLI, Web platforms, API endpoints. All swappable.
   config/kilo-session.json - keys: max_sessions, max_concurrent_tasks_per_session, notes, memory_per_session_mb, reason
   config/maintenance_commands.json - Maintenance command configuration. Defines allowed git operations and validation rules.
@@ -208,7 +208,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 0e2385cb
+- Commit: 5754cec5
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
