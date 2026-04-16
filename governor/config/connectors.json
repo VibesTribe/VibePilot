@@ -18,12 +18,23 @@
       "id": "claude-code",
       "name": "Claude Code CLI",
       "type": "cli",
-      "status": "active",
+      "status": "inactive",
       "command": "claude",
       "cli_args": ["-p", "--output-format", "json"],
       "timeout_seconds": 300,
       "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep"],
-      "notes": "Claude Code CLI with GLM-5 model"
+      "notes": "Claude Code CLI. Inactive - auth broken after key rotation."
+    },
+    {
+      "id": "hermes",
+      "name": "Hermes Agent",
+      "type": "cli",
+      "status": "active",
+      "command": "hermes",
+      "cli_args": ["chat", "-q", "{PROMPT}", "-Q"],
+      "timeout_seconds": 300,
+      "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep", "search", "browser", "terminal", "file"],
+      "notes": "Hermes Agent CLI. Currently running GLM-5 via Z.AI."
     },
     {
       "id": "kimi",
