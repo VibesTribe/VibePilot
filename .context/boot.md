@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-16T00:22:54Z | Commit: d109fb1d | Branch: main
+# Generated: 2026-04-16T02:04:54Z | Commit: 0be84e81 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -34,21 +34,32 @@ and cleanup work.
 3. **NEVER guess -- check first.** Guessing creates cleanup work.
    Read the existing code, query knowledge.db, check what's there before inventing.
 
-4. **NEVER apply migrations directly.** Always go through GitHub first.
-   Supabase REST API cannot run DDL (CREATE TABLE, ALTER TABLE, etc).
-   There is no programmatic way to apply migrations from this machine.
-   The ONLY path: write the SQL file, push to GitHub, human applies via Dashboard.
+4. **Schema migrations have ONE path. Use it. No exceptions.**
+   Supabase REST API cannot run DDL (CREATE TABLE, ALTER, CREATE FUNCTION). No amount of
+   clever curl, REST calls, RPC tricks, or workarounds will change this. They ALL fail for DDL.
+   Agents have wasted entire sessions trying every possible method before finally doing it right.
    
-   When creating a schema migration:
-   - Check existing files: ls ~/VibePilot/docs/supabase-schema/ to find the next number
-   - Write the file to ~/VibePilot/docs/supabase-schema/NNN_name.sql (dev repo)
-   - Commit and push to GitHub main (VibesTribe/VibePilot repo, main branch only)
-   - Then pull into ~/vibepilot/ (running copy): cd ~/vibepilot && git pull
-   - Tell the human explicitly: "Apply migration NNN via Supabase SQL Editor"
-   - Provide the direct GitHub link: https://github.com/VibesTribe/VibePilot/blob/main/docs/supabase-schema/NNN_name.sql
-   - Human clicks link, copies SQL, pastes into Supabase Dashboard > SQL Editor, runs it
-   - Do NOT skip this. Do NOT apply via REST. Do NOT assume it's done.
-   - Every time an agent got this wrong, the human had to redo it manually.
+   The ONLY working path. Every step is mandatory:
+   
+   a) Find next number: `ls ~/VibePilot/docs/supabase-schema/` -- use the NEXT unused number.
+      Do NOT reuse an existing number. Do NOT guess -- ls first.
+   
+   b) Write the file: `~/VibePilot/docs/supabase-schema/NNN_name.sql`
+      Must include DROP FUNCTION/CREATE OR REPLACE for idempotency.
+      Must include DROP POLICY IF EXISTS before any CREATE POLICY.
+   
+   c) Commit and push to GitHub main:
+      `cd ~/VibePilot && git add -A && git commit -m "..." && git push`
+   
+   d) Pull into running copy: `cd ~/vibepilot && git pull`
+   
+   e) Tell the human EXACTLY what to do. Not "apply the migration" -- give them:
+      - The direct GitHub link: https://github.com/VibesTribe/VibePilot/blob/main/docs/supabase-schema/NNN_name.sql
+      - Clear instruction: "Copy the SQL from this file, paste into Supabase Dashboard > SQL Editor, click Run"
+      - Do NOT assume they'll figure it out. Do NOT skip this step. Do NOT move on until confirmed.
+   
+   Do NOT attempt REST, curl, RPC, psql, or any other method for DDL. They waste time and tokens.
+   Do NOT skip the GitHub link. If it's not on GitHub with the right number, it won't get applied.
 
 5. **ALWAYS push to GitHub.** Local-only work gets lost. Commit and push.
    This has caused more lost work than anything else.
@@ -208,7 +219,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: d109fb1d
+- Commit: 0be84e81
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
