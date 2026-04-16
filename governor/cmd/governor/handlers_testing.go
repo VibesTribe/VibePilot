@@ -14,12 +14,13 @@ import (
 )
 
 type TestingHandler struct {
-	database   *db.DB
-	factory    *runtime.SessionFactory
-	pool       *runtime.AgentPool
-	connRouter *runtime.Router
-	git        *gitree.Gitree
-	cfg        *runtime.Config
+	database    *db.DB
+	factory     *runtime.SessionFactory
+	pool        *runtime.AgentPool
+	connRouter  *runtime.Router
+	git         *gitree.Gitree
+	cfg         *runtime.Config
+	worktreeMgr *gitree.WorktreeManager
 }
 
 func NewTestingHandler(
@@ -29,14 +30,16 @@ func NewTestingHandler(
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
 	cfg *runtime.Config,
+	worktreeMgr *gitree.WorktreeManager,
 ) *TestingHandler {
 	return &TestingHandler{
-		database:   database,
-		factory:    factory,
-		pool:       pool,
-		connRouter: connRouter,
-		git:        git,
-		cfg:        cfg,
+		database:    database,
+		factory:     factory,
+		pool:        pool,
+		connRouter:  connRouter,
+		git:         git,
+		cfg:         cfg,
+		worktreeMgr: worktreeMgr,
 	}
 }
 
@@ -137,8 +140,26 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			recordModelSuccess(ctx, h.database, routingResult.ModelID, taskType, duration)
 			log.Printf("[Testing] Task %s → complete (tests passed)", truncateID(taskID))
 
-			// Auto-merge step
+			// Auto-merge step with shadow merge check
 			targetBranch := h.getTargetBranch(sliceID)
+
+			// Shadow merge: test for conflicts before real merge
+			if h.worktreeMgr != nil {
+				shadowResult, shadowErr := h.worktreeMgr.ShadowMerge(ctx, branchName, targetBranch)
+				if shadowErr != nil {
+					log.Printf("[Testing] Shadow merge check failed for %s: %v (proceeding anyway)", branchName, shadowErr)
+				} else if shadowResult != nil && shadowResult.HasConflicts {
+					log.Printf("[Testing] Shadow merge found conflicts in %s: %v", branchName, shadowResult.ConflictFiles)
+					h.database.RPC(ctx, "transition_task", map[string]any{
+						"p_task_id":        taskID,
+						"p_new_status":     "merge_pending",
+						"p_failure_reason": fmt.Sprintf("merge conflicts: %v", shadowResult.ConflictFiles),
+					})
+					log.Printf("[Testing] Task %s → merge_pending (shadow merge conflicts)", truncateID(taskID))
+					return nil
+				}
+			}
+
 			if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
 				log.Printf("[Testing] Merge failed for %s: %v", branchName, err)
 				h.database.RPC(ctx, "transition_task", map[string]any{
@@ -148,7 +169,10 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 				})
 				log.Printf("[Testing] Task %s → merge_pending (merge failed, will retry)", truncateID(taskID))
 			} else {
-				// Merge success!
+				// Merge success! Clean up worktree + branch
+				if h.worktreeMgr != nil {
+					h.worktreeMgr.RemoveWorktree(ctx, taskID)
+				}
 				h.git.DeleteBranch(ctx, branchName)
 				h.database.RPC(ctx, "transition_task", map[string]any{
 					"p_task_id":    taskID,
@@ -165,6 +189,9 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			failureReason := testOutput.NextAction
 			if failureReason == "" {
 				failureReason = "test_failed"
+			}
+			if h.worktreeMgr != nil {
+				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
 			h.git.DeleteBranch(ctx, branchName)
 			h.database.RPC(ctx, "transition_task", map[string]any{
@@ -226,7 +253,8 @@ func setupTestingHandlers(
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
+	worktreeMgr *gitree.WorktreeManager,
 ) {
-	handler := NewTestingHandler(database, factory, pool, connRouter, git, cfg)
+	handler := NewTestingHandler(database, factory, pool, connRouter, git, cfg, worktreeMgr)
 	handler.Register(router)
 }

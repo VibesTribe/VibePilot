@@ -151,10 +151,32 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	if v, ok := task["attempts"].(float64); ok {
 		attempts = int(v)
 	}
-	if attempts > 0 {
-		h.git.DeleteBranch(ctx, branchName)
+
+	var worktreePath string
+
+	if h.worktreeMgr != nil {
+		// Worktree mode: isolated checkout per task
+		if attempts > 0 {
+			h.worktreeMgr.RemoveWorktree(ctx, taskID)
+			h.git.DeleteBranch(ctx, branchName)
+		}
+		wtInfo, err := h.worktreeMgr.CreateWorktree(ctx, taskID, branchName)
+		if err != nil {
+			log.Printf("[TaskAvailable] Worktree create failed for %s: %v, falling back to branch-only", truncateID(taskID), err)
+			// Fallback: old behavior
+			h.git.CreateBranch(ctx, branchName)
+		} else {
+			worktreePath = wtInfo.Path
+			log.Printf("[TaskAvailable] Worktree created for %s at %s", truncateID(taskID), worktreePath)
+		}
+	} else {
+		// Legacy mode: single directory, branch checkout
+		if attempts > 0 {
+			h.git.DeleteBranch(ctx, branchName)
+		}
+		h.git.CreateBranch(ctx, branchName)
 	}
-	h.git.CreateBranch(ctx, branchName)
+
 	h.database.RPC(ctx, "update_task_branch", map[string]any{
 		"p_task_id":     taskID,
 		"p_branch_name": branchName,
@@ -165,7 +187,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 
 	// Execute
 	err = h.pool.SubmitWithDestination(ctx, sliceID, connectorID, func() error {
-		return h.executeTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, runStart)
+		return h.executeTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, worktreePath, runStart)
 	})
 	if err != nil {
 		log.Printf("[TaskAvailable] Pool error for %s: %v", truncateID(taskID), err)
@@ -177,7 +199,7 @@ func (h *TaskHandler) executeTask(
 	ctx context.Context,
 	task map[string]any,
 	taskPacket *db.TaskPacket,
-	taskID, taskNumber, modelID, connectorID, branchName, taskCategory string,
+	taskID, taskNumber, modelID, connectorID, branchName, taskCategory, worktreePath string,
 	runStart time.Time,
 ) error {
 
@@ -192,7 +214,8 @@ func (h *TaskHandler) executeTask(
 		return err
 	}
 
-	result, err := session.Run(ctx, map[string]any{
+	// Build session params -- include worktree path if available
+	sessionParams := map[string]any{
 		"task_id":         taskID,
 		"task_number":     taskNumber,
 		"title":           getString(task, "title"),
@@ -203,7 +226,13 @@ func (h *TaskHandler) executeTask(
 		"context":         contextData,
 		"dependencies":    task["dependencies"],
 		"event":           "task_available",
-	})
+	}
+	if worktreePath != "" {
+		sessionParams["worktree_path"] = worktreePath
+		sessionParams["repo_path"] = worktreePath
+	}
+
+	result, err := session.Run(ctx, sessionParams)
 	if err != nil {
 		// Check for rate limit (HTTP 429)
 		if h.usageTracker != nil && modelID != "" {
@@ -435,6 +464,9 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			}
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
 			h.recordFailure(ctx, modelID, taskID, "supervisor_fail")
+			if h.worktreeMgr != nil {
+				h.worktreeMgr.RemoveWorktree(ctx, taskID)
+			}
 			h.git.DeleteBranch(ctx, branchName)
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":        taskID,
@@ -446,6 +478,9 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		case "needs_revision":
 			// Needs revision → back to available for re-execution
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
+			if h.worktreeMgr != nil {
+				h.worktreeMgr.RemoveWorktree(ctx, taskID)
+			}
 			h.git.DeleteBranch(ctx, branchName)
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":    taskID,
@@ -463,6 +498,9 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 		case "reroute":
 			// Reroute → back to available for different assignment
+			if h.worktreeMgr != nil {
+				h.worktreeMgr.RemoveWorktree(ctx, taskID)
+			}
 			h.git.DeleteBranch(ctx, branchName)
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":    taskID,
@@ -492,6 +530,10 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 func (h *TaskHandler) failTask(ctx context.Context, taskID, modelID, branchName, reason string) {
 	h.recordFailure(ctx, modelID, taskID, reason)
+	// Clean up worktree if active
+	if h.worktreeMgr != nil {
+		h.worktreeMgr.RemoveWorktree(ctx, taskID)
+	}
 	h.git.DeleteBranch(ctx, branchName)
 	h.database.RPC(ctx, "transition_task", map[string]any{
 		"p_task_id":        taskID,

@@ -163,7 +163,7 @@
     "port": 8081
   },
   "worktrees": {
-    "enabled": false,
+    "enabled": true,
     "base_path": "/home/vibes/VibePilot-work"
   }
 }
