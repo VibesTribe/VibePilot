@@ -306,12 +306,14 @@ Fix the Go code that writes to Supabase.
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 7. TASK RUNNER EXECUTES                                     │
-│    - Creates task branch                                    │
+│ 7. TASK RUNNER EXECUTES (IN ISOLATED WORKTREE)             │
+│    - Creates git worktree at ~/VibePilot-work/{taskID}      │
+│    - Bootstraps symlinks (config, prompts, .context)        │
 │    - Sends prompt packet to model                           │
-│    - Model generates code                                   │
-│    - Commits to task branch                                 │
+│    - Model generates code IN the worktree                   │
+│    - Commits to task branch inside worktree                  │
 │    - Creates task_runs record with tokens/costs             │
+│    - No agent confusion about which branch -- each isolated │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -336,9 +338,11 @@ Fix the Go code that writes to Supabase.
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 10. SYSTEM AUTO-MERGES                                      │
-│     - Task branch → Module branch (auto-merge)              │
-│     - Task branch deleted                                   │
+│ 10. SYSTEM AUTO-MERGES (with shadow merge safety)           │
+│     - Shadow merge: test for conflicts before real merge    │
+│     - If conflicts: merge_pending, agents resolve           │
+│     - If clean: task branch → Module branch (auto-merge)    │
+│     - Worktree removed, task branch deleted                 │
 │     - No human involvement for code                         │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -385,7 +389,7 @@ Merge problems are solved by agents, not human.
 │   │   ├── db/             # Supabase client, RPCs
 │   │   ├── runtime/        # Router, agents, sessions, context builder
 │   │   ├── dag/            # DAG engine, YAML workflow execution
-│   │   ├── gitree/         # Git branch management (orphan branches for parallel agents)
+│   │   ├── gitree/         # Git worktree management (isolated worktrees per parallel agent)
 │   │   ├── mcp/            # MCP protocol support
 │   │   ├── connectors/     # Courier agents, runner connectors
 │   │   ├── security/       # Leak detection
@@ -402,8 +406,8 @@ Merge problems are solved by agents, not human.
 │       └── *.json          # agents, platforms, roles, skills, tools, etc.
 │
 ├── .context/                 # Knowledge layer (auto-generated, agent boot material)
-│   ├── boot.md             # Agent orientation (~2837 tokens, Tier 0 first)
-│   ├── knowledge.db        # SQLite: 24 rules, 30 prompts, 15 configs, 3231 doc sections
+│   ├── boot.md             # Agent orientation (~3764 tokens, Tier 0 first)
+│   ├── knowledge.db        # SQLite: 30 rules, 30 prompts, 15 configs, 3337 docs, 364 schema, 17 pipelines
 │   ├── map.md              # Full code map (functions, types, imports)
 │   ├── index.db            # Code index (functions, dependencies)
 │   └── tools/              # Build tools
@@ -415,7 +419,7 @@ Merge problems are solved by agents, not human.
 ├── docs/
 │   ├── prd/                 # Product Requirements (INPUT)
 │   ├── plans/               # Generated plans (OUTPUT)
-│   ├── supabase-schema/     # Database migrations (109 files)
+│   ├── supabase-schema/     # Database migrations (111 files)
 │   ├── rate_limits/         # Multi-tier rate limit data (Gemini, DeepSeek, Kimi)
 │   └── research/            # Historical research reports
 │
@@ -436,6 +440,37 @@ Merge problems are solved by agents, not human.
 ├── apps/dashboard/          # React dashboard
 └── src/                     # Core types, agents
 ```
+
+### Worktree Strategy (Agent Isolation)
+
+**The Problem:** Multiple agents sharing one directory with `git checkout -b` caused constant branch confusion. Agent A checks out task/T001, Agent B checks out task/T002, and now Agent A is on the wrong branch.
+
+**The Solution:** One git worktree per task. Each agent works in a physically separate directory.
+
+```
+~/VibePilot/                 # Main repo (never checked out to a task branch)
+~/VibePilot-work/{task1}/    # Agent 1's isolated checkout on task/T001
+~/VibePilot-work/{task2}/    # Agent 2's isolated checkout on task/T002
+~/VibePilot-work/{task3}/    # Agent 3's isolated checkout on task/T003
+```
+
+**Bootstrap:** Each worktree gets symlinks to shared resources:
+- `governor/config/*.json` -- model definitions, routing, connectors
+- `governor/config/prompts/` -- agent role templates
+- `governor/config/pipelines/` -- pipeline definitions
+- `.hermes.md` -- enforcement rules
+- `.context/` -- knowledge layer (index.db, knowledge.db, map.md)
+
+**Shadow Merge:** Before real merge, the system does a test merge to detect conflicts. If conflicts found, task goes to `merge_pending` for agent resolution instead of blowing up.
+
+**Lifecycle:**
+1. Task claimed → `CreateWorktree()` + `BootstrapWorktree()`
+2. Agent executes in worktree (isolated directory)
+3. Review/testing → `ShadowMerge()` before real merge
+4. Merge success → `RemoveWorktree()` + delete branch
+5. Task fail → `RemoveWorktree()` cleanup
+
+**Fallback:** If worktree creation fails, falls back to legacy single-dir branch mode.
 
 ---
 
@@ -652,15 +687,15 @@ governor/
 
 | File | Purpose |
 |------|---------|
-| `.context/boot.md` | Agent orientation (~2837 tokens). Tier 0 rules first, then codebase map. Auto-generated. |
-| `.context/knowledge.db` | SQLite: 24 rules, 30 prompts, 15 configs, 3231 doc sections. Queryable by agents. |
+| `.context/boot.md` | Agent orientation (~3764 tokens). Tier 0 rules first, then codebase map. Auto-generated. |
+| `.context/knowledge.db` | SQLite: 30 rules, 30 prompts, 15 configs, 3337 docs, 364 SQL schema, 17 pipeline stages. Queryable by agents. |
 | `.context/tools/tier0-static.md` | Single source of truth for all principles, rules, roles. Hand-crafted. |
 | `governor/cmd/governor/main.go` | Entry point, starts all services |
 | `governor/cmd/governor/handlers_task.go` | Task execution logic |
 | `governor/cmd/governor/handlers_plan.go` | Plan creation logic |
 | `governor/internal/runtime/router.go` | Routing logic (SelectDestination) |
 | `governor/internal/dag/engine.go` | DAG execution engine |
-| `governor/internal/gitree/gitree.go` | Git branch management (orphan branches, parallel agents) |
+| `governor/internal/gitree/gitree.go` | Git branch + worktree management (isolated worktrees per parallel agent) |
 | `governor/internal/db/supabase.go` | Database client |
 | `governor/config/pipelines/code-pipeline.yaml` | YAML DAG pipeline definition |
 | `governor/config/models.json` | Model definitions |
