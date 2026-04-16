@@ -303,6 +303,6 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 	setupPlanHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter, git)
-	setupTestingHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
+	setupTestingHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, worktreeMgr)
 	setupResearchHandlers(ctx, router, factory, pool, database, cfg, connRouter)
 }

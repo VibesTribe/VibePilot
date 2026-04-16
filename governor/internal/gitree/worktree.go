@@ -330,10 +330,26 @@ func (wm *WorktreeManager) shadowMergeFallback(ctx context.Context, sourceBranch
 // It ensures agents have API keys, caches, and config available immediately.
 func (wm *WorktreeManager) BootstrapWorktree(ctx context.Context, worktreePath string) error {
 	// Shared resources to symlink from main repo into worktree
+	// These are the files agents need to do their work
 	sharedFiles := []string{
-		".governor_env",        // API keys
-		"config/models.json",   // Model definitions
-		"config/vibepilot.yaml", // Runtime config
+		"governor/config/system.json",    // Runtime config (connectors, worktrees, MCP)
+		"governor/config/models.json",    // Model definitions
+		"governor/config/routing.json",   // Routing rules
+		"governor/config/agents.json",    // Agent definitions
+		"governor/config/connectors.json", // Connector configs
+		"governor/config/categories.json", // Task categories
+		"governor/config/tools.json",     // Tool definitions
+		".hermes.md",                     // Enforcement rules (priority 1)
+		".context/boot.md",               // Boot context
+		".context/map.md",                // Go function signatures
+		".context/index.db",              // Code symbol index
+		".context/knowledge.db",          // Rules, prompts, configs, docs, schema
+	}
+	// Symlink entire directories
+	sharedDirs := []string{
+		"governor/config/prompts",        // Agent role prompt templates
+		"governor/config/pipelines",      // Pipeline definitions
+		".context/tools",                 // Build tools, tier0 rules
 	}
 
 	// Find main repo path (parent of worktrees)
@@ -362,6 +378,26 @@ func (wm *WorktreeManager) BootstrapWorktree(ctx context.Context, worktreePath s
 		// Create symlink
 		if err := os.Symlink(source, target); err != nil {
 			log.Printf("[Worktrees] Warning: symlink %s -> %s: %v", source, target, err)
+		}
+	}
+
+	// Symlink shared directories (prompts, pipelines, tools)
+	for _, shared := range sharedDirs {
+		source := filepath.Join(mainRepoPath, shared)
+		target := filepath.Join(worktreePath, shared)
+
+		if _, err := os.Stat(source); os.IsNotExist(err) {
+			continue
+		}
+		if _, err := os.Stat(target); err == nil {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			log.Printf("[Worktrees] Warning: mkdir for %s: %v", target, err)
+			continue
+		}
+		if err := os.Symlink(source, target); err != nil {
+			log.Printf("[Worktrees] Warning: symlink dir %s -> %s: %v", source, target, err)
 		}
 	}
 
