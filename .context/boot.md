@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-16T00:19:20Z | Commit: 5754cec5 | Branch: main
+# Generated: 2026-04-16T00:22:54Z | Commit: d109fb1d | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -208,7 +208,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 5754cec5
+- Commit: d109fb1d
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -227,33 +227,33 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 5. Raw source = for implementation details only
 
 ## Current Status (from CURRENT_STATE.md)
-# VibePilot Current State - 2026-04-15 (late evening)
-## Status: Fully operational. Schema deployed, vault stocked, worktrees wired, governor running.
+# VibePilot Current State - 2026-04-15 (night)
+## Status: Fully operational. Schema deployed, vault stocked, connectors wired, worktrees live.
 ### The Repo Situation
 Two copies on disk, both synced to main:
 | Location | Purpose | State |
 |---|---|---|
-| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Binary rebuilt Apr 15 19:52. |
+| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Binary rebuilt Apr 15 20:19. |
 | `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main). |
-**GitHub main is current** -- all work pushed April 15.
+**GitHub main is current** -- 12 commits pushed April 15 evening session.
 ---
 ### What's Running
-- **Governor:** systemd user service, active (running since Apr 15 19:52)
+- **Governor:** systemd user service, active (running since Apr 15 20:19)
   - Binary: `~/vibepilot/governor/governor` (compiled Apr 15, includes worktree wiring + MCP + memory)
   - Service: `systemctl --user status vibepilot-governor`
   - Logs: `journalctl --user -u vibepilot-governor -f`
   - MCP servers: jcodemunch (52 tools) + jdocmunch (15 tools) = 67 tools connected
   - Governor MCP server: disabled in config (ready to enable for SSE port 8081)
   - **Worktrees: ENABLED** -- base path `/home/vibes/VibePilot-work/`, auto-cleanup on shutdown
+  - **Connectors registered:** claude-code (cli), gemini-api (api), groq-api (api), nvidia-api (api)
 - **Cloudflared tunnel:** live at vibestribe.rocks, sacred (don't touch)
 - **Hermes agent:** accessible via dashboard chat through tunnel
 - **Chrome CDP:** port 9222, bind mount active, user auto-logged into Gmail/Gemini/Sheets
 - **TTS:** edge-tts (fast, free)
-### Supabase Schema (fully deployed)
-- **Migration 111 applied** -- all RPCs, tables, policies live and verified
-  - `get_model_performance()` -- returns heuristics by model (uses correct `preferred_model` column)
-  - `get_model_score_for_task(model, type, category)` -- weighted scoring (40% base + 20% recency + 25% heuristic + 15% strengths)
-  - Both RPCs smoke-tested via curl, returning valid results
-- **Secrets vault:** 10 keys stored (all encrypted AES-256-GCM)
-  - GITHUB_TOKEN, GROQ_API_KEY, NVIDIA_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY
-  - DEEPSEEK_API_KEY, VIBEPILOT_GMAIL_EMAIL, VIBEPILOT_GMAIL_PASSWORD, SUPABASE_SERVICE_KEY, webhook_secret
+### Connectors (4 API + 7 web couriers)
+| ID | Type | Status | Key Vault |
+|---|---|---|---|
+| claude-code | cli | active | none (local) |
+| gemini-api | api | active | GEMINI_API_KEY |
+| groq-api | api | active | GROQ_API_KEY |
+| nvidia-api | api | active | NVIDIA_API_KEY |

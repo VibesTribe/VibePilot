@@ -1,14 +1,13 @@
-# VibePilot TODO - 2026-04-15 (late evening)
+# VibePilot TODO - 2026-04-15 (night)
 
-## Critical (do next session)
+## Critical (do next)
 
 ### 1. Test the pipeline end-to-end
-The YAML pipeline is written but never tested against real governor:
+THE blocker for everything else. The YAML pipeline is written but never tested against real governor:
 - Queue a real task through Supabase
 - Watch it flow through: plan -> supervisor -> execute -> review -> test -> merge
 - Verify gitree branch management works with parallel tasks
 - Fix whatever breaks (will be things)
-- This is THE blocker for everything else
 
 ### 2. Test full fallback chain before May 1
 ZAI/GLM subscription ends May 1. Before then:
@@ -17,23 +16,17 @@ ZAI/GLM subscription ends May 1. Before then:
 - Time each tier's response to confirm latency is acceptable
 - Document any that fail
 
-### 3. Wire NVIDIA NIM connector in governor
-NVIDIA models are in models.json but governor may not have a connector for nvidia provider:
-- Check if `connectors.json` has nvidia base_url + headers
-- If not, add NVIDIA NIM connector (api.nvidia.ai, Bearer token auth)
-- Verify the 3 NVIDIA models actually route correctly
-
 ---
 
 ## High Priority
 
-### 4. Visual QA agent
+### 3. Visual QA agent
 - Wire browser-use to capture screenshots of dashboard after changes
 - Compare to baseline, flag visual regressions
 - Present to human for UI/UX yes/no
 - This is the courier pattern applied to our own app
 
-### 5. Daily landscape research cron
+### 4. Daily landscape research cron
 The researcher prompt exists (`prompts/daily_landscape_researcher.md`).
 Need to wire it:
 - Cron job that runs researcher daily
@@ -41,7 +34,7 @@ Need to wire it:
 - Posts findings to Supabase for Supervisor review
 - Supervisor approves minor, escalates major to Council -> Human
 
-### 6. Pre-execution design preview
+### 5. Pre-execution design preview
 For UI tasks, show human a design choice BEFORE writing code:
 - Courier generates mockup/plan, presents to human
 - Human picks direction, THEN agent writes code
@@ -51,7 +44,7 @@ For UI tasks, show human a design choice BEFORE writing code:
 
 ## Medium Priority
 
-### 7. LogAct patterns (from Meta research)
+### 6. LogAct patterns (from Meta research)
 `research/2026-04-14-logact-agent-bus.md` -- maps directly to our architecture.
 Adopt after pipeline is working end-to-end:
 - Intent logging: record what agent PLANS to do before execution
@@ -59,11 +52,11 @@ Adopt after pipeline is working end-to-end:
 - Append-only task_events table in Supabase (currently we update rows in-place)
 - Stupidity diagnosis: agent reads own failed output from log, rewrites
 
-### 8. JourneyKits implementation
+### 7. JourneyKits implementation
 95 kits scanned, 20 mapped to VibePilot gaps (`research/2026-04-08-journeykits-landscape-analysis.md`).
 Need to go through them and decide which patterns to adopt.
 
-### 9. Make .context/ hooks async
+### 8. Make .context/ hooks async
 Post-checkout, post-merge, pre-commit hooks rebuild entire knowledge layer synchronously.
 On x220 this causes command timeouts. Fix:
 - Run rebuild in background (don't block git)
@@ -74,11 +67,11 @@ On x220 this causes command timeouts. Fix:
 
 ## Lower Priority
 
-### 10. Enable governor MCP server
+### 9. Enable governor MCP server
 The governor can expose its tools as an MCP server (SSE on port 8081).
 Currently disabled. Enable when there's a consumer for it.
 
-### 11. Ethernet + headless setup
+### 10. Ethernet + headless setup
 x220 currently tethered via phone WiFi. More stable:
 - USB ethernet adapter for wired connection
 - Configure headless boot (no display manager)
@@ -113,15 +106,20 @@ x220 currently tethered via phone WiFi. More stable:
 - [x] MCP Server Phase 2 -- governor exposes tools via stdio/SSE
 - [x] 3-Layer Memory System -- short/mid/long-term in Supabase
 - [x] Migration 110 applied (memory tables)
-- [x] Migration 111 applied (all RPCs, idempotent, verified)
+- [x] Migration 111 applied (all RPCs, idempotent, verified live)
 - [x] Context Compaction -- compactor.go auto-summarizes sessions
 - [x] Worktrees WIRED into governor (handlers, shutdown cleanup, shadow merge, bootstrap)
-- [x] Worktree strategic patterns implemented (Gemini: shadow merge, env injection, branch naming)
-- [x] Secrets vault fully stocked (10 keys, all encrypted, all fresh)
+- [x] Worktree strategic patterns (Gemini: shadow merge, env injection, branch naming)
+- [x] Secrets vault fully stocked (10 keys, all encrypted, all fresh Apr 15)
 - [x] Models config updated (16 models, correct rate limits, 3 NVIDIA NIM added)
+- [x] Connectors wired (4 API active: gemini, groq, nvidia, claude-code + 7 web couriers)
+- [x] NVIDIA NIM connector added (integrate.api.nvidia.com, OpenAI-compatible)
+- [x] Groq connector fixed (active, all 4 models, key in vault)
+- [x] Gemini API connector fixed (active, updated models, key in vault)
+- [x] Deepseek API benched (out of credits, NVIDIA NIM deepseek-r1 as fallback)
 - [x] Chrome CDP working (port 9222, auto-login Gmail/Gemini/Sheets)
 - [x] Gmail app password updated in vault
-- [x] Tier0 rules expanded (migration workflow, no shortcuts)
+- [x] Tier0 rules expanded (migration workflow, no shortcuts, post-task discipline)
 
 ## Not Viable (abandoned)
 
@@ -131,4 +129,4 @@ x220 currently tethered via phone WiFi. More stable:
 
 ---
 
-**Last Updated:** 2026-04-15 (late evening)
+**Last Updated:** 2026-04-15 (night)
