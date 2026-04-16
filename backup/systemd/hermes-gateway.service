@@ -1,0 +1,24 @@
+[Unit]
+Description=Hermes Agent Gateway - Messaging Platform Integration
+After=network.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/home/vibes/.hermes/hermes-agent/venv/bin/python -m hermes_cli.main gateway run --replace
+WorkingDirectory=/home/vibes/.hermes/hermes-agent
+Environment="PATH=/home/vibes/.hermes/hermes-agent/venv/bin:/home/vibes/.hermes/hermes-agent/node_modules/.bin:/home/vibes/.nvm/versions/node/v24.14.1/bin:/home/vibes/.local/bin:/home/vibes/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="VIRTUAL_ENV=/home/vibes/.hermes/hermes-agent/venv"
+Environment="HERMES_HOME=/home/vibes/.hermes"
+Environment="TERMINAL_CWD=/home/vibes/VibePilot"
+Restart=on-failure
+RestartSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=60
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
