@@ -470,19 +470,17 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
 			h.recordFailure(ctx, modelID, taskID, failureClass)
 			h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
+			h.recordEvent(ctx, "failure", taskID, modelID, failureClass, map[string]any{
+				"class": failureClass, "detail": failureDetail,
+			})
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
 			h.git.DeleteBranch(ctx, branchName)
 			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":    taskID,
-				"p_new_status": "available",
-				"p_failure_reason": map[string]any{
-					"class":  failureClass,
-					"detail": failureDetail,
-					"model":  modelID,
-					"issues": decision.Issues,
-				},
+				"p_task_id":        taskID,
+				"p_new_status":     "available",
+				"p_failure_reason": fmt.Sprintf("[%s] %s", failureClass, failureDetail),
 			})
 			log.Printf("[TaskReview] Task %s failed: %s (%s) → available", truncateID(taskID), failureClass, failureDetail)
 
@@ -498,19 +496,17 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			}
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
 			h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
+			h.recordEvent(ctx, "revision_needed", taskID, modelID, failureClass, map[string]any{
+				"class": failureClass, "detail": failureDetail,
+			})
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
 			h.git.DeleteBranch(ctx, branchName)
 			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":    taskID,
-				"p_new_status": "available",
-				"p_failure_reason": map[string]any{
-					"class":  failureClass,
-					"detail": failureDetail,
-					"model":  modelID,
-					"issues": decision.Issues,
-				},
+				"p_task_id":        taskID,
+				"p_new_status":     "available",
+				"p_failure_reason": fmt.Sprintf("[%s] %s", failureClass, failureDetail),
 			})
 			log.Printf("[TaskReview] Task %s needs revision: %s (%s) → available", truncateID(taskID), failureClass, failureDetail)
 
@@ -533,19 +529,17 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 				failureDetail = "Supervisor recommends different model"
 			}
 			h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
+			h.recordEvent(ctx, "reroute", taskID, modelID, failureClass, map[string]any{
+				"class": failureClass, "detail": failureDetail,
+			})
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
 			h.git.DeleteBranch(ctx, branchName)
 			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":    taskID,
-				"p_new_status": "available",
-				"p_failure_reason": map[string]any{
-					"class":  failureClass,
-					"detail": failureDetail,
-					"model":  modelID,
-					"action": "reroute",
-				},
+				"p_task_id":        taskID,
+				"p_new_status":     "available",
+				"p_failure_reason": fmt.Sprintf("[%s] %s", failureClass, failureDetail),
 			})
 			log.Printf("[TaskReview] Task %s reroute → available", truncateID(taskID))
 
@@ -691,7 +685,7 @@ func (h *TaskHandler) recordIssues(ctx context.Context, taskID, modelID, taskTyp
 
 // recordModelLearning writes structured failure data to models.learned JSONB column
 // This builds institutional knowledge: which models excel at what, struggle with what.
-// Over time the router uses this to prefer models for task types they're strong at.
+// Over time the router uses best_for_task_types / avoid_for_task_types for intelligent routing.
 func (h *TaskHandler) recordModelLearning(ctx context.Context, modelID, taskType, failureClass, failureDetail string) {
 	if modelID == "" {
 		return
@@ -701,13 +695,36 @@ func (h *TaskHandler) recordModelLearning(ctx context.Context, modelID, taskType
 	// Update learned.failure_rate_by_type and learned.avoid_for_task_types
 	// The RPC will merge into the existing JSONB
 	h.database.RPC(ctx, "update_model_learning", map[string]any{
-		"p_model_id":       modelID,
-		"p_task_type":      taskType,
-		"p_outcome":        "failure",
-		"p_failure_class":  failureClass,
+		"p_model_id":         modelID,
+		"p_task_type":        taskType,
+		"p_outcome":          "failure",
+		"p_failure_class":    failureClass,
 		"p_failure_category": category,
-		"p_failure_detail": failureDetail,
+		"p_failure_detail":   failureDetail,
 	})
+}
+
+// recordEvent writes to orchestrator_events for the dashboard timeline.
+// The dashboard reads: event_type (maps to type), reason (maps to reasonCode),
+// details JSONB, task_id, model_id, created_at.
+// event_type "failure" marks task quality as "fail" in deriveQualityMap.
+func (h *TaskHandler) recordEvent(ctx context.Context, eventType, taskID, modelID, reason string, details map[string]any) {
+	eventDetails := details
+	if eventDetails == nil {
+		eventDetails = map[string]any{}
+	}
+	eventDetails["model_id"] = modelID
+
+	_, err := h.database.REST(ctx, "POST", "orchestrator_events", map[string]any{
+		"event_type": eventType,
+		"task_id":    taskID,
+		"model_id":   modelID,
+		"reason":     reason,
+		"details":    eventDetails,
+	})
+	if err != nil {
+		log.Printf("[recordEvent] Failed to write event: %v", err)
+	}
 }
 
 func (h *TaskHandler) saveCheckpoint(ctx context.Context, taskID, step string, progress int, output string, files []string) {
