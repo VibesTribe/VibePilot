@@ -235,7 +235,7 @@ func validateRPCs(ctx context.Context, database interface {
 		"update_plan_status":       {"p_plan_id": "00000000-0000-0000-0000-000000000000", "p_status": "test"},
 		"claim_task":               {"p_task_id": "00000000-0000-0000-0000-000000000000", "p_worker_id": "test", "p_model_id": "test", "p_routing_flag": "test"},
 		"transition_task":          {"p_task_id": "00000000-0000-0000-0000-000000000000", "p_new_status": "test"},
-		"create_task_run":          {"p_task_id": "00000000-0000-0000-0000-000000000000", "p_status": "test", "p_model_id": "test", "p_connector_id": "test"},
+		"create_task_run":          {"p_task_id": "00000000-0000-0000-0000-000000000000", "p_status": "test", "p_model_id": "test", "p_courier": "test"},
 		"record_model_success":     {"p_model_id": "test"},
 		"record_model_failure":     {"p_model_id": "test"},
 		"set_processing":           {"p_table": "tasks", "p_id": "00000000-0000-0000-0000-000000000000"},
