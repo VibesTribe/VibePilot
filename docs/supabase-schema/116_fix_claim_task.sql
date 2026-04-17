@@ -1,6 +1,3 @@
--- Migration 116: Fix claim_task parameter names to match Go code
--- Go sends: p_task_id, p_worker_id, p_model_id, p_routing_flag, p_routing_reason
-
 DROP FUNCTION IF EXISTS claim_task(UUID, TEXT, TEXT, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION claim_task(
   p_task_id UUID,
@@ -25,7 +22,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Also update transition_task to handle in_progress → review properly
 DROP FUNCTION IF EXISTS transition_task(UUID, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION transition_task(
   p_task_id UUID,
@@ -51,5 +47,3 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO service_role;
-
-SELECT 'Migration 116 complete - claim_task params fixed' AS status;
