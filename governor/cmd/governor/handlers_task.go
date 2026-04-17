@@ -458,27 +458,18 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			log.Printf("[TaskReview] Task %s → testing", truncateID(taskID))
 
 		case "fail", "failed":
-			// Failed → back to available with notes
-			failureReason := "supervisor_reject"
-			if len(decision.Issues) > 0 {
-				failureReason = decision.Issues[0].Description
+			// Failed → back to available with structured failure notes
+			failureClass := decision.FailureClass
+			if failureClass == "" {
+				failureClass = "unknown"
+			}
+			failureDetail := decision.FailureDetail
+			if failureDetail == "" && len(decision.Issues) > 0 {
+				failureDetail = decision.Issues[0].Description
 			}
 			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
-			h.recordFailure(ctx, modelID, taskID, "supervisor_fail")
-			if h.worktreeMgr != nil {
-				h.worktreeMgr.RemoveWorktree(ctx, taskID)
-			}
-			h.git.DeleteBranch(ctx, branchName)
-			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":        taskID,
-				"p_new_status":     "available",
-				"p_failure_reason": failureReason,
-			})
-			log.Printf("[TaskReview] Task %s failed: %s → available", truncateID(taskID), failureReason)
-
-		case "needs_revision":
-			// Needs revision → back to available for re-execution
-			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
+			h.recordFailure(ctx, modelID, taskID, failureClass)
+			h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
@@ -486,8 +477,42 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":    taskID,
 				"p_new_status": "available",
+				"p_failure_reason": map[string]any{
+					"class":  failureClass,
+					"detail": failureDetail,
+					"model":  modelID,
+					"issues": decision.Issues,
+				},
 			})
-			log.Printf("[TaskReview] Task %s needs revision → available", truncateID(taskID))
+			log.Printf("[TaskReview] Task %s failed: %s (%s) → available", truncateID(taskID), failureClass, failureDetail)
+
+		case "needs_revision":
+			// Needs revision → back to available for re-execution
+			failureClass := decision.FailureClass
+			if failureClass == "" {
+				failureClass = "needs_revision"
+			}
+			failureDetail := decision.FailureDetail
+			if failureDetail == "" && len(decision.Issues) > 0 {
+				failureDetail = decision.Issues[0].Description
+			}
+			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
+			h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
+			if h.worktreeMgr != nil {
+				h.worktreeMgr.RemoveWorktree(ctx, taskID)
+			}
+			h.git.DeleteBranch(ctx, branchName)
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "available",
+				"p_failure_reason": map[string]any{
+					"class":  failureClass,
+					"detail": failureDetail,
+					"model":  modelID,
+					"issues": decision.Issues,
+				},
+			})
+			log.Printf("[TaskReview] Task %s needs revision: %s (%s) → available", truncateID(taskID), failureClass, failureDetail)
 
 		case "council_review":
 			// Complex → escalate to council
@@ -499,6 +524,15 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 		case "reroute":
 			// Reroute → back to available for different assignment
+			failureClass := decision.FailureClass
+			if failureClass == "" {
+				failureClass = "model_limitation"
+			}
+			failureDetail := decision.FailureDetail
+			if failureDetail == "" {
+				failureDetail = "Supervisor recommends different model"
+			}
+			h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
@@ -506,6 +540,12 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":    taskID,
 				"p_new_status": "available",
+				"p_failure_reason": map[string]any{
+					"class":  failureClass,
+					"detail": failureDetail,
+					"model":  modelID,
+					"action": "reroute",
+				},
 			})
 			log.Printf("[TaskReview] Task %s reroute → available", truncateID(taskID))
 
@@ -613,6 +653,15 @@ func (h *TaskHandler) recordSuccess(ctx context.Context, taskID, modelID, taskTy
 		"p_duration_seconds": durationSeconds,
 		"p_tokens_used":      tokensUsed,
 	})
+	// Feed success into model learning for competency tracking
+	h.database.RPC(ctx, "update_model_learning", map[string]any{
+		"p_model_id":       modelID,
+		"p_task_type":      taskType,
+		"p_outcome":        "success",
+		"p_failure_class":  "",
+		"p_failure_category": "",
+		"p_failure_detail": "",
+	})
 }
 
 func (h *TaskHandler) recordFailure(ctx context.Context, modelID, taskID, failureType string) {
@@ -638,6 +687,27 @@ func (h *TaskHandler) recordIssues(ctx context.Context, taskID, modelID, taskTyp
 			"p_task_type":        taskType,
 		})
 	}
+}
+
+// recordModelLearning writes structured failure data to models.learned JSONB column
+// This builds institutional knowledge: which models excel at what, struggle with what.
+// Over time the router uses this to prefer models for task types they're strong at.
+func (h *TaskHandler) recordModelLearning(ctx context.Context, modelID, taskType, failureClass, failureDetail string) {
+	if modelID == "" {
+		return
+	}
+	category := runtime.CategorizeFailure(failureClass)
+
+	// Update learned.failure_rate_by_type and learned.avoid_for_task_types
+	// The RPC will merge into the existing JSONB
+	h.database.RPC(ctx, "update_model_learning", map[string]any{
+		"p_model_id":       modelID,
+		"p_task_type":      taskType,
+		"p_outcome":        "failure",
+		"p_failure_class":  failureClass,
+		"p_failure_category": category,
+		"p_failure_detail": failureDetail,
+	})
 }
 
 func (h *TaskHandler) saveCheckpoint(ctx context.Context, taskID, step string, progress int, output string, files []string) {

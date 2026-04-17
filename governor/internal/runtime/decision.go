@@ -12,12 +12,14 @@ type Issue struct {
 }
 
 type SupervisorDecision struct {
-	Action     string `json:"action"`
-	TaskID     string `json:"task_id"`
-	TaskNumber string `json:"task_number"`
-	Decision   string `json:"decision"`
-	NextAction string `json:"next_action"`
-	Checks     struct {
+	Action        string `json:"action"`
+	TaskID        string `json:"task_id"`
+	TaskNumber    string `json:"task_number"`
+	Decision      string `json:"decision"`
+	NextAction    string `json:"next_action"`
+	FailureClass  string `json:"failure_class"`
+	FailureDetail string `json:"failure_detail"`
+	Checks        struct {
 		AllDeliverablesPresent bool `json:"all_deliverables_present"`
 		TestsWritten           bool `json:"tests_written"`
 		NoHardcodedSecrets     bool `json:"no_hardcoded_secrets"`
@@ -81,6 +83,8 @@ type InitialReviewDecision struct {
 	TaskCount            int      `json:"task_count"`
 	TasksReviewed        []string `json:"tasks_reviewed"`
 	TasksNeedingRevision []string `json:"tasks_needing_revision"`
+	FailureClass         string   `json:"failure_class"`
+	FailureDetail        string   `json:"failure_detail"`
 }
 
 type ResearchReviewDecision struct {
@@ -290,14 +294,20 @@ func extractJSON(output string) string {
 
 func CategorizeFailure(issueType string) string {
 	switch issueType {
-	case "truncation", "context_exceeded", "incomplete":
+	case "truncation", "context_exceeded", "incomplete", "truncated_output":
 		return "model_issue"
-	case "drift", "wrong_output", "unexpected_changes":
+	case "drift", "wrong_output", "unexpected_changes", "quality_below_standard", "broken_output":
 		return "quality_issue"
-	case "security", "secrets", "no_hardcoded_secrets":
+	case "security", "secrets", "no_hardcoded_secrets", "dangerous_output":
 		return "security_issue"
 	case "timeout", "rate_limited":
 		return "platform_issue"
+	case "prompt_needs_improvement", "task_too_large":
+		return "prompt_issue"
+	case "model_limitation":
+		return "capability_issue"
+	case "almost_perfect", "needs_revision":
+		return "revision_issue"
 	default:
 		return "task_issue"
 	}

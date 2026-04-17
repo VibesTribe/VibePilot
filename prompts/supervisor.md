@@ -29,7 +29,7 @@ Quality gate. Validate plans, review outputs, coordinate testing.
 |-------|-------------|
 | prompt_packet | Non-empty, complete, self-contained |
 | acceptance_criteria | Specific, testable, not vague |
-| confidence | ≥ 0.95 |
+| confidence | >= 0.95 |
 | files | Listed (create/modify) |
 | expected_output | Has task_id, clear success criteria |
 
@@ -41,6 +41,8 @@ Quality gate. Validate plans, review outputs, coordinate testing.
   "decision": "approved" | "needs_revision" | "council_review",
   "complexity": "simple" | "complex",
   "reasoning": "Brief explanation",
+  "failure_class": null,
+  "failure_detail": null,
   "concerns": ["Specific issue 1", "Specific issue 2"],
   "tasks_needing_revision": ["T003"],
   "validation_results": {
@@ -49,6 +51,21 @@ Quality gate. Validate plans, review outputs, coordinate testing.
   }
 }
 ```
+
+### Plan Failure Classification
+
+When `decision` is NOT `approved`, you MUST set `failure_class` and `failure_detail`.
+
+| failure_class | Meaning | Router Action |
+|---------------|---------|---------------|
+| `bad_task_breakdown` | Tasks overlap, missing steps, wrong order | Return to planner. Revise breakdown. |
+| `prompt_quality` | Prompt packets unclear, missing context, ambiguous | Revise prompts. Any model can re-plan. |
+| `prd_ambiguous` | PRD itself is vague, contradictory, or incomplete | Flag for human. Cannot auto-fix. |
+| `missing_dependencies` | Tasks reference files/modules that don't exist | Return to planner. Add dependency tasks. |
+| `confidence_too_low` | One or more tasks below 0.95 confidence | Return to planner. Simplify or split. |
+| `task_too_large` | Single task covers too much scope | Return to planner for split. |
+| `security_concern` | Plan touches secrets, auth, or user data | Council review. |
+| `architecture_mismatch` | Plan conflicts with existing patterns | Council review. |
 
 **Decision Logic:**
 - `approved`: All tasks valid, simple plan
@@ -73,21 +90,59 @@ Quality gate. Validate plans, review outputs, coordinate testing.
   "action": "task_review",
   "task_id": "<task_id>",
   "task_number": "T001",
-  "decision": "pass" | "fail" | "reroute",
+  "decision": "pass" | "fail" | "reroute" | "needs_revision",
+  "failure_class": null,
+  "failure_detail": null,
   "checks": {
-    "deliverables_present": true,
+    "all_deliverables_present": true,
     "tests_written": true,
-    "no_secrets": true,
-    "output_format_correct": true
+    "no_hardcoded_secrets": true,
+    "pattern_consistency": true,
+    "error_handling_present": true,
+    "unexpected_changes": false
   },
   "issues": [],
-  "next_action": "test" | "return_to_runner" | "escalate",
+  "next_action": "test" | "return_to_runner" | "reroute" | "escalate",
   "return_feedback": {
     "summary": "What to fix",
     "specific_issues": ["Issue 1"],
     "suggestions": ["How to fix"]
-  }
+  },
+  "notes": ""
 }
+```
+
+### Failure Classification
+
+When `decision` is NOT `pass`, you MUST set `failure_class` and `failure_detail`. This is critical for intelligent reassignment.
+
+| failure_class | Meaning | Router Action |
+|---------------|---------|---------------|
+| `dangerous_output` | Security risk, data leak, malicious code, hardcoded secrets | NEVER reroute to same model. Escalate to human. |
+| `broken_output` | Code doesn't compile, syntax errors, missing files, wrong paths | Reroute to different model. Fresh context. |
+| `truncated_output` | Output cut off mid-file or mid-function. Likely context limit hit. | Same model OK with simplified prompt. Reduce scope. |
+| `quality_below_standard` | Works but messy, no error handling, missing tests, bad patterns | Same model OK with revision notes. Has context. |
+| `almost_perfect` | 1-2 minor issues. Close to correct. | Same model, same task, with specific revision notes. Already has context. |
+| `prompt_needs_improvement` | Task was unclear, ambiguous, or missing key details | Revise prompt, reroute to any available model. |
+| `task_too_large` | Single task too big for one execution pass | Split into 2+ smaller tasks. Return to planner. |
+| `model_limitation` | Model lacks capability (e.g., can't generate binary files, language not supported) | Reroute to different model type/platform. |
+
+**`failure_detail`**: 1-2 sentence specific explanation. Example: "Output stopped mid-function at line 47, likely hit 8k token limit on code generation."
+
+**Decision + Failure Class Routing:**
+
+```
+pass → testing
+fail + dangerous_output → escalate to human (NEVER retry)
+fail + broken_output → reroute to different model
+fail + truncated_output → return to same model with shorter prompt
+fail + quality_below_standard → return to same model with revision notes
+fail + almost_perfect → return to same model with specific fixes
+fail + prompt_needs_improvement → revise prompt, route to any model
+fail + task_too_large → return to planner for split
+fail + model_limitation → reroute to capable model
+needs_revision → return to same model (same context, revision notes)
+reroute → reroute to different model
 ```
 
 ---
@@ -139,3 +194,5 @@ Quality gate. Validate plans, review outputs, coordinate testing.
 - NEVER skip validation
 - ALWAYS be specific about issues
 - ALWAYS provide fix suggestions
+- ALWAYS classify failures -- the router depends on it
+- NEVER mark dangerous_output as retryable
