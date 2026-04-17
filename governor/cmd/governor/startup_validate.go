@@ -233,7 +233,7 @@ func validateRPCs(ctx context.Context, database interface {
 	// Any other error (FK violation, no rows, etc.) means it EXISTS and is working.
 	rpcTestParams := map[string]map[string]interface{}{
 		"update_plan_status":       {"p_plan_id": "00000000-0000-0000-0000-000000000000", "p_status": "test"},
-		"claim_task":               {"p_task_id": "00000000-0000-0000-0000-000000000000", "p_agent_id": "test", "p_model_id": "test", "p_connector_id": "test"},
+		"claim_task":               {"p_task_id": "00000000-0000-0000-0000-000000000000", "p_worker_id": "test", "p_model_id": "test", "p_routing_flag": "test"},
 		"transition_task":          {"p_task_id": "00000000-0000-0000-0000-000000000000", "p_new_status": "test"},
 		"create_task_run":          {"p_task_id": "00000000-0000-0000-0000-000000000000", "p_status": "test", "p_model_id": "test", "p_connector_id": "test"},
 		"record_model_success":     {"p_model_id": "test"},
