@@ -1,17 +1,22 @@
 # VibePilot Current State - 2026-04-17
 
-## Status: Pipeline proven end-to-end. Hermes v0.8.0 has known GLM-5 bug — updating to v0.9.0 next.
+## Status: Pipeline working end-to-end. Dashboard fixes in migration 119 (needs applying).
+
+### What needs to happen on wake:
+1. Apply migration 119 in Supabase SQL editor (copy from GitHub `migrations/119_fix_claim_task_and_create_task_run.sql`)
+2. Rebuild governor binary (already built locally, needs copy)
+3. Test pipeline -- dashboard should now show active agent on tasks
 
 ### The Repo Situation
 
 Two copies on disk, both synced to main:
 
-|| Location | Purpose | State |
+| Location | Purpose | State |
 |---|---|---|
-| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Binary from Apr 16, includes task_runner fix. |
-| `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main), all uncommitted hacks discarded. |
+| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Binary from this session, includes \r fix |
+| `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main), all fixes committed |
 
-**GitHub main is current.** Committed changes are safe (SQL migrations + one Go fix). All panicked rewrites to CLIRunner/decision.go/recovery were discarded — those were bandaids for a hermes bug already fixed upstream.
+**GitHub main is current.** Latest commit: `bc839255` (migration 119 + \r fix)
 
 ---
 
@@ -23,119 +28,89 @@ Two copies on disk, both synced to main:
   - Logs: `journalctl --user -u vibepilot-governor -f`
   - MCP servers: jcodemunch (52 tools). jDocMunch removed. jDataMunch disabled.
   - Connectors registered: hermes (cli), opencode (cli), gemini-api, groq-api, nvidia-api
-- **Hermes Agent:** v0.8.0, 100 commits behind (v0.9.0 available)
-  - **Known bug in v0.8.0:** Empty response recovery broken for reasoning models (GLM-5, Qwen, mimo). Fixed in commit d6785dc4 / v0.9.0.
-  - Update command: `hermes update`
-- **Cloudflared tunnel:** live at vibestribe.rocks, sacred (don't touch)
-- **Chrome CDP:** port 9222, bind mount active, user auto-logged into Gmail/Gemini/Sheets
+- **Hermes Agent:** v0.9.0 (updated from v0.8.0)
+  - v0.8.0 bug FIXED: empty response recovery for GLM-5 (commit d6785dc4)
+  - v0.9.0 also fixes: partial streamed content on connection failure
+- **Cloudflared tunnel:** live at vibestrike.rocks, sacred (don't touch)
+- **Chrome CDP:** port 9222, bind mount active
 - **TTS:** edge-tts (fast, free)
 
-### Pipeline Proven Working (Smoke Tests, Apr 16-17)
+### Pipeline Proven Working (April 2026)
 
-3 out of 4 smoke tests passed ALL stages:
-
+Full pipeline proven 4 times:
 ```
 Plan inserted → Planner creates plan → Supervisor approves → Tasks created → Task claimed by glm-5 → Hermes executes → Task moved to review
 ```
 
-**Timing:** Full pipeline ~3 minutes (planner 1m30s, supervisor 1m17s, task execution 45s)
+**Latest run:** Plan f0245756 → task d69dac9e completed execution, moved to `review` status. The /hello endpoint was actually written to server.go by hermes.
 
-**Failures were hermes/GLM-5** (empty response bug), NOT governor logic. The 1 failure showed `🔎 preparing search_files…` as hermes output — partial streamed content that v0.9.0 fixes.
+**Timing:** ~4-5 minutes total (planner ~2min at GLM-5 speed, task execution ~2min)
 
-### Committed Changes (All on main, all safe)
+### Fixes Made This Session (All Committed to main)
 
-| Commit | What | Impact |
+| What | Why | Where |
 |---|---|---|
-| 4c76b4f8 - 15bfc88a | Migrations 113-114 (RPCs + tables) | Additive SQL only |
-| 6ab5dd33 | Fixed system.json paths, missing tables | Config fix |
-| 613b095e | Fixed reserved word in migration 114 | SQL fix |
-| 746471ef | Migration 115 (4 failed RPCs) | SQL only |
-| 2388c694 | Migration 116 (claim_task params) | SQL + startup_validate |
-| b1f7bf91 | Migration 117 (remove model_id) | SQL only |
-| 4aaed0c3 | Migration 118 (transition_task JSONB) | SQL only |
-| e83e03c4 | `internal_cli` → `task_runner` in handlers_task.go | One-line Go fix |
+| Hermes v0.8.0 → v0.9.0 | GLM-5 empty response bug | `hermes update` |
+| `\r` strip in extractJSON | GLM-5 includes carriage returns in JSON | `decision.go` line 258 |
+| `assigned_to = p_model_id` in claim_task | Dashboard shows agent via `tasks.assigned_to` | Migration 119 |
+| `routing_flag` + `routing_flag_reason` in claim_task | Dashboard location badge | Migration 119 |
+| `create_task_run` RPC | Dashboard token counts and ROI panel | Migration 119 |
 
-### Supabase Schema (118 migrations applied)
+### Supabase Schema (119 migrations, migration 119 NOT YET APPLIED)
 
-- All RPCs live and verified with correct signatures
-- `claim_task(UUID, TEXT, TEXT, TEXT, TEXT)` — fixed params, no model_id
-- `transition_task(UUID, TEXT, JSONB)` — fixed JSONB type
-- Secrets vault: 10 keys (AES-256-GCM encrypted)
+- `claim_task(UUID, TEXT, TEXT, TEXT, TEXT)` -- sets `assigned_to`, `processing_by`, `routing_flag`
+- `transition_task(UUID, TEXT, TEXT)` -- clears `processing_by`, keeps `assigned_to`
+- `create_task_run(UUID, TEXT, ...)` -- NEW, records tokens/costs/ROI
 
-### Connectors (4 API + 7 web couriers)
+### Dashboard Contract (See `docs/HOW_DASHBOARD_WORKS.md`)
 
-|| ID | Type | Status | Notes |
-|---|---|---|---|
-| hermes | cli | active (primary) | v0.8.0, updating to v0.9.0 |
-| opencode | cli | active | |
-| gemini-api | api | active | GEMINI_API_KEY |
-| groq-api | api | active | GROQ_API_KEY |
-| nvidia-api | api | active | NVIDIA_API_KEY |
-| deepseek-api | api | benched | out of credits |
-| openrouter-api | api | emergency_fallback | |
-| 7 web couriers | web | active | browser-based |
+**CRITICAL: Dashboard is READ-ONLY. Fix Go/Supabase, never the dashboard.**
 
-### Models (16 configured)
+Dashboard expects from Supabase:
+1. `tasks.assigned_to` = model ID (e.g. "glm-5") ← Fixed in migration 119
+2. `task_runs` records with tokens/costs ← Fixed in migration 119
+3. `tasks.slice_id` = slice grouping ← Already set by planner in validation.go
+4. `tasks.routing_flag` = "internal"/"mcp"/"web" ← Fixed in migration 119
+5. `task_runs` cost/savings columns ← Already calculated by Go
+6. `models.status` = "active"/"paused" ← Already in models table
+7. `orchestrator_events` for timeline ← NOT YET IMPLEMENTED (empty timeline OK)
 
-Primary: GLM-5 via Z.AI (hermes CLI). Fallback chain: Gemini Flash → Groq → NVIDIA → OpenRouter free tiers.
-
-**WARNING: ZAI/GLM subscription ends May 1.**
-
----
-
-## What Got Built (April 2026)
-
-### Governor (Go, ~15k lines, 16 packages)
-
-- Event-driven runtime with session factory, agent pool, connection router
-- MCP client: 52 tools from jcodemunch
-- 3-layer memory (short/mid/long-term) in Supabase
-- Context compaction, gitree (git abstraction), worktrees
-- Model router: courier availability → connector matching → model assignment
-- Pipeline: plan → planner → supervisor → council → tasks → dependency-locked claiming
-
-### Supabase Schema (118 migrations)
-
-- Core: tasks, plans, task_runs, orchestrator_events, platforms, models, prompts, slices
-- Memory: memory_sessions, memory_project, memory_rules
-- Performance: model_scores, performance_metrics, failure_records, checkpoints, state_transitions
-- Security: security_audit_log, secrets_vault
-
-### Knowledge Layer (.context/)
-
-- lean-ctx (map.md): Go function signatures
-- jCodeMunch (index.db): All code symbols
-- knowledge.db: Prose, rules, prompts, docs, schema
+### Key Dashboard Data Flow
+```
+Governor writes to Supabase → Dashboard reads via Realtime → User sees updates
+tasks.assigned_to = "glm-5" → adaptVibePilotToDashboard → owner: "agent.glm-5" → shows agent icon
+task_runs tokens/costs → calculateROI() → ROI panel
+```
 
 ---
 
 ## Known Issues
 
-### To Fix (Hermes Update)
-- **Hermes v0.8.0 GLM-5 bug** — empty response recovery broken for reasoning models. Fixed in v0.9.0 commit d6785dc4. Update with `hermes update`.
+### Fixed This Session
+- ~~Hermes v0.8.0 GLM-5 empty response~~ → Updated to v0.9.0
+- ~~`\r` in JSON crashing parser~~ → Stripped in extractJSON
+- ~~`assigned_to` never set~~ → claim_task now sets it to model ID
+- ~~`create_task_run` RPC missing~~ → Created in migration 119
 
-### Existing (Not Caused By Tonight)
-- **Startup missed events** — plans inserted before governor subscribes sit in `draft`. Need boot scan for stuck plans. NOT YET IMPLEMENTED (recovery code was discarded).
-- **Worktree branch leak** — task operations switch main repo branch. Pre-commit hook makes it worse.
+### Still To Fix
+- **Orchestrator events not written** — Go never inserts into `orchestrator_events`. Dashboard timeline empty.
+- **Startup missed events** — plans inserted before governor subscribes sit in `draft`. Need boot scan for stuck plans. NOT YET IMPLEMENTED.
+- **Worktree branch leak** — task operations switch main repo branch instead of isolated worktree.
 - **ZAI subscription ends May 1** — test fallback chain before then.
-- **Browser tool** — Playwright headless, no cookies. Real Chrome via CDP works.
-- **Dashboard** — not reflecting real-time status correctly.
+- **`received` status never used** — Dashboard expects `in_progress → received → review` flow. Governor jumps straight to execution.
 
-### NOT Issues (False Alarms From Tonight)
-- CLIRunner is NOT broken — it's agent-agnostic, handles JSON streaming correctly
-- decision.go extractJSON is NOT broken — balanced brace extraction works fine
-- Governor pipeline logic is NOT broken — planner → supervisor → council → tasks flow is correct
-- The problem was hermes v0.8.0 returning empty/partial output with GLM-5
+### NOT Issues (False Alarms)
+- CLIRunner is NOT broken — it's agent-agnostic
+- decision.go extractJSON is NOT broken (was just missing \r strip)
+- Governor pipeline logic is NOT broken
+- The problem was hermes v0.8.0 + missing RPCs, not the governor
 
 ---
 
 ## Hardware: ThinkPad X220
-
 - Intel i5-2520M (Sandy Bridge, no AVX2, no GPU)
 - 16GB RAM (~10GB available)
 - ~780GB disk free
 - Phone WiFi tethered
 
----
-
-**Last Updated:** 2026-04-17 (discarded all panicked rewrites, honest assessment)
+**Last Updated:** 2026-04-17 05:30 (after session fixes, before sleep)
