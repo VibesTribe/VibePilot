@@ -1,43 +1,54 @@
 # PLAN: Hello World Endpoint
 
 ## Overview
-Add a GET /hello endpoint to the governor webhook HTTP server (port 8080) that returns `{"message":"Hello from VibePilot"}`.
+Add a `/hello` GET endpoint to the governor webhook HTTP server that returns `{"message":"Hello from VibePilot"}` with `application/json` content type. One file change, ~15 lines of code.
 
 ## Architecture Notes
-The webhook server lives in `governor/internal/webhooks/server.go`. It creates an `http.NewServeMux()` in `Start()` (line 74) and registers routes via `mux.HandleFunc`. The package already imports `encoding/json` and `net/http` -- no new dependencies needed. The handler and route registration both go in this single file.
+- The governor's HTTP server lives in `governor/internal/webhooks/server.go`
+- It uses `net/http.NewServeMux()` — routes are registered via `mux.HandleFunc`
+- Currently only one route is registered: the webhook path
+- The `/hello` route will be added alongside it in the `Start()` method
+- No new packages, no new files, no new dependencies
 
 ## Tasks
 
-### T001: Add /hello GET handler and route
-**Confidence:** 0.99
+### T001: Add /hello GET endpoint to webhook server
+**Confidence:** 0.98
 **Category:** coding
 **Dependencies:** none
 
 #### Prompt Packet
 ```
-# TASK: T001 - Add /hello GET handler and route
+# TASK: T001 - Add /hello GET endpoint to webhook server
 
 ## Context
-The governor webhook server (port 8080) needs a health/readiness endpoint that external callers can hit to confirm the service is alive. This is a single GET route returning static JSON.
+The governor exposes an HTTP server via `governor/internal/webhooks/server.go` for receiving webhooks. A simple health/identity endpoint at `/hello` is needed so operators can verify the server is running and identify it as VibePilot. This is a single-file change adding ~12 lines.
 
 ## What to Build
 
-1. Add a handler method `handleHello` on the `Server` struct in `governor/internal/webhooks/server.go`:
-   - Accept only GET. For any other method, return 405.
-   - Set header `Content-Type: application/json`.
-   - Write HTTP 200 with body `{"message":"Hello from VibePilot"}`.
-   - Use `json.Marshal` on a struct or map (not raw string concatenation).
-   - ~12 lines of code.
+In `governor/internal/webhooks/server.go`, in the `Start()` method (line 73), add a second route registration to the mux:
 
-2. Register the route in the `Start()` method, right after the existing `mux.HandleFunc(s.path, s.handleWebhook)` line (line 75):
+1. After line 75 (`mux.HandleFunc(s.path, s.handleWebhook)`), add:
    ```go
    mux.HandleFunc("/hello", s.handleHello)
    ```
 
-3. No new imports. `encoding/json` and `net/http` are already in the import block.
+2. Add a new handler method on the Server struct (place it after the `handleWebhook` method, around line 189):
+   ```go
+   func (s *Server) handleHello(w http.ResponseWriter, r *http.Request) {
+   	if r.Method != http.MethodGet {
+   		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+   		return
+   	}
+   	w.Header().Set("Content-Type", "application/json")
+   	json.NewEncoder(w).Encode(map[string]string{"message": "Hello from VibePilot"})
+   }
+   ```
+
+No other files need to change. `encoding/json` is already imported. `net/http` is already imported.
 
 ## Files
-- `governor/internal/webhooks/server.go` -- add `handleHello` method + one route registration line
+- `governor/internal/webhooks/server.go` — add `/hello` route in `Start()`, add `handleHello` method
 ```
 
 #### Expected Output
@@ -49,3 +60,17 @@ The governor webhook server (port 8080) needs a health/readiness endpoint that e
   "verification": "curl http://localhost:8080/hello returns {\"message\":\"Hello from VibePilot\"} with Content-Type application/json"
 }
 ```
+
+---
+
+## Dependency Graph
+
+```
+T001 (no dependencies)
+```
+
+## Risk Assessment
+- **Complexity:** Trivial — 12 lines in one file
+- **Dependencies:** None (json and net/http already imported)
+- **Blast radius:** Zero — new route, no existing code touched
+- **Rollback:** Remove 2 lines from Start() and the handleHello method
