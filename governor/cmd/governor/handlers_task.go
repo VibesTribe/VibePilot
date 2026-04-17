@@ -208,8 +208,9 @@ func (h *TaskHandler) executeTask(
 		json.Unmarshal(taskPacket.Context, &contextData)
 	}
 
-	session, err := h.factory.CreateWithConnector(ctx, "internal_cli", taskCategory, connectorID)
+	session, err := h.factory.CreateWithConnector(ctx, "task_runner", taskCategory, connectorID)
 	if err != nil {
+		log.Printf("[TaskHandler] Session create failed for task %s: %v", truncateID(taskID), err)
 		h.failTask(ctx, taskID, modelID, branchName, "session_create_failed")
 		return err
 	}
