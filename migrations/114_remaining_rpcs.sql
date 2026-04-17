@@ -131,10 +131,10 @@ DROP FUNCTION IF EXISTS load_checkpoint(UUID) CASCADE;
 CREATE OR REPLACE FUNCTION load_checkpoint(
   p_task_id UUID
 )
-RETURNS TABLE(step TEXT, progress NUMERIC, output TEXT, files JSONB, timestamp TIMESTAMPTZ) AS $$
+RETURNS TABLE(step TEXT, progress NUMERIC, output TEXT, files JSONB, checkpoint_ts TIMESTAMPTZ) AS $$
 BEGIN
   RETURN QUERY
-  SELECT c.step, c.progress, c.output, c.files, c.timestamp
+  SELECT c.step, c.progress, c.output, c.files, c.timestamp AS checkpoint_ts
   FROM checkpoints c
   WHERE c.task_id = p_task_id
   ORDER BY c.timestamp DESC
