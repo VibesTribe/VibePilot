@@ -31,7 +31,7 @@
       "type": "cli",
       "status": "active",
       "command": "hermes",
-      "cli_args": ["chat", "-q", "{PROMPT}", "-Q"],
+      "cli_args": ["chat", "-q", "{PROMPT}", "-Q", "-t", "terminal,file", "--yolo", "--max-turns", "50"],
       "timeout_seconds": 300,
       "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep", "search", "browser", "terminal", "file"],
       "notes": "Hermes Agent CLI. Currently running GLM-5 via Z.AI."
