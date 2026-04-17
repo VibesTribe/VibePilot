@@ -31,6 +31,17 @@ var (
 )
 
 func main() {
+	// Check for smoke test flag
+	if len(os.Args) > 1 && os.Args[1] == "-smoke-test" {
+		dbURL := os.Getenv("SUPABASE_URL")
+		dbKey := os.Getenv("SUPABASE_SERVICE_KEY")
+		if dbURL == "" || dbKey == "" {
+			log.Fatal("SUPABASE_URL and SUPABASE_SERVICE_KEY required for smoke test")
+		}
+		runSmokeTest(dbURL, dbKey)
+		return
+	}
+
 	log.Printf("VibePilot Governor %s (commit: %s, built: %s)", version, commit, date)
 
 	configDir := getConfigDir()
@@ -50,6 +61,13 @@ func main() {
 	log.Println("Connected to database")
 
 	cfg.SetDatabase(database)
+
+	// Validate all dependencies before accepting work
+	validateDB := &startupDBAdapter{db: database}
+	startupErrors := startupValidate(configDir, validateDB)
+	if startupErrors > 0 {
+		log.Printf("[Startup] Governor starting in DEGRADED mode (%d validation errors). Some features may not work.", startupErrors)
+	}
 
 	if err := cfg.SyncPromptsToDB(); err != nil {
 		log.Printf("Warning: failed to sync prompts to DB: %v", err)
