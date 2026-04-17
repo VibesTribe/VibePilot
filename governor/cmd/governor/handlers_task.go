@@ -98,13 +98,13 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 
 	// Route to model
 	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-		AgentID:  "internal_cli",
+		AgentID:  "task_runner",
 		TaskID:   taskID,
 		TaskType: taskCategory,
 	})
 	if err != nil || routingResult == nil {
 		routingResult, _ = h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-			AgentID:  "internal_cli",
+			AgentID:  "task_runner",
 			TaskID:   taskID,
 			TaskType: taskType,
 		})
