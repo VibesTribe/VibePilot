@@ -1,7 +1,5 @@
 -- Migration 119: Fix claim_task (set assigned_to) and create create_task_run RPC
--- 
--- Dashboard reads tasks.assigned_to to show which model is working
--- Dashboard reads task_runs for token counts, costs, ROI
+-- Rerunnable: uses DROP + CREATE to replace any existing version
 -- See docs/HOW_DASHBOARD_WORKS.md
 
 -- 1. claim_task: set assigned_to = model ID, routing_flag for dashboard
@@ -30,12 +28,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 2. create_task_run: record execution results for dashboard token/cost/ROI display
--- Columns that exist: id, task_id, model_id, platform, status, tokens_in, tokens_out, 
---   tokens_used, courier_tokens, courier_cost_usd, courier_model_id,
---   platform_theoretical_cost_usd, total_actual_cost_usd, total_savings_usd,
---   started_at, completed_at, result, chat_url
-DROP FUNCTION IF EXISTS create_task_run(UUID, TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER, INTEGER, TEXT, INTEGER, DECIMAL, DECIMAL, DECIMAL, DECIMAL, TIMESTAMPTZ, TIMESTAMPTZ, TEXT);
+-- 2. Drop any old create_task_run signatures before recreating
+DO $$
+DECLARE
+  sig RECORD;
+BEGIN
+  FOR sig IN
+    SELECT p.oid::regprocedure AS signature
+    FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'create_task_run'
+  LOOP
+    EXECUTE 'DROP FUNCTION IF EXISTS ' || sig.signature;
+    RAISE NOTICE 'Dropped %', sig.signature;
+  END LOOP;
+END;
+$$;
+
+-- 3. create_task_run: record execution results for dashboard token/cost/ROI display
 CREATE OR REPLACE FUNCTION create_task_run(
   p_task_id UUID,
   p_model_id TEXT DEFAULT NULL,
