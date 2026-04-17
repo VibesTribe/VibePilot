@@ -255,6 +255,7 @@ func parseFilesArray(raw json.RawMessage) []File {
 
 func extractJSON(output string) string {
 	output = strings.TrimSpace(output)
+	output = strings.ReplaceAll(output, "\r", "")
 
 	if strings.Contains(output, "```") {
 		lines := strings.Split(output, "\n")
