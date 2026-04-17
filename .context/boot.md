@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-17T06:00:01Z | Commit: 4aaed0c3 | Branch: main
+# Generated: 2026-04-17T08:13:08Z | Commit: ae25d7dd | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -182,11 +182,11 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
 - governor/internal/memory/ (2 files, 19 funcs, 5 types)
 - governor/internal/realtime/ (1 files, 23 funcs, 8 types)
-- governor/internal/runtime/ (10 files, 165 funcs, 92 types)
+- governor/internal/runtime/ (10 files, 164 funcs, 92 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 15 funcs, 4 types)
-- governor/internal/webhooks/ (2 files, 21 funcs, 7 types)
+- governor/internal/webhooks/ (2 files, 20 funcs, 7 types)
 - governor/pkg/types/ (1 files, 0 funcs, 9 types)
 ## Config: JSON (auto-discovered)
   config/agents.json - Agent definitions with capability declarations. Roles separated: decide vs execute. Only Maintenance has git write.
@@ -221,7 +221,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 4aaed0c3
+- Commit: ae25d7dd
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -240,33 +240,33 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 5. Raw source = for implementation details only
 
 ## Current Status (from CURRENT_STATE.md)
-# VibePilot Current State - 2026-04-16
-## Status: Fully operational. Schema deployed, vault stocked, worktrees WIRED AND LIVE.
+# VibePilot Current State - 2026-04-17
+## Status: Pipeline proven end-to-end. Hermes v0.8.0 has known GLM-5 bug — updating to v0.9.0 next.
 ### The Repo Situation
 Two copies on disk, both synced to main:
-| Location | Purpose | State |
+|| Location | Purpose | State |
 |---|---|---|
-| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Current (main). Binary rebuilt Apr 16 00:05. |
-| `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main). |
-**GitHub main is current** -- all changes pushed.
+| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Binary from Apr 16, includes task_runner fix. |
+| `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main), all uncommitted hacks discarded. |
+**GitHub main is current.** Committed changes are safe (SQL migrations + one Go fix). All panicked rewrites to CLIRunner/decision.go/recovery were discarded — those were bandaids for a hermes bug already fixed upstream.
 ---
 ### What's Running
-- **Governor:** systemd user service, active (running since Apr 16 00:05)
-  - Binary: `~/vibepilot/governor/governor` (compiled Apr 16, includes worktree wiring)
+- **Governor:** systemd user service
+  - Binary: `~/vibepilot/governor/governor`
   - Service: `systemctl --user status vibepilot-governor`
   - Logs: `journalctl --user -u vibepilot-governor -f`
-  - MCP servers: jcodemunch only (51 tools). jDocMunch + jDataMunch REMOVED.
-  - Governor MCP server: disabled in config (ready to enable for SSE port 8081)
-  - **Worktrees: ENABLED AND WIRED** -- base path `/home/vibes/VibePilot-work/`
-  - **Connectors registered:** claude-code (cli), gemini-api (api), groq-api (api), nvidia-api (api)
+  - MCP servers: jcodemunch (52 tools). jDocMunch removed. jDataMunch disabled.
+  - Connectors registered: hermes (cli), opencode (cli), gemini-api, groq-api, nvidia-api
+- **Hermes Agent:** v0.8.0, 100 commits behind (v0.9.0 available)
+  - **Known bug in v0.8.0:** Empty response recovery broken for reasoning models (GLM-5, Qwen, mimo). Fixed in commit d6785dc4 / v0.9.0.
+  - Update command: `hermes update`
 - **Cloudflared tunnel:** live at vibestribe.rocks, sacred (don't touch)
-- **Hermes agent:** accessible via dashboard chat through tunnel
 - **Chrome CDP:** port 9222, bind mount active, user auto-logged into Gmail/Gemini/Sheets
 - **TTS:** edge-tts (fast, free)
-### Connectors (4 API + 7 web couriers)
-| ID | Type | Status | Key Vault |
-|---|---|---|---|
-| claude-code | cli | active | none (local) |
-| gemini-api | api | active | GEMINI_API_KEY |
-| groq-api | api | active | GROQ_API_KEY |
-| nvidia-api | api | active | NVIDIA_API_KEY |
+### Pipeline Proven Working (Smoke Tests, Apr 16-17)
+3 out of 4 smoke tests passed ALL stages:
+```
+Plan inserted → Planner creates plan → Supervisor approves → Tasks created → Task claimed by glm-5 → Hermes executes → Task moved to review
+```
+**Timing:** Full pipeline ~3 minutes (planner 1m30s, supervisor 1m17s, task execution 45s)
+**Failures were hermes/GLM-5** (empty response bug), NOT governor logic. The 1 failure showed `🔎 preparing search_files…` as hermes output — partial streamed content that v0.9.0 fixes.
