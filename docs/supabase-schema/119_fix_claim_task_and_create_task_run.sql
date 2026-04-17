@@ -53,7 +53,7 @@ CREATE OR REPLACE FUNCTION create_task_run(
   p_total_savings_usd DECIMAL DEFAULT 0,
   p_started_at TIMESTAMPTZ DEFAULT NOW(),
   p_completed_at TIMESTAMPTZ DEFAULT NOW(),
-  p_result TEXT DEFAULT NULL
+  p_result JSONB DEFAULT NULL
 )
 RETURNS UUID AS $$
 DECLARE
