@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-17T04:28:35Z | Commit: d53a0218 | Branch: main
+# Generated: 2026-04-17T06:00:01Z | Commit: 4aaed0c3 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -182,11 +182,11 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
 - governor/internal/memory/ (2 files, 19 funcs, 5 types)
 - governor/internal/realtime/ (1 files, 23 funcs, 8 types)
-- governor/internal/runtime/ (10 files, 164 funcs, 92 types)
+- governor/internal/runtime/ (10 files, 165 funcs, 92 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 15 funcs, 4 types)
-- governor/internal/webhooks/ (2 files, 20 funcs, 7 types)
+- governor/internal/webhooks/ (2 files, 21 funcs, 7 types)
 - governor/pkg/types/ (1 files, 0 funcs, 9 types)
 ## Config: JSON (auto-discovered)
   config/agents.json - Agent definitions with capability declarations. Roles separated: decide vs execute. Only Maintenance has git write.
@@ -221,7 +221,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: d53a0218
+- Commit: 4aaed0c3
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
