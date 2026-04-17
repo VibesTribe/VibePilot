@@ -222,16 +222,37 @@ func validateRPCs(ctx context.Context, database interface {
 	}
 
 	errors := 0
-	missing := []string{}
 
+	// Probe each RPC with matching params to check existence.
+	// We can't query pg_proc via REST API, so we call each RPC with safe dummy params.
+	// If it returns 404/PGRST202, the function doesn't exist.
+	// Any other error (FK violation, no rows, etc.) means it EXISTS and is working.
+	rpcTestParams := map[string]map[string]interface{}{
+		"update_plan_status":       {"p_plan_id": "00000000-0000-0000-0000-000000000000", "p_status": "test"},
+		"claim_task":               {"p_task_id": "00000000-0000-0000-0000-000000000000", "p_agent_id": "test", "p_model_id": "test", "p_connector_id": "test"},
+		"transition_task":          {"p_task_id": "00000000-0000-0000-0000-000000000000", "p_new_status": "test"},
+		"create_task_run":          {"p_task_id": "00000000-0000-0000-0000-000000000000", "p_status": "test", "p_model_id": "test", "p_connector_id": "test"},
+		"record_model_success":     {"p_model_id": "test"},
+		"record_model_failure":     {"p_model_id": "test"},
+		"set_processing":           {"p_table_name": "tasks", "p_record_id": "00000000-0000-0000-0000-000000000000"},
+		"clear_processing":         {"p_table_name": "tasks", "p_record_id": "00000000-0000-0000-0000-000000000000"},
+		"record_performance_metric": {"p_metric_type": "test", "p_metric_name": "test"},
+		"record_failure":           {"p_task_id": "00000000-0000-0000-0000-000000000000"},
+		"calculate_run_costs":      {"p_run_id": "00000000-0000-0000-0000-000000000000"},
+	}
+
+	missing := []string{}
 	for _, rpc := range requiredRPCs {
-		// Try calling with empty params -- if it returns 404, the RPC doesn't exist
-		_, err := database.RPC(ctx, rpc, map[string]interface{}{})
+		params, ok := rpcTestParams[rpc]
+		if !ok {
+			params = map[string]interface{}{}
+		}
+		_, err := database.RPC(ctx, rpc, params)
 		if err != nil {
-			if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "Could not find") {
+			if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "Could not find") || strings.Contains(err.Error(), "PGRST202") {
 				missing = append(missing, rpc)
 			}
-			// Other errors (like wrong params) mean the RPC exists -- that's fine
+			// Other errors (FK violations, not found rows) mean the RPC exists
 		}
 	}
 
@@ -246,7 +267,7 @@ func validateRPCs(ctx context.Context, database interface {
 	for _, rpc := range optionalRPCs {
 		_, err := database.RPC(ctx, rpc, map[string]interface{}{})
 		if err != nil {
-			if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "Could not find") {
+			if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "Could not find") || strings.Contains(err.Error(), "PGRST202") {
 				optMissing = append(optMissing, rpc)
 			}
 		}

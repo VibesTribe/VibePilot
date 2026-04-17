@@ -1,5 +1,5 @@
 {
-  "prompts_dir": "/home/vibes/vibepilot/prompts",
+  "prompts_dir": "/home/vibes/VibePilot/prompts",
   "database": {
     "type": "supabase",
     "url_env": "SUPABASE_URL",
@@ -13,7 +13,7 @@
   "git": {
     "host": "github",
     "repo_env": "GITHUB_REPO",
-    "repo_path": "/home/vibes/vibepilot",
+    "repo_path": "/home/vibes/VibePilot",
     "token_env": "GITHUB_TOKEN",
     "protected_branches": [
       "main",

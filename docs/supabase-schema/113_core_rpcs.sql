@@ -271,6 +271,36 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ========================================
+-- MISSING TABLES needed by the RPCs above
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS model_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  model_id TEXT NOT NULL UNIQUE,
+  success_count INT DEFAULT 0,
+  failure_count INT DEFAULT 0,
+  total_count INT DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS performance_metrics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  metric_type TEXT NOT NULL,
+  metric_name TEXT NOT NULL,
+  value JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS failure_records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID REFERENCES tasks(id),
+  model_id TEXT,
+  error_type TEXT,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ========================================
 -- GRANT permissions
 -- ========================================
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
