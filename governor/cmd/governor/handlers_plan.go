@@ -326,13 +326,23 @@ func runPlanReview(
 		log.Printf("[PlanReview] Plan %s approved and tasks created in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
 
 	case "needs_revision":
+		failureClass := review.FailureClass
+		if failureClass == "" {
+			failureClass = "plan_quality"
+		}
+		failureDetail := review.FailureDetail
+		if failureDetail == "" {
+			failureDetail = review.Reasoning
+		}
 		_, err = database.RPC(ctx, "update_plan_status", map[string]any{
 			"p_plan_id": planID,
 			"p_status":  "revision_needed",
 			"p_review_notes": map[string]any{
-				"decision":  review.Decision,
-				"reasoning": review.Reasoning,
-				"concerns":  review.Concerns,
+				"decision":      review.Decision,
+				"failure_class": failureClass,
+				"failure_detail": failureDetail,
+				"reasoning":     review.Reasoning,
+				"concerns":      review.Concerns,
 			},
 		})
 		if err != nil {
@@ -340,7 +350,7 @@ func runPlanReview(
 			return
 		}
 
-		log.Printf("[PlanReview] Plan %s needs revision", truncateID(planID))
+		log.Printf("[PlanReview] Plan %s needs revision: %s (%s)", truncateID(planID), failureClass, failureDetail)
 
 	case "council_review":
 		_, err = database.RPC(ctx, "update_plan_status", map[string]any{
