@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-17T08:13:08Z | Commit: ae25d7dd | Branch: main
+# Generated: 2026-04-17T14:15:27Z | Commit: 03550d89 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -221,7 +221,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: ae25d7dd
+- Commit: 03550d89
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -241,14 +241,18 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State - 2026-04-17
-## Status: Pipeline proven end-to-end. Hermes v0.8.0 has known GLM-5 bug — updating to v0.9.0 next.
+## Status: Pipeline working end-to-end. Dashboard fixes in migration 119 (needs applying).
+### What needs to happen on wake:
+1. Apply migration 119 in Supabase SQL editor (copy from GitHub `migrations/119_fix_claim_task_and_create_task_run.sql`)
+2. Rebuild governor binary (already built locally, needs copy)
+3. Test pipeline -- dashboard should now show active agent on tasks
 ### The Repo Situation
 Two copies on disk, both synced to main:
-|| Location | Purpose | State |
+| Location | Purpose | State |
 |---|---|---|
-| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Binary from Apr 16, includes task_runner fix. |
-| `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main), all uncommitted hacks discarded. |
-**GitHub main is current.** Committed changes are safe (SQL migrations + one Go fix). All panicked rewrites to CLIRunner/decision.go/recovery were discarded — those were bandaids for a hermes bug already fixed upstream.
+| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Binary from this session, includes \r fix |
+| `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main), all fixes committed |
+**GitHub main is current.** Latest commit: `bc839255` (migration 119 + \r fix)
 ---
 ### What's Running
 - **Governor:** systemd user service
@@ -257,16 +261,12 @@ Two copies on disk, both synced to main:
   - Logs: `journalctl --user -u vibepilot-governor -f`
   - MCP servers: jcodemunch (52 tools). jDocMunch removed. jDataMunch disabled.
   - Connectors registered: hermes (cli), opencode (cli), gemini-api, groq-api, nvidia-api
-- **Hermes Agent:** v0.8.0, 100 commits behind (v0.9.0 available)
-  - **Known bug in v0.8.0:** Empty response recovery broken for reasoning models (GLM-5, Qwen, mimo). Fixed in commit d6785dc4 / v0.9.0.
-  - Update command: `hermes update`
-- **Cloudflared tunnel:** live at vibestribe.rocks, sacred (don't touch)
-- **Chrome CDP:** port 9222, bind mount active, user auto-logged into Gmail/Gemini/Sheets
+- **Hermes Agent:** v0.9.0 (updated from v0.8.0)
+  - v0.8.0 bug FIXED: empty response recovery for GLM-5 (commit d6785dc4)
+  - v0.9.0 also fixes: partial streamed content on connection failure
+- **Cloudflared tunnel:** live at vibestrike.rocks, sacred (don't touch)
+- **Chrome CDP:** port 9222, bind mount active
 - **TTS:** edge-tts (fast, free)
-### Pipeline Proven Working (Smoke Tests, Apr 16-17)
-3 out of 4 smoke tests passed ALL stages:
+### Pipeline Proven Working (April 2026)
+Full pipeline proven 4 times:
 ```
-Plan inserted → Planner creates plan → Supervisor approves → Tasks created → Task claimed by glm-5 → Hermes executes → Task moved to review
-```
-**Timing:** Full pipeline ~3 minutes (planner 1m30s, supervisor 1m17s, task execution 45s)
-**Failures were hermes/GLM-5** (empty response bug), NOT governor logic. The 1 failure showed `🔎 preparing search_files…` as hermes output — partial streamed content that v0.9.0 fixes.
