@@ -2,35 +2,42 @@
 
 **Purpose:** Single source of truth for what Go code exists, what it does, and whether it aligns with VibePilot architecture. Never repeat this audit again.
 
-**Last Updated:** 2025-04-18
+**Last Updated:** 2026-04-18 (post Fix 1-3)
 
 ---
 
 ## What EXISTS and WORKS
 
 ### Config System
-- `models.json` -- 15 models defined with rate limits, pricing, capabilities, recovery config, learned data
-- `connectors.json` -- 17 destinations (3 CLI, 4 API, 10 web)
-- `routing.json` -- Strategies, agent restrictions, selection criteria, fallback config
-- `agents.json` -- 11 agents with model assignments, capabilities, connector references
+- `models.json` -- 15 models defined with rate limits, pricing, capabilities, recovery config, learned data (+ nemotron-ultra-253b)
+- `connectors.json` -- 18 destinations (3 CLI, 5 API including groq-api active + nvidia-api new, 10 web)
+- `routing.json` -- Strategies, agent restrictions, selection criteria, fallback config, `free_cascade` strategy with model priority order
+- `agents.json` -- 11 agents, NO model pins (empty model field = cascade routing)
 - All loaded at startup by `internal/runtime/config.go` and `internal/runtime/model_loader.go`
 
 ### Router (`internal/runtime/router.go` -- 513 lines)
 - `SelectRouting()` -- Main entry point, checks routing flag, courier availability, web vs internal
-- `selectInternal()` -- Uses agent model override OR cascade selection
-- `selectByCascade()` -- Iterates model priority, checks UsageTracker, picks first available, falls back to shortest cooldown
+- `selectInternal()` -- Agent model field empty → falls through to cascade selection
+- `selectByCascade()` -- Looks for `free_cascade` strategy first, iterates model priority list, checks UsageTracker, picks first available, falls back to shortest cooldown
 - `selectCourierModel()` -- Picks best active model with vision/browser capability
 - `tryWebRouting()` -- Routes to courier + web platform for external tasks
 - `getModelScore()` -- Calls Supabase RPC `get_model_score_for_task` (RPC DOES NOT EXIST)
 - `selectDestination()` -- Picks active web destination from connectors
 - `isDestinationAvailable()` -- Calls Supabase RPC `check_platform_availability` (RPC DOES NOT EXIST)
 
+### Cascade Routing (FIXED this session)
+- `free_cascade` strategy in routing.json defines priority: glm-5, llama-3.3-70b, kimi-k2, qwen3-32b, nemotron-ultra, llama-3.1-8b, deepseek-chat, gemini-2.5-flash, deepseek-reasoner
+- All agents.json model pins removed -- cascade routing now runs for all agents
+- groq-api connector activated (was `pending_key`, GROQ_API_KEY in vault)
+- nvidia-api connector added (NVIDIA_API_KEY in vault)
+- `runners.go` handles groq/nvidia/openrouter providers via `callOpenAICompatible()`
+
 ### Usage Tracker (`internal/runtime/usage_tracker.go` -- 450 lines)
 - `RegisterModel()` -- Loads model profiles at startup
 - `CanMakeRequest()` -- Checks cooldown, minute/hour/day/token limits, spacing requirements
-- `RecordUsage()` -- Tracks tokens in minute/hour/day/week windows -- **IS CALLED** from handlers_task.go:282
-- `RecordCompletion()` -- Tracks success/failure, updates learned data (avg duration, best/avoid task types) -- **IS CALLED** from handlers_task.go:260 and :350
-- `RecordRateLimit()` -- Sets cooldown expiry, increments rate limit count -- **IS CALLED** from handlers_task.go:258
+- `RecordUsage()` -- Tracks tokens in minute/hour/day/week windows -- **IS CALLED** from handlers_task.go
+- `RecordCompletion()` -- Tracks success/failure, updates learned data -- **IS CALLED** from handlers_task.go
+- `RecordRateLimit()` -- Sets cooldown expiry, increments rate limit count -- **IS CALLED** from handlers_task.go
 - `ExportForDashboard()` -- Serializes all model status to JSON -- **NEVER CALLED** from any handler or endpoint
 
 ### Model Loader (`internal/runtime/model_loader.go`)
@@ -40,18 +47,29 @@
 
 ### Supabase `models` Table (verified)
 - Has columns: id, status, name, vendor, context_limit, strengths, weaknesses, config (JSONB)
-- Tracks: tokens_used (1,166,695 for glm-5), tasks_completed (483), tasks_failed (1,381), success_rate (0.26)
+- Tracks: tokens_used (1,166,695 for glm-5), tasks_completed (483), tasks_failed, success_rate
 - Tracks: usage_windows (minute/hour/day/week), learned data, rate_limit_count, cooldown_expires_at
-- Has: rate_limits (JSONB), api pricing, subscription cost fields
+- **Pricing populated**: cost_input_per_1k_usd and cost_output_per_1k_usd set for all 11 active models
 - 15 models synced from models.json
+
+### Cost Calculation (FIXED this session)
+- `handlers_task.go:319` calls `calculateCosts()` for every task run
+- `calc_run_costs` Supabase RPC reads pricing from models table, returns theoretical/actual/savings
+- Go writes `platform_theoretical_cost_usd`, `total_actual_cost_usd`, `total_savings_usd` to task_runs
+- Dashboard ROI calculator reads these fields from task_runs and displays real savings
 
 ### Task Handlers
 - `handlers_task.go` (853 lines) -- Task available event, routing, worktree creation, hermes execution, recording
-- `handlers_testing.go` -- Runs `go test` in worktree's `governor/` subdirectory (FIXED this session)
+- `handlers_testing.go` -- Runs `go test` in worktree's `governor/` subdirectory, merges to TEST_MODULES/<slice>, then checks if all module tasks done and merges to `testing` branch
 - `handlers_plan.go` -- Planner creates plans from PRDs, parses JSON output
 - `handlers_maint.go` -- Maintenance agent for code changes
 - `handlers_council.go` -- Council review for complex plans
 - `handlers_research.go` -- Researcher agent
+
+### Module-to-Testing Merge (FIXED this session)
+- After a task merges to `TEST_MODULES/<slice>`, `tryMergeModuleToTesting()` checks sibling tasks
+- If all tasks with same slice_id + plan_id are in terminal state → merges module branch to `testing`
+- `testing` branch exists on origin as merge target
 
 ### Webhook Server (`internal/webhooks/github.go`)
 - Detects PRD files pushed to `docs/prd/` (singular)
@@ -78,54 +96,71 @@
 
 ---
 
+## Fixes Applied This Session (2026-04-18)
+
+### Fix 1: Cascade Routing
+- `runners.go`: Added groq/nvidia/openrouter provider handling (all OpenAI-compatible)
+- `connectors.json`: Activated groq-api, added nvidia-api connector
+- `models.json`: Added nemotron-ultra-253b with nvidia access_via
+- `routing.json`: Added `free_cascade` strategy with 9 models in priority order
+- `agents.json`: Removed all model pins so cascade routing runs for all agents
+
+### Fix 2: Module-to-Testing Merge
+- `handlers_testing.go`: Added `tryMergeModuleToTesting()` method
+- After task merge to `TEST_MODULES/<slice>`, checks if all sibling tasks are done
+- If all complete → merges module branch to `testing` branch
+- Created and pushed `testing` branch to origin
+
+### Fix 3: Cost Calculation
+- Supabase `models` table: Updated cost_input/output_per_1k_usd for all 11 models with real pricing
+- Migration 122: Created `calc_run_costs` RPC (renamed from `calculate_run_costs` to avoid stuck overloads)
+- RPC reads pricing from models table, returns theoretical/actual/savings as JSONB
+- Go code already wired at handlers_task.go:319, just needed the RPC to work
+
+---
+
 ## What DOES NOT WORK and WHY
 
 ### 1. Missing Supabase RPCs
 **What:** `get_model_score_for_task` and `check_platform_availability`
 **Impact:** Router falls back to default score (0.5) for all models. Platform availability always returns true. Model scoring is blind.
-**Why:** These RPCs were designed but never created in Supabase migrations.
 
-### 2. Agent Model Overrides Short-Circuit Cascade
-**What:** `agents.json` has `"model": "glm-5"` for planner, supervisor, tester, task_runner, maintenance
-**Impact:** `selectInternal()` finds the agent model override first and routes directly there. The cascade logic in `selectByCascade()` never runs for these agents.
-**Why:** agents.json was set up with fixed models before cascade routing was implemented. Nobody removed the pins.
-**Fix:** Remove `model` field from agents that should use cascade, or make it optional with empty string meaning "use cascade."
-
-### 3. ExportForDashboard Never Called
+### 2. ExportForDashboard Never Called
 **What:** `UsageTracker.ExportForDashboard()` exists but nothing calls it
 **Impact:** Dashboard has no way to get live model status, usage windows, cooldown info from the governor
-**Why:** No endpoint or event handler was wired to expose this data
 
-### 4. No ROI / Cost Calculator
-**What:** models.json has pricing data (`input_per_1m_usd`, `output_per_1m_usd`). Supabase has `api_cost_per_1k_tokens`, `subscription_cost`. No code aggregates these.
-**Impact:** Dashboard shows ROI $0, Tokens 0. No cost tracking happens.
-**Why:** Nobody wrote the calculator that reads pricing data and multiplies by recorded token usage
+### 3. Token Counting for Hermes
+**What:** Hermes CLI doesn't output token counts. The hermes runner in `connectors/runners.go` can't parse what isn't there.
+**Impact:** Token counts for glm-5 runs may be estimates or zeros. Other runners (Gemini, OpenAI-compatible) DO parse tokens correctly.
 
-### 5. Token Counting Inaccurate
-**What:** `RecordUsage()` is called but hermes doesn't report exact token counts. The `tokensIn` and `tokensOut` values passed are estimates (likely 0 or rough guesses).
-**Impact:** Supabase shows `tokens_used: 1,166,695` but this may not be accurate. Dashboard shows Tokens 0.
-**Why:** Hermes CLI doesn't output token usage in a parseable format. The runner (`connectors/runners.go`) would need to parse token data from hermes output.
-
-### 6. Webhook Points to Dead GCE IP
+### 4. Webhook Points to Dead GCE IP
 **What:** GitHub webhook URL is `http://34.45.124.117:8080/webhooks` -- the old GCE instance
 **Impact:** Pushing PRDs to GitHub does NOT auto-create plans. Manual Supabase INSERT required.
-**Fix:** Either (a) set up cloudflared tunnel for webhook, or (b) use an alternative trigger mechanism
+**Fix:** Set up cloudflared tunnel for x220
 
-### 7. PRD Path Mismatch
+### 5. PRD Path Mismatch
 **What:** Webhook watches `docs/prd/` (singular). Actual PRD directory is `docs/prds/` (plural).
 **Impact:** Even if webhook was reachable, it wouldn't detect any PRDs.
 **Fix:** Change line 98 of `github.go` to use `"docs/prds/"` or make it configurable
 
-### 8. Merge Goes to Wrong Branch
-**What:** Completed tasks merge to `TEST_MODULES/general` instead of `main`
-**Impact:** Merged code sits on a dead branch. `go test ./...` on main fails because tests reference code that was never merged to main. This causes EVERY subsequent task to fail testing.
-**Fix:** Merge target should be `main`, not a test modules branch
+### 6. gemini-api and deepseek-api Inactive
+**What:** Connectors exist in connectors.json but marked inactive. API keys exist in vault.
+**Impact:** Models gemini-2.5-flash and deepseek-chat/reasoner can't be reached via API.
+**Fix:** Activate connectors in connectors.json, verify API keys work
 
-### 9. Courier / Browser Use Not Integrated
+### 7. Courier / Browser Use Not Integrated
 **What:** `courier.go` dispatches to GitHub Actions. No Playwright/Browser Use integration exists in Go.
-**Impact:** Web platforms (chatgpt-web, gemini-web, etc.) in connectors.json are defined but unreachable. Free web tier models cannot be used.
-**Why:** Courier concept requires browser automation which needs Python/Playwright, not Go. The Go code has the dispatch mechanism but no browser automation.
+**Impact:** Web platforms (chatgpt-web, gemini-web, etc.) in connectors.json are defined but unreachable.
 
-### 10. Dashboard Telemetry Not Connected
-**What:** Dashboard adapter reads from Supabase. Governor writes to Supabase. But the specific fields the dashboard needs (token counts, ROI, active model status) are either not populated or not in the format the dashboard expects.
-**Impact:** Dashboard shows correct task counts and statuses for tasks that flow through, but Tokens: 0, ROI: $0, no model health info.
+### 8. Module-to-Main Merge
+**What:** Module-to-testing merge works. But testing-to-main merge doesn't exist yet.
+**Impact:** Code accumulates on `testing` branch but never reaches `main`.
+**Note:** User wants to decide the final merge flow (testing folder approach TBD).
+
+---
+
+## Previously Fixed Issues (confirmed resolved)
+
+- ~~Agent Model Overrides Short-Circuit Cascade~~ → Removed model pins from agents.json
+- ~~No ROI / Cost Calculator~~ → `calc_run_costs` RPC wired, pricing populated
+- ~~Merge Goes to Wrong Branch~~ → Module-to-testing merge implemented, testing branch created
