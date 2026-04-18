@@ -487,3 +487,13 @@ func (g *Gitree) gitCommand(ctx context.Context, args ...string) *exec.Cmd {
 	cmd.Dir = g.repoPath
 	return cmd
 }
+
+// Pull fetches and merges the latest changes from origin main
+func (g *Gitree) Pull(ctx context.Context) error {
+	cmd := g.gitCommand(ctx, "pull", "--rebase", "origin", "main")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git pull: %s: %w", string(out), err)
+	}
+	return nil
+}
