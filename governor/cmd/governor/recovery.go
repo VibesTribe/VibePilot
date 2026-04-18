@@ -291,3 +291,94 @@ func recoverPendingResources(ctx context.Context, database *db.DB) {
 
 	log.Printf("[ResourceRecovery] Released %d tasks from pending_resources", len(tasks))
 }
+
+// runStartupRehydration scans for tasks and plans in active states
+// and fires synthetic events so the governor picks them up on cold start.
+// This ensures the pipeline is autonomous even after restarts.
+func runStartupRehydration(ctx context.Context, database *db.DB, router *runtime.EventRouter) {
+	log.Println("[Rehydration] Scanning for active tasks and plans...")
+
+	// Rehydrate plans in draft status
+	plansRaw, err := database.Query(ctx, "plans", map[string]any{
+		"status": "in.(draft,council_review,revision_needed,pending_human)",
+		"order":  "created_at.asc",
+	})
+	if err != nil {
+		log.Printf("[Rehydration] Warning: could not query plans: %v", err)
+	} else {
+		var plans []map[string]any
+		if err := json.Unmarshal(plansRaw, &plans); err == nil {
+			for _, plan := range plans {
+				status, _ := plan["status"].(string)
+				id, _ := plan["id"].(string)
+				if id == "" {
+					continue
+				}
+				record, _ := json.Marshal(plan)
+				var eventType runtime.EventType
+				switch status {
+				case "draft":
+					eventType = runtime.EventPlanCreated
+				case "council_review":
+					eventType = runtime.EventCouncilReview
+				default:
+					eventType = runtime.EventPlanReview
+				}
+				log.Printf("[Rehydration] Firing event %s for plan %s (status=%s)", eventType, id[:8], status)
+				router.Route(runtime.Event{
+					Type:      eventType,
+					ID:        id,
+					Table:     "plans",
+					Record:    record,
+					Timestamp: time.Now(),
+				})
+			}
+		}
+	}
+
+	// Rehydrate tasks in active states (available, review, testing)
+	// Skip in_progress — those have processing_by set and will be caught by stale recovery
+	tasksRaw, err := database.Query(ctx, "tasks", map[string]any{
+		"status": "in.(available,review,testing)",
+		"order":  "created_at.asc",
+	})
+	if err != nil {
+		log.Printf("[Rehydration] Warning: could not query tasks: %v", err)
+	} else {
+		var tasks []map[string]any
+		if err := json.Unmarshal(tasksRaw, &tasks); err == nil {
+			for _, task := range tasks {
+				status, _ := task["status"].(string)
+				id, _ := task["id"].(string)
+				if id == "" {
+					continue
+				}
+				// Only rehydrate tasks without active processing_by
+				if pb, _ := task["processing_by"].(string); pb != "" {
+					log.Printf("[Rehydration] Skipping task %s (%s) — has processing_by=%q", id[:8], status, pb)
+					continue
+				}
+				record, _ := json.Marshal(task)
+				var eventType runtime.EventType
+				switch status {
+				case "available":
+					eventType = runtime.EventTaskAvailable
+				case "review":
+					eventType = runtime.EventTaskReview
+				case "testing":
+					eventType = runtime.EventTaskTesting
+				default:
+					continue
+				}
+				log.Printf("[Rehydration] Firing event %s for task %s (status=%s)", eventType, id[:8], status)
+				router.Route(runtime.Event{
+					Type:      eventType,
+					ID:        id,
+					Table:     "tasks",
+					Record:    record,
+					Timestamp: time.Now(),
+				})
+			}
+		}
+	}
+}

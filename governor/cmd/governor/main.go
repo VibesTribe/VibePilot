@@ -224,6 +224,10 @@ func main() {
 
 	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr)
 
+	// Rehydrate: fire synthetic events for any active tasks/plans so the
+	// governor picks them up without waiting for a realtime event.
+	runStartupRehydration(ctx, database, eventRouter)
+
 	if err := webhookServer.Start(ctx); err != nil {
 		log.Fatalf("Failed to start webhook server: %v", err)
 	}
