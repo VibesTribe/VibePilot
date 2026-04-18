@@ -30,7 +30,7 @@
         "llama-3.3-70b-versatile",
         "kimi-k2-instruct",
         "qwen3-32b",
-        "nemotron-ultra-253b",
+        "nvidia/llama-3.1-nemotron-ultra-253b-v1",
         "llama-3.1-8b-instant",
         "deepseek-chat",
         "gemini-2.0-flash",

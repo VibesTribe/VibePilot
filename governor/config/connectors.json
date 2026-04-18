@@ -61,7 +61,7 @@
         "glm-5"
       ],
       "provides_tools": [],
-      "notes": "Direct API for GLM-5. Fast — no CLI overhead. Used by planner/supervisor/tester."
+      "notes": "Direct API for GLM-5. Fast \u2014 no CLI overhead. Used by planner/supervisor/tester."
     },
     {
       "id": "hermes",
@@ -186,7 +186,7 @@
       "endpoint": "https://integrate.api.nvidia.com/v1",
       "api_key_ref": "NVIDIA_API_KEY",
       "models_available": [
-        "nvidia/llama-3.1-nemotron-ultra-253b"
+        "nvidia/llama-3.1-nemotron-ultra-253b-v1"
       ],
       "provides_tools": [],
       "notes": "Free tier with rate limits. Nemotron Ultra for complex tasks."
