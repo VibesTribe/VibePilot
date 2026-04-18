@@ -16,18 +16,14 @@ import (
 	"github.com/vibepilot/governor/internal/runtime"
 )
 
-// Version is set at build time via -ldflags "-X github.com/vibepilot/governor/internal/webhooks.Version=..."
-var Version = "dev"
-
 type Server struct {
-	port      int
-	path      string
-	secret    string
-	router    *runtime.EventRouter
-	github    *GitHubWebhookHandler
-	server    *http.Server
-	handlers  map[string]EventHandler
-	startedAt time.Time
+	port     int
+	path     string
+	secret   string
+	router   *runtime.EventRouter
+	github   *GitHubWebhookHandler
+	server   *http.Server
+	handlers map[string]EventHandler
 }
 
 type EventHandler func(ctx context.Context, payload *Payload) error
@@ -77,9 +73,6 @@ func (s *Server) RegisterHandler(eventType string, handler EventHandler) {
 func (s *Server) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(s.path, s.handleWebhook)
-	mux.HandleFunc("/status", s.handleStatus)
-
-	s.startedAt = time.Now()
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
@@ -193,34 +186,6 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[Webhooks] Processed %s from %s", eventType, supabasePayload.Table)
 	w.WriteHeader(http.StatusOK)
-}
-
-func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	uptime := int64(0)
-	if !s.startedAt.IsZero() {
-		uptime = int64(time.Since(s.startedAt).Seconds())
-	}
-
-	resp := struct {
-		Governor       string `json:"governor"`
-		Version        string `json:"version"`
-		Status         string `json:"status"`
-		UptimeSeconds  int64  `json:"uptime_seconds"`
-	}{
-		Governor:      "vibepilot",
-		Version:       Version,
-		Status:        "running",
-		UptimeSeconds: uptime,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
 }
 
 func (s *Server) handleGitHubWebhook(w http.ResponseWriter, r *http.Request, body []byte, eventType string) {
