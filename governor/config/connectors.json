@@ -9,9 +9,21 @@
       "type": "cli",
       "status": "inactive",
       "command": "opencode",
-      "cli_args": ["run", "--format", "json"],
+      "cli_args": [
+        "run",
+        "--format",
+        "json"
+      ],
       "timeout_seconds": 300,
-      "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep"],
+      "provides_tools": [
+        "read",
+        "write",
+        "bash",
+        "webfetch",
+        "edit",
+        "glob",
+        "grep"
+      ],
       "notes": "Uses ~700MB RAM per session. Consider Kilo for lower memory footprint."
     },
     {
@@ -20,9 +32,21 @@
       "type": "cli",
       "status": "inactive",
       "command": "claude",
-      "cli_args": ["-p", "--output-format", "json"],
+      "cli_args": [
+        "-p",
+        "--output-format",
+        "json"
+      ],
       "timeout_seconds": 300,
-      "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep"],
+      "provides_tools": [
+        "read",
+        "write",
+        "bash",
+        "webfetch",
+        "edit",
+        "glob",
+        "grep"
+      ],
       "notes": "Claude Code CLI. Inactive - auth broken after key rotation."
     },
     {
@@ -31,9 +55,31 @@
       "type": "cli",
       "status": "active",
       "command": "hermes",
-      "cli_args": ["chat", "-q", "{PROMPT}", "-Q", "-t", "terminal,file", "--yolo", "--max-turns", "50"],
+      "cli_args": [
+        "chat",
+        "-q",
+        "{PROMPT}",
+        "-Q",
+        "-t",
+        "terminal,file",
+        "--yolo",
+        "--max-turns",
+        "50"
+      ],
       "timeout_seconds": 300,
-      "provides_tools": ["read", "write", "bash", "webfetch", "edit", "glob", "grep", "search", "browser", "terminal", "file"],
+      "provides_tools": [
+        "read",
+        "write",
+        "bash",
+        "webfetch",
+        "edit",
+        "glob",
+        "grep",
+        "search",
+        "browser",
+        "terminal",
+        "file"
+      ],
       "notes": "Hermes Agent CLI. Currently running GLM-5 via Z.AI."
     },
     {
@@ -42,22 +88,35 @@
       "type": "cli",
       "status": "inactive",
       "command": "kimi",
-      "cli_args": ["run", "--format", "json"],
+      "cli_args": [
+        "run",
+        "--format",
+        "json"
+      ],
       "timeout_seconds": 300,
-      "provides_tools": ["read", "write", "bash", "websearch", "webfetch"],
+      "provides_tools": [
+        "read",
+        "write",
+        "bash",
+        "websearch",
+        "webfetch"
+      ],
       "notes": "Web search enabled"
     },
     {
       "id": "gemini-api",
       "name": "Gemini API",
       "type": "api",
-      "status": "inactive",
+      "status": "active",
       "provider": "google",
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
       "api_key_ref": "GEMINI_API_KEY",
-      "models_available": ["gemini-2.0-flash", "gemini-1.5-pro"],
+      "models_available": [
+        "gemini-2.0-flash",
+        "gemini-1.5-pro"
+      ],
       "provides_tools": [],
-      "notes": "Disabled - API key base64 decode error in vault"
+      "notes": "Re-enabled after vault fix"
     },
     {
       "id": "deepseek-api",
@@ -67,20 +126,27 @@
       "provider": "deepseek",
       "endpoint": "https://api.deepseek.com",
       "api_key_ref": "DEEPSEEK_API_KEY",
-      "models_available": ["deepseek-chat", "deepseek-reasoner"],
+      "models_available": [
+        "deepseek-chat",
+        "deepseek-reasoner"
+      ],
       "provides_tools": []
     },
     {
       "id": "groq-api",
       "name": "Groq Cloud API",
       "type": "api",
-      "status": "inactive",
+      "status": "active",
       "provider": "groq",
       "endpoint": "https://api.groq.com/openai/v1",
       "api_key_ref": "GROQ_API_KEY",
-      "models_available": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen3-32b"],
+      "models_available": [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "qwen3-32b"
+      ],
       "provides_tools": [],
-      "notes": "Disabled - vault decrypt failed for GROQ_API_KEY"
+      "notes": "Re-enabled after vault fix"
     },
     {
       "id": "openrouter-api",
@@ -90,7 +156,10 @@
       "provider": "openrouter",
       "endpoint": "https://openrouter.ai/api/v1",
       "api_key_ref": "OPENROUTER_API_KEY",
-      "models_available": ["deepseek/deepseek-r1:free", "google/gemini-2.5-flash-preview:free"],
+      "models_available": [
+        "deepseek/deepseek-r1:free",
+        "google/gemini-2.5-flash-preview:free"
+      ],
       "provides_tools": [],
       "notes": "EMERGENCY ONLY. Always use :free suffix. Set $0 spend limit in dashboard. Free models can fall back to paid without warning."
     },
@@ -102,7 +171,9 @@
       "provider": "nvidia",
       "endpoint": "https://integrate.api.nvidia.com/v1",
       "api_key_ref": "NVIDIA_API_KEY",
-      "models_available": ["nvidia/llama-3.1-nemotron-ultra-253b"],
+      "models_available": [
+        "nvidia/llama-3.1-nemotron-ultra-253b"
+      ],
       "provides_tools": [],
       "notes": "Free tier with rate limits. Nemotron Ultra for complex tasks."
     },
@@ -114,7 +185,9 @@
       "url": "https://chatgpt.com",
       "provider": "openai",
       "requires_auth": "browser_login",
-      "models_available": ["chatgpt-4o-mini"],
+      "models_available": [
+        "chatgpt-4o-mini"
+      ],
       "provides_tools": [],
       "notes": "Courier destination. Free tier: ~10 messages/3hrs. Manual or browser automation."
     },
@@ -126,7 +199,9 @@
       "url": "https://claude.ai",
       "provider": "anthropic",
       "requires_auth": "browser_login",
-      "models_available": ["claude-sonnet"],
+      "models_available": [
+        "claude-sonnet"
+      ],
       "provides_tools": [],
       "notes": "Courier destination. Variable daily limits. Good for PRD review."
     },
@@ -138,7 +213,10 @@
       "url": "https://gemini.google.com",
       "provider": "google",
       "requires_auth": "browser_login",
-      "models_available": ["gemini-2.5-flash", "gemini-2.5-pro"],
+      "models_available": [
+        "gemini-2.5-flash",
+        "gemini-2.5-pro"
+      ],
       "provides_tools": [],
       "notes": "Courier destination. 1M tokens/day free tier."
     },
@@ -150,7 +228,9 @@
       "url": "https://copilot.microsoft.com",
       "provider": "microsoft",
       "requires_auth": "microsoft_account",
-      "models_available": ["copilot"],
+      "models_available": [
+        "copilot"
+      ],
       "provides_tools": [],
       "notes": "Requires Microsoft account. Not usable."
     },
@@ -162,7 +242,10 @@
       "url": "https://chat.deepseek.com",
       "provider": "deepseek",
       "requires_auth": "optional",
-      "models_available": ["deepseek-chat", "deepseek-r1"],
+      "models_available": [
+        "deepseek-chat",
+        "deepseek-r1"
+      ],
       "provides_tools": [],
       "notes": "Courier destination. Generous free tier. Works without login."
     },
@@ -174,7 +257,10 @@
       "url": "https://qwen.ai",
       "provider": "alibaba",
       "requires_auth": "none",
-      "models_available": ["qwen-3", "qwen-2.5"],
+      "models_available": [
+        "qwen-3",
+        "qwen-2.5"
+      ],
       "provides_tools": [],
       "notes": "Courier destination. Works without login."
     },
@@ -186,7 +272,11 @@
       "url": "https://chat.mistral.ai",
       "provider": "mistral",
       "requires_auth": "browser_login",
-      "models_available": ["mistral-large", "codestral", "pixtral"],
+      "models_available": [
+        "mistral-large",
+        "codestral",
+        "pixtral"
+      ],
       "provides_tools": [],
       "notes": "Courier destination. Free tier available. Good for code."
     },
@@ -198,7 +288,10 @@
       "url": "https://notegpt.io/chat-deepseek",
       "provider": "notegpt",
       "requires_auth": "none",
-      "models_available": ["deepseek-r1", "deepseek-v3"],
+      "models_available": [
+        "deepseek-r1",
+        "deepseek-v3"
+      ],
       "provides_tools": [],
       "notes": "Courier destination. Free DeepSeek R1 & V3. No login required. Good backup."
     }
