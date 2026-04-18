@@ -805,7 +805,7 @@ func (h *TaskHandler) deleteCheckpoint(ctx context.Context, taskID string) {
 type costResult struct{ Theoretical, Actual, Savings float64 }
 
 func (h *TaskHandler) calculateCosts(ctx context.Context, modelID string, tokensIn, tokensOut int) costResult {
-	result, err := h.database.RPC(ctx, "calculate_run_costs", map[string]any{
+	result, err := h.database.RPC(ctx, "calc_run_costs", map[string]any{
 		"p_model_id": modelID, "p_tokens_in": tokensIn, "p_tokens_out": tokensOut, "p_courier_cost_usd": 0,
 	})
 	if err != nil {
