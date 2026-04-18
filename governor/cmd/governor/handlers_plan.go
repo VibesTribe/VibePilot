@@ -79,6 +79,12 @@ func handlePlanCreated(
 	}
 
 	repoPath := cfg.GetRepoPath()
+
+	// Pull latest changes so the PRD file exists on disk
+	if err := git.Pull(ctx); err != nil {
+		log.Printf("[EventPlanCreated] Warning: git pull failed: %v", err)
+	}
+
 	prdContent, err := os.ReadFile(filepath.Join(repoPath, prdPath))
 	if err != nil {
 		log.Printf("[EventPlanCreated] Failed to read PRD: %v", err)
