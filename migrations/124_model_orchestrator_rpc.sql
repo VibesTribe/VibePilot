@@ -1,5 +1,9 @@
 
-DROP FUNCTION IF EXISTS check_platform_availability(TEXT) CASCADE;
+-- Migration 124: Model orchestrator RPCs
+-- Run entire script in Supabase SQL Editor
+
+-- Drop old function with wrong return type
+DROP FUNCTION IF EXISTS check_platform_availability(TEXT);
 
 CREATE OR REPLACE FUNCTION check_platform_availability(p_platform_id TEXT)
 RETURNS JSONB
@@ -64,9 +68,6 @@ DECLARE
     v_success_rate NUMERIC;
     v_tasks_completed INTEGER;
     v_tasks_failed INTEGER;
-    v_learned JSONB;
-    v_best_for TEXT[];
-    v_avoid_for TEXT[];
 BEGIN
     SELECT id, status, success_rate, tasks_completed, tasks_failed, learned
     INTO v_model
