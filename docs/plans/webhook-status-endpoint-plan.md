@@ -1,74 +1,58 @@
 # PLAN: Add /status Endpoint to Webhook Server
 
 ## Overview
-Add a GET /status endpoint to the webhook server that returns governor runtime info as JSON. Two files modified: server.go (core logic) and main.go (wiring).
+Add a GET /status endpoint to the webhook server that returns governor runtime info as JSON for operational monitoring and debugging.
 
 ## Tasks
 
-### T001: Add /status Endpoint to Webhook Server
+### T001: Add /status endpoint with version and uptime tracking
 **Confidence:** 0.98
 **Category:** coding
 **Dependencies:** none
 
 #### Prompt Packet
-```
-# TASK: T001 - Add /status Endpoint to Webhook Server
+
+# TASK: T001 - Add /status endpoint to webhook server
 
 ## Context
-The governor webhook server has no health/status endpoint. For operational monitoring and debugging, we need GET /status to return basic runtime info as JSON without any external dependencies or database queries.
+The webhook server needs a health/monitoring endpoint that returns basic governor runtime info as JSON. This is for operational monitoring and debugging — operators need to verify the governor is alive and see its version and uptime at a glance.
 
 ## What to Build
 
-### 1. Modify `governor/internal/webhooks/server.go`
+### 1. Add fields to the Server struct in `governor/internal/webhooks/server.go`
 
-Add a `startedAt time.Time` field and a `version string` field to the `Server` struct:
+Add two new unexported fields:
+- `startTime time.Time` — set when `Start()` is called
+- `version string` — governor version string
+
+### 2. Add a SetVersion method
+
 ```go
-type Server struct {
-	port     int
-	path     string
-	secret   string
-	router   *runtime.EventRouter
-	github   *GitHubWebhookHandler
-	server   *http.Server
-	handlers map[string]EventHandler
-	startedAt time.Time
-	version   string
+func (s *Server) SetVersion(v string) {
+	s.version = v
 }
 ```
 
-Add `Version string` to the `Config` struct (after `Secret`):
+### 3. Track start time in Start() method
+
+At the beginning of the `Start()` method body (after the mux is created), add:
 ```go
-type Config struct {
-	Port   int
-	Path   string
-	Secret string
-	Version string
-}
+s.startTime = time.Now()
 ```
 
-In `NewServer`, store the version and set `startedAt` to `time.Now()`:
+### 4. Add /status route in Start() method
+
+Right after `mux.HandleFunc(s.path, s.handleWebhook)`, add:
 ```go
-return &Server{
-	port:     cfg.Port,
-	path:     cfg.Path,
-	secret:   cfg.Secret,
-	router:   router,
-	handlers: make(map[string]EventHandler),
-	startedAt: time.Now(),
-	version:   cfg.Version,
-}
+mux.HandleFunc("/status", s.handleStatus)
 ```
 
-In the `Start` method (around line 75), add the /status route BEFORE the existing webhook route:
-```go
-func (s *Server) Start(ctx context.Context) error {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/status", s.handleStatus)
-	mux.HandleFunc(s.path, s.handleWebhook)
-	// ... rest unchanged
-```
+Note: Use `"/status"` as a literal path, not a field.
 
-Add a new handler method:
+### 5. Add handleStatus handler method
+
+Add this new method to the Server:
+
 ```go
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -76,45 +60,61 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resp := struct {
+		Governor      string `json:"governor"`
+		Version       string `json:"version"`
+		Status        string `json:"status"`
+		UptimeSeconds int64  `json:"uptime_seconds"`
+	}{
+		Governor:      "vibepilot",
+		Version:       s.version,
+		Status:        "running",
+		UptimeSeconds: int64(time.Since(s.startTime).Seconds()),
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"governor":        "vibepilot",
-		"version":         s.version,
-		"status":          "running",
-		"uptime_seconds":  int(time.Since(s.startedAt).Seconds()),
-	})
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 ```
 
-Note: `encoding/json` and `time` are already imported in server.go, so no import changes needed.
+### 6. Wire version in main.go (minimal 1-line addition)
 
-### 2. Modify `governor/cmd/governor/main.go`
-
-In the `NewServer` call (around line 214), add the Version field:
+In `governor/cmd/governor/main.go`, after the `webhookServer.SetGitHubHandler(githubHandler)` call (line 221), add:
 ```go
-webhookServer := webhooks.NewServer(&webhooks.Config{
-	Port:    cfg.GetWebhooksConfig().Port,
-	Path:    cfg.GetWebhooksConfig().Path,
-	Secret:  webhookSecret,
-	Version: version,
-}, eventRouter)
+webhookServer.SetVersion(version)
 ```
 
-Note: `version` is already a package-level var in main.go (line 28: `version = "2.0.0"`, overridden at build time via ldflags). No other changes needed.
+This is a single line to pass the build-time version variable to the webhook server.
 
 ## Constraints
-- Only modify these two files
-- No new dependencies
-- No database queries or external calls
-- Must not break existing webhook handling
-- The /status route must be registered on the same mux as webhooks
+- The `/status` route must NOT conflict with the existing webhook path (default `/webhooks`)
+- `handleStatus` must only accept GET requests
+- Must use `application/json` content type
+- No external dependencies, no database queries
+- `time` is already imported in server.go
+- `encoding/json` is already imported in server.go
 
 ## Files
-- `governor/internal/webhooks/server.go` - Add startedAt/version fields, handleStatus handler, /status route
-- `governor/cmd/governor/main.go` - Pass version string to webhook server config
+- `governor/internal/webhooks/server.go` — primary changes: add fields, handler, route
+- `governor/cmd/governor/main.go` — 1-line addition: `webhookServer.SetVersion(version)` after line 221
+
+## Verification
+After changes, run:
+```bash
+cd ~/VibePilot/governor && go build ./...
+```
+Then start the governor and test:
+```bash
+curl http://localhost:8080/status
+```
+Expected response:
+```json
+{"governor":"vibepilot","version":"2.0.0","status":"running","uptime_seconds":42}
 ```
 
 #### Expected Output
+
 ```json
 {
   "task_id": "T001",
@@ -123,6 +123,6 @@ Note: `version` is already a package-level var in main.go (line 28: `version = "
     "governor/cmd/governor/main.go"
   ],
   "tests_written": [],
-  "verification": "curl http://localhost:8080/status returns {\"governor\":\"vibepilot\",\"version\":\"2.0.0\",\"status\":\"running\",\"uptime_seconds\":<number>} with HTTP 200"
+  "verification": "curl http://localhost:8080/status returns 200 with governor, version, status, uptime_seconds fields"
 }
 ```
