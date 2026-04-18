@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -447,4 +448,30 @@ func (t *UsageTracker) ExportForDashboard() ([]byte, error) {
 	}
 
 	return json.Marshal(models)
+}
+
+func (t *UsageTracker) PersistToDatabase(ctx context.Context) {
+	t.mu.RLock()
+	data := make(map[string]*ModelUsage)
+	for id, usage := range t.models {
+		data[id] = usage
+	}
+	t.mu.RUnlock()
+
+	for modelID, usage := range data {
+		windowsJSON, _ := json.Marshal(usage.UsageWindows)
+		learnedJSON, _ := json.Marshal(usage.Learned)
+
+		_, err := t.db.RPC(ctx, "update_model_usage", map[string]any{
+			"p_model_id":            modelID,
+			"p_usage_windows":       string(windowsJSON),
+			"p_cooldown_expires_at": usage.CooldownExpiresAt,
+			"p_last_rate_limit_at":  usage.LastRateLimitAt,
+			"p_rate_limit_count":    usage.RateLimitCount,
+			"p_learned":             string(learnedJSON),
+		})
+		if err != nil {
+			log.Printf("[UsageTracker] Failed to persist model %s: %v", modelID, err)
+		}
+	}
 }

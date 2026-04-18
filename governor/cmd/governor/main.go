@@ -224,6 +224,22 @@ func main() {
 
 	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr)
 
+	// Periodically persist usage tracker state to Supabase for dashboard
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				// Final persist before shutdown
+				usageTracker.PersistToDatabase(ctx)
+				return
+			case <-ticker.C:
+				usageTracker.PersistToDatabase(ctx)
+			}
+		}
+	}()
+
 	// Rehydrate: fire synthetic events for any active tasks/plans so the
 	// governor picks them up without waiting for a realtime event.
 	runStartupRehydration(ctx, database, eventRouter)
