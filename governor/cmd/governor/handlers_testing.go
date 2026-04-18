@@ -90,8 +90,10 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 
 	log.Printf("[Testing] Running tests for task %s (branch: %s)", truncateID(taskID), branchName)
 
+	changedPackages := h.extractTestPackages(task)
+
 	start := time.Now()
-	passed, testOutput, err := h.runTests(ctx, branchName)
+	passed, testOutput, err := h.runTests(ctx, branchName, changedPackages)
 	duration := time.Since(start).Seconds()
 
 	if err != nil {
@@ -173,84 +175,100 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 	}
 }
 
-// runTests executes `go test ./...` on the task branch.
+// runTests executes go build + go test on the task branch.
 // Returns (passed, output, error).
-func (h *TestingHandler) runTests(ctx context.Context, branchName string) (bool, string, error) {
+func (h *TestingHandler) runTests(ctx context.Context, branchName string, changedPackages []string) (bool, string, error) {
 	repoPath := h.cfg.GetRepoPath()
+	testDir := ""
 
-	// Try to find an existing worktree for this branch
-	testDir := repoPath
+	// Method 1: Check git worktree list
 	if h.worktreeMgr != nil {
 		worktrees, err := h.worktreeMgr.ListWorktrees(ctx)
 		if err == nil {
 			for _, wt := range worktrees {
 				if strings.Contains(wt.BranchName, branchName) || strings.Contains(wt.Path, branchName) {
-				testDir = wt.Path
-				// Worktrees clone the repo root, but go.mod lives in governor/ subdirectory
-				governorDir := filepath.Join(wt.Path, "governor")
-				if _, err := os.Stat(filepath.Join(governorDir, "go.mod")); err == nil {
-					testDir = governorDir
-				}
-				log.Printf("[Testing] Using worktree at %s", testDir)
+					testDir = wt.Path
+					governorDir := filepath.Join(wt.Path, "governor")
+					if _, err := os.Stat(filepath.Join(governorDir, "go.mod")); err == nil {
+						testDir = governorDir
+					}
+					log.Printf("[Testing] Using git worktree at %s", testDir)
 					break
 				}
 			}
 		}
 	}
 
-	// If no worktree found, checkout the branch in the main repo temporarily
-	needsCheckout := testDir == repoPath
-	if needsCheckout {
-		// Save current branch
-		headCmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
-		headCmd.Dir = repoPath
-		var headOut bytes.Buffer
-		headCmd.Stdout = &headOut
-		if err := headCmd.Run(); err != nil {
-			return false, "", fmt.Errorf("failed to get current branch: %w", err)
-		}
-		originalBranch := strings.TrimSpace(headOut.String())
-
-		// Checkout the task branch
-		log.Printf("[Testing] Checking out %s to run tests (was on %s)", branchName, originalBranch)
-		checkoutCmd := exec.CommandContext(ctx, "git", "checkout", "-f", branchName)
-		checkoutCmd.Dir = repoPath
-		if out, err := checkoutCmd.CombinedOutput(); err != nil {
-			return false, string(out), fmt.Errorf("checkout %s failed: %w", branchName, err)
-		}
-
-		// Defer checkout back
-		defer func() {
-			backCmd := exec.CommandContext(ctx, "git", "checkout", "-f", originalBranch)
-			backCmd.Dir = repoPath
-			if out, err := backCmd.CombinedOutput(); err != nil {
-				log.Printf("[Testing] Warning: checkout back to %s failed: %v %s", originalBranch, err, string(out))
+	// Method 2: Scan VibePilot-work for directories with .go files
+	if testDir == "" {
+		workBase := filepath.Join(filepath.Dir(repoPath), "VibePilot-work")
+		entries, err := os.ReadDir(workBase)
+		if err == nil {
+			for _, e := range entries {
+				if !e.IsDir() {
+					continue
+				}
+				dirPath := filepath.Join(workBase, e.Name())
+				// Check for go.mod in governor/ subdir or direct
+				govMod := filepath.Join(dirPath, "governor", "go.mod")
+				directMod := filepath.Join(dirPath, "go.mod")
+				if _, err := os.Stat(govMod); err == nil {
+					testDir = filepath.Join(dirPath, "governor")
+					log.Printf("[Testing] Using filesystem worktree at %s", testDir)
+					break
+				} else if _, err := os.Stat(directMod); err == nil {
+					testDir = dirPath
+					log.Printf("[Testing] Using filesystem worktree at %s", testDir)
+					break
+				}
 			}
-		}()
+		}
 	}
 
-	// Run go test with a 2-minute timeout
+	// Method 3: Fallback to main repo
+	if testDir == "" {
+		testDir = repoPath
+		log.Printf("[Testing] No worktree found, using main repo at %s", testDir)
+	}
+
+	// Timeout
 	testCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	// Resolve go binary path — systemd services may not have go in PATH
 	goBin := "/home/vibes/go/bin/go"
 	if _, err := exec.LookPath("go"); err == nil {
 		goBin = "go"
 	}
+	env := append(os.Environ(), "PATH="+os.Getenv("PATH")+":/home/vibes/go/bin:/usr/local/go/bin")
 
-	cmd := exec.CommandContext(testCtx, goBin, "test", "-v", "-count=1", "./...")
+	// Phase 1: go build ./...
+	buildCmd := exec.CommandContext(testCtx, goBin, "build", "./...")
+	buildCmd.Dir = testDir
+	buildCmd.Env = env
+	var buildOut bytes.Buffer
+	buildCmd.Stdout = &buildOut
+	buildCmd.Stderr = &buildOut
+	log.Printf("[Testing] Phase 1: go build ./... (dir: %s)", testDir)
+	if err := buildCmd.Run(); err != nil {
+		return false, buildOut.String(), fmt.Errorf("build failed")
+	}
+
+	// Phase 2: go test on changed packages (or ./... as fallback)
+	testTargets := changedPackages
+	if len(testTargets) == 0 {
+		testTargets = []string{"./..."}
+	}
+	args := []string{"test", "-v", "-count=1"}
+	args = append(args, testTargets...)
+	cmd := exec.CommandContext(testCtx, goBin, args...)
 	cmd.Dir = testDir
-	// Ensure PATH includes common go locations
-	cmd.Env = append(os.Environ(),
-		"PATH="+os.Getenv("PATH")+":/home/vibes/go/bin:/usr/local/go/bin",
-	)
+	cmd.Env = env
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	log.Printf("[Testing] Running: go test -v -count=1 ./... (dir: %s)", testDir)
+	log.Printf("[Testing] Phase 2: go test -v -count=1 %s (dir: %s)", strings.Join(testTargets, " "), testDir)
 	err := cmd.Run()
 
 	output := stdout.String()
@@ -263,11 +281,9 @@ func (h *TestingHandler) runTests(ctx context.Context, branchName string) (bool,
 	}
 
 	if err != nil {
-		// ExitError means tests compiled but failed — that's a normal test failure
 		if _, ok := err.(*exec.ExitError); ok {
 			return false, output, nil
 		}
-		// Other error (compile failure, etc)
 		return false, output, err
 	}
 
