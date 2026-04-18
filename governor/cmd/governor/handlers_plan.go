@@ -93,41 +93,58 @@ func handlePlanCreated(
 		return
 	}
 
-	routingResult, err := connRouter.SelectRouting(ctx, runtime.RoutingRequest{
-		Role:        "planner",
-		TaskType:    "planning",
-		RoutingFlag: "internal",
-	})
-	if err != nil || routingResult == nil {
-		log.Printf("[EventPlanCreated] No routing available for planner")
-		setPlanError(ctx, database, planID, "no_routing")
-		clearProcessingLock()
-		return
-	}
-
-	session, err := factory.CreateWithConnector(ctx, "planner", "planning", routingResult.ConnectorID)
-	if err != nil {
-		log.Printf("[EventPlanCreated] Failed to create planner session: %v", err)
-		setPlanError(ctx, database, planID, "session_failed")
-		clearProcessingLock()
-		return
-	}
-
-	result, err := session.Run(ctx, map[string]any{
-		"prd_content": string(prdContent),
-		"plan_id":     planID,
-	})
-	if err != nil {
-		log.Printf("[EventPlanCreated] Planner execution failed: %v", err)
-		database.RPC(ctx, "record_model_failure", map[string]any{
-			"p_model_id":         routingResult.ModelID,
-			"p_task_id":          planID,
-			"p_failure_type":     "execution_error",
-			"p_failure_category": "model_issue",
+	// Try running planner with cascade retry on transient failures (429, 503, timeout)
+	var result *runtime.SessionResult
+	var routingResult *runtime.RoutingResult
+	maxRetries := 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		var routeErr error
+		excludeModel := ""
+		if attempt > 0 && routingResult != nil {
+			excludeModel = routingResult.ModelID
+			log.Printf("[EventPlanCreated] Retry %d/%d: excluding model %s", attempt+1, maxRetries, excludeModel)
+		}
+		routingResult, routeErr = connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+			Role:          "planner",
+			TaskType:      "planning",
+			RoutingFlag:   "internal",
+			ExcludeModel:  excludeModel,
 		})
-		setPlanError(ctx, database, planID, "execution_failed")
-		clearProcessingLock()
-		return
+		if routeErr != nil || routingResult == nil {
+			log.Printf("[EventPlanCreated] No routing available for planner (attempt %d)", attempt+1)
+			setPlanError(ctx, database, planID, "no_routing")
+			clearProcessingLock()
+			return
+		}
+
+		session, err := factory.CreateWithConnector(ctx, "planner", "planning", routingResult.ConnectorID)
+		if err != nil {
+			log.Printf("[EventPlanCreated] Failed to create planner session: %v", err)
+			setPlanError(ctx, database, planID, "session_failed")
+			clearProcessingLock()
+			return
+		}
+
+		result, err = session.Run(ctx, map[string]any{
+			"prd_content": string(prdContent),
+			"plan_id":     planID,
+		})
+		if err != nil {
+			log.Printf("[EventPlanCreated] Planner attempt %d failed (model=%s, connector=%s): %v", attempt+1, routingResult.ModelID, routingResult.ConnectorID, err)
+			database.RPC(ctx, "record_model_failure", map[string]any{
+				"p_model_id":         routingResult.ModelID,
+				"p_task_id":          planID,
+				"p_failure_type":     "execution_error",
+				"p_failure_category": "model_issue",
+			})
+			if attempt < maxRetries-1 {
+				continue // try next model
+			}
+			setPlanError(ctx, database, planID, "execution_failed")
+			clearProcessingLock()
+			return
+		}
+		break // success
 	}
 
 	plannerOutput, err := runtime.ParsePlannerOutput(result.Output)

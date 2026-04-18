@@ -30,6 +30,7 @@ type RoutingRequest struct {
 	RoutingFlag      string
 	RequiresCodebase bool
 	Dependencies     []string
+	ExcludeModel     string // skip this model when cascading
 }
 
 type RoutingResult struct {
@@ -157,6 +158,16 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 	// Use cascade-aware model selection via UsageTracker
 	cascade := r.getModelCascade()
 	if r.usageTracker != nil && len(cascade) > 0 {
+		// Filter out excluded model for cascade retry
+		if req.ExcludeModel != "" {
+			filtered := make([]string, 0, len(cascade))
+			for _, m := range cascade {
+				if m != req.ExcludeModel {
+					filtered = append(filtered, m)
+				}
+			}
+			cascade = filtered
+		}
 		return r.selectByCascade(ctx, connectors, cascade)
 	}
 
