@@ -689,7 +689,7 @@
       "notes": "Available on Groq (free) and OpenRouter. 200+ tool call chains. Best for complex agentic tasks."
     },
     {
-      "id": "nemotron-ultra-253b",
+      "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
       "name": "Nemotron Ultra 253B (NVIDIA)",
       "provider": "nvidia",
       "access_type": "api",
