@@ -378,3 +378,69 @@ func setupTestingHandlers(
 	handler := NewTestingHandler(database, factory, pool, connRouter, git, cfg, worktreeMgr)
 	handler.Register(router)
 }
+
+// extractTestPackages parses task result to find Go package paths for targeted testing.
+// Falls back to empty slice (which triggers ./... in runTests).
+func (h *TestingHandler) extractTestPackages(task map[string]any) []string {
+	result, ok := task["result"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	// Try expected_output.files_created first
+	expectedStr, _ := result["expected_output"].(string)
+	if expectedStr != "" {
+		var expected map[string]any
+		if json.Unmarshal([]byte(expectedStr), &expected) == nil {
+			if files, ok := expected["files_created"].([]any); ok {
+				return filesToPackagePaths(files)
+			}
+		}
+	}
+
+	// Try raw_output for files_created
+	rawStr, _ := result["raw_output"].(string)
+	if rawStr != "" {
+		// Look for files_created in the JSON output
+		var outputs []map[string]any
+		// Try parsing as JSON array or object
+		if json.Unmarshal([]byte(rawStr), &outputs) == nil {
+			for _, o := range outputs {
+				if files, ok := o["files_created"].([]any); ok {
+					return filesToPackagePaths(files)
+				}
+			}
+		}
+		var output map[string]any
+		if json.Unmarshal([]byte(rawStr), &output) == nil {
+			if files, ok := output["files_created"].([]any); ok {
+				return filesToPackagePaths(files)
+			}
+		}
+	}
+
+	return nil
+}
+
+// filesToPackagePaths converts file paths like "internal/hello/hello.go" to "./internal/hello/..."
+func filesToPackagePaths(files []any) []string {
+	seen := make(map[string]bool)
+	var pkgs []string
+	for _, f := range files {
+		path, _ := f.(string)
+		if path == "" {
+			continue
+		}
+		// Extract directory from file path
+		dir := filepath.Dir(path)
+		// Only include .go-related paths
+		if filepath.Ext(path) == ".go" || filepath.Ext(path) == "" {
+			pkg := "./" + dir + "/..."
+			if !seen[pkg] {
+				seen[pkg] = true
+				pkgs = append(pkgs, pkg)
+			}
+		}
+	}
+	return pkgs
+}
