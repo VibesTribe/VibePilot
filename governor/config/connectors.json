@@ -74,13 +74,13 @@
       "id": "groq-api",
       "name": "Groq Cloud API",
       "type": "api",
-      "status": "active",
+      "status": "inactive",
       "provider": "groq",
       "endpoint": "https://api.groq.com/openai/v1",
       "api_key_ref": "GROQ_API_KEY",
       "models_available": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen3-32b"],
       "provides_tools": [],
-      "notes": "Free tier: 14400 RPM, 1M tokens/day"
+      "notes": "Disabled - vault decrypt failed for GROQ_API_KEY"
     },
     {
       "id": "openrouter-api",
