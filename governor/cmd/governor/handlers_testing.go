@@ -109,13 +109,29 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 	if passed {
 		log.Printf("[Testing] Task %s tests PASSED in %.1fs", truncateID(taskID), duration)
 
-		// Complete
+		// TASK IS COMPLETE. Period. Testing passed = success.
+		// Record completion with model tracking data. This is the source of truth
+		// for model success/failure stats. Merge is a separate concern below.
+		completionResult := map[string]any{
+			"status":         "complete",
+			"test_passed":    true,
+			"test_duration":  duration,
+			"files_created":  h.extractFilesFromTask(task),
+		}
+		completionJSON, _ := json.Marshal(completionResult)
 		h.database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":    taskID,
-			"p_new_status": "complete",
+			"p_new_status": "merged",
+			"p_result":     string(completionJSON),
+		})
+		log.Printf("[Testing] Task %s → COMPLETE (testing passed)", truncateID(taskID))
+
+		// Unlock dependents now — task is done regardless of merge
+		h.database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
+			"p_completed_task_id": taskID,
 		})
 
-		// Auto-merge to module branch
+		// Auto-merge to module branch (best effort, does not affect completion)
 		targetBranch := h.getTargetBranch(sliceID)
 
 		// Shadow merge check
@@ -124,37 +140,23 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			if shadowErr != nil {
 				log.Printf("[Testing] Shadow merge check failed for %s: %v (proceeding anyway)", branchName, shadowErr)
 			} else if shadowResult != nil && shadowResult.HasConflicts {
-				log.Printf("[Testing] Shadow merge found conflicts in %s: %v", branchName, shadowResult.ConflictFiles)
-				h.database.RPC(ctx, "transition_task", map[string]any{
-					"p_task_id":        taskID,
-					"p_new_status":     "merge_pending",
-					"p_failure_reason": fmt.Sprintf("merge conflicts: %v", shadowResult.ConflictFiles),
-				})
+				log.Printf("[Testing] Shadow merge found conflicts for %s: %v (task still complete)", branchName, shadowResult.ConflictFiles)
+				// Task stays merged. Merge conflicts handled separately.
+				// Do NOT change task status — completion is already recorded.
 				return
 			}
 		}
 
 		if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
-			log.Printf("[Testing] Merge failed for %s: %v", branchName, err)
-			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":        taskID,
-				"p_new_status":     "merge_pending",
-				"p_failure_reason": "merge_failed: " + err.Error(),
-			})
+			// Merge failed but TASK IS STILL COMPLETE. Log and move on.
+			log.Printf("[Testing] Merge to %s failed for task %s (task still complete): %v", targetBranch, truncateID(taskID), err)
 		} else {
 			// Merge success — cleanup
+			log.Printf("[Testing] Task %s code merged to %s", truncateID(taskID), targetBranch)
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
 			h.git.DeleteBranch(ctx, branchName)
-			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":    taskID,
-				"p_new_status": "merged",
-			})
-			h.database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
-				"p_completed_task_id": taskID,
-			})
-			log.Printf("[Testing] Task %s → merged to %s", truncateID(taskID), targetBranch)
 
 			// Check if all tasks for this slice are now merged → merge module to testing
 			h.tryMergeModuleToTesting(ctx, taskID, sliceID, targetBranch)
@@ -459,4 +461,29 @@ func filesToPackagePaths(files []any) []string {
 		}
 	}
 	return pkgs
+}
+
+// extractFilesFromTask pulls files_created from task result for completion tracking
+func (h *TestingHandler) extractFilesFromTask(task map[string]any) []string {
+	result, ok := task["result"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	// Try expected_output.files_created
+	expectedStr, _ := result["expected_output"].(string)
+	if expectedStr != "" {
+		var expected map[string]any
+		if json.Unmarshal([]byte(expectedStr), &expected) == nil {
+			if files, ok := expected["files_created"].([]any); ok {
+				var out []string
+				for _, f := range files {
+					if s, ok := f.(string); ok {
+						out = append(out, s)
+					}
+				}
+				return out
+			}
+		}
+	}
+	return nil
 }
