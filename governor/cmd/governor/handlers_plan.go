@@ -96,19 +96,19 @@ func handlePlanCreated(
 	// Try running planner with cascade retry on transient failures (429, 503, timeout)
 	var result *runtime.SessionResult
 	var routingResult *runtime.RoutingResult
-	maxRetries := 3
+	var failedModels []string
+	maxRetries := 5
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		var routeErr error
-		excludeModel := ""
 		if attempt > 0 && routingResult != nil {
-			excludeModel = routingResult.ModelID
-			log.Printf("[EventPlanCreated] Retry %d/%d: excluding model %s", attempt+1, maxRetries, excludeModel)
+			failedModels = append(failedModels, routingResult.ModelID)
+			log.Printf("[EventPlanCreated] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
 		}
 		routingResult, routeErr = connRouter.SelectRouting(ctx, runtime.RoutingRequest{
-			Role:          "planner",
-			TaskType:      "planning",
-			RoutingFlag:   "internal",
-			ExcludeModel:  excludeModel,
+			Role:           "planner",
+			TaskType:       "planning",
+			RoutingFlag:    "internal",
+			ExcludeModels:  failedModels,
 		})
 		if routeErr != nil || routingResult == nil {
 			log.Printf("[EventPlanCreated] No routing available for planner (attempt %d)", attempt+1)
