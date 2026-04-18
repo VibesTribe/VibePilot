@@ -49,6 +49,7 @@ var defaultRPCAllowlist = map[string]bool{
 	"get_model_score_for_task":    true,
 	"check_model_availability":    true,
 	"check_platform_availability": true,
+	"update_model_usage":          true,
 
 	// Planner learning
 	"create_planner_rule":         true,
