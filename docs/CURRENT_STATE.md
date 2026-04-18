@@ -1,16 +1,17 @@
 # VibePilot Current State
-**Updated: April 18, 2026**
+**Updated: April 18, 2026 16:20**
 
-## System Status: PARTIALLY OPERATIONAL
+## System Status: OPERATIONAL (with known issues)
 
 ### What Works
 - GitHub webhook delivery (webhooks.vibestribe.rocks permanent URL)
 - Governor realtime subscriptions and event processing
 - Full pipeline chain: Plan → Tasks → Execute → Review → Test → Merge
-- Vault encryption/decryption (all 6 API keys re-encrypted and working)
+- Vault encryption/decryption (all 6 API keys working in governor)
 - Task completion tracking (testing passed = task complete, merge best-effort)
 - Named tunnel "vibes" for dashboard/chat (sacred, never modify)
-- Quick tunnel via `--config /dev/null`
+- Model orchestrator: 25 models synced to Supabase, usage persistence every 30s
+- Migration 124 applied: check_platform_availability, get_model_score_for_task, update_model_usage RPCs
 
 ### Pipeline End-to-End (Verified Apr 18)
 1. Webhook push → plan created → tasks decomposed
@@ -21,78 +22,68 @@
 6. Best-effort merge to module branch
 7. Dashboard tracks live via realtime subscriptions
 
-### API Connectors
-| Connector | Status | Notes |
-|-----------|--------|-------|
-| hermes (GLM-5) | ACTIVE | CLI-based, local. Subscription ends May 1 |
-| nvidia-api (nemotron-ultra) | ACTIVE | Free tier, working |
-| groq-api (llama-3.3-70b, etc) | ACTIVE | Free tier, re-enabled after vault fix |
-| gemini-api (gemini-2.5-flash) | ACTIVE | Free tier, re-enabled after vault fix |
-| deepseek-api | INACTIVE | Out of credit |
+### Active Issues (Apr 18)
 
-### Models in models.json but NOT in Supabase (10 models)
-The following models exist in config/models.json but were never synced to the Supabase
-models table. Migration 124 + model_loader upsert fix will create them on next restart:
-- llama-3.3-70b-versatile, llama-3.1-8b-instant, qwen3-32b (groq)
-- nemotron-ultra-253b (nvidia)
-- gemini-2.5-flash-preview (gemini)
-- kimi-k2-instruct (kimi/web)
-- gpt-4o, gpt-4o-mini (openai/web)
-- claude-sonnet-4-5 (anthropic/web)
-- claude-haiku-4-5 (anthropic/web)
+**1. GLM-5 rate limiting**
+GLM-5 hits 429 "Insufficient balance" intermittently. Not permanent — comes back.
+When it fails, Hermes falls through to nemotron-ultra (nvidia) which works.
 
-## Migrations Pending Application
-**Migration 124**: `124_model_orchestrator_rpc.sql`
-- `check_platform_availability(p_platform_id)` - checks model status, cooldown, credit
-- `get_model_score_for_task(p_model_id, p_task_type, p_task_category)` - scores model for routing
-- `update_model_usage(p_model_id, ...)` - persists usage/cooldown/learned data
+**2. Cascade retry bug (CRITICAL)**
+When primary model fails, Hermes retries 3 times on same model BEFORE falling through.
+Then when it DOES fall through, Groq and NVIDIA return 401 (Invalid API Key).
+This means the encrypted API keys in secrets_vault may not decrypt correctly
+when used OUTSIDE the governor (i.e. by Hermes CLI directly).
+Governor vault decryption works fine. Hermes CLI may use different key path.
 
-Apply via Supabase Dashboard → SQL Editor.
+**3. API key auth failures on Groq + NVIDIA via Hermes**
+Groq returns 401 "Invalid API Key", NVIDIA returns 401 "Authentication failed".
+These work from governor (proven by E2E pipeline) but fail from Hermes CLI fallback.
+Root cause likely: Hermes CLI uses OpenRouter-style config, not governor's vault.
 
-## What Was Fixed Today (Apr 18)
-1. **Vault encryption** - All 6 API keys re-encrypted with current VAULT_KEY
-2. **Testing handler** - Filesystem worktree discovery (3 methods), two-phase testing (build+test)
-3. **Task completion semantics** - Testing passed = complete. Merge is best-effort. Model data preserved.
-4. **Model loader** - Upsert (insert-then-update) so new models auto-created in Supabase
-5. **Usage persistence** - UsageTracker.PersistToDatabase() every 30 seconds to Supabase
-6. **Querier interface** - Expanded to include RPC for persistence
+### Three-Tier Architecture (Model ≠ Connector ≠ Platform)
+- **Model** = who does the thinking (deepseek-chat, llama-3.3-70b, glm-5)
+- **Connector** = how to reach it (API key, CLI, browser session)
+- **Platform** = where to send it (deepseek-api, groq-api, chatgpt-web)
+- One model can use MULTIPLE connectors with different pricing/credit/limits
+- Fisherman analogy: Model=fisherman, Connector=gear/credit, Platform=river
+- NEVER conflate these. Routing picks best model THEN best connector.
 
-## Known Issues / Not Yet Implemented
-1. **Credit tracking not wired** - credit_remaining_usd exists in DB but no code deducts from it
-   after task runs. Need to record cost per task_run and deduct from model's credit.
-2. **Cascade retry bug** - When model fails (vault decrypt), cascade retries same model instead
-   of falling through. Needs investigation in router cascade logic.
-3. **Testing-to-main merge (step 3)** - Module→main merge not implemented. User wants testing
-   folder approach for easy cleanup.
-4. **Planner output parsing** - GLM-5 sometimes produces malformed JSON with backticks.
-5. **Module→main merge** - Not yet implemented.
-6. **E2E with real project** - Only tested with hello package. Needs real project PRD.
+### Models (25 in Supabase)
+Active: glm-5, opencode, deepseek-chat, deepseek-reasoner, gemini-2.0-flash,
+        gemini-2.5-flash, gemini-api, gemini-web, copilot, deepseek-web,
+        llama-3.3-70b-versatile, llama-3.1-8b-instant, qwen3-32b,
+        kimi-k2-instruct (via groq-api, NOT kimi subscription), nemotron-ultra-253b
+Benched: claude-haiku-4-5, claude-sonnet-4-5, claude-sonnet, gpt-4o, gpt-4o-mini,
+         chatgpt-4o-mini, gemini-flash, kimi-cli, kimi-internal, kimi-k2.5
+Cancelled subscription: kimi-k2 (kimi platform, does NOT affect kimi-k2-instruct via groq)
 
-## Architecture Hierarchy (Non-Negotiable)
-1. VibePilot architecture/flow
-2. Dashboard (live, realtime, DO NOT TOUCH)
-3. Supabase (state and contracts)
-4. Go code (servant to all above)
+### Connectors (connectors.json)
+Active: hermes (CLI), gemini-api, groq-api, nvidia-api
+Inactive: opencode, claude-code, kimi, deepseek-api (out of credit), openrouter-api (emergency)
+Web: chatgpt-web, claude-web, gemini-web, deepseek-web, qwen-web, mistral-web, notegpt-web
 
-## Critical Files
-- `governor/config/models.json` - Model definitions with rate limits, pricing, capabilities
-- `governor/config/connectors.json` - API connector configs (destinations array)
-- `governor/internal/runtime/router.go` - Cascade routing, platform availability checks
-- `governor/internal/runtime/usage_tracker.go` - Rate limiting, cooldown, learned data
-- `governor/internal/runtime/model_loader.go` - Loads models.json, syncs to Supabase
-- `governor/cmd/governor/handlers_testing.go` - Two-phase testing with worktree discovery
-- `governor/cmd/governor/handlers_task.go` - Task execution, rate limit detection
-- `migrations/124_model_orchestrator_rpc.sql` - Platform health + usage persistence RPCs
+### Migrations Applied
+1-122: Historical (see Supabase schema docs)
+123: create_plan status fix (draft not pending)
+124a: Drop old check_platform_availability function
+124b: Create check_platform_availability, get_model_score_for_task, update_model_usage RPCs
 
-## Machine
+### Outstanding Fixes (Priority Order)
+1. Fix cascade retry bug — fall through on failure, not retry same model 3 times
+2. Improve planner output parsing — handle GLM-5 malformed JSON with backticks
+3. Testing-to-main merge (step 3) — testing folder approach
+4. Wire credit tracking — record cost per task_run, deduct from credit_remaining_usd
+5. Fix Groq/NVIDIA 401s from Hermes CLI (separate from governor vault)
+
+### Machine
 - ThinkPad X220, Debian Linux
 - USB tether to phone for Supabase connectivity
 - Go 1.24.3 at /home/vibes/go/bin/go
 - systemd user service: vibepilot-governor
-- No direct PostgreSQL access (IPv6). Migrations via Supabase SQL Editor only.
+- No direct PostgreSQL access (IPv6). Migrations via Supabase SQL Editor.
 - Git hooks require: `git -c core.hooksPath=/dev/null`
 
-## Budget Timeline
-- GLM-5 subscription: ends **May 1, 2026**
+### Budget Timeline
+- GLM-5 subscription: ends **May 1, 2026** (~12 days)
 - Free tiers: Groq, NVIDIA, Gemini (rate limited but functional)
 - Must prove pipeline with real projects before subscription ends
