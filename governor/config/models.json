@@ -628,6 +628,54 @@
       "strengths": ["long_horizon", "tool_chaining", "complex_reasoning", "500k_context"],
       "weaknesses": [],
       "notes": "Available on Groq (free) and OpenRouter. 200+ tool call chains. Best for complex agentic tasks."
+    },
+    {
+      "id": "nemotron-ultra-253b",
+      "name": "Nemotron Ultra 253B (NVIDIA)",
+      "provider": "nvidia",
+      "access_type": "api",
+      "context_limit": 128000,
+      "capabilities": ["code", "reasoning", "tools"],
+      "access_via": ["nvidia-api"],
+      "api_key_ref": "NVIDIA_API_KEY",
+      "status": "active",
+      
+      "rate_limits": {
+        "requests_per_minute": 10,
+        "requests_per_hour": null,
+        "requests_per_day": 500,
+        "tokens_per_minute": 8000,
+        "tokens_per_day": 100000
+      },
+      
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      
+      "strengths": ["complex_reasoning", "code", "large_model"],
+      "weaknesses": ["slower_than_groq", "lower_rate_limits"],
+      "notes": "NVIDIA free tier. 253B parameter model. Good for complex tasks when Groq models hit limits."
     }
   ],
   

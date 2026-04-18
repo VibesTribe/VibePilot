@@ -153,6 +153,9 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 				"p_completed_task_id": taskID,
 			})
 			log.Printf("[Testing] Task %s → merged to %s", truncateID(taskID), targetBranch)
+
+			// Check if all tasks for this slice are now merged → merge module to testing
+			h.tryMergeModuleToTesting(ctx, taskID, sliceID, targetBranch)
 		}
 	} else {
 		// Tests failed → back to available with test output as feedback
@@ -292,6 +295,73 @@ func (h *TestingHandler) getTargetBranch(sliceID string) string {
 		sliceID = "general"
 	}
 	return "TEST_MODULES/" + sliceID
+}
+
+// tryMergeModuleToTesting checks if all tasks for the same slice and plan are merged.
+// If so, merges TEST_MODULES/<slice> into the "testing" branch.
+func (h *TestingHandler) tryMergeModuleToTesting(ctx context.Context, taskID, sliceID, moduleBranch string) {
+	planID := ""
+	// Query this task to get its plan_id
+	taskData, err := h.database.Query(ctx, "tasks", map[string]any{"id": "eq." + taskID, "select": "plan_id"})
+	if err != nil {
+		log.Printf("[Testing] Module merge check: failed to query task plan_id: %v", err)
+		return
+	}
+	var tasks []map[string]any
+	if err := json.Unmarshal(taskData, &tasks); err == nil && len(tasks) > 0 {
+		if pid, ok := tasks[0]["plan_id"].(string); ok {
+			planID = pid
+		}
+	}
+	if planID == "" {
+		log.Printf("[Testing] Module merge check: no plan_id for task %s, skipping", truncateID(taskID))
+		return
+	}
+
+	// Count tasks in this slice+plan that are NOT yet merged or complete
+	// Check for any status other than merged/complete/escalated
+	filters := map[string]any{
+		"plan_id": "eq." + planID,
+		"slice_id": "eq." + sliceID,
+		"select":   "id,status",
+	}
+	siblingData, err := h.database.Query(ctx, "tasks", filters)
+	if err != nil {
+		log.Printf("[Testing] Module merge check: failed to query siblings: %v", err)
+		return
+	}
+	var siblings []map[string]any
+	if err := json.Unmarshal(siblingData, &siblings); err != nil {
+		log.Printf("[Testing] Module merge check: failed to parse siblings: %v", err)
+		return
+	}
+
+	allDone := true
+	remaining := 0
+	for _, s := range siblings {
+		status, _ := s["status"].(string)
+		switch status {
+		case "merged", "complete", "escalated", "cancelled":
+			// terminal states
+		default:
+			allDone = false
+			remaining++
+		}
+	}
+
+	if !allDone {
+		log.Printf("[Testing] Module %s has %d tasks remaining (plan %s), skipping module merge", sliceID, remaining, truncateID(planID))
+		return
+	}
+
+	// All tasks in this module are done → merge TEST_MODULES/<slice> into testing
+	log.Printf("[Testing] All tasks complete for module %s (plan %s) → merging %s to testing", sliceID, truncateID(planID), moduleBranch)
+
+	if err := h.git.MergeBranch(ctx, moduleBranch, "testing"); err != nil {
+		log.Printf("[Testing] Module-to-testing merge FAILED for %s: %v", moduleBranch, err)
+	} else {
+		log.Printf("[Testing] Module %s successfully merged to testing branch", sliceID)
+	}
 }
 
 func setupTestingHandlers(

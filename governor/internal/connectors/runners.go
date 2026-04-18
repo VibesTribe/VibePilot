@@ -322,6 +322,16 @@ func (r *APIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 	case "openai":
 		url := strings.TrimSuffix(r.endpoint, "/") + "/chat/completions"
 		return r.callOpenAICompatible(ctx, prompt, url, apiKey)
+	case "groq":
+		url := strings.TrimSuffix(r.endpoint, "/") + "/chat/completions"
+		return r.callOpenAICompatible(ctx, prompt, url, apiKey)
+	case "nvidia":
+		// NVIDIA NIM is OpenAI-compatible
+		url := strings.TrimSuffix(r.endpoint, "/") + "/chat/completions"
+		return r.callOpenAICompatible(ctx, prompt, url, apiKey)
+	case "openrouter":
+		url := strings.TrimSuffix(r.endpoint, "/") + "/chat/completions"
+		return r.callOpenAICompatible(ctx, prompt, url, apiKey)
 	default:
 		return "", 0, 0, fmt.Errorf("unsupported provider: %s", r.provider)
 	}
