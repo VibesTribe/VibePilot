@@ -96,6 +96,13 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		}
 	}
 
+	// On retry: append supervisor revision notes to prompt so executor fixes issues
+	// failure_notes being non-empty means a previous supervisor review rejected this task
+	if failureNotes, ok := task["failure_notes"].(string); ok && failureNotes != "" {
+		taskPacket.Prompt += "\n\n## PREVIOUS ATTEMPT FEEDBACK (fix these issues)\n" + failureNotes
+		log.Printf("[TaskAvailable] Task %s retry: appended revision notes (%d bytes)", truncateID(taskID), len(failureNotes))
+	}
+
 	// Route to model
 	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
 		AgentID:  "task_runner",
@@ -233,8 +240,17 @@ func (h *TaskHandler) executeTask(
 		sessionParams["repo_path"] = worktreePath
 	}
 
-	result, err := session.Run(ctx, sessionParams)
+	// Execute with timeout — prevent hung workers from locking tasks forever
+	execCtx, execCancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer execCancel()
+
+	result, err := session.Run(execCtx, sessionParams)
 	if err != nil {
+		if execCtx.Err() == context.DeadlineExceeded {
+			log.Printf("[TaskHandler] TIMEOUT for task %s after 5m", truncateID(taskID))
+			h.failTask(ctx, taskID, modelID, branchName, "execution_timeout")
+			return fmt.Errorf("execution timeout")
+		}
 		// Check for rate limit (HTTP 429)
 		if h.usageTracker != nil && modelID != "" {
 			if isRateLimitError(err) {
@@ -402,13 +418,26 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			latestRun = taskRuns[0]
 		}
 
-		result, err := session.Run(ctx, map[string]any{
+		// Supervisor with timeout — prevent hung reviews from locking tasks
+		reviewCtx, reviewCancel := context.WithTimeout(ctx, 2*time.Minute)
+		defer reviewCancel()
+
+		result, err := session.Run(reviewCtx, map[string]any{
 			"task":        task,
 			"event":       "task_review",
 			"task_packet": taskPacket,
 			"task_run":    latestRun,
 		})
 		if err != nil {
+			if reviewCtx.Err() == context.DeadlineExceeded {
+				log.Printf("[TaskReview] TIMEOUT reviewing task %s after 2m", truncateID(taskID))
+				h.database.RPC(ctx, "transition_task", map[string]any{
+					"p_task_id":        taskID,
+					"p_new_status":     "review",
+					"p_failure_reason": "supervisor_review_timeout",
+				})
+				return nil
+			}
 			log.Printf("[TaskReview] Session failed for %s: %v", truncateID(taskID), err)
 			return err
 		}
@@ -458,7 +487,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			log.Printf("[TaskReview] Task %s → testing", truncateID(taskID))
 
 		case "fail", "failed":
-			// Failed → back to available with structured failure notes
+			// Failed → back to available with full failure context
 			failureClass := decision.FailureClass
 			if failureClass == "" {
 				failureClass = "unknown"
@@ -467,7 +496,19 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			if failureDetail == "" && len(decision.Issues) > 0 {
 				failureDetail = decision.Issues[0].Description
 			}
-			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
+
+			// Build full failure notes including ReturnFeedback
+			failureNotes := fmt.Sprintf("[%s] %s", failureClass, failureDetail)
+			if decision.ReturnFeedback.Summary != "" {
+				failureNotes += "\n\n" + decision.ReturnFeedback.Summary
+			}
+			if len(decision.ReturnFeedback.SpecificIssues) > 0 {
+				failureNotes += "\n\nIssues:"
+				for _, issue := range decision.ReturnFeedback.SpecificIssues {
+					failureNotes += "\n- " + issue
+				}
+			}
+
 			h.recordFailure(ctx, modelID, taskID, failureClass)
 			h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
 			h.recordEvent(ctx, "failure", taskID, modelID, failureClass, map[string]any{
@@ -480,12 +521,12 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":        taskID,
 				"p_new_status":     "available",
-				"p_failure_reason": fmt.Sprintf("[%s] %s", failureClass, failureDetail),
+				"p_failure_reason": failureNotes,
 			})
 			log.Printf("[TaskReview] Task %s failed: %s (%s) → available", truncateID(taskID), failureClass, failureDetail)
 
 		case "needs_revision":
-			// Needs revision → back to available for re-execution
+			// Needs revision → back to available with FULL feedback for retry
 			failureClass := decision.FailureClass
 			if failureClass == "" {
 				failureClass = "needs_revision"
@@ -494,10 +535,28 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			if failureDetail == "" && len(decision.Issues) > 0 {
 				failureDetail = decision.Issues[0].Description
 			}
-			h.recordIssues(ctx, taskID, modelID, taskType, decision.Issues)
+
+			// Build structured revision feedback from supervisor's ReturnFeedback
+			revisionNotes := fmt.Sprintf("[%s] %s", failureClass, failureDetail)
+			if decision.ReturnFeedback.Summary != "" {
+				revisionNotes += "\n\n" + decision.ReturnFeedback.Summary
+			}
+			if len(decision.ReturnFeedback.SpecificIssues) > 0 {
+				revisionNotes += "\n\nIssues to fix:"
+				for _, issue := range decision.ReturnFeedback.SpecificIssues {
+					revisionNotes += "\n- " + issue
+				}
+			}
+			if len(decision.ReturnFeedback.Suggestions) > 0 {
+				revisionNotes += "\n\nSuggestions:"
+				for _, s := range decision.ReturnFeedback.Suggestions {
+					revisionNotes += "\n- " + s
+				}
+			}
+
 			h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
 			h.recordEvent(ctx, "revision_needed", taskID, modelID, failureClass, map[string]any{
-				"class": failureClass, "detail": failureDetail,
+				"class": failureClass, "detail": failureDetail, "revision_notes": revisionNotes,
 			})
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
@@ -506,7 +565,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":        taskID,
 				"p_new_status":     "available",
-				"p_failure_reason": fmt.Sprintf("[%s] %s", failureClass, failureDetail),
+				"p_failure_reason": revisionNotes,
 			})
 			log.Printf("[TaskReview] Task %s needs revision: %s (%s) → available", truncateID(taskID), failureClass, failureDetail)
 
