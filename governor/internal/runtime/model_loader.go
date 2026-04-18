@@ -83,26 +83,29 @@ func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) 
 	}
 
 	// Derive platform from access_via (connector name) or fall back to provider
-	platform := profile.Provider
+	// NOTE: platform/courier on models table are historical. A model can use
+	// multiple connectors (e.g. deepseek-chat via deepseek-api OR openrouter).
+	// The connector/platform selection happens at routing time, not model definition.
+	// We only set these for display purposes if the model has a single access_via.
+	platform := ""
+	courier := ""
 	if len(profile.AccessVia) > 0 {
 		platform = profile.AccessVia[0]
-	}
-
-	// Derive courier from access_via
-	courier := "api"
-	if len(profile.AccessVia) > 0 {
 		courier = profile.AccessVia[0]
 	}
-	if profile.AccessType == "cli_subscription" {
-		courier = platform
+	if platform == "" {
+		platform = profile.Provider
+	}
+	if courier == "" {
+		courier = "api"
 	}
 
-	// Build insert data with all required columns
+	// Build insert data -- only model-level properties, not connector/platform state
 	insertData := map[string]interface{}{
 		"id":            profile.ID,
 		"name":          profile.Name,
 		"vendor":        profile.Provider,
-		"platform":      platform,
+		"platform":      platform,  // display hint only, NOT routing
 		"access_type":   profile.AccessType,
 		"context_limit": profile.ContextLimit,
 		"status":        profile.Status,
@@ -110,7 +113,7 @@ func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) 
 		"config":        configMap,
 		"strengths":     profile.Strengths,
 		"weaknesses":    profile.Weaknesses,
-		"courier":       courier,
+		"courier":       courier, // display hint only, NOT routing
 		"rate_limit_requests_per_minute": profile.RateLimits.RequestsPerMinute,
 	}
 	if profile.APIPricing.InputPer1MUsd > 0 {
