@@ -82,17 +82,36 @@ func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) 
 		"notes":               profile.Notes,
 	}
 
-	// Try insert first (for new models), fall back to update (for existing)
+	// Derive platform from access_via (connector name) or fall back to provider
+	platform := profile.Provider
+	if len(profile.AccessVia) > 0 {
+		platform = profile.AccessVia[0]
+	}
+
+	// Derive courier from access_via
+	courier := "api"
+	if len(profile.AccessVia) > 0 {
+		courier = profile.AccessVia[0]
+	}
+	if profile.AccessType == "cli_subscription" {
+		courier = platform
+	}
+
+	// Build insert data with all required columns
 	insertData := map[string]interface{}{
 		"id":            profile.ID,
 		"name":          profile.Name,
 		"vendor":        profile.Provider,
-		"platform":      profile.Provider, // platform is NOT NULL, same as vendor
+		"platform":      platform,
 		"access_type":   profile.AccessType,
 		"context_limit": profile.ContextLimit,
 		"status":        profile.Status,
 		"rate_limits":   json.RawMessage(rateLimitsJSON),
 		"config":        configMap,
+		"strengths":     profile.Strengths,
+		"weaknesses":    profile.Weaknesses,
+		"courier":       courier,
+		"rate_limit_requests_per_minute": profile.RateLimits.RequestsPerMinute,
 	}
 	if profile.APIPricing.InputPer1MUsd > 0 {
 		insertData["cost_input_per_1k_usd"] = profile.APIPricing.InputPer1MUsd / 1000.0
@@ -107,11 +126,16 @@ func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) 
 		updateData := map[string]interface{}{
 			"name":          profile.Name,
 			"vendor":        profile.Provider,
+			"platform":      platform,
 			"access_type":   profile.AccessType,
 			"context_limit": profile.ContextLimit,
 			"status":        profile.Status,
 			"rate_limits":   json.RawMessage(rateLimitsJSON),
 			"config":        configMap,
+			"strengths":     profile.Strengths,
+			"weaknesses":    profile.Weaknesses,
+			"courier":       courier,
+			"rate_limit_requests_per_minute": profile.RateLimits.RequestsPerMinute,
 		}
 		if profile.APIPricing.InputPer1MUsd > 0 {
 			updateData["cost_input_per_1k_usd"] = profile.APIPricing.InputPer1MUsd / 1000.0
