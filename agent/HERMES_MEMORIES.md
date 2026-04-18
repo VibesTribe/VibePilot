@@ -1,31 +1,33 @@
 # Hermes Agent Memories
 # Auto-backed up from Hermes memory store. Do not edit manually.
-# Last updated: 2026-04-15 (evening)
+# Last updated: 2026-04-18 (06:22 UTC)
 
 ## MEMORY
 
-VP: Gov v2.0.0, main branch only. TWO copies: ~/VibePilot/ (dev) + ~/vibepilot/ (running). x220=server (wifi dead, USB tethered). 15,000+ lines Go, 60 files, 16 pkgs. WYNTK updated Apr 15. MCP LIVE: jcodemunch(52 tools)+jdocmunch(15 tools)=67 tools in governor. jdatamunch failed(transport error), disabled. MCP Server Phase 2 DONE. 3-Layer Memory DONE + migration 110. Context Compaction DONE. Git Worktrees DONE. tier0 rules 10 items incl post-task discipline.
-
-CHROME CDP: Port 9222. Wrapper /usr/bin/google-chrome-stable has --remote-debugging-port=9222 + --user-data-dir=$HOME/.config/chrome-debug. Bind mount active. User auto-logged into Gmail/Gemini/Sheets. browser_navigate=Playwright HEADLESS (not real Chrome). For logged-in sites use Python Playwright connect_over_cdp + browser.contexts[0]. No --disable-blink-features (causes warning). Hermes restart needed to pick up BROWSER_CDP_URL from .env.
-
-FREE API KEYS (all verified): Google AI Studio (primary) + Groq (fallback 1-2) + NVIDIA NIM 131 models (fallback 3-4, includes DeepSeek-v3.2/Llama-4/Qwen3-coder) + OpenRouter free-only (fallback 5-7). ZAI/GLM ends May 1. NOT FREE: SiliconFlow, SambaNova, Together AI. Governor config files (models.json/connectors.json/routing.json) still stale -- need updating with real free providers.
-
-TTS: edge-tts only (fast, free). Kokoro removed (too slow). Cache: ~/.hermes/audio_cache/
-
-OLLAMA: ABANDONED. x220 (AVX-only, no AVX2) max 6tok/s. Service disabled, no models. Cloud-only strategy.
-
-EMAIL: himalaya reads OK (app password "vibes"), use Python smtplib fallback for sending (himalaya raw send crashes on MIME parsing). Gmail browser needs manual login once, cookies to chrome-debug profile.
-
-CONTEXT LAYER: lean-ctx (map.md) + jCodeMunch (index.db) + build-knowledge-db.py (knowledge.db). MCP: jcodemunch 52 + jdocmunch 15 = 67 tools live. tier0 = rules source of truth. Post-task: update CURRENT_STATE+WYNTK+TODO.
-
-§MEMORY-BACKUP: Hermes memories are backed up to GitHub (VibePilot repo, agent/HERMES_MEMORIES.md). Update that file whenever memories change.
-
+PARAM FIX: set/clear_processing use p_table/p_id. claim_task uses p_task_id/p_worker_id/p_model_id/p_routing_flag/p_routing_reason. transition_task uses p_task_id/p_new_status/p_failure_reason(TEXT)/p_result(JSONB). create_task_run uses p_courier (nullable). ALWAYS grep Go call site for exact param names before writing SQL. Migrations 118-120 BROKE working pipeline by changing RPC signatures without matching Go callers.
+§
+HERMES v0.9.0 (Apr 17). GLM-5 ~50s/call. FIXED: v0.8.0 empty response bug + \r in JSON. TODO: per-agent max-turns overrides, planner prompt redundancy, startup plan recovery. All CONFIG fixes, never hardcode agent patterns into shared code.
+§
+CONTEXT WIRED: .hermes.md=enforcement (priority 1, loaded every msg). knowledge.db=3300 docs+364 SQL schema objects+17 pipeline stages. index.db (jCodeMunch)=1974 Go symbols + 2872 vibeflow symbols (indexed separately at ~/.code-index/local-vibeflow-c8d9c778.db). map.md=Go function signatures. Post-commit hook syncs to ~/vibepilot/. TERMINAL_CWD=~/VibePilot. AUDIT DOCS: DASHBOARD_AUDIT.md, CROSS_REFERENCE_AUDIT.md in docs/.
+§
+E2E PROVEN Apr 18: T001+T002 merged. M122+Go fixes: claim_for_review(review+testing), deps guard, attempts+unlock, revision feedback, timeouts(5m/2m), testing parse error, gitree branch delete+worktree. Recovery auto (300s stale). Module→main merge NOT yet done. Cold start = processing recovery.
+§
+GOVERNOR GOTCHAS: (1) Cold start only reacts to realtime events, not existing state — must touch updated_at. (2) claim_for_review reused by testing handler, must match both statuses. (3) task_packets static table, must exist or executor skips.
+§
+DASHBOARD: ~/vibeflow/apps/dashboard/ SACRED. Adapter: lib/vibepilotAdapter.ts. Lifecycle: pending→in_progress→review→testing→complete→merged. Pipeline proven E2E Apr 18. M122 applied: claim_for_review(review+testing), deps guard, attempts, auto-unlock. Gitree: DeleteBranch+worktree checkout main first.
+BLOCKING: Tester calls GLM-5 via hermes to "run tests" — killed every time, recovery loops. Need direct `go test` not LLM. plans table: no title/description (only prd_path,plan_path,status,complexity).
 ## USER PROFILE
 
-PET PEEVE: Stop overcomplicating. SIMPLE DIRECT ACTION. Don't spawn extra models/processes when I can just DO it myself. Never dismiss local path fixes or config tweaks as "minor" -- if they break on another machine, they're not minor.
-
+PET PEEVE: SIMPLE DIRECT ACTION. No spawning extra models. No asking me to edit code, save files, or multi-step copy-paste. I copy ONE thing from GitHub, paste ONE place. Migrations must be self-contained and rerunnable. DON'T IMAGINE, VERIFY — review existing code/state before proposing fixes, never invent solutions. Always grep/read first.
+§
 User vision: n8n-like visual config-driven orchestration (draw pipelines, not code them). Courier agents to free web AI tiers via Browser Use (self-hosted, open source). Chat URLs stored in task_runs for revision context. Visual QA agent checks apps before human review. MIT/Apache only. No Apple. Conservative subagent usage with GLM. May 1 = budget cliff.
-
-WORKFLOW: User researches on personal laptop (emails, raindrop.io, Gemini chats, newsletters). Forwards links/articles to vibepilot email. Phone secondary. Dashboard primary, Telegram backup. No .env files, keys in Supabase vault.
-AGENT SWAP VELOCITY: Uses Codex, OpenCode, Kimi, Kilo, Claude, Hermes -- swaps at lightspeed. Everything MUST be agent-independent. No Hermes-only dependencies. Knowledge must survive agent swap. Prefers building own tools over external deps. No multi-MCP chains.
-BURNING CONSTRAINT: 20-46K tokens to boot up on repo files out of 70K context. Need compressed knowledge layer (queryable index, not raw files). Think before build -- analyze carefully first.
+§
+BURNING CONSTRAINT: 20-46K tokens boot on repo files. Compressed knowledge layer needed. Think before build.
+§
+CRITICAL: NEVER declare dead/mock without checking docs+user. Dashboard IS LIVE. Supabase+GitHub=truth, not local. Governor subservient to VibePilot. Must work on autopilot or it's broken. PRDs need full tech specs.
+§
+CONFIDENCE DECOMPOSITION: Tasks split until 95%+ each. Low=auto-decompose not just council. Not implemented yet.
+§
+NO CANCELLED STATUS: Factory not todo app. Tasks complete/escalate. Failed→notes→available for re-route. Learns from failures.
+§
+CURRENT MODEL: GLM-5 via Z.AI Pro subscription. Better for coding and complex reasoning.
