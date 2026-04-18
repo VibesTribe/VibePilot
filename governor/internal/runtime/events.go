@@ -54,6 +54,7 @@ type EventWatcher interface {
 
 type Querier interface {
 	Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error)
+	RPC(ctx context.Context, name string, params map[string]interface{}) ([]byte, error)
 }
 
 type NopWatcher struct{}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -81,24 +82,49 @@ func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) 
 		"notes":               profile.Notes,
 	}
 
-	updateData := map[string]interface{}{
+	// Try insert first (for new models), fall back to update (for existing)
+	insertData := map[string]interface{}{
+		"id":            profile.ID,
 		"name":          profile.Name,
 		"vendor":        profile.Provider,
+		"access_type":   profile.AccessType,
 		"context_limit": profile.ContextLimit,
+		"status":        profile.Status,
 		"rate_limits":   json.RawMessage(rateLimitsJSON),
 		"config":        configMap,
 	}
-
 	if profile.APIPricing.InputPer1MUsd > 0 {
-		updateData["cost_input_per_1k_usd"] = profile.APIPricing.InputPer1MUsd / 1000.0
+		insertData["cost_input_per_1k_usd"] = profile.APIPricing.InputPer1MUsd / 1000.0
 	}
 	if profile.APIPricing.OutputPer1MUsd > 0 {
-		updateData["cost_output_per_1k_usd"] = profile.APIPricing.OutputPer1MUsd / 1000.0
+		insertData["cost_output_per_1k_usd"] = profile.APIPricing.OutputPer1MUsd / 1000.0
 	}
 
-	_, err := l.db.Update(ctx, "models", profile.ID, updateData)
+	_, err := l.db.Insert(ctx, "models", insertData)
 	if err != nil {
-		return fmt.Errorf("update model %s: %w", profile.ID, err)
+		// Already exists -- update instead
+		updateData := map[string]interface{}{
+			"name":          profile.Name,
+			"vendor":        profile.Provider,
+			"access_type":   profile.AccessType,
+			"context_limit": profile.ContextLimit,
+			"status":        profile.Status,
+			"rate_limits":   json.RawMessage(rateLimitsJSON),
+			"config":        configMap,
+		}
+		if profile.APIPricing.InputPer1MUsd > 0 {
+			updateData["cost_input_per_1k_usd"] = profile.APIPricing.InputPer1MUsd / 1000.0
+		}
+		if profile.APIPricing.OutputPer1MUsd > 0 {
+			updateData["cost_output_per_1k_usd"] = profile.APIPricing.OutputPer1MUsd / 1000.0
+		}
+
+		_, updateErr := l.db.Update(ctx, "models", profile.ID, updateData)
+		if updateErr != nil {
+			return fmt.Errorf("upsert model %s: insert=%w update=%v", profile.ID, err, updateErr)
+		}
+	} else {
+		log.Printf("[ModelLoader] Created new model %s in Supabase", profile.ID)
 	}
 
 	return nil
