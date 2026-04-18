@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -223,8 +224,18 @@ func (h *TestingHandler) runTests(ctx context.Context, branchName string) (bool,
 	testCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(testCtx, "go", "test", "-v", "-count=1", "./...")
+	// Resolve go binary path — systemd services may not have go in PATH
+	goBin := "/home/vibes/go/bin/go"
+	if _, err := exec.LookPath("go"); err == nil {
+		goBin = "go"
+	}
+
+	cmd := exec.CommandContext(testCtx, goBin, "test", "-v", "-count=1", "./...")
 	cmd.Dir = testDir
+	// Ensure PATH includes common go locations
+	cmd.Env = append(os.Environ(),
+		"PATH="+os.Getenv("PATH")+":/home/vibes/go/bin:/usr/local/go/bin",
+	)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
