@@ -337,6 +337,14 @@ func (h *TaskHandler) executeTask(
 		"p_result":                         executionResult,
 	})
 
+	// Deduct cost from model's credit_remaining_usd (if model has credit tracking)
+	if costs.Actual > 0 {
+		h.database.RPC(ctx, "deduct_model_credit", map[string]any{
+			"p_model_id": modelID,
+			"p_cost_usd": costs.Actual,
+		})
+	}
+
 	// Atomically transition to review
 	h.database.RPC(ctx, "transition_task", map[string]any{
 		"p_task_id":    taskID,
