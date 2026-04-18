@@ -1,10 +1,24 @@
--- Migration 122 (v4): Fix calculate_run_costs - kill duplicates
--- Two copies exist (NUMERIC and DOUBLE PRECISION variants), PostgREST can't choose
+-- Migration 122 (v5): Nuclear option - drop ALL calculate_run_costs variants
+-- The overloading is stuck, must use specific signatures
 
-DROP FUNCTION IF EXISTS calculate_run_costs(UUID) CASCADE;
-DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INT, INT, NUMERIC) CASCADE;
-DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INT, INT, DOUBLE PRECISION) CASCADE;
+-- Kill every possible signature
+DO $$
+DECLARE
+    sig TEXT;
+BEGIN
+    FOR sig IN 
+        SELECT pg_get_function_identity_arguments(oid) 
+        FROM pg_proc 
+        WHERE proname = 'calculate_run_costs' 
+        AND pronamespace = 'public'::regnamespace
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS calculate_run_costs(' || sig || ') CASCADE';
+        RAISE NOTICE 'Dropped calculate_run_costs(%)', sig;
+    END LOOP;
+END;
+$$;
 
+-- Now create the single clean version
 CREATE OR REPLACE FUNCTION calculate_run_costs(
     p_model_id TEXT,
     p_tokens_in INT DEFAULT 0,
