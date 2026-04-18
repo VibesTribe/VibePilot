@@ -1,28 +1,28 @@
 # Hermes Agent Memories
 # Auto-backed up from Hermes memory store. Do not edit manually.
-# Last updated: 2026-04-18 (06:22 UTC)
+# Last updated: 2026-04-18 (22:28 UTC)
 
 ## MEMORY
 
 PARAM FIX: set/clear_processing use p_table/p_id. claim_task uses p_task_id/p_worker_id/p_model_id/p_routing_flag/p_routing_reason. transition_task uses p_task_id/p_new_status/p_failure_reason(TEXT)/p_result(JSONB). create_task_run uses p_courier (nullable). ALWAYS grep Go call site for exact param names before writing SQL. Migrations 118-120 BROKE working pipeline by changing RPC signatures without matching Go callers.
 §
-HERMES v0.9.0 (Apr 17). GLM-5 ~50s/call. FIXED: v0.8.0 empty response bug + \r in JSON. TODO: per-agent max-turns overrides, planner prompt redundancy, startup plan recovery. All CONFIG fixes, never hardcode agent patterns into shared code.
+FIXED Apr 18: Cascade routing, module→testing merge, cost calc (calc_run_costs RPC). WEBHOOK LIVE: Governor IS webhook server on :8080. Quick tunnel needs `--config /dev/null` (named tunnel catch-all bleeds). Migration 123: create_plan='draft'. handlePlanCreated does git.Pull() before reading PRD. MIGRATIONS PUSHED TO GITHUB — user applies via Supabase SQL Editor. PG overloading traps: pg_proc loop or rename function entirely.
 §
-CONTEXT WIRED: .hermes.md=enforcement (priority 1, loaded every msg). knowledge.db=3300 docs+364 SQL schema objects+17 pipeline stages. index.db (jCodeMunch)=1974 Go symbols + 2872 vibeflow symbols (indexed separately at ~/.code-index/local-vibeflow-c8d9c778.db). map.md=Go function signatures. Post-commit hook syncs to ~/vibepilot/. TERMINAL_CWD=~/VibePilot. AUDIT DOCS: DASHBOARD_AUDIT.md, CROSS_REFERENCE_AUDIT.md in docs/.
+E2E+VAULT FIXED Apr 18: Full pipeline proven. Vault re-encrypted all 6 keys with current VAULT_KEY (single PBKDF2+AES-GCM). Root cause was old double-derivation mismatch. Testing handler: 3-method worktree discovery, two-phase testing. Task completion = testing passed, merge best-effort. Module→main merge NOT yet done.
 §
-E2E PROVEN Apr 18: T001+T002 merged. M122+Go fixes: claim_for_review(review+testing), deps guard, attempts+unlock, revision feedback, timeouts(5m/2m), testing parse error, gitree branch delete+worktree. Recovery auto (300s stale). Module→main merge NOT yet done. Cold start = processing recovery.
+GOVERNOR GOTCHAS: Cold start only reacts to realtime events (touch updated_at). claim_for_review reused by testing. task_packets table must exist. Migration 124 applied: check_platform_availability, get_model_score_for_task, update_model_usage RPCs. UsageTracker persists every 30s. RPC allowlist in db/rpc.go — must add new RPCs there. models table `platform` is NOT NULL — must always include in insert. platform/courier on models table are DISPLAY HINTS only, not routing.
 §
-GOVERNOR GOTCHAS: (1) Cold start only reacts to realtime events, not existing state — must touch updated_at. (2) claim_for_review reused by testing handler, must match both statuses. (3) task_packets static table, must exist or executor skips.
+ZAI API: GLM-5 subscription key may not work for direct API calls — endpoint or auth might differ from CLI. INVESTIGATE before assuming key is wrong. Governor cascade retry now loops through models on planner failure (ExcludeModel field). Realtime triggers plan_created on UPDATE→draft not just INSERT.
 §
-DASHBOARD: ~/vibeflow/apps/dashboard/ SACRED. Adapter: lib/vibepilotAdapter.ts. Lifecycle: pending→in_progress→review→testing→complete→merged. Pipeline proven E2E Apr 18. M122 applied: claim_for_review(review+testing), deps guard, attempts, auto-unlock. Gitree: DeleteBranch+worktree checkout main first.
-BLOCKING: Tester calls GLM-5 via hermes to "run tests" — killed every time, recovery loops. Need direct `go test` not LLM. plans table: no title/description (only prd_path,plan_path,status,complexity).
+THREE-TIER: Model=who, Connector=how, Platform=where. GLM-5=subscription(z.ai, 3 concurrent, May 1). Router: filter ACTIVE first. Governor reads files from GitHub, passes content — never make up prompts.
 ## USER PROFILE
 
-PET PEEVE: SIMPLE DIRECT ACTION. No spawning extra models. No asking me to edit code, save files, or multi-step copy-paste. I copy ONE thing from GitHub, paste ONE place. Migrations must be self-contained and rerunnable. DON'T IMAGINE, VERIFY — review existing code/state before proposing fixes, never invent solutions. Always grep/read first.
+PET PEEVE: SIMPLE DIRECT ACTION. No spawning models. Push changes to GitHub FIRST. Migrations self-contained. DON'T IMAGINE VERIFY — grep/read before proposing fixes. Check git history before claiming wrong. Do homework first.
 §
 User vision: n8n-like visual config-driven orchestration (draw pipelines, not code them). Courier agents to free web AI tiers via Browser Use (self-hosted, open source). Chat URLs stored in task_runs for revision context. Visual QA agent checks apps before human review. MIT/Apache only. No Apple. Conservative subagent usage with GLM. May 1 = budget cliff.
 §
-BURNING CONSTRAINT: 20-46K tokens boot on repo files. Compressed knowledge layer needed. Think before build.
+BURNING CONSTRAINT: 20-46K tokens boot. Think before build. May 1 = GLM budget cliff.
+ORCHESTRATOR NON-NEGOTIABLE: Health, cooldown, rate limits, credit, routing — never skip. Core system.
 §
 CRITICAL: NEVER declare dead/mock without checking docs+user. Dashboard IS LIVE. Supabase+GitHub=truth, not local. Governor subservient to VibePilot. Must work on autopilot or it's broken. PRDs need full tech specs.
 §
