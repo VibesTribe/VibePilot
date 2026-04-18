@@ -1,17 +1,17 @@
 {
   "$schema": "./schemas/agents.schema.json",
-  "version": "2.1",
-  "description": "Agent configurations. Capabilities define what the agent needs for routing - destinations provide tools natively.",
+  "version": "2.2",
+  "description": "Agent configurations. Empty model field = use cascade routing from routing.json free_cascade strategy.",
   "agents": [
-    {"id":"consultant","name":"Consultant","model":"gemini-2.0-flash","prompt":"consultant.md","capabilities":["web_access","file_access","interactive"],"default_connector":"hermes","description":"Human entry point"},
-    {"id":"planner","name":"Planner","model":"glm-5","prompt":"planner.md","capabilities":["file_access"],"default_connector":"hermes","description":"Breaks PRD into tasks"},
-    {"id":"supervisor","name":"Supervisor","model":"glm-5","prompt":"supervisor.md","capabilities":["file_access"],"default_connector":"hermes","description":"Quality gate"},
-    {"id":"council","name":"Council","model":"gemini-2.0-flash","prompt":"council.md","capabilities":["file_access","web_access"],"default_connector":"hermes","description":"Deep review"},
-    {"id":"orchestrator","name":"Vibes","model":"gemini-2.0-flash","prompt":"orchestrator.md","capabilities":[],"default_connector":"hermes","description":"Human interface"},
-    {"id":"maintenance","name":"Maintenance","model":"glm-5","prompt":"maintenance.md","capabilities":["git_access","file_access","sandbox_execution"],"default_connector":"hermes","description":"Code changes"},
-    {"id":"researcher","name":"Researcher","model":"gemini-2.0-flash","prompt":"system_researcher.md","capabilities":["web_access"],"default_connector":"hermes","description":"System improvements"},
-    {"id":"tester","name":"Tester","model":"glm-5","prompt":"testers.md","capabilities":["file_access","sandbox_execution"],"default_connector":"hermes","description":"Code validation"},
-    {"id":"watcher","name":"Watcher","model":"gemini-2.0-flash","prompt":"watcher.md","capabilities":[],"default_connector":"hermes","description":"Safety monitor"},
-    {"id":"task_runner","name":"Task Runner","model":"glm-5","prompt":"task_runner_simple.md","capabilities":["file_access"],"default_connector":"hermes","description":"Executes tasks in one session"}
+    {"id":"consultant","name":"Consultant","model":"","prompt":"consultant.md","capabilities":["web_access","file_access","interactive"],"default_connector":"","description":"Human entry point"},
+    {"id":"planner","name":"Planner","model":"","prompt":"planner.md","capabilities":["file_access"],"default_connector":"","description":"Breaks PRD into tasks"},
+    {"id":"supervisor","name":"Supervisor","model":"","prompt":"supervisor.md","capabilities":["file_access"],"default_connector":"","description":"Quality gate"},
+    {"id":"council","name":"Council","model":"","prompt":"council.md","capabilities":["file_access","web_access"],"default_connector":"","description":"Deep review"},
+    {"id":"orchestrator","name":"Vibes","model":"","prompt":"orchestrator.md","capabilities":[],"default_connector":"","description":"Human interface"},
+    {"id":"maintenance","name":"Maintenance","model":"","prompt":"maintenance.md","capabilities":["git_access","file_access","sandbox_execution"],"default_connector":"","description":"Code changes"},
+    {"id":"researcher","name":"Researcher","model":"","prompt":"system_researcher.md","capabilities":["web_access"],"default_connector":"","description":"System improvements"},
+    {"id":"tester","name":"Tester","model":"","prompt":"testers.md","capabilities":["file_access","sandbox_execution"],"default_connector":"","description":"Code validation"},
+    {"id":"watcher","name":"Watcher","model":"","prompt":"watcher.md","capabilities":[],"default_connector":"","description":"Safety monitor"},
+    {"id":"task_runner","name":"Task Runner","model":"","prompt":"task_runner_simple.md","capabilities":["file_access"],"default_connector":"","description":"Executes tasks in one session"}
   ]
 }

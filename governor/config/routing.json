@@ -17,6 +17,10 @@
     "external_only": {
       "description": "Only use external platforms",
       "priority": ["external"]
+    },
+    "free_cascade": {
+      "description": "Cascade through free API models in priority order. Used when agent has no model pin.",
+      "priority": ["glm-5", "llama-3.3-70b-versatile", "kimi-k2-instruct", "qwen3-32b", "nemotron-ultra-253b", "llama-3.1-8b-instant", "deepseek-chat", "gemini-2.5-flash", "deepseek-reasoner"]
     }
   },
   

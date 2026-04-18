@@ -74,13 +74,13 @@
       "id": "groq-api",
       "name": "Groq Cloud API",
       "type": "api",
-      "status": "pending_key",
+      "status": "active",
       "provider": "groq",
       "endpoint": "https://api.groq.com/openai/v1",
       "api_key_ref": "GROQ_API_KEY",
       "models_available": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen3-32b"],
       "provides_tools": [],
-      "notes": "Need to add GROQ_API_KEY to vault"
+      "notes": "Free tier: 14400 RPM, 1M tokens/day"
     },
     {
       "id": "openrouter-api",
@@ -93,6 +93,18 @@
       "models_available": ["deepseek/deepseek-r1:free", "google/gemini-2.5-flash-preview:free"],
       "provides_tools": [],
       "notes": "EMERGENCY ONLY. Always use :free suffix. Set $0 spend limit in dashboard. Free models can fall back to paid without warning."
+    },
+    {
+      "id": "nvidia-api",
+      "name": "NVIDIA NIM API",
+      "type": "api",
+      "status": "active",
+      "provider": "nvidia",
+      "endpoint": "https://integrate.api.nvidia.com/v1",
+      "api_key_ref": "NVIDIA_API_KEY",
+      "models_available": ["nvidia/llama-3.1-nemotron-ultra-253b"],
+      "provides_tools": [],
+      "notes": "Free tier with rate limits. Nemotron Ultra for complex tasks."
     },
     {
       "id": "chatgpt-web",
