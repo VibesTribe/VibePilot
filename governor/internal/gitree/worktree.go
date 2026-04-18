@@ -71,6 +71,12 @@ func (wm *WorktreeManager) CreateWorktree(ctx context.Context, taskID, branchNam
 		return nil, fmt.Errorf("create worktree base dir: %w", err)
 	}
 
+	// Ensure main repo is on main before creating branch/worktree
+	// (can't create worktree for a branch that's checked out in main repo)
+	if err := wm.gitree.gitCommand(ctx, "checkout", "main").Run(); err != nil {
+		log.Printf("[Worktrees] Warning: checkout main failed: %v", err)
+	}
+
 	// Create the branch if it doesn't exist
 	if err := wm.gitree.CreateBranchFrom(ctx, branchName, "main"); err != nil {
 		// Branch might already exist, that's OK

@@ -359,6 +359,11 @@ func (g *Gitree) DeleteBranch(ctx context.Context, branchName string) error {
 		return fmt.Errorf("cannot delete protected branch: %s", branchName)
 	}
 
+	// Ensure we're not on the branch we're trying to delete
+	if err := g.gitCommand(ctx, "checkout", "main").Run(); err != nil {
+		log.Printf("[Gitree] Warning: checkout main before delete failed: %v", err)
+	}
+
 	if err := g.gitCommand(ctx, "branch", "-D", branchName).Run(); err != nil {
 		log.Printf("[Gitree] Warning: branch -D %s failed: %v", branchName, err)
 	}
