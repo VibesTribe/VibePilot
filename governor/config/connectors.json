@@ -50,6 +50,20 @@
       "notes": "Claude Code CLI. Inactive - auth broken after key rotation."
     },
     {
+      "id": "zai-api",
+      "name": "Z.AI API (GLM-5)",
+      "type": "api",
+      "status": "active",
+      "provider": "openai",
+      "endpoint": "https://api.z.ai/api/paas/v4",
+      "api_key_ref": "ZAI_API_KEY",
+      "models_available": [
+        "glm-5"
+      ],
+      "provides_tools": [],
+      "notes": "Direct API for GLM-5. Fast — no CLI overhead. Used by planner/supervisor/tester."
+    },
+    {
       "id": "hermes",
       "name": "Hermes Agent",
       "type": "cli",
@@ -80,7 +94,7 @@
         "terminal",
         "file"
       ],
-      "notes": "Hermes Agent CLI. Currently running GLM-5 via Z.AI."
+      "notes": "Hermes Agent CLI. For executor tasks that need tools. GLM-5 via Z.AI."
     },
     {
       "id": "kimi",

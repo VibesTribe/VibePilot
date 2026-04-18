@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"sort"
 
 	"github.com/vibepilot/governor/internal/db"
 )
@@ -111,6 +112,27 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 	if len(connectors) == 0 {
 		log.Printf("[Router] No internal connectors available")
 		return nil, nil
+	}
+
+	// Prefer API connectors over CLI for toolless agents (planner, supervisor, tester, council)
+	// CLI connectors are heavier (spawn full agent sessions) and only needed for executor tasks
+	needsTools := r.agentNeedsTools(req.Role)
+	if !needsTools {
+		sort.Slice(connectors, func(i, j int) bool {
+			ti, tj := connectors[i].Type, connectors[j].Type
+			// api first, cli second, everything else last
+			order := func(t string) int {
+				switch t {
+				case "api":
+					return 0
+				case "cli":
+					return 1
+				default:
+					return 2
+				}
+			}
+			return order(ti) < order(tj)
+		})
 	}
 
 	// If we have an agent-specific model, route directly to it
@@ -510,4 +532,16 @@ func (r *Router) GetAvailableConnectors() []string {
 		}
 	}
 	return result
+}
+
+// agentNeedsTools returns true for agents that need CLI connector with tools.
+// Planner/supervisor/tester/council receive file content in their prompt from the governor,
+// so they can use lightweight API connectors instead of spawning full CLI sessions.
+func (r *Router) agentNeedsTools(role string) bool {
+	switch role {
+	case "task_runner", "maintenance":
+		return true
+	default:
+		return false
+	}
 }
