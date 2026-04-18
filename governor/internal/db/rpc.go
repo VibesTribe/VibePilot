@@ -50,6 +50,7 @@ var defaultRPCAllowlist = map[string]bool{
 	"check_model_availability":    true,
 	"check_platform_availability": true,
 	"update_model_usage":          true,
+	"deduct_model_credit":        true,
 
 	// Planner learning
 	"create_planner_rule":         true,
