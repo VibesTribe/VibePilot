@@ -279,7 +279,13 @@ func extractJSON(output string) string {
 		}
 		result := strings.Join(jsonLines, "\n")
 		if result != "" {
-			return result
+			trimmed := strings.TrimSpace(result)
+			// Validate: must start with { and end with }
+			if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
+				return result
+			}
+			// Code fence extraction gave incomplete JSON (inner ``` cut it short)
+			// Fall through to first { ... last } strategy
 		}
 	}
 
