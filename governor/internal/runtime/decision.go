@@ -266,16 +266,23 @@ func extractJSON(output string) string {
 		lines := strings.Split(output, "\n")
 		var jsonLines []string
 		inBlock := false
+		braceDepth := 0
 		for _, line := range lines {
 			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, "```") {
-				if inBlock {
-					break // closing backticks
-				}
+			if !inBlock && strings.HasPrefix(trimmed, "```") {
 				inBlock = true
 				continue // skip opening line (including ```json tag)
 			}
+			if inBlock && strings.HasPrefix(trimmed, "```") && braceDepth > 0 {
+				// Closing backticks inside JSON content — treat as literal content, not fence
+				jsonLines = append(jsonLines, line)
+				continue
+			}
+			if inBlock && strings.HasPrefix(trimmed, "```") {
+				break // closing backticks at block level
+			}
 			if inBlock {
+				braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
 				jsonLines = append(jsonLines, line)
 			}
 		}

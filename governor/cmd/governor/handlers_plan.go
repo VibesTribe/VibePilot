@@ -149,7 +149,12 @@ func handlePlanCreated(
 
 	plannerOutput, err := runtime.ParsePlannerOutput(result.Output)
 	if err != nil {
-		log.Printf("[EventPlanCreated] Failed to parse planner output: %v", err)
+		// Log first 500 chars of raw output for debugging
+		raw := result.Output
+		if len(raw) > 500 {
+			raw = raw[:500]
+		}
+		log.Printf("[EventPlanCreated] Failed to parse planner output: %v\nRaw output (first 500): %s", err, raw)
 		setPlanError(ctx, database, planID, "parse_failed")
 		clearProcessingLock()
 		return
