@@ -1,25 +1,14 @@
--- Migration 122 (v5): Nuclear option - drop ALL calculate_run_costs variants
--- The overloading is stuck, must use specific signatures
+-- Migration 122 (v6): Give up fighting overloads, use a clean new name
+-- The old calculate_run_costs has stuck overloads that won't drop.
+-- Go code will be updated to call calc_run_costs instead.
 
--- Kill every possible signature
-DO $$
-DECLARE
-    sig TEXT;
-BEGIN
-    FOR sig IN 
-        SELECT pg_get_function_identity_arguments(oid) 
-        FROM pg_proc 
-        WHERE proname = 'calculate_run_costs' 
-        AND pronamespace = 'public'::regnamespace
-    LOOP
-        EXECUTE 'DROP FUNCTION IF EXISTS calculate_run_costs(' || sig || ') CASCADE';
-        RAISE NOTICE 'Dropped calculate_run_costs(%)', sig;
-    END LOOP;
-END;
-$$;
+-- Kill everything we can
+DROP FUNCTION IF EXISTS calculate_run_costs(UUID) CASCADE;
+DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INT, INT, NUMERIC) CASCADE;
+DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INT, INT, DOUBLE PRECISION) CASCADE;
 
--- Now create the single clean version
-CREATE OR REPLACE FUNCTION calculate_run_costs(
+-- Create with clean name - no overloads possible
+CREATE OR REPLACE FUNCTION calc_run_costs(
     p_model_id TEXT,
     p_tokens_in INT DEFAULT 0,
     p_tokens_out INT DEFAULT 0,
