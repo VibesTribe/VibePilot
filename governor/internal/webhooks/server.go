@@ -17,21 +17,24 @@ import (
 )
 
 type Server struct {
-	port     int
-	path     string
-	secret   string
-	router   *runtime.EventRouter
-	github   *GitHubWebhookHandler
-	server   *http.Server
-	handlers map[string]EventHandler
+	port      int
+	path      string
+	secret    string
+	version   string
+	startTime time.Time
+	router    *runtime.EventRouter
+	github    *GitHubWebhookHandler
+	server    *http.Server
+	handlers  map[string]EventHandler
 }
 
 type EventHandler func(ctx context.Context, payload *Payload) error
 
 type Config struct {
-	Port   int
-	Path   string
-	Secret string
+	Port    int
+	Path    string
+	Secret  string
+	Version string
 }
 
 type Payload struct {
@@ -53,11 +56,13 @@ func NewServer(cfg *Config, router *runtime.EventRouter) *Server {
 	}
 
 	return &Server{
-		port:     cfg.Port,
-		path:     cfg.Path,
-		secret:   cfg.Secret,
-		router:   router,
-		handlers: make(map[string]EventHandler),
+		port:      cfg.Port,
+		path:      cfg.Path,
+		secret:    cfg.Secret,
+		version:   cfg.Version,
+		startTime: time.Now(),
+		router:    router,
+		handlers:  make(map[string]EventHandler),
 	}
 }
 
@@ -73,6 +78,7 @@ func (s *Server) RegisterHandler(eventType string, handler EventHandler) {
 func (s *Server) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(s.path, s.handleWebhook)
+	mux.HandleFunc("/status", s.handleStatus)
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
@@ -285,6 +291,24 @@ func extractID(record map[string]any) string {
 		return id
 	}
 	return ""
+}
+
+func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	uptime := time.Since(s.startTime).Seconds()
+	resp := map[string]any{
+		"governor":       "vibepilot",
+		"version":        s.version,
+		"status":         "running",
+		"uptime_seconds": uptime,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (s *Server) GetPort() int {
