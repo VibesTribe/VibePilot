@@ -1,4 +1,6 @@
 
+DROP FUNCTION IF EXISTS check_platform_availability(TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION check_platform_availability(p_platform_id TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
