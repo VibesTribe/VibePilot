@@ -184,10 +184,24 @@ func ParseCouncilVote(output string) (*CouncilVote, error) {
 
 func ParsePlannerOutput(output string) (*PlannerOutput, error) {
 	var p PlannerOutput
-	jsonStr := sanitizeJSON(extractJSON(output))
-	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil {
-		return nil, err
+	jsonStr := extractJSON(output)
+
+	// Extract plan_content separately to avoid unescaped quote issues
+	planContent, cleanJSON := extractPlanContent(jsonStr)
+
+	if planContent != "" {
+		// Parse the clean JSON (plan_content replaced with empty string)
+		if err := json.Unmarshal([]byte(sanitizeJSON(cleanJSON)), &p); err != nil {
+			return nil, err
+		}
+		p.PlanContent = planContent
+	} else {
+		// No plan_content field or couldn't extract, try normal parsing
+		if err := json.Unmarshal([]byte(sanitizeJSON(jsonStr)), &p); err != nil {
+			return nil, err
+		}
 	}
+
 	return &p, nil
 }
 
@@ -379,4 +393,50 @@ func sanitizeJSON(input string) string {
 	}
 
 	return cleaned
+}
+
+// extractPlanContent safely extracts plan_content from raw LLM JSON output
+// where the value may contain unescaped double quotes from markdown code blocks.
+// Returns the plan_content string and the remaining JSON with plan_content replaced by empty string.
+func extractPlanContent(raw string) (planContent string, cleanJSON string) {
+	// Find the start of plan_content value
+	marker := `"plan_content": "`
+	idx := strings.Index(raw, marker)
+	if idx == -1 {
+		// Try with escaped quotes variant
+		marker = `"plan_content":"`
+		idx = strings.Index(raw, marker)
+	}
+	if idx == -1 {
+		return "", raw
+	}
+
+	valueStart := idx + len(marker)
+
+	// plan_content ends at the last occurrence of `"` followed by a comma or closing brace
+	// at the top level. Look for the pattern: `"\n  "total_tasks"` or `"\n}`
+	// We search backwards from the end for the closing quote of plan_content
+	//
+	// The JSON after plan_content has known keys: "total_tasks" and "status"
+	// Find the last valid closing pattern
+	endMarkers := []string{
+		"\",\n  \"total_tasks\"",
+		"\",\n  \"status\"",
+		"\",\n\"total_tasks\"",
+		"\",\n\"status\"",
+		"\"\n}",
+		"\"\n}",
+	}
+
+	for _, endMarker := range endMarkers {
+		endIdx := strings.LastIndex(raw, endMarker)
+		if endIdx > valueStart {
+			planContent = raw[valueStart:endIdx]
+			// Rebuild JSON with plan_content as empty string to parse other fields
+			cleanJSON = raw[:valueStart] + "" + raw[endIdx:]
+			return planContent, cleanJSON
+		}
+	}
+
+	return "", raw
 }
