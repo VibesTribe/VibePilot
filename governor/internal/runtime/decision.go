@@ -261,96 +261,61 @@ func extractJSON(output string) string {
 	output = strings.TrimSpace(output)
 	output = strings.ReplaceAll(output, "\r", "")
 
-	// Strategy 1: Extract from code blocks (handles ```json, ```, etc.)
-	// For large outputs with nested code fences, fall through to Strategy 2
 	if strings.Contains(output, "```") {
 		lines := strings.Split(output, "\n")
 		var jsonLines []string
 		inBlock := false
 		for _, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			if !inBlock && strings.HasPrefix(trimmed, "```") {
-				inBlock = true
-				continue
-			}
-			if inBlock && strings.HasPrefix(trimmed, "```") && len(jsonLines) == 0 {
-				// Empty block, skip
-				break
-			}
-			if inBlock && trimmed == "```" && len(jsonLines) > 0 {
-				// Potential close — but check if content looks like complete JSON
-				result := strings.Join(jsonLines, "\n")
-				trimmedResult := strings.TrimSpace(result)
-				if strings.HasPrefix(trimmedResult, "{") && strings.HasSuffix(trimmedResult, "}") {
-					// Looks complete, return it
-					return result
+			if strings.HasPrefix(line, "```") {
+				if inBlock {
+					break
 				}
-				// Not complete, this ``` is inside the JSON content
-				jsonLines = append(jsonLines, line)
+				inBlock = true
 				continue
 			}
 			if inBlock {
 				jsonLines = append(jsonLines, line)
 			}
 		}
-		// If we have content but no closing fence, try it as-is
-		if len(jsonLines) > 0 {
-			result := strings.Join(jsonLines, "\n")
-			trimmedResult := strings.TrimSpace(result)
-			if strings.HasPrefix(trimmedResult, "{") && strings.HasSuffix(trimmedResult, "}") {
-				return result
-			}
+		result := strings.Join(jsonLines, "\n")
+		if result != "" {
+			return result
 		}
-		// Strategy 1 didn't yield valid JSON, fall through to Strategy 2
 	}
 
-	// Strategy 2: Balanced brace matching from first { to its matching }
 	firstBrace := strings.Index(output, "{")
-	if firstBrace == -1 {
-		return output
-	}
-	depth := 0
-	inString := false
-	escape := false
-	for i, ch := range output[firstBrace:] {
-		if escape {
-			escape = false
-			continue
-		}
-		if ch == '\\' && inString {
-			escape = true
-			continue
-		}
-		if ch == '"' {
-			inString = !inString
-			continue
-		}
-		if inString {
-			continue
-		}
-		if ch == '{' {
-			depth++
-		} else if ch == '}' {
-			depth--
-			if depth == 0 {
-				return output[firstBrace : firstBrace+i+1]
-			}
-		}
-	}
-
-	// Strategy 3: Fallback to first { ... last }
 	lastBrace := strings.LastIndex(output, "}")
-	if lastBrace > firstBrace {
+	if firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace {
 		return output[firstBrace : lastBrace+1]
 	}
 
 	return output
 }
 
+func CategorizeFailure(issueType string) string {
+	switch issueType {
+	case "truncation", "context_exceeded", "incomplete", "truncated_output":
+		return "model_issue"
+	case "drift", "wrong_output", "unexpected_changes", "quality_below_standard", "broken_output":
+		return "quality_issue"
+	case "security", "secrets", "no_hardcoded_secrets", "dangerous_output":
+		return "security_issue"
+	case "timeout", "rate_limited":
+		return "platform_issue"
+	case "prompt_needs_improvement", "task_too_large":
+		return "prompt_issue"
+	case "model_limitation":
+		return "capability_issue"
+	case "almost_perfect", "needs_revision":
+		return "revision_issue"
+	default:
+		return "task_issue"
+	}
+}
+
 // sanitizeJSON fixes common LLM JSON issues: unescaped newlines/tabs in strings,
 // trailing commas, and other formatting problems that make json.Unmarshal fail.
 func sanitizeJSON(input string) string {
-	// Fix unescaped newlines and tabs inside JSON string values
 	var result strings.Builder
 	inString := false
 	escape := false
@@ -395,7 +360,7 @@ func sanitizeJSON(input string) string {
 
 	cleaned := result.String()
 
-	// Remove trailing commas before } or ] (common LLM mistake)
+	// Remove trailing commas before } or ]
 	for {
 		replaced := strings.ReplaceAll(cleaned, ",\n}", "\n}")
 		replaced = strings.ReplaceAll(replaced, ",\n]", "\n]")
@@ -408,25 +373,4 @@ func sanitizeJSON(input string) string {
 	}
 
 	return cleaned
-}
-
-func CategorizeFailure(issueType string) string {
-	switch issueType {
-	case "truncation", "context_exceeded", "incomplete", "truncated_output":
-		return "model_issue"
-	case "drift", "wrong_output", "unexpected_changes", "quality_below_standard", "broken_output":
-		return "quality_issue"
-	case "security", "secrets", "no_hardcoded_secrets", "dangerous_output":
-		return "security_issue"
-	case "timeout", "rate_limited":
-		return "platform_issue"
-	case "prompt_needs_improvement", "task_too_large":
-		return "prompt_issue"
-	case "model_limitation":
-		return "capability_issue"
-	case "almost_perfect", "needs_revision":
-		return "revision_issue"
-	default:
-		return "task_issue"
-	}
 }
