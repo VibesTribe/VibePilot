@@ -262,39 +262,46 @@ func extractJSON(output string) string {
 	output = strings.ReplaceAll(output, "\r", "")
 
 	// Strategy 1: Extract from code blocks (handles ```json, ```, etc.)
+	// For large outputs with nested code fences, fall through to Strategy 2
 	if strings.Contains(output, "```") {
 		lines := strings.Split(output, "\n")
 		var jsonLines []string
 		inBlock := false
-		braceDepth := 0
 		for _, line := range lines {
 			trimmed := strings.TrimSpace(line)
 			if !inBlock && strings.HasPrefix(trimmed, "```") {
 				inBlock = true
-				continue // skip opening line (including ```json tag)
+				continue
 			}
-			if inBlock && strings.HasPrefix(trimmed, "```") && braceDepth > 0 {
-				// Closing backticks inside JSON content — treat as literal content, not fence
+			if inBlock && strings.HasPrefix(trimmed, "```") && len(jsonLines) == 0 {
+				// Empty block, skip
+				break
+			}
+			if inBlock && trimmed == "```" && len(jsonLines) > 0 {
+				// Potential close — but check if content looks like complete JSON
+				result := strings.Join(jsonLines, "\n")
+				trimmedResult := strings.TrimSpace(result)
+				if strings.HasPrefix(trimmedResult, "{") && strings.HasSuffix(trimmedResult, "}") {
+					// Looks complete, return it
+					return result
+				}
+				// Not complete, this ``` is inside the JSON content
 				jsonLines = append(jsonLines, line)
 				continue
 			}
-			if inBlock && strings.HasPrefix(trimmed, "```") {
-				break // closing backticks at block level
-			}
 			if inBlock {
-				braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
 				jsonLines = append(jsonLines, line)
 			}
 		}
-		result := strings.Join(jsonLines, "\n")
-		if result != "" {
-			// Validate it looks like JSON
-			trimmed := strings.TrimSpace(result)
-			if (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) ||
-				(strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) {
+		// If we have content but no closing fence, try it as-is
+		if len(jsonLines) > 0 {
+			result := strings.Join(jsonLines, "\n")
+			trimmedResult := strings.TrimSpace(result)
+			if strings.HasPrefix(trimmedResult, "{") && strings.HasSuffix(trimmedResult, "}") {
 				return result
 			}
 		}
+		// Strategy 1 didn't yield valid JSON, fall through to Strategy 2
 	}
 
 	// Strategy 2: Balanced brace matching from first { to its matching }
