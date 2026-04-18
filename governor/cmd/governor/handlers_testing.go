@@ -379,6 +379,61 @@ func (h *TestingHandler) tryMergeModuleToTesting(ctx context.Context, taskID, sl
 		log.Printf("[Testing] Module-to-testing merge FAILED for %s: %v", moduleBranch, err)
 	} else {
 		log.Printf("[Testing] Module %s successfully merged to testing branch", sliceID)
+		// Step 3: Check if ALL modules for this plan are merged to testing → merge testing to main
+		h.tryMergeTestingToMain(ctx, planID)
+	}
+}
+
+// tryMergeTestingToMain checks if all modules for a plan are merged into testing.
+// If so, merges the testing branch into main (the final integration step).
+func (h *TestingHandler) tryMergeTestingToMain(ctx context.Context, planID string) {
+	// Query all tasks for this plan to check module merge status
+	taskData, err := h.database.Query(ctx, "tasks", map[string]any{
+		"plan_id": "eq." + planID,
+		"select":  "id,status,slice_id",
+	})
+	if err != nil {
+		log.Printf("[Testing] Testing-to-main check: failed to query plan tasks: %v", err)
+		return
+	}
+	var tasks []map[string]any
+	if err := json.Unmarshal(taskData, &tasks); err != nil {
+		log.Printf("[Testing] Testing-to-main check: failed to parse tasks: %v", err)
+		return
+	}
+
+	// Group by slice_id to check each module's status
+	moduleStatus := map[string]bool{} // sliceID → all tasks merged/done
+	for _, t := range tasks {
+		sliceID, _ := t["slice_id"].(string)
+		status, _ := t["status"].(string)
+		if sliceID == "" {
+			continue
+		}
+		switch status {
+		case "merged", "complete", "escalated", "cancelled":
+			// terminal — ok
+		default:
+			moduleStatus[sliceID] = false // at least one task not done
+		}
+		if _, exists := moduleStatus[sliceID]; !exists {
+			moduleStatus[sliceID] = true // first task we see is terminal
+		}
+	}
+
+	// Check if all modules are complete
+	for slice, done := range moduleStatus {
+		if !done {
+			log.Printf("[Testing] Testing-to-main: module %s still has pending tasks (plan %s)", slice, truncateID(planID))
+			return
+		}
+	}
+
+	log.Printf("[Testing] All modules complete for plan %s → merging testing to main", truncateID(planID))
+	if err := h.git.MergeBranch(ctx, "testing", "main"); err != nil {
+		log.Printf("[Testing] Testing-to-main merge FAILED: %v", err)
+	} else {
+		log.Printf("[Testing] Plan %s fully integrated: testing → main merge complete", truncateID(planID))
 	}
 }
 
