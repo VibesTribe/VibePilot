@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -181,8 +182,13 @@ func (h *TestingHandler) runTests(ctx context.Context, branchName string) (bool,
 		if err == nil {
 			for _, wt := range worktrees {
 				if strings.Contains(wt.BranchName, branchName) || strings.Contains(wt.Path, branchName) {
-					testDir = wt.Path
-					log.Printf("[Testing] Using worktree at %s", testDir)
+				testDir = wt.Path
+				// Worktrees clone the repo root, but go.mod lives in governor/ subdirectory
+				governorDir := filepath.Join(wt.Path, "governor")
+				if _, err := os.Stat(filepath.Join(governorDir, "go.mod")); err == nil {
+					testDir = governorDir
+				}
+				log.Printf("[Testing] Using worktree at %s", testDir)
 					break
 				}
 			}
