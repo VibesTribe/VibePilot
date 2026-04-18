@@ -261,17 +261,19 @@ func extractJSON(output string) string {
 	output = strings.TrimSpace(output)
 	output = strings.ReplaceAll(output, "\r", "")
 
+	// Strategy 1: Extract from code blocks (handles ```json, ```, etc.)
 	if strings.Contains(output, "```") {
 		lines := strings.Split(output, "\n")
 		var jsonLines []string
 		inBlock := false
 		for _, line := range lines {
-			if strings.HasPrefix(line, "```") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "```") {
 				if inBlock {
-					break
+					break // closing backticks
 				}
 				inBlock = true
-				continue
+				continue // skip opening line (including ```json tag)
 			}
 			if inBlock {
 				jsonLines = append(jsonLines, line)
@@ -279,13 +281,52 @@ func extractJSON(output string) string {
 		}
 		result := strings.Join(jsonLines, "\n")
 		if result != "" {
-			return result
+			// Validate it looks like JSON
+			trimmed := strings.TrimSpace(result)
+			if (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) ||
+				(strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) {
+				return result
+			}
 		}
 	}
 
+	// Strategy 2: Balanced brace matching from first { to its matching }
 	firstBrace := strings.Index(output, "{")
+	if firstBrace == -1 {
+		return output
+	}
+	depth := 0
+	inString := false
+	escape := false
+	for i, ch := range output[firstBrace:] {
+		if escape {
+			escape = false
+			continue
+		}
+		if ch == '\\' && inString {
+			escape = true
+			continue
+		}
+		if ch == '"' {
+			inString = !inString
+			continue
+		}
+		if inString {
+			continue
+		}
+		if ch == '{' {
+			depth++
+		} else if ch == '}' {
+			depth--
+			if depth == 0 {
+				return output[firstBrace : firstBrace+i+1]
+			}
+		}
+	}
+
+	// Strategy 3: Fallback to first { ... last }
 	lastBrace := strings.LastIndex(output, "}")
-	if firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace {
+	if lastBrace > firstBrace {
 		return output[firstBrace : lastBrace+1]
 	}
 
