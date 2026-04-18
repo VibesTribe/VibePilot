@@ -87,6 +87,7 @@ func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) 
 		"id":            profile.ID,
 		"name":          profile.Name,
 		"vendor":        profile.Provider,
+		"platform":      profile.Provider, // platform is NOT NULL, same as vendor
 		"access_type":   profile.AccessType,
 		"context_limit": profile.ContextLimit,
 		"status":        profile.Status,
