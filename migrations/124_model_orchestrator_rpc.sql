@@ -2,8 +2,10 @@
 -- Migration 124: Model orchestrator RPCs
 -- Run entire script in Supabase SQL Editor
 
--- Drop old function with wrong return type
+-- Drop old functions with wrong signatures
 DROP FUNCTION IF EXISTS check_platform_availability(TEXT);
+DROP FUNCTION IF EXISTS get_model_score_for_task(TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS update_model_usage(TEXT, JSONB, TIMESTAMPTZ, TIMESTAMPTZ, INTEGER, TEXT, TEXT, INTEGER, JSONB);
 
 CREATE OR REPLACE FUNCTION check_platform_availability(p_platform_id TEXT)
 RETURNS JSONB
