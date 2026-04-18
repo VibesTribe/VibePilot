@@ -184,7 +184,7 @@ func ParseCouncilVote(output string) (*CouncilVote, error) {
 
 func ParsePlannerOutput(output string) (*PlannerOutput, error) {
 	var p PlannerOutput
-	jsonStr := extractJSON(output)
+	jsonStr := sanitizeJSON(extractJSON(output))
 	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func ParsePlannerOutput(output string) (*PlannerOutput, error) {
 
 func ParseTestResults(output string) (*TestResults, error) {
 	var t TestResults
-	jsonStr := extractJSON(output)
+	jsonStr := sanitizeJSON(extractJSON(output))
 	if err := json.Unmarshal([]byte(jsonStr), &t); err != nil {
 		return nil, err
 	}
@@ -331,6 +331,69 @@ func extractJSON(output string) string {
 	}
 
 	return output
+}
+
+// sanitizeJSON fixes common LLM JSON issues: unescaped newlines/tabs in strings,
+// trailing commas, and other formatting problems that make json.Unmarshal fail.
+func sanitizeJSON(input string) string {
+	// Fix unescaped newlines and tabs inside JSON string values
+	var result strings.Builder
+	inString := false
+	escape := false
+
+	for i := 0; i < len(input); i++ {
+		ch := input[i]
+
+		if escape {
+			escape = false
+			result.WriteByte(ch)
+			continue
+		}
+
+		if ch == '\\' && inString {
+			escape = true
+			result.WriteByte(ch)
+			continue
+		}
+
+		if ch == '"' {
+			inString = !inString
+			result.WriteByte(ch)
+			continue
+		}
+
+		if inString {
+			switch ch {
+			case '\n':
+				result.WriteString("\\n")
+				continue
+			case '\r':
+				result.WriteString("\\r")
+				continue
+			case '\t':
+				result.WriteString("\\t")
+				continue
+			}
+		}
+
+		result.WriteByte(ch)
+	}
+
+	cleaned := result.String()
+
+	// Remove trailing commas before } or ] (common LLM mistake)
+	for {
+		replaced := strings.ReplaceAll(cleaned, ",\n}", "\n}")
+		replaced = strings.ReplaceAll(replaced, ",\n]", "\n]")
+		replaced = strings.ReplaceAll(replaced, ",}", "}")
+		replaced = strings.ReplaceAll(replaced, ",]", "]")
+		if replaced == cleaned {
+			break
+		}
+		cleaned = replaced
+	}
+
+	return cleaned
 }
 
 func CategorizeFailure(issueType string) string {
