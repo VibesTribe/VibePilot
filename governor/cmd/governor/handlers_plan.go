@@ -23,12 +23,13 @@ func setupPlanHandlers(
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
+	usageTracker *runtime.UsageTracker,
 ) {
 	router.On(runtime.EventPlanCreated, func(event runtime.Event) {
-		handlePlanCreated(ctx, factory, pool, database, cfg, connRouter, git, event)
+		handlePlanCreated(ctx, factory, pool, database, cfg, connRouter, git, usageTracker, event)
 	})
 	router.On(runtime.EventPlanReview, func(event runtime.Event) {
-		handlePlanReview(ctx, factory, pool, database, cfg, connRouter, git, event)
+		handlePlanReview(ctx, factory, pool, database, cfg, connRouter, git, usageTracker, event)
 	})
 }
 
@@ -40,6 +41,7 @@ func handlePlanCreated(
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
+	usageTracker *runtime.UsageTracker,
 	event runtime.Event,
 ) {
 	startTime := time.Now()
@@ -131,6 +133,13 @@ func handlePlanCreated(
 		})
 		if err != nil {
 			log.Printf("[EventPlanCreated] Planner attempt %d failed (model=%s, connector=%s): %v", attempt+1, routingResult.ModelID, routingResult.ConnectorID, err)
+			// Track rate limit and completion in usage tracker
+			if usageTracker != nil {
+				if isRateLimitError(err) {
+					usageTracker.RecordRateLimit(ctx, routingResult.ModelID)
+				}
+				usageTracker.RecordCompletion(ctx, routingResult.ModelID, "", time.Since(startTime).Seconds(), false)
+			}
 			database.RPC(ctx, "record_model_failure", map[string]any{
 				"p_model_id":         routingResult.ModelID,
 				"p_task_id":          planID,
@@ -143,6 +152,11 @@ func handlePlanCreated(
 			setPlanError(ctx, database, planID, "execution_failed")
 			clearProcessingLock()
 			return
+		}
+		// Track successful planner usage
+		if usageTracker != nil {
+			usageTracker.RecordUsage(ctx, routingResult.ModelID, result.TokensIn, result.TokensOut)
+			usageTracker.RecordCompletion(ctx, routingResult.ModelID, "planning", time.Since(startTime).Seconds(), true)
 		}
 		break // success
 	}
@@ -429,6 +443,7 @@ func handlePlanReview(
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
+	usageTracker *runtime.UsageTracker,
 	event runtime.Event,
 ) {
 	var plan map[string]any
