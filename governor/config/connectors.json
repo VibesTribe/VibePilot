@@ -188,12 +188,13 @@
         "openrouter/elephant-alpha:free"
       ],
       "provides_tools": [],
-      "notes": "Free tier: 200 RPD unfunded, 1000 RPD with $10 deposit. 20 RPM per model. Always use :free suffix. openrouter/free auto-routes to best available. Deposit $10 for 5x volume.",
+      "notes": "Free tier: 200 RPD unfunded, 1000 RPD with $10+ deposit. 20 RPM per model. Always use :free suffix. openrouter/free auto-routes to best available. Credit: -$0.57 (was $18, burned by Anthropic default). Use free models ONLY.",
       "rate_limits": {
         "rpm_per_model": 20,
         "rpd_unfunded": 200,
         "rpd_funded": 1000
-      }
+      },
+      "credit_remaining_usd": -0.57
     },
     {
       "id": "nvidia-api",
