@@ -741,6 +741,126 @@
         "lower_rate_limits"
       ],
       "notes": "NVIDIA free tier. 253B parameter model. Good for complex tasks when Groq models hit limits."
+    },
+    {
+      "id": "meta/llama-3.3-70b-instruct",
+      "name": "Llama 3.3 70B Instruct (NVIDIA)",
+      "provider": "nvidia",
+      "access_type": "free_tier",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "api_key_ref": "NVIDIA_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 1,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 2,
+        "timeout_seconds": 120
+      },
+      "learned": {},
+      "strengths": [
+        "code",
+        "reasoning",
+        "instruction_following"
+      ],
+      "weaknesses": [],
+      "notes": "Meta Llama 3.3 70B via NVIDIA API free tier"
+    },
+    {
+      "id": "qwen/qwen3-32b",
+      "name": "Qwen3 32B (NVIDIA)",
+      "provider": "nvidia",
+      "access_type": "free_tier",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "api_key_ref": "NVIDIA_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 1,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 2,
+        "timeout_seconds": 120
+      },
+      "learned": {},
+      "strengths": [
+        "code",
+        "reasoning",
+        "multilingual"
+      ],
+      "weaknesses": [],
+      "notes": "Qwen3 32B via NVIDIA API free tier"
+    },
+    {
+      "id": "moonshotai/kimi-k2-instruct",
+      "name": "Kimi K2 Instruct (NVIDIA)",
+      "provider": "nvidia",
+      "access_type": "free_tier",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "api_key_ref": "NVIDIA_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 1,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 2,
+        "timeout_seconds": 120
+      },
+      "learned": {},
+      "strengths": [
+        "code",
+        "reasoning",
+        "agentic"
+      ],
+      "weaknesses": [],
+      "notes": "Moonshot Kimi K2 via NVIDIA API free tier"
     }
   ],
   "defaults": {

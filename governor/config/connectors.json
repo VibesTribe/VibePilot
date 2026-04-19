@@ -186,7 +186,10 @@
       "endpoint": "https://integrate.api.nvidia.com/v1",
       "api_key_ref": "NVIDIA_API_KEY",
       "models_available": [
-        "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+        "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+        "meta/llama-3.3-70b-instruct",
+        "qwen/qwen3-32b",
+        "moonshotai/kimi-k2-instruct"
       ],
       "provides_tools": [],
       "notes": "Free tier with rate limits. Nemotron Ultra for complex tasks."
