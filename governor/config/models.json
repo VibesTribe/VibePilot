@@ -5,7 +5,7 @@
   "models": [
     {
       "id": "glm-5",
-      "name": "GLM-5",
+      "name": "GLM-5 (Z.AI)",
       "provider": "zhipu",
       "access_type": "cli_subscription",
       "context_limit": 203000,
@@ -60,7 +60,7 @@
     },
     {
       "id": "gemini-2.5-flash",
-      "name": "Gemini 2.5 Flash",
+      "name": "Gemini 2.5 Flash (Gemini API)",
       "provider": "google",
       "access_type": "api",
       "context_limit": 1000000,
@@ -998,7 +998,7 @@
     },
     {
       "id": "qwen3.5-flash",
-      "name": "Qwen 3.5 Flash",
+      "name": "Qwen 3.5 Flash (Alibaba)",
       "vendor": "alibaba",
       "context_limit": 1000000,
       "status": "active",
@@ -1016,7 +1016,7 @@
     },
     {
       "id": "qwen3.5-plus",
-      "name": "Qwen 3.5 Plus",
+      "name": "Qwen 3.5 Plus (Alibaba)",
       "vendor": "alibaba",
       "context_limit": 1000000,
       "status": "active",
@@ -1033,7 +1033,7 @@
     },
     {
       "id": "minimax-m2.7",
-      "name": "MiniMax M2.7",
+      "name": "MiniMax M2.7 (MiniMax)",
       "vendor": "minimax",
       "context_limit": 205000,
       "status": "active",
@@ -1050,7 +1050,7 @@
     },
     {
       "id": "qwen3.6-plus",
-      "name": "Qwen 3.6 Plus",
+      "name": "Qwen 3.6 Plus (Alibaba Web)",
       "vendor": "alibaba",
       "context_limit": 1000000,
       "status": "active",
