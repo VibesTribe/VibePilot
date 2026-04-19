@@ -55,7 +55,8 @@
         "tools"
       ],
       "weaknesses": [],
-      "notes": "Subscription via OpenCode. Throttles by slowing down, not hard cutoff."
+      "notes": "Subscription via OpenCode. Throttles by slowing down, not hard cutoff.",
+      "courier": false
     },
     {
       "id": "gemini-2.5-flash",
@@ -111,7 +112,8 @@
       "weaknesses": [
         "strict_rate_limits"
       ],
-      "notes": "Best free tier but strict rate limits. Space requests 5s apart minimum."
+      "notes": "Best free tier but strict rate limits. Space requests 5s apart minimum.",
+      "courier": false
     },
     {
       "id": "deepseek-chat",
@@ -127,7 +129,7 @@
         "deepseek-api"
       ],
       "api_key_ref": "DEEPSEEK_API_KEY",
-      "status": "active",
+      "status": "paused",
       "rate_limits": {
         "requests_per_minute": 60,
         "requests_per_hour": 3600,
@@ -178,7 +180,7 @@
         "deepseek-api"
       ],
       "api_key_ref": "DEEPSEEK_API_KEY",
-      "status": "active",
+      "status": "paused",
       "rate_limits": {
         "requests_per_minute": 60,
         "requests_per_hour": 3600,
@@ -335,7 +337,7 @@
       "access_via": [
         "gemini-web"
       ],
-      "status": "active",
+      "status": "benched",
       "rate_limits": {
         "requests_per_minute": null,
         "requests_per_hour": null,
@@ -371,60 +373,6 @@
         "daily_token_limit"
       ],
       "notes": "1M tokens/day free tier. Dies fast if exceeded - use with caution."
-    },
-    {
-      "id": "copilot",
-      "name": "Microsoft Copilot",
-      "provider": "microsoft",
-      "access_type": "web",
-      "context_limit": 128000,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "web_search",
-        "image_generation"
-      ],
-      "access_via": [
-        "copilot-web"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": null,
-        "requests_per_hour": null,
-        "requests_per_day": null,
-        "tokens_per_day": null,
-        "messages_per_session": 30
-      },
-      "throttle_behavior": "hard_cutoff",
-      "buffer_pct": 80,
-      "api_pricing": {
-        "input_per_1m_usd": 2.5,
-        "output_per_1m_usd": 10.0
-      },
-      "recovery": {
-        "on_rate_limit": "new_session",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "free_gpt4",
-        "web_search",
-        "image_generation"
-      ],
-      "weaknesses": [
-        "session_limits"
-      ],
-      "notes": "Free GPT-4 access. 30 messages per session, unlimited sessions."
     },
     {
       "id": "deepseek-web",
@@ -526,7 +474,8 @@
       "weaknesses": [
         "lower_context_than_gemini"
       ],
-      "notes": "Groq free tier. Ultra fast inference. Good for quick decisions."
+      "notes": "Groq free tier. Ultra fast inference. Good for quick decisions.",
+      "courier": false
     },
     {
       "id": "llama-3.1-8b-instant",
@@ -579,7 +528,8 @@
       "weaknesses": [
         "smaller_model"
       ],
-      "notes": "Groq free tier. Fastest. Good for micro-decisions."
+      "notes": "Groq free tier. Fastest. Good for micro-decisions.",
+      "courier": false
     },
     {
       "id": "qwen3-32b",
@@ -631,7 +581,8 @@
         "fast"
       ],
       "weaknesses": [],
-      "notes": "Groq free tier. Strong multilingual support."
+      "notes": "Groq free tier. Strong multilingual support.",
+      "courier": false
     },
     {
       "id": "kimi-k2-instruct",
@@ -650,7 +601,7 @@
         "openrouter-api"
       ],
       "api_key_ref": "GROQ_API_KEY",
-      "status": "active",
+      "status": "benched",
       "rate_limits": {
         "requests_per_minute": 60,
         "requests_per_hour": null,
@@ -741,7 +692,8 @@
         "slower_than_groq",
         "lower_rate_limits"
       ],
-      "notes": "NVIDIA free tier. 253B parameter model. Good for complex tasks when Groq models hit limits."
+      "notes": "NVIDIA free tier. 253B parameter model. Good for complex tasks when Groq models hit limits.",
+      "courier": false
     },
     {
       "id": "meta/llama-3.3-70b-instruct",
