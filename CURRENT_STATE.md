@@ -75,12 +75,18 @@
 - Both fire simultaneously. Duplicate detection helps but is fragile
 - Fix: plan_created should only trigger on INSERT, not UPDATE
 
-### 9. UUID Query Bug in Testing Handler
+### 9. Testing Handler Deletes Work On Failure
+- Lines 168-171: on test failure, worktree and branch are DELETED
+- Correct behavior: keep branch, keep worktree, executor fixes specific failure on same branch, re-test
+- Branch cleanup should ONLY happen after successful merge (lines 156-159, which is correct)
+- Also: testing is hardcoded to `go test` only — useless for non-Go projects
+
+### 10. UUID Query Bug in Testing Handler
 - Testing module merge check passes `eq.taskID` as UUID value
 - `"invalid input syntax for type uuid: \"eq.db49b924-...\""`
 - The `eq.` prefix from the Supabase REST filter is being included in the parameter
 
-### 10. orchestrator_events Table Missing `payload` Column
+### 11. orchestrator_events Table Missing `payload` Column
 - Vault audit logging fails on every single vault read
 - `"column \"payload\" of relation \"orchestrator_events\" does not exist"`
 - Non-critical but spams logs and means no audit trail
@@ -159,17 +165,17 @@ groq fast → nvidia → hermes CLI → small backup:
 ## Priority Fixes Needed
 
 ### Critical (pipeline won't work without these)
-1. **max_attempts enforcement** — check attempts >= max_attempts before claiming, block if exceeded
-2. **Dependency resolution** — after task merge, check if any pending tasks have all deps met, transition to available
-3. **Cooldown fallback fix** — don't route when all models in cooldown, wait instead
-4. **Plan file newline fix** — convert `\n` escapes to real newlines before writing
+1. **Model rotation at every stage** — executor and task review use legacy `SelectDestination` (single model, no retry). Need `SelectRouting` with cascade like planner/supervisor have.
+2. **Failure feedback** — SupervisorDecision has rich fields (checks, issues, suggestions, specific_issues). Code discards it all, writes one-liner to failure_notes. Preserve full feedback so executor knows what to fix.
+3. **Rate limits that actually protect** — remove "shortest cooldown fallback" that routes during cooldown. Cooldown = STOP. All in cooldown = WAIT. Fill missing rate limits for 6 models.
+4. **Testing preserves work on failure** — don't delete worktree+branch. Keep branch, send back to executor with specific failure, fix on same branch, re-test. Cleanup only after merge.
 
 ### Important (pipeline works poorly without these)
-5. **Task review cascade retry** — same pattern as planner/supervisor
-6. **Rate limits for all models** — fill in missing data from provider docs
+5. **max_attempts enforcement** — check attempts >= max_attempts before claiming, block if exceeded
+6. **Plan file newline fix** — convert `\n` escapes to real newlines before writing
 7. **Race condition fix** — plan_created only on INSERT, not UPDATE
 8. **UUID query fix** — strip `eq.` prefix from testing handler queries
-9. **Failure learning** — when a task fails N times with same error, stop retrying and escalate
+9. **Dependency resolution** — after task merge, check if pending tasks have all deps met
 
 ### Nice to Have
 10. Project concept (separate repos per plan target)
