@@ -27,14 +27,14 @@
       "description": "Cascade through free API models in priority order. Used when agent has no model pin.",
       "priority": [
         "glm-5",
-        "llama-3.3-70b-versatile",
-        "kimi-k2-instruct",
-        "qwen3-32b",
         "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+        "meta/llama-3.3-70b-instruct",
+        "qwen/qwen3-32b",
+        "moonshotai/kimi-k2-instruct",
+        "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
-        "deepseek-chat",
-        "gemini-2.0-flash",
-        "deepseek-reasoner"
+        "gemini-2.5-flash",
+        "deepseek-chat"
       ]
     }
   },
