@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-19T02:23:36Z | Commit: 00a3681d | Branch: main
+# Generated: 2026-04-19T06:00:01Z | Commit: 6ce7d1ce | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -222,7 +222,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 00a3681d
+- Commit: 6ce7d1ce
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -241,33 +241,33 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 5. Raw source = for implementation details only
 
 ## Current Status (from CURRENT_STATE.md)
-# VibePilot Current State - 2026-04-17
-## Status: Pipeline working end-to-end. Dashboard fixes in migration 119 (needs applying).
-### What needs to happen on wake:
-1. Apply migration 119 in Supabase SQL editor (copy from GitHub `migrations/119_fix_claim_task_and_create_task_run.sql`)
-2. Rebuild governor binary (already built locally, needs copy)
-3. Test pipeline -- dashboard should now show active agent on tasks
-### The Repo Situation
-Two copies on disk, both synced to main:
-| Location | Purpose | State |
-|---|---|---|
-| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Binary from this session, includes \r fix |
-| `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main), all fixes committed |
-**GitHub main is current.** Latest commit: `bc839255` (migration 119 + \r fix)
+# VibePilot Current State - 2026-04-19
+## Status: Core fixes applied. Ready for hello world E2E test.
+### Fixes Applied This Session (Apr 19)
+1. **Cascade routing for executor+review** — both now use SelectRouting with 5-retry cascade (was legacy SelectDestination, single model)
+2. **Cooldown bypass removed** — all models in cooldown = wait, don't route anyway
+3. **Rate limits for all active models** — filled from provider docs (groq, nvidia, glm-5)
+4. **Test failure preserves work** — worktree+branch kept, executor reuses on retry
+5. **LLM Wiki PRD deleted** — was hallucinated without user consultation
+6. **Task branches/worktrees/tasks cleaned up**
 ---
-### What's Running
-- **Governor:** systemd user service
-  - Binary: `~/vibepilot/governor/governor`
-  - Service: `systemctl --user status vibepilot-governor`
-  - Logs: `journalctl --user -u vibepilot-governor -f`
-  - MCP servers: jcodemunch (52 tools). jDocMunch removed. jDataMunch disabled.
-  - Connectors registered: hermes (cli), opencode (cli), gemini-api, groq-api, nvidia-api
-- **Hermes Agent:** v0.9.0 (updated from v0.8.0)
-  - v0.8.0 bug FIXED: empty response recovery for GLM-5 (commit d6785dc4)
-  - v0.9.0 also fixes: partial streamed content on connection failure
-- **Cloudflared tunnel:** live at vibestrike.rocks, sacred (don't touch)
-- **Chrome CDP:** port 9222, bind mount active
-- **TTS:** edge-tts (fast, free)
-### Pipeline Proven Working (April 2026)
-Full pipeline proven 4 times:
-```
+## What Actually Works (Proven)
+### Routing and Cascade
+- Groq API routing works (llama-3.3-70b-versatile via groq-api)
+- NVIDIA API routing works (nemotron-ultra-253b-v1 via nvidia-api)
+- GLM-5 via hermes CLI works (used for all earlier E2E runs)
+- Cascade retry works: planner/supervisor try models in order, accumulate failures, exclude on retry
+- Vault decryption works (Go encryption tool at /tmp/vault_encrypt2_bin)
+### Pipeline Stages
+- **Planner**: Parses prompts, produces plans, writes plan files. Proven with groq.
+- **Supervisor (plan review)**: Reviews plans, approves/rejects/escalates to council. Proven with groq.
+- **Council handler**: Routes members independently via cascade (fixed this session).
+- **Task creation**: Parses plan markdown, creates task rows in DB.
+- **Executor claim + worktree**: Claims available tasks, creates isolated worktrees.
+### What Was Proven Before Today
+- Full E2E pipeline with GLM-5 via hermes: task 93637196 completed full cycle
+- Pipeline: PRD push → webhook → planner → supervisor → tasks → executor → review → merge
+---
+## What Is Broken
+### 1. No Dependency Resolution Logic
+- Tasks with dependencies are set to `pending` in validation.go (line 162)
