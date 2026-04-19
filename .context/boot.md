@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-18T20:21:52Z | Commit: 2ebe5567 | Branch: main
+# Generated: 2026-04-19T02:23:36Z | Commit: 00a3681d | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -171,7 +171,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Codebase Structure (auto-discovered)
 - governor/cmd/cleanup/ (1 files, 1 funcs, 0 types)
 - governor/cmd/encrypt_secret/ (1 files, 1 funcs, 0 types)
-- governor/cmd/governor/ (14 files, 113 funcs, 13 types)
+- governor/cmd/governor/ (14 files, 114 funcs, 13 types)
 - governor/cmd/migrate_vault/ (1 files, 5 funcs, 1 types)
 - governor/internal/connectors/ (2 files, 23 funcs, 8 types)
 - governor/internal/core/ (4 files, 35 funcs, 27 types)
@@ -183,7 +183,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
 - governor/internal/memory/ (2 files, 19 funcs, 5 types)
 - governor/internal/realtime/ (1 files, 23 funcs, 8 types)
-- governor/internal/runtime/ (10 files, 165 funcs, 92 types)
+- governor/internal/runtime/ (10 files, 170 funcs, 92 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 15 funcs, 4 types)
@@ -222,7 +222,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 2ebe5567
+- Commit: 00a3681d
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
