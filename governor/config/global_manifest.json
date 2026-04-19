@@ -1,0 +1,544 @@
+{
+  "_comment": "VibePilot Global Manifest \u2014 Map of every slice, what it produces, what it consumes",
+  "_analogy": "Like a plumber's schematic: where the water comes from, where it goes, and every joint in between",
+  "flows": {
+    "task_execution": {
+      "description": "A feature task goes from idea to merged code",
+      "trigger": "Webhook (GitHub issue) or manual dashboard entry",
+      "steps": [
+        {
+          "step": 1,
+          "action": "create_plan RPC",
+          "caller": "webhooks/github.go",
+          "writes_to": "plans table",
+          "config": "plan_lifecycle.json"
+        },
+        {
+          "step": 2,
+          "action": "Plan handler decomposes into tasks",
+          "caller": "handlers_plan.go",
+          "reads": "get_planner_rules, get_slice_task_info",
+          "writes_to": "tasks table",
+          "config": "routing.json, models.json"
+        },
+        {
+          "step": 3,
+          "action": "Council reviews plan",
+          "caller": "handlers_council.go",
+          "reads": "get_supervisor_rules, get_tester_rules",
+          "writes_to": "plans (status update)",
+          "config": "routing.json"
+        },
+        {
+          "step": 4,
+          "action": "Router picks model + connector",
+          "caller": "runtime/router.go",
+          "reads": "check_platform_availability, get_model_score_for_task",
+          "config": "routing.json, connectors.json, models.json"
+        },
+        {
+          "step": 5,
+          "action": "Task handler claims and executes",
+          "caller": "handlers_task.go",
+          "reads": "claim_task",
+          "writes_to": "tasks (status=in_progress)",
+          "config": "agents.json, tools.json"
+        },
+        {
+          "step": 6,
+          "action": "Execution via connector",
+          "caller": "internal/connectors",
+          "spawns": "hermes CLI / groq-api / openrouter-api",
+          "reads": "connector config + vault keys"
+        },
+        {
+          "step": 7,
+          "action": "Record result",
+          "caller": "handlers_task.go",
+          "reads": "calc_run_costs",
+          "writes_to": "task_runs, record_model_success/failure",
+          "config": "models.json (for pricing)"
+        },
+        {
+          "step": 8,
+          "action": "Transition to review",
+          "caller": "handlers_task.go",
+          "writes_to": "tasks (status=review), unlock_dependent_tasks"
+        },
+        {
+          "step": 9,
+          "action": "Review handler checks quality",
+          "caller": "handlers_maint.go",
+          "reads": "claim_for_review",
+          "writes_to": "tasks (status=testing/merged)"
+        },
+        {
+          "step": 10,
+          "action": "Testing handler verifies",
+          "caller": "handlers_testing.go",
+          "writes_to": "tasks (status=merged/failed)"
+        },
+        {
+          "step": 11,
+          "action": "Dashboard renders",
+          "consumer": "useMissionData.ts \u2192 vibepilotAdapter.ts",
+          "reads": "tasks, task_runs, models, platforms, orchestrator_events"
+        }
+      ]
+    },
+    "model_health": {
+      "description": "Track which models are working, which are rate-limited, which are down",
+      "trigger": "Every task run (success or failure)",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Record outcome",
+          "caller": "handlers_task.go",
+          "writes_to": "record_model_success/failure, update_model_learning"
+        },
+        {
+          "step": 2,
+          "action": "Usage tracker updates",
+          "caller": "runtime/usage_tracker.go",
+          "reads": "rate_limits from models table",
+          "writes_to": "update_model_usage (cooldown, rate limit count)"
+        },
+        {
+          "step": 3,
+          "action": "Router checks health",
+          "caller": "runtime/router.go",
+          "reads": "check_platform_availability"
+        },
+        {
+          "step": 4,
+          "action": "Dashboard shows status",
+          "consumer": "vibepilotAdapter.ts",
+          "reads": "models (status, status_reason, cooldown_expires_at, rate_limits)"
+        }
+      ]
+    },
+    "system_research": {
+      "description": "Research new models, platforms, and pricing",
+      "trigger": "Scheduled cron or manual",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Research handler runs",
+          "caller": "handlers_research.go",
+          "reads": "get_heuristic, get_problem_solution"
+        },
+        {
+          "step": 2,
+          "action": "Create suggestion",
+          "writes_to": "research_suggestions table"
+        },
+        {
+          "step": 3,
+          "action": "Supervisor reviews",
+          "caller": "handlers_research.go",
+          "writes_to": "update_research_suggestion_status"
+        },
+        {
+          "step": 4,
+          "action": "If approved, maintenance command",
+          "writes_to": "create_maintenance_command"
+        }
+      ]
+    }
+  },
+  "slices": {
+    "handlers_task": {
+      "role": "Task executor \u2014 claims, runs, records, transitions tasks",
+      "produces": [
+        "task_runs records",
+        "task status transitions",
+        "model performance data",
+        "cost calculations"
+      ],
+      "consumes": [
+        "tasks table",
+        "models table (pricing)",
+        "connectors (execution)",
+        "vault (API keys)"
+      ],
+      "rpcs_out": [
+        "claim_task",
+        "create_task_run",
+        "transition_task",
+        "calc_run_costs",
+        "record_model_success",
+        "record_model_failure",
+        "record_failure",
+        "update_model_learning",
+        "update_task_branch",
+        "save_checkpoint",
+        "delete_checkpoint",
+        "claim_for_review",
+        "deduct_model_credit"
+      ],
+      "config_depends": [
+        "models.json",
+        "agents.json",
+        "tools.json",
+        "routing.json",
+        "connectors.json"
+      ],
+      "shared_state": [
+        "tasks.status",
+        "task_runs.*",
+        "models.learned"
+      ]
+    },
+    "handlers_plan": {
+      "role": "Planner \u2014 decomposes PRDs into atomic tasks",
+      "produces": [
+        "plans",
+        "tasks (from decomposition)"
+      ],
+      "consumes": [
+        "plans table",
+        "get_planner_rules",
+        "get_slice_task_info"
+      ],
+      "rpcs_out": [
+        "update_plan_status",
+        "record_model_success",
+        "record_model_failure",
+        "record_performance_metric",
+        "set_processing",
+        "clear_processing"
+      ],
+      "config_depends": [
+        "routing.json",
+        "models.json",
+        "plan_lifecycle.json"
+      ],
+      "shared_state": [
+        "plans.status",
+        "tasks (created)"
+      ]
+    },
+    "handlers_council": {
+      "role": "Council \u2014 vets complex plans before execution",
+      "produces": [
+        "plan reviews",
+        "planner rules",
+        "revision feedback"
+      ],
+      "consumes": [
+        "plans",
+        "get_supervisor_rules",
+        "get_tester_rules"
+      ],
+      "rpcs_out": [
+        "update_plan_status",
+        "store_council_reviews",
+        "set_council_consensus",
+        "record_planner_revision",
+        "record_revision_feedback",
+        "create_planner_rule"
+      ],
+      "config_depends": [
+        "routing.json",
+        "models.json"
+      ],
+      "shared_state": [
+        "plans.status",
+        "planner_rules table"
+      ]
+    },
+    "handlers_maint": {
+      "role": "Supervisor review + maintenance \u2014 quality gate and system upkeep",
+      "produces": [
+        "review decisions",
+        "maintenance commands"
+      ],
+      "consumes": [
+        "tasks (in review)",
+        "get_supervisor_rules"
+      ],
+      "rpcs_out": [
+        "claim_for_review",
+        "transition_task",
+        "unlock_dependent_tasks",
+        "record_model_success",
+        "update_maintenance_command_status",
+        "create_maintenance_command"
+      ],
+      "config_depends": [
+        "routing.json",
+        "system.json"
+      ],
+      "shared_state": [
+        "tasks.status",
+        "maintenance_commands table"
+      ]
+    },
+    "handlers_testing": {
+      "role": "Tester \u2014 runs tests on completed tasks",
+      "produces": [
+        "test results",
+        "pass/fail decisions"
+      ],
+      "consumes": [
+        "tasks (in testing)",
+        "get_tester_rules"
+      ],
+      "rpcs_out": [
+        "claim_for_review",
+        "transition_task",
+        "unlock_dependent_tasks"
+      ],
+      "config_depends": [
+        "system.json"
+      ],
+      "shared_state": [
+        "tasks.status"
+      ]
+    },
+    "handlers_research": {
+      "role": "System researcher \u2014 discovers new models/platforms/pricing",
+      "produces": [
+        "research suggestions",
+        "maintenance commands"
+      ],
+      "consumes": [
+        "get_heuristic",
+        "get_problem_solution"
+      ],
+      "rpcs_out": [
+        "set_processing",
+        "clear_processing",
+        "update_research_suggestion_status",
+        "create_maintenance_command"
+      ],
+      "config_depends": [
+        "system.json"
+      ],
+      "shared_state": [
+        "research_suggestions table"
+      ]
+    },
+    "runtime_router": {
+      "role": "Model router \u2014 picks best model+connector for each task",
+      "produces": [
+        "routing decisions",
+        "model scores"
+      ],
+      "consumes": [
+        "models table (health, pricing, learned)",
+        "connectors.json (availability)",
+        "routing.json (strategy)"
+      ],
+      "rpcs_out": [
+        "check_platform_availability",
+        "get_model_score_for_task"
+      ],
+      "config_depends": [
+        "routing.json",
+        "connectors.json",
+        "models.json"
+      ],
+      "shared_state": [
+        "models (status, cooldown, learned)"
+      ]
+    },
+    "runtime_context_builder": {
+      "role": "Builds context/prompts for each agent role",
+      "produces": [
+        "prompts with rules, failures, heuristics injected"
+      ],
+      "consumes": [
+        "get_supervisor_rules",
+        "get_planner_rules",
+        "get_tester_rules",
+        "get_recent_failures",
+        "get_heuristic",
+        "get_problem_solution",
+        "get_slice_task_info"
+      ],
+      "rpcs_out": [
+        "get_supervisor_rules",
+        "get_planner_rules",
+        "get_tester_rules",
+        "get_recent_failures",
+        "get_heuristic",
+        "get_problem_solution",
+        "get_slice_task_info"
+      ],
+      "config_depends": [
+        "prompts/ directory"
+      ],
+      "shared_state": [
+        "rules tables",
+        "heuristics table",
+        "failures table"
+      ]
+    },
+    "dashboard": {
+      "role": "User interface \u2014 renders all pipeline state",
+      "produces": [
+        "visual representation of VibePilot state"
+      ],
+      "consumes": [
+        "tasks",
+        "task_runs",
+        "models",
+        "platforms",
+        "orchestrator_events"
+      ],
+      "rpcs_out": [],
+      "config_depends": [],
+      "shared_state": [
+        "ALL tables \u2014 does select(*) on 5 tables"
+      ]
+    }
+  },
+  "config_files": {
+    "models.json": {
+      "consumed_by": [
+        "handlers_task (pricing)",
+        "handlers_plan (model selection)",
+        "handlers_council (multi-model review)",
+        "runtime/router (routing)",
+        "model_loader (startup)"
+      ],
+      "contains": [
+        "model IDs",
+        "API pricing",
+        "context limits",
+        "strengths/weaknesses",
+        "access_via connectors"
+      ]
+    },
+    "connectors.json": {
+      "consumed_by": [
+        "runtime/router (availability)",
+        "courier (execution)",
+        "main.go (startup)"
+      ],
+      "contains": [
+        "connector configs",
+        "API keys references",
+        "rate limits",
+        "available models"
+      ]
+    },
+    "routing.json": {
+      "consumed_by": [
+        "runtime/router",
+        "handlers_plan",
+        "handlers_council",
+        "handlers_maint",
+        "analyst"
+      ],
+      "contains": [
+        "routing strategy",
+        "model preferences",
+        "failover chains"
+      ]
+    },
+    "agents.json": {
+      "consumed_by": [
+        "handlers_task",
+        "governor_server",
+        "main.go"
+      ],
+      "contains": [
+        "agent role definitions",
+        "prompt templates"
+      ]
+    },
+    "tools.json": {
+      "consumed_by": [
+        "context_builder",
+        "db_tools",
+        "executor",
+        "file_tools"
+      ],
+      "contains": [
+        "tool definitions",
+        "allowed operations"
+      ]
+    },
+    "system.json": {
+      "consumed_by": [
+        "handlers_testing",
+        "maintenance",
+        "runners",
+        "startup_validate"
+      ],
+      "contains": [
+        "system-wide settings",
+        "feature flags",
+        "thresholds"
+      ]
+    }
+  },
+  "shared_state_joints": {
+    "_comment": "These are the pipes that connect everything. Touch one joint and water sprays everywhere.",
+    "tasks.status": {
+      "written_by": [
+        "handlers_task",
+        "handlers_plan",
+        "handlers_maint",
+        "handlers_testing",
+        "recovery"
+      ],
+      "read_by": [
+        "handlers_task (claim)",
+        "handlers_maint (review)",
+        "handlers_testing (test)",
+        "dashboard (render)"
+      ],
+      "valid_values": [
+        "available",
+        "pending",
+        "in_progress",
+        "review",
+        "testing",
+        "merged",
+        "failed",
+        "escalated",
+        "approval"
+      ]
+    },
+    "models table": {
+      "written_by": [
+        "runtime/usage_tracker",
+        "handlers_task (learning)",
+        "system_research",
+        "hermes (manual DB updates)"
+      ],
+      "read_by": [
+        "runtime/router",
+        "handlers_task",
+        "handlers_plan",
+        "dashboard"
+      ],
+      "critical_columns": [
+        "status",
+        "cooldown_expires_at",
+        "learned",
+        "rate_limits",
+        "cost_*_per_1k_usd"
+      ]
+    },
+    "task_runs": {
+      "written_by": [
+        "handlers_task (create_task_run RPC)"
+      ],
+      "read_by": [
+        "dashboard (useMissionData)",
+        "analyst"
+      ],
+      "critical_columns": [
+        "courier",
+        "platform",
+        "tokens_in",
+        "tokens_out",
+        "cost columns"
+      ]
+    }
+  }
+}
