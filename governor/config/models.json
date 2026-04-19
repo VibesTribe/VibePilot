@@ -1049,25 +1049,6 @@
       "weaknesses": []
     },
     {
-      "id": "qwen3.6-plus",
-      "name": "Qwen 3.6 Plus (Alibaba Web)",
-      "vendor": "alibaba",
-      "context_limit": 1000000,
-      "status": "active",
-      "courier": true,
-      "api_pricing": {
-        "input_per_1m_usd": 0.5,
-        "output_per_1m_usd": 3.0
-      },
-      "strengths": [
-        "coding",
-        "reasoning",
-        "1M context",
-        "free web via chat.qwen.ai"
-      ],
-      "weaknesses": []
-    },
-    {
       "id": "qwen/qwen3.6-plus",
       "name": "Qwen 3.6 Plus (OpenRouter)",
       "vendor": "alibaba",
