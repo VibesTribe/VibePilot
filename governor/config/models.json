@@ -1114,6 +1114,118 @@
         "free web via chat.qwen.ai"
       ],
       "weaknesses": []
+    },
+    {
+      "id": "qwen/qwen3.6-plus",
+      "name": "Qwen 3.6 Plus (OpenRouter)",
+      "vendor": "alibaba",
+      "context_limit": 1000000,
+      "status": "active",
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_pricing": {
+        "input_per_1m_usd": 0.33,
+        "output_per_1m_usd": 1.95
+      },
+      "strengths": [
+        "coding",
+        "reasoning",
+        "1M context",
+        "free on openrouter"
+      ],
+      "weaknesses": [
+        "20 RPM rate limit"
+      ]
+    },
+    {
+      "id": "qwen/qwen3-coder",
+      "name": "Qwen3 Coder 480B (OpenRouter)",
+      "vendor": "alibaba",
+      "context_limit": 262000,
+      "status": "active",
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_pricing": {
+        "input_per_1m_usd": 0.2,
+        "output_per_1m_usd": 0.6
+      },
+      "strengths": [
+        "coding",
+        "262K output",
+        "480B MoE",
+        "free on openrouter"
+      ],
+      "weaknesses": [
+        "20 RPM rate limit"
+      ]
+    },
+    {
+      "id": "nvidia/nemotron-3-super-120b",
+      "name": "Nemotron 3 Super 120B (OpenRouter)",
+      "vendor": "nvidia",
+      "context_limit": 262000,
+      "status": "active",
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_pricing": {
+        "input_per_1m_usd": 0.1,
+        "output_per_1m_usd": 0.1
+      },
+      "strengths": [
+        "reasoning",
+        "262K context",
+        "free on openrouter"
+      ],
+      "weaknesses": [
+        "20 RPM rate limit"
+      ]
+    },
+    {
+      "id": "google/gemma-4-31b-it",
+      "name": "Gemma 4 31B (OpenRouter)",
+      "vendor": "google",
+      "context_limit": 262000,
+      "status": "active",
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_pricing": {
+        "input_per_1m_usd": 0.13,
+        "output_per_1m_usd": 0.38
+      },
+      "strengths": [
+        "balanced",
+        "262K context",
+        "free on openrouter"
+      ],
+      "weaknesses": [
+        "20 RPM rate limit"
+      ]
+    },
+    {
+      "id": "z-ai/glm-4.5-air",
+      "name": "GLM 4.5 Air (OpenRouter)",
+      "vendor": "zhipu",
+      "context_limit": 131000,
+      "status": "active",
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_pricing": {
+        "input_per_1m_usd": 0.1,
+        "output_per_1m_usd": 0.3
+      },
+      "strengths": [
+        "fast",
+        "free GLM access",
+        "free on openrouter"
+      ],
+      "weaknesses": [
+        "20 RPM rate limit"
+      ]
     }
   ],
   "defaults": {
