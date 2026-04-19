@@ -1,1 +1,294 @@
-# PLAN: LLM Wiki\n\n## Overview\nTransform the PRD into a static site with model/ provider directories, search, and comparison tool.\n\n## Tasks\n\n### T001: Create Model Directory\n**Confidence:** 0.98\n**Category:** frontend\n**Dependencies:** T004\n\n#### Prompt Packet\n```\n# TASK: T001 - Model Directory\n\n## Context\nUsers need a navigable grid/list of models with key stats and filters.\n\n## What to Build\n- React component at `src/components/ModelDirectory.js`\n- Display models from `data/models.json`\n- Add filters (provider, size, open/closed, cost tier)\n- Add sort options (release date, parameters, cost)\n\n## Files\n- `src/components/ModelDirectory.js` - Main component\n- `src/styles/directory.css` - Layout styling\n```\n\n#### Expected Output\n```json\n{\n  "task_id": "T001",\n  "files_created": ["src/components/ModelDirectory.js", "src/styles/directory.css"],\n  "tests_required": ["tests/directory.test.js"]\n}\n```\n\n### T002: Model Detail Page\n**Confidence:** 0.96\n**Category:** frontend\n**Dependencies:** T004\n\n#### Prompt Packet\n```\n# TASK: T002 - Model Detail Page\n\n## Context\nUsers need detailed technical specs for individual models.\n\n## What to Build\n- React component at `src/components/ModelDetail.js`\n- Render data from `data/models.json` for selected model\n- Include: architecture, benchmarks, pricing, strengths/weaknesses\n- Link to provider detail page\n\n## Files\n- `src/components/ModelDetail.js` - Detail view\n- `src/styles/detail.css` - Responsive styling\n```\n\n#### Expected Output\n```json\n{\n  "task_id": "T002",\n  "files_created": ["src/components/ModelDetail.js", "src/styles/detail.css"],\n  "tests_required": ["tests/detail.test.js"]\n}\n```\n\n### T003: Provider Directory\n**Confidence:** 0.97\n**Category:** frontend\n**Dependencies:** T004\n\n#### Prompt Packet\n```\n# TASK: T003 - Provider Directory\n\n## Context\nUsers need to compare providers (OpenAI, Anthropic, etc.)\n\n## What to Build\n- React component at `src/components/ProviderDirectory.js`\n- Display provider data from `data/providers.json`\n- Show models offered, pricing structure, free tier details\n\n## Files\n- `src/components/ProviderDirectory.js` - Provider grid\n- `src/styles/provider.css` - Layout\n```\n\n#### Expected Output\n```json\n{\n  "task_id": "T003",\n  "files_created": ["src/components/ProviderDirectory.js", "src/styles/provider.css"],\n  "tests_required": ["tests/provider.test.js"]\n}\n```\n\n### T004: JSON Data Structure\n**Confidence:** 0.95\n**Category:** data\n**Dependencies:** none\n\n#### Prompt Packet\n```\n# TASK: T004 - Define JSON Schema\n\n## Context\nAll features depend on clean, complete model/provider data.\n\n## What to Build\n- Create `data/models.json` with schema:\n  - id, name, provider, params, context_window, open_source\n  - pricing (input/output per 1M tokens)\n  - benchmarks (MMLU, HumanEval, GPQA)\n  - strengths/weaknesses arrays\n- Create `data/providers.json` with provider details\n\n## Files\n- `data/models.json` - Model entries\n- `data/providers.json` - Provider data\n```\n\n#### Expected Output\n```json\n{\n  "task_id": "T004",\n  "files_created": ["data/models.json", "data/providers.json"],\n  "tests_required": ["tests/data.test.js"]\n}\n```\n\n### T005: Basic Search\n**Confidence:** 0.98\n**Category:** frontend\n**Dependencies:** T004\n\n#### Prompt Packet\n```\n# TASK: T005 - Implement Search\n\n## Context\nUsers need to find models/providers via natural language queries.\n\n## What to Build\n- Search bar component at `src/components/Search.js`\n- Filter models/providers using Fuse.js or similar\n- Support queries like 'cheapest coding model'\n\n## Files\n- `src/components/Search.js` - Search logic\n- `src/styles/search.css` - Bar styling\n```\n\n#### Expected Output\n```json\n{\n  "task_id": "T005",\n  "files_created": ["src/components/Search.js", "src/styles/search.css"],\n  "tests_required": ["tests/search.test.js"]\n}\n```\n\n### T006: Static Site Setup\n**Confidence:** 0.99\n**Category:** devops\n**Dependencies:** none\n\n#### Prompt Packet\n```\n# TASK: T006 - Configure Vite + Deploy\n\n## Context\nThe site must be static, fast, and deployable to GitHub Pages/Cloudflare.\n\n## What to Build\n- Initialize Vite with React template\n- Add `vite.config.js` for static build\n- Add service worker for offline support\n- Deploy script in `package.json`\n\n## Files\n- `vite.config.js` - Build config\n- `src/registerSW.js` - Service worker setup\n```\n\n#### Expected Output\n```json\n{\n  "task_id": "T006",\n  "files_created": ["vite.config.js", "src/registerSW.js"],\n  "tests_required": []\n}\n```\n\n### T007: Accessibility Testing\n**Confidence:** 0.95\n**Category:** qa\n**Dependencies:** T001-T006\n\n#### Prompt Packet\n```\n# TASK: T007 - Verify WCAG AA Compliance\n\n## Context\nThe site must meet accessibility standards for all users.\n\n## What to Build\n- Run axe-core audits in CI\n- Test keyboard navigation\n- Validate color contrast ratios\n\n## Files\n- `.github/workflows/a11y.yml` - CI config\n```\n\n#### Expected Output\n```json\n{\n  "task_id": "T007",\n  "files_created": [".github/workflows/a11y.yml"],\n  "tests_required": ["tests/a11y.test.js"]\n}\n```\n\n### T008: Initial Data Population\n**Confidence:** 0.95\n**Category:** data\n**Dependencies:** T004\n\n#### Prompt Packet\n```\n# TASK: T008 - Seed 50+ Models\n\n## Context\nSuccess criteria require 50+ models at launch.\n\n## What to Build\n- Add 50 entries to `data/models.json`\n- Validate provider data in `data/providers.json`\n- Cross-check specs with model cards/papers\n\n## Files\n- `data/models.json` - Updated\n- `data/providers.json` - Updated\n```\n\n#### Expected Output\n```json\n{\n  "task_id": "T008",\n  "files_created": [],\n  "tests_required": ["tests/data.test.js"]\n}\n```\n\n
+# PLAN: LLM Wiki — Knowledge Base for Large Language Models
+
+## Overview
+Build a static site for LLM model and provider documentation with search, filter, and comparison features.
+
+## Tasks
+
+### T001: Create Data Structure Schema
+**Confidence:** 0.99
+**Category:** data
+**Dependencies:** none
+
+#### Prompt Packet
+```
+# TASK: T001 - Create Data Structure Schema
+
+## Context
+The LLM Wiki requires structured JSON data to populate model and provider information.
+
+## What to Build
+Define the JSON schema for `models.json` and `providers.json` with all required fields from the PRD. Include sample entries for testing.
+
+## Files
+- `data/models.json` - Model entries with id, name, provider, params, context window, open_source, pricing, benchmarks, etc.
+- `data/providers.json` - Provider entries with name, models, pricing structure, free tier details, API notes.
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T001",
+  "files_created": ["data/models.json", "data/providers.json"],
+  "tests_required": ["schema_validation.js"]
+}
+```
+
+### T002: Develop Model Directory UI
+**Confidence:** 0.98
+**Category:** frontend
+**Dependencies:** T001
+
+#### Prompt Packet
+```
+# TASK: T002 - Develop Model Directory UI
+
+## Context
+Users need a grid/list view to browse models with key statistics.
+
+## What to Build
+Create a responsive React component for the Model Directory:
+- Display model cards in grid/list layouts
+- Render dynamic data from `models.json`
+- Include placeholder filters/sort UI elements
+
+## Files
+- `src/components/ModelDirectory.js` - Main directory component
+- `src/components/ModelCard.jsx` - Individual model card
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T002",
+  "files_created": ["src/components/ModelDirectory.js", "src/components/ModelCard.jsx"],
+  "tests_required": ["directory_render_test.js"]
+}
+```
+
+### T003: Implement Filtering & Sorting
+**Confidence:** 0.97
+**Category:** frontend
+**Dependencies:** T002
+
+#### Prompt Packet
+```
+# TASK: T003 - Implement Filtering & Sorting
+
+## Context
+Users must filter models by provider, size, cost tier, and capabilities.
+
+## What to Build
+Add client-side filtering and sorting to ModelDirectory.js:
+- Implement provider/type/size/cost filters
+- Add sort options for release date, parameters, cost
+- Debounce filter input for performance
+
+## Files
+- `src/components/ModelDirectory.js` - Update with filter logic
+- `src/utils/sorting.js` - Reusable sorting functions
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T003",
+  "files_created": ["src/utils/sorting.js"],
+  "tests_required": ["filter_logic_test.js"]
+}
+```
+
+### T004: Create Model Detail Page
+**Confidence:** 0.96
+**Category:** frontend
+**Dependencies:** T001
+
+#### Prompt Packet
+```
+# TASK: T004 - Create Model Detail Page
+
+## Context
+Each model needs a detailed view with architecture, benchmarks, and pricing.
+
+## What to Build
+Develop a React page template for model details:
+- Dynamically load data from `models.json` by model ID
+- Display architecture summary, benchmark tables, pricing breakdown
+- Include responsive layout with side navigation
+
+## Files
+- `src/pages/ModelDetail.jsx` - Page component
+- `src/components/BenchmarkTable.jsx` - Reusable table
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T004",
+  "files_created": ["src/pages/ModelDetail.jsx"],
+  "tests_required": ["detail_page_render_test.js"]
+}
+```
+
+### T005: Implement Instant Search
+**Confidence:** 0.95
+**Category:** frontend
+**Dependencies:** T001
+
+#### Prompt Packet
+```
+# TASK: T005 - Implement Instant Search
+
+## Context
+Users need to find models/providers via natural language queries.
+
+## What to Build
+Integrate Fuse.js for client-side search:
+- Index `models.json` and `providers.json` fields
+- Add search bar component with typeahead suggestions
+- Highlight search terms in results
+
+## Files
+- `src/components/SearchBar.jsx` - Search UI
+- `src/utils/search.js` - Fuse configuration
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T005",
+  "files_created": ["src/utils/search.js"],
+  "tests_required": ["search_functional_test.js"]
+}
+```
+
+### T006: Add Service Worker for Offline Access
+**Confidence:** 0.99
+**Category:** infrastructure
+**Dependencies:** none
+
+#### Prompt Packet
+```
+# TASK: T006 - Add Service Worker for Offline Access
+
+## Context
+The site must work offline after initial load.
+
+## What to Build
+Implement Workbox-based service worker:
+- Cache HTML, CSS, JS, and JSON data
+- Add offline fallback page
+- Precache critical assets during build
+
+## Files
+- `src/sw.js` - Service worker configuration
+- `workbox-config.js` - Precache rules
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T006",
+  "files_created": ["src/sw.js"],
+  "tests_required": ["offline_test.js"]
+}
+```
+
+### T007: Ensure Accessibility Compliance
+**Confidence:** 0.98
+**Category:** frontend
+**Dependencies:** T002, T004
+
+#### Prompt Packet
+```
+# TASK: T007 - Ensure Accessibility Compliance
+
+## Context
+The site must meet WCAG AA standards.
+
+## What to Build
+Audit and implement accessibility fixes:
+- Add ARIA labels for dynamic content
+- Verify color contrast ratios ≥4.5:1
+- Implement keyboard navigation for filters
+- Add semantic HTML structure
+
+## Files
+- `accessibility.md` - Audit report
+- `src/styles/accessible.scss` - Contrast fixes
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T007",
+  "files_created": ["accessibility.md"],
+  "tests_required": ["a11y_audit_report.html"]
+}
+```
+
+### T008: Optimize Loading Speed
+**Confidence:** 0.97
+**Category:** infrastructure
+**Dependencies:** T006
+
+#### Prompt Packet
+```
+# TASK: T008 - Optimize Loading Speed
+
+## Context
+The site must load in under 2 seconds on mobile.
+
+## What to Build
+Implement performance optimizations:
+- Code splitting for route-based loading
+- Image compression (WebP)
+- Lazy-load non-critical assets
+- Enable Brotli compression
+
+## Files
+- `vite.config.js` - Build optimizations
+- `src/images/` - Compressed assets
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T008",
+  "files_created": ["vite.config.js"],
+  "tests_required": ["lighthouse_report.html"]
+}
+```
+
+### T009: Develop Comparison Tool (Stretch)
+**Confidence:** 0.95
+**Category:** frontend
+**Dependencies:** T001, T005
+
+#### Prompt Packet
+```
+# TASK: T009 - Develop Comparison Tool (Stretch)
+
+## Context
+Users need to compare models side-by-side.
+
+## What to Build
+Create comparison page for 2-4 models:
+- Select/deselect models from search results
+- Compare benchmarks/pricing/context windows
+- Generate recommendation summary
+
+## Files
+- `src/pages/Compare.jsx` - Comparison UI
+- `src/components/ComparisonTable.jsx` - Dynamic table
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T009",
+  "files_created": ["src/pages/Compare.jsx"],
+  "tests_required": ["comparison_render_test.js"]
+}
+```
+
