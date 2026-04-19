@@ -82,6 +82,43 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		return
 	}
 
+	// DEPENDENCY GATE: Block tasks whose dependencies aren't complete
+	if deps, ok := task["dependencies"].([]any); ok && len(deps) > 0 {
+		allComplete := true
+		for _, dep := range deps {
+			depNum, _ := dep.(string)
+			if depNum == "" {
+				continue
+			}
+			depRows, err := h.database.Query(ctx, "tasks", map[string]any{
+				"task_number": depNum,
+				"select":      "id,status",
+			})
+			if err != nil || len(depRows) == 0 {
+				log.Printf("[TaskAvailable] Task %s: dependency %s not found, blocking", taskNumber, depNum)
+				allComplete = false
+				break
+			}
+			var depTasks []map[string]any
+			if json.Unmarshal(depRows, &depTasks) == nil && len(depTasks) > 0 {
+				depStatus, _ := depTasks[0]["status"].(string)
+				if depStatus != "merged" && depStatus != "complete" && depStatus != "completed" {
+					log.Printf("[TaskAvailable] Task %s: dependency %s not complete (status=%s), reverting to pending", taskNumber, depNum, depStatus)
+					allComplete = false
+					break
+				}
+			}
+		}
+		if !allComplete {
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "pending",
+			})
+			return
+		}
+		log.Printf("[TaskAvailable] Task %s: all dependencies complete, proceeding", taskNumber)
+	}
+
 	// Get task packet
 	taskPacket, err := h.database.GetTaskPacket(ctx, taskID)
 	if err != nil {
