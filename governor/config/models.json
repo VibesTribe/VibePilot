@@ -8,7 +8,7 @@
       "name": "GLM-5",
       "provider": "zhipu",
       "access_type": "cli_subscription",
-      "context_limit": 128000,
+      "context_limit": 203000,
       "capabilities": [
         "code",
         "reasoning",
@@ -28,8 +28,8 @@
       "throttle_behavior": "slow_down",
       "buffer_pct": 80,
       "api_pricing": {
-        "input_per_1m_usd": null,
-        "output_per_1m_usd": null
+        "input_per_1m_usd": 0.95,
+        "output_per_1m_usd": 3.15
       },
       "subscription": {
         "cost_usd": null,
@@ -501,8 +501,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 2,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 0.59,
+        "output_per_1m_usd": 0.79
       },
       "recovery": {
         "on_rate_limit": "cooldown",
@@ -554,8 +554,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 2,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 0.05,
+        "output_per_1m_usd": 0.08
       },
       "recovery": {
         "on_rate_limit": "cooldown",
@@ -608,8 +608,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 1,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 0.59,
+        "output_per_1m_usd": 0.79
       },
       "recovery": {
         "on_rate_limit": "cooldown",
@@ -638,7 +638,7 @@
       "name": "Kimi K2 (OpenRouter/Groq)",
       "provider": "moonshot",
       "access_type": "api",
-      "context_limit": 500000,
+      "context_limit": 262000,
       "capabilities": [
         "code",
         "reasoning",
@@ -662,8 +662,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 1,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 0.6,
+        "output_per_1m_usd": 3.0
       },
       "recovery": {
         "on_rate_limit": "cooldown",
@@ -715,8 +715,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 3,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 2.0,
+        "output_per_1m_usd": 6.0
       },
       "recovery": {
         "on_rate_limit": "cooldown",
@@ -769,8 +769,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 1,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 0.59,
+        "output_per_1m_usd": 0.79
       },
       "recovery": {
         "on_rate_limit": "wait_and_retry",
@@ -812,8 +812,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 1,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 0.59,
+        "output_per_1m_usd": 0.79
       },
       "recovery": {
         "on_rate_limit": "wait_and_retry",
@@ -855,8 +855,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 1,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 0.6,
+        "output_per_1m_usd": 3.0
       },
       "recovery": {
         "on_rate_limit": "wait_and_retry",
@@ -898,8 +898,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 2,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 0.2,
+        "output_per_1m_usd": 0.4
       },
       "recovery": {
         "on_rate_limit": "wait_and_retry",
@@ -941,8 +941,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 2,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 0.59,
+        "output_per_1m_usd": 0.79
       },
       "recovery": {
         "on_rate_limit": "wait_and_retry",
@@ -984,8 +984,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 2,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 0.59,
+        "output_per_1m_usd": 0.79
       },
       "recovery": {
         "on_rate_limit": "wait_and_retry",
@@ -1026,8 +1026,8 @@
       "buffer_pct": 80,
       "spacing_min_seconds": 2,
       "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
+        "input_per_1m_usd": 0.2,
+        "output_per_1m_usd": 0.4
       },
       "recovery": {
         "on_rate_limit": "wait_and_retry",
@@ -1043,6 +1043,77 @@
         "smaller_capacity"
       ],
       "notes": "Groq Compound Mini via Groq free tier, faster but smaller"
+    },
+    {
+      "id": "qwen3.5-flash",
+      "name": "Qwen 3.5 Flash",
+      "vendor": "alibaba",
+      "context_limit": 1000000,
+      "status": "active",
+      "api_pricing": {
+        "input_per_1m_usd": 0.05,
+        "output_per_1m_usd": 0.15
+      },
+      "strengths": [
+        "cheap",
+        "fast",
+        "1M context",
+        "coding"
+      ],
+      "weaknesses": []
+    },
+    {
+      "id": "qwen3.5-plus",
+      "name": "Qwen 3.5 Plus",
+      "vendor": "alibaba",
+      "context_limit": 1000000,
+      "status": "active",
+      "api_pricing": {
+        "input_per_1m_usd": 0.2,
+        "output_per_1m_usd": 0.6
+      },
+      "strengths": [
+        "balanced",
+        "1M context",
+        "reasoning"
+      ],
+      "weaknesses": []
+    },
+    {
+      "id": "minimax-m2.7",
+      "name": "MiniMax M2.7",
+      "vendor": "minimax",
+      "context_limit": 205000,
+      "status": "active",
+      "api_pricing": {
+        "input_per_1m_usd": 0.26,
+        "output_per_1m_usd": 1.2
+      },
+      "strengths": [
+        "agentic benchmarks",
+        "reasoning",
+        "cheap"
+      ],
+      "weaknesses": []
+    },
+    {
+      "id": "qwen3.6-plus",
+      "name": "Qwen 3.6 Plus",
+      "vendor": "alibaba",
+      "context_limit": 1000000,
+      "status": "active",
+      "courier": true,
+      "api_pricing": {
+        "input_per_1m_usd": 0.5,
+        "output_per_1m_usd": 3.0
+      },
+      "strengths": [
+        "coding",
+        "reasoning",
+        "1M context",
+        "free web via chat.qwen.ai"
+      ],
+      "weaknesses": []
     }
   ],
   "defaults": {
