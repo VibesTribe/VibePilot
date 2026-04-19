@@ -1,6 +1,6 @@
 {
   "_comment": "VIBEPILOT CONTRACT REGISTRY - Source of truth for all interfaces",
-  "_hierarchy": "Dashboard \u2192 SQL tables/views \u2192 Go RPC calls. Never change downstream without checking upstream.",
+  "_hierarchy": "Dashboard (what user sees) \u2190 Supabase (data contract) \u2190 GitHub/Go (code that populates it). Change flows DOWN. Verification flows UP.",
   "_rule": "Before ANY migration or Go change: 1) Check this registry 2) Find ALL consumers 3) Update ALL at once",
   "dashboard": {
     "tasks": [
@@ -593,6 +593,28 @@
       "callers": [
         "handlers_task.go"
       ]
+    }
+  },
+  "_sources_of_truth": {
+    "supabase": {
+      "role": "DATA truth \u2014 tables, views, RPCs, row data",
+      "url": "https://qtpdzsinvifkgpxyxlaz.supabase.co",
+      "what_lives_here": "tasks, task_runs, models, platforms, orchestrator_events, plans, research_suggestions, vault, rules, heuristics, memories, checkpoints, maintenance_commands",
+      "rule": "If it's not in Supabase, the dashboard can't see it and the governor can't route it. Local DB changes are phantom."
+    },
+    "github": {
+      "role": "CODE truth \u2014 Go source, config files, migrations, prompts",
+      "url": "https://github.com/VibesTribe/VibePilot",
+      "what_lives_here": "governor/, migrations/, governor/config/*.json, governor/config/prompts/",
+      "rule": "If it's not pushed to GitHub main, it doesn't exist. Local-only changes will be lost or conflict. Always push BEFORE declaring done.",
+      "branch_rule": "VibePilot config/migration changes go to main. Feature tasks use task/ branches via worktree. Never commit config changes to a task branch."
+    },
+    "dashboard": {
+      "role": "RENDERING truth \u2014 what the user actually sees",
+      "url": "Vercel deployment of vibeflow",
+      "what_lives_here": "apps/dashboard/ \u2014 React components, hooks, adapters",
+      "repo": "https://github.com/VibesTribe/vibeflow",
+      "rule": "If the dashboard can't render it, it doesn't matter. select(*) means ANY dropped column = break."
     }
   }
 }
