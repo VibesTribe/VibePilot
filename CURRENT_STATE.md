@@ -1,6 +1,14 @@
 # VibePilot Current State - 2026-04-19
 
-## Status: Pipeline partially working. Critical gaps found. Needs fixing before next E2E run.
+## Status: Core fixes applied. Ready for hello world E2E test.
+
+### Fixes Applied This Session (Apr 19)
+1. **Cascade routing for executor+review** — both now use SelectRouting with 5-retry cascade (was legacy SelectDestination, single model)
+2. **Cooldown bypass removed** — all models in cooldown = wait, don't route anyway
+3. **Rate limits for all active models** — filled from provider docs (groq, nvidia, glm-5)
+4. **Test failure preserves work** — worktree+branch kept, executor reuses on retry
+5. **LLM Wiki PRD deleted** — was hallucinated without user consultation
+6. **Task branches/worktrees/tasks cleaned up**
 
 ---
 
