@@ -940,3 +940,85 @@ func setupTaskHandlers(
 	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg, usageTracker, worktreeMgr)
 	handler.Register(router)
 }
+
+// unlockDependentsByTaskNumber finds tasks in "pending" status whose dependencies
+// contain the given task number (e.g. "T001") and transitions them to "available"
+// once ALL their dependencies are complete.
+func unlockDependentsByTaskNumber(ctx context.Context, database *db.DB, completedTaskNumber string) {
+	if completedTaskNumber == "" || database == nil {
+		return
+	}
+
+	// Find all pending tasks
+	raw, err := database.Query(ctx, "tasks", map[string]any{
+		"status": "eq.pending",
+		"select": "id,task_number,dependencies",
+	})
+	if err != nil || len(raw) == 0 {
+		return
+	}
+
+	var pendingTasks []map[string]any
+	if json.Unmarshal(raw, &pendingTasks) != nil {
+		return
+	}
+
+	for _, pt := range pendingTasks {
+		pendingID, _ := pt["id"].(string)
+		pendingNum, _ := pt["task_number"].(string)
+		deps, _ := pt["dependencies"].([]any)
+
+		if len(deps) == 0 {
+			continue
+		}
+
+		// Check if this pending task depends on the completed task
+		dependsOnCompleted := false
+		for _, dep := range deps {
+			if depStr, ok := dep.(string); ok && depStr == completedTaskNumber {
+				dependsOnCompleted = true
+				break
+			}
+		}
+		if !dependsOnCompleted {
+			continue
+		}
+
+		// Check if ALL dependencies are now complete
+		allComplete := true
+		for _, dep := range deps {
+			depNum, _ := dep.(string)
+			if depNum == "" {
+				continue
+			}
+			depRaw, err := database.Query(ctx, "tasks", map[string]any{
+				"task_number": depNum,
+				"select":      "status",
+			})
+			if err != nil || len(depRaw) == 0 {
+				allComplete = false
+				break
+			}
+			var depTasks []map[string]any
+			if json.Unmarshal(depRaw, &depTasks) != nil || len(depTasks) == 0 {
+				allComplete = false
+				break
+			}
+			depStatus, _ := depTasks[0]["status"].(string)
+			if depStatus != "merged" && depStatus != "complete" && depStatus != "completed" {
+				allComplete = false
+				break
+			}
+		}
+
+		if allComplete {
+			log.Printf("[DependencyUnlock] Task %s: all dependencies complete, transitioning to available", pendingNum)
+			database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    pendingID,
+				"p_new_status": "available",
+			})
+		} else {
+			log.Printf("[DependencyUnlock] Task %s: still has unmet dependencies", pendingNum)
+		}
+	}
+}
