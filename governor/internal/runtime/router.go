@@ -5,14 +5,16 @@ import (
 	"encoding/json"
 	"log"
 	"sort"
+	"sync/atomic"
 
 	"github.com/vibepilot/governor/internal/db"
 )
 
 type Router struct {
-	cfg          *Config
-	database     *db.DB
-	usageTracker *UsageTracker
+	cfg           *Config
+	database      *db.DB
+	usageTracker  *UsageTracker
+	cascadeOffset uint64 // round-robin counter for model rotation
 }
 
 func NewRouter(cfg *Config, database *db.DB, usageTracker *UsageTracker) *Router {
@@ -38,6 +40,7 @@ type RoutingResult struct {
 	ModelID     string
 	RoutingFlag string
 	Category    string
+	IsFallback  bool // true when routed to Hermes because all models in cooldown
 }
 
 func (r *Router) SelectRouting(ctx context.Context, req RoutingRequest) (*RoutingResult, error) {
@@ -136,21 +139,46 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 		})
 	}
 
-	// If we have an agent-specific model, route directly to it
+	// If we have an agent-specific model, check if it's available first
 	if agentModelID != "" {
-		for i := range connectors {
-			conn := &connectors[i]
-			if !r.isConnectorExecutable(conn) {
-				continue
+		if r.usageTracker != nil {
+			decision := r.usageTracker.CanMakeRequest(ctx, agentModelID, 0)
+			if !decision.CanProceed {
+				log.Printf("[Router] Agent %s model %s unavailable (%s), falling through to cascade", req.Role, agentModelID, decision.Reason)
+			} else {
+				// Model is available, find connector
+				for i := range connectors {
+					conn := &connectors[i]
+					if !r.isConnectorExecutable(conn) {
+						continue
+					}
+					if r.canConnectorAccessModel(conn.ID, agentModelID) {
+						log.Printf("[Router] Internal routing: connector=%s model=%s (from agent %s)", conn.ID, agentModelID, req.Role)
+						return &RoutingResult{
+							ConnectorID: conn.ID,
+							ModelID:     agentModelID,
+							RoutingFlag: "internal",
+							Category:    "internal",
+						}, nil
+					}
+				}
 			}
-			if r.canConnectorAccessModel(conn.ID, agentModelID) {
-				log.Printf("[Router] Internal routing: connector=%s model=%s (from agent %s)", conn.ID, agentModelID, req.Role)
-				return &RoutingResult{
-					ConnectorID: conn.ID,
-					ModelID:     agentModelID,
-					RoutingFlag: "internal",
-					Category:    "internal",
-				}, nil
+		} else {
+			// No usage tracker, route directly to pinned model
+			for i := range connectors {
+				conn := &connectors[i]
+				if !r.isConnectorExecutable(conn) {
+					continue
+				}
+				if r.canConnectorAccessModel(conn.ID, agentModelID) {
+					log.Printf("[Router] Internal routing: connector=%s model=%s (from agent %s)", conn.ID, agentModelID, req.Role)
+					return &RoutingResult{
+						ConnectorID: conn.ID,
+						ModelID:     agentModelID,
+						RoutingFlag: "internal",
+						Category:    "internal",
+					}, nil
+				}
 			}
 		}
 	}
@@ -225,23 +253,38 @@ func (r *Router) getModelCascade() []string {
 	return nil
 }
 
-// selectByCascade picks the first available model from the cascade that passes
-// UsageTracker rate limit checks, and finds a connector for it.
-// If all models are in cooldown, returns the one with shortest cooldown.
+// selectByCascade picks the least-loaded available model from the cascade.
+// Uses round-robin rotation to distribute load across models.
+// If all models are in cooldown, falls back to Hermes (the human's agent).
 func (r *Router) selectByCascade(ctx context.Context, connectors []ConnectorConfig, cascade []string) (*RoutingResult, error) {
+	if len(cascade) == 0 {
+		return nil, nil
+	}
+
+	// Advance round-robin offset so each call starts from a different position
+	offset := atomic.AddUint64(&r.cascadeOffset, 1)
+	startIdx := int(offset % uint64(len(cascade)))
+
 	var shortestCooldownModel string
 	var shortestCooldownSecs int = -1
 
-	for _, modelID := range cascade {
-		// Check if model is registered and can make a request
+	// Collect all available candidates, then pick least-loaded
+	type candidate struct {
+		modelID string
+		connID  string
+	}
+	var candidates []candidate
+
+	for i := 0; i < len(cascade); i++ {
+		idx := (startIdx + i) % len(cascade)
+		modelID := cascade[idx]
+
 		decision := r.usageTracker.CanMakeRequest(ctx, modelID, 0)
 		if decision.CanProceed {
-			// Find a connector that can access this model
 			connID := r.findConnectorForModel(modelID)
 			if connID == "" {
-				// Also check against our internal connectors list
-				for i := range connectors {
-					conn := &connectors[i]
+				for j := range connectors {
+					conn := &connectors[j]
 					if r.isConnectorExecutable(conn) && r.canConnectorAccessModel(conn.ID, modelID) {
 						connID = conn.ID
 						break
@@ -249,18 +292,12 @@ func (r *Router) selectByCascade(ctx context.Context, connectors []ConnectorConf
 				}
 			}
 			if connID != "" {
-				log.Printf("[Router] Cascade routing: model=%s connector=%s", modelID, connID)
-				return &RoutingResult{
-					ConnectorID: connID,
-					ModelID:     modelID,
-					RoutingFlag: "internal",
-					Category:    "internal",
-				}, nil
+				candidates = append(candidates, candidate{modelID: modelID, connID: connID})
 			}
 			continue
 		}
 
-		// Track model with shortest cooldown for fallback
+		// Track model with shortest cooldown for fallback info
 		waitSecs := int(decision.WaitTime.Seconds())
 		if shortestCooldownSecs < 0 || waitSecs < shortestCooldownSecs {
 			shortestCooldownSecs = waitSecs
@@ -268,10 +305,47 @@ func (r *Router) selectByCascade(ctx context.Context, connectors []ConnectorConf
 		}
 	}
 
-	// All models in cooldown — do NOT bypass cooldown. Return nil so caller waits.
-	// Cooldown exists to protect provider keys. Routing during cooldown defeats the purpose.
+	if len(candidates) > 0 {
+		// Pick the candidate with fewest recent requests (load-balancing)
+		best := candidates[0]
+		bestCount := r.usageTracker.GetMinuteRequestCount(ctx, best.modelID)
+		for _, c := range candidates[1:] {
+			count := r.usageTracker.GetMinuteRequestCount(ctx, c.modelID)
+			if count < bestCount {
+				best = c
+				bestCount = count
+			}
+		}
+		log.Printf("[Router] Cascade routing: model=%s connector=%s (%d candidates available, picked least-loaded with %d min-requests)",
+			best.modelID, best.connID, len(candidates), bestCount)
+		return &RoutingResult{
+			ConnectorID: best.connID,
+			ModelID:     best.modelID,
+			RoutingFlag: "internal",
+			Category:    "internal",
+		}, nil
+	}
+
+	// All models in cooldown — fall back to Hermes connector (the human's agent)
+	// Hermes is always available as last resort, no rate limits apply to it
+	for i := range connectors {
+		conn := &connectors[i]
+		if conn.ID == "hermes" && r.isConnectorExecutable(conn) {
+			log.Printf("[Router] All %d models in cooldown (shortest: %s at %ds). Falling back to Hermes.",
+				len(cascade), shortestCooldownModel, shortestCooldownSecs)
+			return &RoutingResult{
+				ConnectorID: "hermes",
+				ModelID:     "glm-5",
+				RoutingFlag: "internal",
+				Category:    "internal",
+				IsFallback:  true,
+			}, nil
+		}
+	}
+
+	// Not even Hermes available (should never happen)
 	if shortestCooldownModel != "" {
-		log.Printf("[Router] All models in cooldown. Shortest wait: model=%s (%ds). Waiting.", shortestCooldownModel, shortestCooldownSecs)
+		log.Printf("[Router] All models in cooldown and no Hermes fallback. Shortest wait: model=%s (%ds).", shortestCooldownModel, shortestCooldownSecs)
 	}
 	return nil, nil
 }

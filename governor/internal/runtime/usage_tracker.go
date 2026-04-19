@@ -22,6 +22,7 @@ type RateLimits struct {
 	RequestsPerMinute  *int `json:"requests_per_minute"`
 	RequestsPerHour    *int `json:"requests_per_hour"`
 	RequestsPerDay     *int `json:"requests_per_day"`
+	TokensPerMinute    *int `json:"tokens_per_minute"`
 	TokensPerDay       *int `json:"tokens_per_day"`
 	MessagesPer3Hours  *int `json:"messages_per_3_hours"`
 	MessagesPerSession *int `json:"messages_per_session"`
@@ -227,6 +228,18 @@ func (t *UsageTracker) CanMakeRequest(ctx context.Context, modelID string, estim
 				WaitTime:   usage.UsageWindows.Day.ResetAt.Sub(now),
 				Reason:     "token_limit_reached",
 				WindowType: "day",
+			}
+		}
+	}
+
+	if limits.TokensPerMinute != nil {
+		allowed := int(float64(*limits.TokensPerMinute) * buffer)
+		if usage.UsageWindows.Minute.Tokens+estimatedTokens > allowed {
+			return RequestDecision{
+				CanProceed: false,
+				WaitTime:   usage.UsageWindows.Minute.ResetAt.Sub(now),
+				Reason:     "token_minute_limit_reached",
+				WindowType: "minute",
 			}
 		}
 	}
@@ -474,4 +487,17 @@ func (t *UsageTracker) PersistToDatabase(ctx context.Context) {
 			log.Printf("[UsageTracker] Failed to persist model %s: %v", modelID, err)
 		}
 	}
+}
+
+// GetMinuteRequestCount returns the number of requests made to a model in the current minute window.
+// Used by the router for load-balancing across available models.
+func (t *UsageTracker) GetMinuteRequestCount(ctx context.Context, modelID string) int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	usage, exists := t.models[modelID]
+	if !exists {
+		return 0
+	}
+	return usage.UsageWindows.Minute.Requests
 }
