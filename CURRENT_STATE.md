@@ -1,109 +1,180 @@
-# VibePilot Current State - 2026-04-17
+# VibePilot Current State - 2026-04-19
 
-## Status: Pipeline working end-to-end. Dashboard fixes in migration 119 (needs applying).
-
-### What needs to happen on wake:
-1. Apply migration 119 in Supabase SQL editor (copy from GitHub `migrations/119_fix_claim_task_and_create_task_run.sql`)
-2. Rebuild governor binary (already built locally, needs copy)
-3. Test pipeline -- dashboard should now show active agent on tasks
-
-### The Repo Situation
-
-Two copies on disk, both synced to main:
-
-| Location | Purpose | State |
-|---|---|---|
-| `~/vibepilot/` | RUNNING copy. Compiled binary + systemd service. | Binary from this session, includes \r fix |
-| `~/VibePilot/` | DEVELOPMENT copy. Primary working directory. | Current (main), all fixes committed |
-
-**GitHub main is current.** Latest commit: `bc839255` (migration 119 + \r fix)
+## Status: Pipeline partially working. Critical gaps found. Needs fixing before next E2E run.
 
 ---
 
-### What's Running
+## What Actually Works (Proven)
 
-- **Governor:** systemd user service
-  - Binary: `~/vibepilot/governor/governor`
-  - Service: `systemctl --user status vibepilot-governor`
-  - Logs: `journalctl --user -u vibepilot-governor -f`
-  - MCP servers: jcodemunch (52 tools). jDocMunch removed. jDataMunch disabled.
-  - Connectors registered: hermes (cli), opencode (cli), gemini-api, groq-api, nvidia-api
-- **Hermes Agent:** v0.9.0 (updated from v0.8.0)
-  - v0.8.0 bug FIXED: empty response recovery for GLM-5 (commit d6785dc4)
-  - v0.9.0 also fixes: partial streamed content on connection failure
-- **Cloudflared tunnel:** live at vibestrike.rocks, sacred (don't touch)
-- **Chrome CDP:** port 9222, bind mount active
-- **TTS:** edge-tts (fast, free)
+### Routing and Cascade
+- Groq API routing works (llama-3.3-70b-versatile via groq-api)
+- NVIDIA API routing works (nemotron-ultra-253b-v1 via nvidia-api)
+- GLM-5 via hermes CLI works (used for all earlier E2E runs)
+- Cascade retry works: planner/supervisor try models in order, accumulate failures, exclude on retry
+- Vault decryption works (Go encryption tool at /tmp/vault_encrypt2_bin)
 
-### Pipeline Proven Working (April 2026)
+### Pipeline Stages
+- **Planner**: Parses prompts, produces plans, writes plan files. Proven with groq.
+- **Supervisor (plan review)**: Reviews plans, approves/rejects/escalates to council. Proven with groq.
+- **Council handler**: Routes members independently via cascade (fixed this session).
+- **Task creation**: Parses plan markdown, creates task rows in DB.
+- **Executor claim + worktree**: Claims available tasks, creates isolated worktrees.
 
-Full pipeline proven 4 times:
-```
-Plan inserted → Planner creates plan → Supervisor approves → Tasks created → Task claimed by glm-5 → Hermes executes → Task moved to review
-```
-
-**Latest run:** Plan f0245756 → task d69dac9e completed execution, moved to `review` status. The /hello endpoint was actually written to server.go by hermes.
-
-**Timing:** ~4-5 minutes total (planner ~2min at GLM-5 speed, task execution ~2min)
-
-### Fixes Made This Session (All Committed to main)
-
-| What | Why | Where |
-|---|---|---|
-| Hermes v0.8.0 → v0.9.0 | GLM-5 empty response bug | `hermes update` |
-| `\r` strip in extractJSON | GLM-5 includes carriage returns in JSON | `decision.go` line 258 |
-| `assigned_to = p_model_id` in claim_task | Dashboard shows agent via `tasks.assigned_to` | Migration 119 |
-| `routing_flag` + `routing_flag_reason` in claim_task | Dashboard location badge | Migration 119 |
-| `create_task_run` RPC | Dashboard token counts and ROI panel | Migration 119 |
-
-### Supabase Schema (119 migrations, migration 119 NOT YET APPLIED)
-
-- `claim_task(UUID, TEXT, TEXT, TEXT, TEXT)` -- sets `assigned_to`, `processing_by`, `routing_flag`
-- `transition_task(UUID, TEXT, TEXT)` -- clears `processing_by`, keeps `assigned_to`
-- `create_task_run(UUID, TEXT, ...)` -- NEW, records tokens/costs/ROI
-
-### Dashboard Contract (See `docs/HOW_DASHBOARD_WORKS.md`)
-
-**CRITICAL: Dashboard is READ-ONLY. Fix Go/Supabase, never the dashboard.**
-
-Dashboard expects from Supabase:
-1. `tasks.assigned_to` = model ID (e.g. "glm-5") ← Fixed in migration 119
-2. `task_runs` records with tokens/costs ← Fixed in migration 119
-3. `tasks.slice_id` = slice grouping ← Already set by planner in validation.go
-4. `tasks.routing_flag` = "internal"/"mcp"/"web" ← Fixed in migration 119
-5. `task_runs` cost/savings columns ← Already calculated by Go
-6. `models.status` = "active"/"paused" ← Already in models table
-7. `orchestrator_events` for timeline ← NOT YET IMPLEMENTED (empty timeline OK)
-
-### Key Dashboard Data Flow
-```
-Governor writes to Supabase → Dashboard reads via Realtime → User sees updates
-tasks.assigned_to = "glm-5" → adaptVibePilotToDashboard → owner: "agent.glm-5" → shows agent icon
-task_runs tokens/costs → calculateROI() → ROI panel
-```
+### What Was Proven Before Today
+- Full E2E pipeline with GLM-5 via hermes: task 93637196 completed full cycle
+- Pipeline: PRD push → webhook → planner → supervisor → tasks → executor → review → merge
 
 ---
 
-## Known Issues
+## What Is Broken
 
-### Fixed This Session
-- ~~Hermes v0.8.0 GLM-5 empty response~~ → Updated to v0.9.0
-- ~~`\r` in JSON crashing parser~~ → Stripped in extractJSON
-- ~~`assigned_to` never set~~ → claim_task now sets it to model ID
-- ~~`create_task_run` RPC missing~~ → Created in migration 119
+### 1. No Dependency Resolution Logic
+- Tasks with dependencies are set to `pending` in validation.go (line 162)
+- **There is NO code anywhere** to transition `pending → available` when dependencies complete
+- Result: tasks with deps stay pending forever, OR they were created as `available` despite having deps (T003, T007)
+- The dependency field exists in the task but nobody checks it
 
-### Still To Fix
-- **Orchestrator events not written** — Go never inserts into `orchestrator_events`. Dashboard timeline empty.
-- **Startup missed events** — plans inserted before governor subscribes sit in `draft`. Need boot scan for stuck plans. NOT YET IMPLEMENTED.
-- **Worktree branch leak** — task operations switch main repo branch instead of isolated worktree.
-- **ZAI subscription ends May 1** — test fallback chain before then.
-- **`received` status never used** — Dashboard expects `in_progress → received → review` flow. Governor jumps straight to execution.
+### 2. No max_attempts Enforcement  
+- `max_attempts` is stored in tasks but the task handler NEVER checks it
+- T001 ran 9 times with max_attempts=3
+- Failed tasks go to `available` unconditionally — no limit, no escalation, no learning
 
-### NOT Issues (False Alarms)
-- CLIRunner is NOT broken — it's agent-agnostic
-- decision.go extractJSON is NOT broken (was just missing \r strip)
-- Governor pipeline logic is NOT broken
-- The problem was hermes v0.8.0 + missing RPCs, not the governor
+### 3. Cooldown Doesn't Actually Protect
+- `CanMakeRequest()` in usage_tracker.go checks cooldown and rate limits correctly
+- BUT when ALL models are in cooldown, `selectByCascade()` (router.go line 271-282) picks "shortest cooldown" and ROUTES ANYWAY
+- This defeats the entire purpose of cooldown — providers get hammered during backpressure
+
+### 4. No Project Concept
+- The worktree is always cloned from VibePilot's own repo
+- There is no way to say "this plan is for project X, clone repo Y"
+- The LLM Wiki had no repo. The executor tried to build it inside VibePilot's source tree
+- Result: models wrote code that didn't belong, supervisor correctly flagged "empty output"
+
+### 5. Supervisor Task Review Has No Cascade Retry
+- The plan review handler has cascade retry (added this session)
+- The task review handler does NOT — single shot, one model, fails → back to available
+- This is why T001 kept getting the same model (llama-3.3-70b) producing the same empty output
+
+### 6. Missing Rate Limit Data for New Models
+- 6 models added this session have no rate limits in models.json:
+  - meta/llama-3.3-70b-instruct, qwen/qwen3-32b, moonshotai/kimi-k2-instruct (nvidia)
+  - meta-llama/llama-4-scout, openai/gpt-oss-120b, groq/compound, groq/compound-mini (groq — partial data only)
+- Without rate limits, the UsageTracker can't enforce anything for these models
+
+### 7. Plan File Written With Escaped Newlines
+- The planner's plan_content has `\n` as literal characters
+- `os.WriteFile` writes them as-is instead of converting to real newlines
+- Task parser regex `^### (T\d+)` requires real newlines, finds nothing
+- Had to manually fix with Python string replacement
+- **Root cause not fixed** — next plan will have the same problem
+
+### 8. Race Condition: plan_created + plan_review
+- When planner finishes and sets status to `review`, the Realtime UPDATE fires both:
+  - `plan_created` handler (because status changed FROM draft)
+  - `plan_review` handler (because status changed TO review)
+- Both fire simultaneously. Duplicate detection helps but is fragile
+- Fix: plan_created should only trigger on INSERT, not UPDATE
+
+### 9. UUID Query Bug in Testing Handler
+- Testing module merge check passes `eq.taskID` as UUID value
+- `"invalid input syntax for type uuid: \"eq.db49b924-...\""`
+- The `eq.` prefix from the Supabase REST filter is being included in the parameter
+
+### 10. orchestrator_events Table Missing `payload` Column
+- Vault audit logging fails on every single vault read
+- `"column \"payload\" of relation \"orchestrator_events\" does not exist"`
+- Non-critical but spams logs and means no audit trail
+
+---
+
+## What Was NOT Wrong (False Alarms from This Session)
+
+- The planner prompt was NEVER the problem (confirmed again)
+- extractJSON was NOT the problem (original + code-fence fallback works)
+- The groq API key works fine (was a vault encryption mismatch, fixed)
+
+---
+
+## The LLM Wiki PRD Problem
+
+The PRD at `docs/prd/llm-wiki.md` was committed by "VibePilot Server" (governor/hermes during a previous session) WITHOUT consulting the user. It produced a garbage task plan:
+- T001 (Model Directory) ran BEFORE T007 (Tech Stack/Project Scaffold)
+- All tasks ran against VibePilot's own repo, not a new LLM Wiki project
+- Supervisor correctly identified output as broken but couldn't diagnose WHY
+- Tasks looped endlessly without max_attempts check
+
+**The PRD should be deleted or rewritten in consultation with the user.**
+
+---
+
+## Rate Limit Reference (What We Know)
+
+### Groq Free Tier (from docs)
+- llama-3.3-70b-versatile: 30 RPM, 1000 RPD, 12K TPM, 100K TPD
+- llama-4-scout: 30 RPM, 14400 RPH (no daily/token limits set yet)
+- gpt-oss-120b: 30 RPM, 14400 RPH
+- compound/compound-mini: 30 RPM, 14400 RPH
+- **Policy: 80% buffer = stop at 24 RPM, 800 RPD, etc.**
+
+### NVIDIA Free Tier
+- nemotron-ultra-253b: 10 RPM, 500 RPD, 8K TPM, 100K TPD
+- Other nvidia models: NO limits set (dangerous)
+
+### GLM-5 (Z.AI Pro subscription)
+- No published limits. Subscription ends May 1.
+- Route only as last resort, one task at a time
+
+### Gemini (if key valid)
+- gemini-2.5-flash: 10 RPM, 150 RPH, 250 RPD, 250K TPM, 1M TPD
+
+---
+
+## Config State
+
+### Active Connectors
+- groq-api: working (key encrypted with Go vault tool)
+- nvidia-api: working
+- hermes (CLI): working for GLM-5
+- gemini-api: key may be invalid (short encrypted value)
+- deepseek-api: benched (out of credit)
+
+### Cascade Order
+groq fast → nvidia → hermes CLI → small backup:
+1. llama-3.3-70b-versatile (groq)
+2. llama-4-scout (groq)
+3. gpt-oss-120b (groq)
+4. groq/compound (groq)
+5. qwen/qwen3-32b (groq)
+6. nemotron-ultra-253b-v1 (nvidia)
+7. meta/llama-3.3-70b-instruct (nvidia)
+8. kimi-k2-instruct (nvidia)
+9. glm-5 (hermes)
+10. llama-3.1-8b-instant (groq)
+11. compound-mini (groq)
+12. deepseek-chat (benched)
+13. gemini-2.5-flash (needs key check)
+
+---
+
+## Priority Fixes Needed
+
+### Critical (pipeline won't work without these)
+1. **max_attempts enforcement** — check attempts >= max_attempts before claiming, block if exceeded
+2. **Dependency resolution** — after task merge, check if any pending tasks have all deps met, transition to available
+3. **Cooldown fallback fix** — don't route when all models in cooldown, wait instead
+4. **Plan file newline fix** — convert `\n` escapes to real newlines before writing
+
+### Important (pipeline works poorly without these)
+5. **Task review cascade retry** — same pattern as planner/supervisor
+6. **Rate limits for all models** — fill in missing data from provider docs
+7. **Race condition fix** — plan_created only on INSERT, not UPDATE
+8. **UUID query fix** — strip `eq.` prefix from testing handler queries
+9. **Failure learning** — when a task fails N times with same error, stop retrying and escalate
+
+### Nice to Have
+10. Project concept (separate repos per plan target)
+11. orchestrator_events.payload column
+12. GEMINI_API_KEY validity check
 
 ---
 
@@ -113,4 +184,4 @@ task_runs tokens/costs → calculateROI() → ROI panel
 - ~780GB disk free
 - Phone WiFi tethered
 
-**Last Updated:** 2026-04-17 05:30 (after session fixes, before sleep)
+**Last Updated:** 2026-04-19 02:30 (after LLM Wiki failure analysis, cleanup, and state audit)
