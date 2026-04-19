@@ -54,8 +54,15 @@ func (l *ModelLoader) Load(ctx context.Context) error {
 			l.tracker.RegisterModel(profile)
 		}
 
+		// Skip DB sync for models missing required fields
+		if profile.AccessType == "" || profile.Status == "" {
+			log.Printf("[ModelLoader] Skipping DB sync for %s: missing access_type or status", profile.ID)
+			continue
+		}
+
 		if err := l.syncToDatabase(ctx, profile); err != nil {
-			return fmt.Errorf("sync model %s to database: %w", profile.ID, err)
+			// Log but don't abort — one bad model shouldn't block all others
+			log.Printf("[ModelLoader] Warning: sync model %s to database failed: %v", profile.ID, err)
 		}
 	}
 
@@ -116,6 +123,9 @@ func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) 
 		"courier":       courier, // display hint only, NOT routing
 		"rate_limit_requests_per_minute": profile.RateLimits.RequestsPerMinute,
 	}
+	if profile.StatusReason != "" {
+		insertData["status_reason"] = profile.StatusReason
+	}
 	if profile.APIPricing.InputPer1MUsd > 0 {
 		insertData["cost_input_per_1k_usd"] = profile.APIPricing.InputPer1MUsd / 1000.0
 	}
@@ -139,6 +149,9 @@ func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) 
 			"weaknesses":    profile.Weaknesses,
 			"courier":       courier,
 			"rate_limit_requests_per_minute": profile.RateLimits.RequestsPerMinute,
+		}
+		if profile.StatusReason != "" {
+			updateData["status_reason"] = profile.StatusReason
 		}
 		if profile.APIPricing.InputPer1MUsd > 0 {
 			updateData["cost_input_per_1k_usd"] = profile.APIPricing.InputPer1MUsd / 1000.0

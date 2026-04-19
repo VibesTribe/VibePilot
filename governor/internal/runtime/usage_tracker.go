@@ -53,25 +53,27 @@ type APIPricing struct {
 }
 
 type ModelProfile struct {
-	ID               string           `json:"id"`
-	Name             string           `json:"name"`
-	Provider         string           `json:"provider"`
-	AccessType       string           `json:"access_type"`
-	ContextLimit     int              `json:"context_limit"`
-	Capabilities     []string         `json:"capabilities"`
-	AccessVia        []string         `json:"access_via"`
-	APIKeyRef        string           `json:"api_key_ref"`
-	Status           string           `json:"status"`
-	RateLimits       RateLimits       `json:"rate_limits"`
-	ThrottleBehavior ThrottleBehavior `json:"throttle_behavior"`
-	BufferPct        int              `json:"buffer_pct"`
-	SpacingMinSecs   int              `json:"spacing_min_seconds"`
-	APIPricing       APIPricing       `json:"api_pricing"`
-	Recovery         RecoveryConfig   `json:"recovery"`
-	Learned          LearnedData      `json:"learned"`
-	Strengths        []string         `json:"strengths"`
-	Weaknesses       []string         `json:"weaknesses"`
-	Notes            string           `json:"notes"`
+	ID                      string                      `json:"id"`
+	Name                    string                      `json:"name"`
+	Provider                string                      `json:"provider"`
+	AccessType              string                      `json:"access_type"`
+	ContextLimit            int                         `json:"context_limit"`
+	Capabilities            []string                    `json:"capabilities"`
+	AccessVia               []string                    `json:"access_via"`
+	APIKeyRef               string                      `json:"api_key_ref"`
+	Status                  string                      `json:"status"`
+	RateLimits              RateLimits                  `json:"rate_limits"`
+	RateLimitsByConnector   map[string]RateLimits       `json:"rate_limits_by_connector"`
+	ThrottleBehavior        ThrottleBehavior            `json:"throttle_behavior"`
+	BufferPct               int                         `json:"buffer_pct"`
+	SpacingMinSecs          int                         `json:"spacing_min_seconds"`
+	APIPricing              APIPricing                  `json:"api_pricing"`
+	Recovery                RecoveryConfig              `json:"recovery"`
+	Learned                 LearnedData                 `json:"learned"`
+	Strengths               []string                    `json:"strengths"`
+	Weaknesses              []string                    `json:"weaknesses"`
+	Notes                   string                      `json:"notes"`
+	StatusReason            string                      `json:"status_reason"`
 }
 
 type UsageWindow struct {
@@ -156,6 +158,13 @@ type RequestDecision struct {
 }
 
 func (t *UsageTracker) CanMakeRequest(ctx context.Context, modelID string, estimatedTokens int) RequestDecision {
+	return t.CanMakeRequestVia(ctx, modelID, "", estimatedTokens)
+}
+
+// CanMakeRequestVia checks rate limits for a model via a specific connector.
+// If the model has rate_limits_by_connector[connectorID], those limits are used.
+// Otherwise falls back to the model's default rate_limits.
+func (t *UsageTracker) CanMakeRequestVia(ctx context.Context, modelID string, connectorID string, estimatedTokens int) RequestDecision {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -182,7 +191,13 @@ func (t *UsageTracker) CanMakeRequest(ctx context.Context, modelID string, estim
 
 	t.resetExpiredWindows(usage, now)
 
+	// Use connector-specific limits if available, otherwise model defaults
 	limits := profile.RateLimits
+	if connectorID != "" {
+		if connectorLimits, ok := profile.RateLimitsByConnector[connectorID]; ok {
+			limits = connectorLimits
+		}
+	}
 
 	if limits.RequestsPerMinute != nil {
 		allowed := int(float64(*limits.RequestsPerMinute) * buffer)
@@ -319,6 +334,34 @@ func (t *UsageTracker) RecordRateLimit(ctx context.Context, modelID string) erro
 	usage.CooldownExpiresAt = &cooldownExpiry
 
 	return nil
+}
+
+// RecordConnectorCooldown puts ALL models on the same connector into cooldown.
+// This handles shared rate limits (e.g., Groq org-level TPD shared across all models).
+func (t *UsageTracker) RecordConnectorCooldown(ctx context.Context, connectorID string, cooldownMins int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	now := time.Now()
+	cooldownExpiry := now.Add(time.Duration(cooldownMins) * time.Minute)
+	affected := 0
+
+	for modelID, usage := range t.models {
+		for _, via := range usage.Profile.AccessVia {
+			if via == connectorID {
+				usage.LastRateLimitAt = &now
+				usage.RateLimitCount++
+				usage.CooldownExpiresAt = &cooldownExpiry
+				affected++
+				log.Printf("[UsageTracker] Connector cooldown: model %s on %s until %v", modelID, connectorID, cooldownExpiry.Format("15:04:05"))
+				break
+			}
+		}
+	}
+
+	if affected > 0 {
+		log.Printf("[UsageTracker] Connector %s rate limit: %d models in cooldown for %d minutes", connectorID, affected, cooldownMins)
+	}
 }
 
 func (t *UsageTracker) RecordCompletion(ctx context.Context, modelID string, taskType string, durationSeconds float64, success bool) error {
@@ -500,4 +543,15 @@ func (t *UsageTracker) GetMinuteRequestCount(ctx context.Context, modelID string
 		return 0
 	}
 	return usage.UsageWindows.Minute.Requests
+}
+
+// GetModelCooldownMinutes returns the configured cooldown minutes for a model.
+func (t *UsageTracker) GetModelCooldownMinutes(modelID string) int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	usage, exists := t.models[modelID]
+	if !exists {
+		return 0
+	}
+	return usage.Profile.Recovery.CooldownMinutes
 }

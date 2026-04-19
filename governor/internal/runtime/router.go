@@ -142,26 +142,26 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 	// If we have an agent-specific model, check if it's available first
 	if agentModelID != "" {
 		if r.usageTracker != nil {
-			decision := r.usageTracker.CanMakeRequest(ctx, agentModelID, 0)
+			// Find connector for agent model first
+			agentConnID := ""
+			for i := range connectors {
+				conn := &connectors[i]
+				if r.isConnectorExecutable(conn) && r.canConnectorAccessModel(conn.ID, agentModelID) {
+					agentConnID = conn.ID
+					break
+				}
+			}
+			decision := r.usageTracker.CanMakeRequestVia(ctx, agentModelID, agentConnID, 0)
 			if !decision.CanProceed {
 				log.Printf("[Router] Agent %s model %s unavailable (%s), falling through to cascade", req.Role, agentModelID, decision.Reason)
-			} else {
-				// Model is available, find connector
-				for i := range connectors {
-					conn := &connectors[i]
-					if !r.isConnectorExecutable(conn) {
-						continue
-					}
-					if r.canConnectorAccessModel(conn.ID, agentModelID) {
-						log.Printf("[Router] Internal routing: connector=%s model=%s (from agent %s)", conn.ID, agentModelID, req.Role)
-						return &RoutingResult{
-							ConnectorID: conn.ID,
-							ModelID:     agentModelID,
-							RoutingFlag: "internal",
-							Category:    "internal",
-						}, nil
-					}
-				}
+			} else if agentConnID != "" {
+				log.Printf("[Router] Internal routing: connector=%s model=%s (from agent %s)", agentConnID, agentModelID, req.Role)
+				return &RoutingResult{
+					ConnectorID: agentConnID,
+					ModelID:     agentModelID,
+					RoutingFlag: "internal",
+					Category:    "internal",
+				}, nil
 			}
 		} else {
 			// No usage tracker, route directly to pinned model
@@ -279,21 +279,24 @@ func (r *Router) selectByCascade(ctx context.Context, connectors []ConnectorConf
 		idx := (startIdx + i) % len(cascade)
 		modelID := cascade[idx]
 
-		decision := r.usageTracker.CanMakeRequest(ctx, modelID, 0)
-		if decision.CanProceed {
-			connID := r.findConnectorForModel(modelID)
-			if connID == "" {
-				for j := range connectors {
-					conn := &connectors[j]
-					if r.isConnectorExecutable(conn) && r.canConnectorAccessModel(conn.ID, modelID) {
-						connID = conn.ID
-						break
-					}
+		// Find connector first so we can check connector-specific limits
+		connID := r.findConnectorForModel(modelID)
+		if connID == "" {
+			for j := range connectors {
+				conn := &connectors[j]
+				if r.isConnectorExecutable(conn) && r.canConnectorAccessModel(conn.ID, modelID) {
+					connID = conn.ID
+					break
 				}
 			}
-			if connID != "" {
-				candidates = append(candidates, candidate{modelID: modelID, connID: connID})
-			}
+		}
+		if connID == "" {
+			continue // No connector available for this model
+		}
+
+		decision := r.usageTracker.CanMakeRequestVia(ctx, modelID, connID, 0)
+		if decision.CanProceed {
+			candidates = append(candidates, candidate{modelID: modelID, connID: connID})
 			continue
 		}
 
