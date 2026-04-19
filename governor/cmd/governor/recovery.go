@@ -298,9 +298,9 @@ func recoverPendingResources(ctx context.Context, database *db.DB) {
 func runStartupRehydration(ctx context.Context, database *db.DB, router *runtime.EventRouter) {
 	log.Println("[Rehydration] Scanning for active tasks and plans...")
 
-	// Rehydrate plans in draft status
+	// Rehydrate plans in active statuses (including review — they need supervisor approval)
 	plansRaw, err := database.Query(ctx, "plans", map[string]any{
-		"status": "in.(draft,council_review,revision_needed,pending_human)",
+		"status": "in.(draft,review,council_review,revision_needed,pending_human)",
 		"order":  "created_at.asc",
 	})
 	if err != nil {

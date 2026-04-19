@@ -175,24 +175,24 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 				"p_slice_id": task.SliceID,
 			})
 			if err != nil {
-				log.Printf("[createTasksFromApprovedPlan] Failed to get task number for slice %s: %v", task.SliceID, err)
-				return fmt.Errorf("get task number for slice %s: %w", task.SliceID, err)
-			}
-
-			// Parse RPC result - function returns TEXT directly, not wrapped
-			if len(result) > 0 {
-				// Try parsing as direct string response
-				var directResult string
-				if err := json.Unmarshal(result, &directResult); err == nil && directResult != "" {
-					taskNumber = directResult
-					log.Printf("[createTasksFromApprovedPlan] Assigned task number %s for slice %s (was %s)", taskNumber, task.SliceID, task.TaskNumber)
-				} else {
-					// Fallback: try parsing as array of objects
-					var rpcResult []map[string]any
-					if err := json.Unmarshal(result, &rpcResult); err == nil && len(rpcResult) > 0 {
-						if num, ok := rpcResult[0]["get_next_task_number_for_slice"].(string); ok {
-							taskNumber = num
-							log.Printf("[createTasksFromApprovedPlan] Assigned task number %s for slice %s (was %s) [fallback]", taskNumber, task.SliceID, task.TaskNumber)
+				// Non-fatal: use the plan's task number instead of aborting
+				log.Printf("[createTasksFromApprovedPlan] Warning: failed to get task number for slice %s (using plan number %s): %v", task.SliceID, task.TaskNumber, err)
+			} else {
+				// Parse RPC result - function returns TEXT directly, not wrapped
+				if len(result) > 0 {
+					// Try parsing as direct string response
+					var directResult string
+					if err := json.Unmarshal(result, &directResult); err == nil && directResult != "" {
+						taskNumber = directResult
+						log.Printf("[createTasksFromApprovedPlan] Assigned task number %s for slice %s (was %s)", taskNumber, task.SliceID, task.TaskNumber)
+					} else {
+						// Fallback: try parsing as array of objects
+						var rpcResult []map[string]any
+						if err := json.Unmarshal(result, &rpcResult); err == nil && len(rpcResult) > 0 {
+							if num, ok := rpcResult[0]["get_next_task_number_for_slice"].(string); ok {
+								taskNumber = num
+								log.Printf("[createTasksFromApprovedPlan] Assigned task number %s for slice %s (was %s) [fallback]", taskNumber, task.SliceID, task.TaskNumber)
+							}
 						}
 					}
 				}
@@ -315,7 +315,25 @@ func parseTaskSection(section string) (TaskData, error) {
 	if len(depsMatch) > 1 {
 		depsStr := strings.TrimSpace(depsMatch[1])
 		if depsStr != "none" && depsStr != "-" {
-			task.Dependencies = strings.Fields(depsStr)
+			if strings.HasPrefix(depsStr, "[") {
+				// Try direct JSON parse
+				var parsed []string
+				if err := json.Unmarshal([]byte(depsStr), &parsed); err == nil {
+					task.Dependencies = parsed
+				} else {
+					// Planner may output escaped quotes: [\"T001\"] — unescape and retry
+					unescaped := strings.ReplaceAll(depsStr, `\"`, `"`)
+					if err := json.Unmarshal([]byte(unescaped), &parsed); err == nil {
+						task.Dependencies = parsed
+					} else {
+						// Final fallback: strip all brackets, quotes, backslashes and split
+						cleaned := strings.Trim(depsStr, "[]\"\\")
+						task.Dependencies = strings.Fields(cleaned)
+					}
+				}
+			} else {
+				task.Dependencies = strings.Fields(depsStr)
+			}
 		}
 	}
 
