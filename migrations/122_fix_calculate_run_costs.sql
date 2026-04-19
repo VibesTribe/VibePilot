@@ -38,9 +38,9 @@ BEGIN
         'model_id', p_model_id,
         'tokens_in', p_tokens_in,
         'tokens_out', p_tokens_out,
-        'theoretical', v_theoretical,
-        'actual', v_actual,
-        'savings', GREATEST(v_theoretical - v_actual, 0)
+        'theoretical_cost_usd', v_theoretical,
+        'actual_cost_usd', v_actual,
+        'savings_usd', GREATEST(v_theoretical - v_actual, 0)
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
