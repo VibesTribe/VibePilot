@@ -171,16 +171,29 @@
       "id": "openrouter-api",
       "name": "OpenRouter API",
       "type": "api",
-      "status": "emergency_fallback",
+      "status": "active",
       "provider": "openrouter",
       "endpoint": "https://openrouter.ai/api/v1",
       "api_key_ref": "OPENROUTER_API_KEY",
       "models_available": [
-        "deepseek/deepseek-r1:free",
-        "google/gemini-2.5-flash-preview:free"
+        "qwen/qwen3.6-plus:free",
+        "qwen/qwen3-coder:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "google/gemma-4-31b-it:free",
+        "openai/gpt-oss-120b:free",
+        "z-ai/glm-4.5-air:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "minimax/minimax-m2.5:free",
+        "openrouter/free",
+        "openrouter/elephant-alpha:free"
       ],
       "provides_tools": [],
-      "notes": "EMERGENCY ONLY. Always use :free suffix. Set $0 spend limit in dashboard. Free models can fall back to paid without warning."
+      "notes": "Free tier: 200 RPD unfunded, 1000 RPD with $10 deposit. 20 RPM per model. Always use :free suffix. openrouter/free auto-routes to best available. Deposit $10 for 5x volume.",
+      "rate_limits": {
+        "rpm_per_model": 20,
+        "rpd_unfunded": 200,
+        "rpd_funded": 1000
+      }
     },
     {
       "id": "nvidia-api",
