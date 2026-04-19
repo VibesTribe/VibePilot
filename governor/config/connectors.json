@@ -50,20 +50,6 @@
       "notes": "Claude Code CLI. Inactive - auth broken after key rotation."
     },
     {
-      "id": "zai-api",
-      "name": "Z.AI API (GLM-5)",
-      "type": "api",
-      "status": "active",
-      "provider": "openai",
-      "endpoint": "https://api.z.ai/api/paas/v4",
-      "api_key_ref": "ZAI_API_KEY",
-      "models_available": [
-        "glm-5"
-      ],
-      "provides_tools": [],
-      "notes": "Direct API for GLM-5. Fast \u2014 no CLI overhead. Used by planner/supervisor/tester."
-    },
-    {
       "id": "hermes",
       "name": "Hermes Agent",
       "type": "cli",
@@ -161,8 +147,7 @@
         "meta-llama/llama-4-scout-17b-16e-instruct",
         "openai/gpt-oss-120b",
         "groq/compound",
-        "groq/compound-mini",
-        "qwen/qwen3-32b"
+        "groq/compound-mini"
       ],
       "provides_tools": [],
       "notes": "Re-enabled after vault fix"
@@ -176,13 +161,10 @@
       "endpoint": "https://openrouter.ai/api/v1",
       "api_key_ref": "OPENROUTER_API_KEY",
       "models_available": [
-        "qwen/qwen3.6-plus:free",
-        "qwen/qwen3-coder:free",
         "nvidia/nemotron-3-super-120b-a12b:free",
         "google/gemma-4-31b-it:free",
         "openai/gpt-oss-120b:free",
         "z-ai/glm-4.5-air:free",
-        "meta-llama/llama-3.3-70b-instruct:free",
         "minimax/minimax-m2.5:free",
         "openrouter/free",
         "openrouter/elephant-alpha:free"
@@ -207,7 +189,6 @@
       "models_available": [
         "nvidia/llama-3.1-nemotron-ultra-253b-v1",
         "meta/llama-3.3-70b-instruct",
-        "qwen/qwen3-32b",
         "moonshotai/kimi-k2-instruct"
       ],
       "provides_tools": [],
@@ -255,20 +236,6 @@
       ],
       "provides_tools": [],
       "notes": "Courier destination. 1M tokens/day free tier."
-    },
-    {
-      "id": "copilot-web",
-      "name": "Copilot Web",
-      "type": "web",
-      "status": "unavailable",
-      "url": "https://copilot.microsoft.com",
-      "provider": "microsoft",
-      "requires_auth": "microsoft_account",
-      "models_available": [
-        "copilot"
-      ],
-      "provides_tools": [],
-      "notes": "Requires Microsoft account. Not usable."
     },
     {
       "id": "deepseek-web",
