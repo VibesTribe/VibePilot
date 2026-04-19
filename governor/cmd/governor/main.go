@@ -231,8 +231,10 @@ func main() {
 		for {
 			select {
 			case <-ctx.Done():
-				// Final persist before shutdown
-				usageTracker.PersistToDatabase(ctx)
+				// Final persist before shutdown — use fresh context since the main one is canceled
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				usageTracker.PersistToDatabase(shutdownCtx)
+				cancel()
 				return
 			case <-ticker.C:
 				usageTracker.PersistToDatabase(ctx)

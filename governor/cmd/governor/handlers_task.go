@@ -318,8 +318,14 @@ func (h *TaskHandler) executeTask(
 		// Check for rate limit (HTTP 429)
 		if h.usageTracker != nil && modelID != "" {
 			if isRateLimitError(err) {
-				log.Printf("[TaskAvailable] Rate limit hit for model %s, recording cooldown", modelID)
+				log.Printf("[TaskAvailable] Rate limit hit for model %s via %s, recording cooldown", modelID, connectorID)
 				h.usageTracker.RecordRateLimit(ctx, modelID)
+				// Also cooldown ALL models on the same connector (shared limits)
+				if connectorID != "" {
+					// Parse retry-after from error if available, otherwise use recovery config
+					cooldownMins := h.getRecoveryCooldown(modelID)
+					h.usageTracker.RecordConnectorCooldown(ctx, connectorID, cooldownMins)
+				}
 			}
 			h.usageTracker.RecordCompletion(ctx, modelID, taskCategory, time.Since(runStart).Seconds(), false)
 		}
@@ -381,7 +387,7 @@ func (h *TaskHandler) executeTask(
 
 	// Record task run with execution result
 	costs := h.calculateCosts(ctx, modelID, tokensIn, tokensOut)
-	h.database.RPC(ctx, "create_task_run", map[string]any{
+	if _, err := h.database.RPC(ctx, "create_task_run", map[string]any{
 		"p_task_id":                       taskID,
 		"p_model_id":                      modelID,
 		"p_courier":                       connectorID,
@@ -399,14 +405,18 @@ func (h *TaskHandler) executeTask(
 		"p_started_at":                    runStart,
 		"p_completed_at":                  time.Now(),
 		"p_result":                         executionResult,
-	})
+	}); err != nil {
+		log.Printf("[TaskHandler] ERROR create_task_run failed for task %s model %s: %v", taskID, modelID, err)
+	}
 
 	// Deduct cost from model's credit_remaining_usd (if model has credit tracking)
 	if costs.Actual > 0 {
-		h.database.RPC(ctx, "deduct_model_credit", map[string]any{
+		if _, err := h.database.RPC(ctx, "deduct_model_credit", map[string]any{
 			"p_model_id": modelID,
 			"p_cost_usd": costs.Actual,
-		})
+		}); err != nil {
+			log.Printf("[TaskHandler] ERROR deduct_model_credit failed for model %s: %v", modelID, err)
+		}
 	}
 
 	// Atomically transition to review
@@ -1021,4 +1031,15 @@ func unlockDependentsByTaskNumber(ctx context.Context, database *db.DB, complete
 			log.Printf("[DependencyUnlock] Task %s: still has unmet dependencies", pendingNum)
 		}
 	}
+}
+
+// getRecoveryCooldown returns the cooldown minutes for a model from config.
+func (h *TaskHandler) getRecoveryCooldown(modelID string) int {
+	if h.usageTracker != nil {
+		cooldown := h.usageTracker.GetModelCooldownMinutes(modelID)
+		if cooldown > 0 {
+			return cooldown
+		}
+	}
+	return 5
 }

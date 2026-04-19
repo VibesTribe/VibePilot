@@ -432,6 +432,8 @@ func extractPlanContent(raw string) (planContent string, cleanJSON string) {
 		endIdx := strings.LastIndex(raw, endMarker)
 		if endIdx > valueStart {
 			planContent = raw[valueStart:endIdx]
+			// Unescape JSON string escapes so plan file has real newlines
+			planContent = unescapePlanContent(planContent)
 			// Rebuild JSON with plan_content as empty string to parse other fields
 			cleanJSON = raw[:valueStart] + "" + raw[endIdx:]
 			return planContent, cleanJSON
