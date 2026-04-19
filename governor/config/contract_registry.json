@@ -1,0 +1,598 @@
+{
+  "_comment": "VIBEPILOT CONTRACT REGISTRY - Source of truth for all interfaces",
+  "_hierarchy": "Dashboard \u2192 SQL tables/views \u2192 Go RPC calls. Never change downstream without checking upstream.",
+  "_rule": "Before ANY migration or Go change: 1) Check this registry 2) Find ALL consumers 3) Update ALL at once",
+  "dashboard": {
+    "tasks": [
+      "id",
+      "title",
+      "status",
+      "confidence",
+      "updated_at",
+      "assigned_to",
+      "slice_id",
+      "task_number",
+      "routing_flag",
+      "routing_flag_reason",
+      "dependencies",
+      "result",
+      "created_at",
+      "prd_path",
+      "plan_path",
+      "branch_name",
+      "category",
+      "type"
+    ],
+    "task_runs": [
+      "id",
+      "task_id",
+      "model_id",
+      "courier",
+      "platform",
+      "status",
+      "tokens_in",
+      "tokens_out",
+      "tokens_used",
+      "started_at",
+      "completed_at",
+      "result",
+      "courier_cost_usd",
+      "platform_theoretical_cost_usd",
+      "total_actual_cost_usd",
+      "total_savings_usd",
+      "courier_model_id",
+      "courier_tokens",
+      "created_at"
+    ],
+    "models": [
+      "id",
+      "name",
+      "status",
+      "status_reason",
+      "vendor",
+      "access_type",
+      "context_limit",
+      "logo_url",
+      "cooldown_expires_at",
+      "rate_limits",
+      "strengths",
+      "weaknesses",
+      "notes",
+      "config",
+      "cost_input_per_1k_usd",
+      "cost_output_per_1k_usd",
+      "courier",
+      "learned",
+      "success_rate"
+    ],
+    "platforms": [
+      "id",
+      "name",
+      "status",
+      "vendor",
+      "config"
+    ],
+    "orchestrator_events": [
+      "id",
+      "event_type",
+      "task_id",
+      "runner_id",
+      "from_runner_id",
+      "to_runner_id",
+      "model_id",
+      "reason",
+      "details",
+      "created_at"
+    ]
+  },
+  "go_to_sql_rpc": {
+    "calc_run_costs": {
+      "params": [
+        "p_courier_cost_usd",
+        "p_model_id",
+        "p_tokens_in",
+        "p_tokens_out"
+      ],
+      "callers": [
+        "handlers_task.go"
+      ]
+    },
+    "check_platform_availability": {
+      "params": [
+        "p_platform_id"
+      ],
+      "callers": [
+        "runtime/router.go"
+      ]
+    },
+    "claim_for_review": {
+      "params": [
+        "p_reviewer_id",
+        "p_task_id"
+      ],
+      "callers": [
+        "handlers_maint.go",
+        "handlers_task.go",
+        "handlers_testing.go"
+      ]
+    },
+    "claim_task": {
+      "params": [
+        "p_model_id",
+        "p_routing_flag",
+        "p_routing_reason",
+        "p_task_id",
+        "p_worker_id"
+      ],
+      "callers": [
+        "handlers_task.go"
+      ]
+    },
+    "clear_processing": {
+      "params": [
+        "p_id",
+        "p_table"
+      ],
+      "callers": [
+        "db/state.go",
+        "handlers_council.go",
+        "handlers_maint.go",
+        "handlers_plan.go",
+        "handlers_research.go"
+      ]
+    },
+    "create_maintenance_command": {
+      "params": [
+        "p_approved_by",
+        "p_command_type",
+        "p_payload",
+        "p_source"
+      ],
+      "callers": [
+        "handlers_maint.go",
+        "handlers_research.go"
+      ]
+    },
+    "create_plan": {
+      "params": [
+        "p_plan_path",
+        "p_prd_path",
+        "p_project_id"
+      ],
+      "callers": [
+        "webhooks/github.go"
+      ]
+    },
+    "create_planner_rule": {
+      "params": [
+        "p_applies_to",
+        "p_rule_text",
+        "p_rule_type",
+        "p_source"
+      ],
+      "callers": [
+        "handlers_council.go"
+      ]
+    },
+    "create_task_run": {
+      "params": [
+        "p_completed_at",
+        "p_courier",
+        "p_courier_cost_usd",
+        "p_courier_model_id",
+        "p_courier_tokens",
+        "p_model_id",
+        "p_platform",
+        "p_platform_theoretical_cost_usd",
+        "p_result",
+        "p_started_at",
+        "p_status",
+        "p_task_id",
+        "p_tokens_in",
+        "p_tokens_out",
+        "p_tokens_used",
+        "p_total_actual_cost_usd",
+        "p_total_savings_usd"
+      ],
+      "callers": [
+        "handlers_task.go"
+      ]
+    },
+    "deduct_model_credit": {
+      "params": [
+        "p_cost_usd",
+        "p_model_id"
+      ],
+      "callers": [
+        "handlers_task.go"
+      ]
+    },
+    "delete_checkpoint": {
+      "params": [
+        "p_task_id"
+      ],
+      "callers": [
+        "core/checkpoint.go",
+        "handlers_task.go",
+        "recovery.go"
+      ]
+    },
+    "find_stale_processing": {
+      "params": [
+        "p_table",
+        "p_timeout_seconds"
+      ],
+      "callers": [
+        "recovery.go"
+      ]
+    },
+    "find_tasks_with_checkpoints": {
+      "params": [
+        "p_statuses"
+      ],
+      "callers": [
+        "recovery.go"
+      ]
+    },
+    "get_failure_patterns": {
+      "params": [],
+      "callers": [
+        "core/analyst.go"
+      ]
+    },
+    "get_heuristic": {
+      "params": [
+        "p_condition",
+        "p_task_type"
+      ],
+      "callers": [
+        "runtime/context_builder.go"
+      ]
+    },
+    "get_latest_state": {
+      "params": [
+        "p_entity_id",
+        "p_entity_type"
+      ],
+      "callers": [
+        "db/state.go"
+      ]
+    },
+    "get_model_score_for_task": {
+      "params": [
+        "p_model_id",
+        "p_task_category",
+        "p_task_type"
+      ],
+      "callers": [
+        "runtime/router.go"
+      ]
+    },
+    "get_next_task_number_for_slice": {
+      "params": [
+        "p_slice_id"
+      ],
+      "callers": [
+        "validation.go"
+      ]
+    },
+    "get_planner_rules": {
+      "params": [
+        "p_applies_to",
+        "p_limit"
+      ],
+      "callers": [
+        "runtime/context_builder.go"
+      ]
+    },
+    "get_problem_solution": {
+      "params": [
+        "p_failure_type",
+        "p_keywords",
+        "p_task_type"
+      ],
+      "callers": [
+        "runtime/context_builder.go"
+      ]
+    },
+    "get_recent_failures": {
+      "params": [
+        "p_since",
+        "p_task_type"
+      ],
+      "callers": [
+        "runtime/context_builder.go"
+      ]
+    },
+    "get_supervisor_rules": {
+      "params": [
+        "p_applies_to",
+        "p_limit"
+      ],
+      "callers": [
+        "runtime/context_builder.go"
+      ]
+    },
+    "get_tester_rules": {
+      "params": [
+        "p_applies_to",
+        "p_limit"
+      ],
+      "callers": [
+        "runtime/context_builder.go"
+      ]
+    },
+    "load_checkpoint": {
+      "params": [
+        "p_task_id"
+      ],
+      "callers": [
+        "core/checkpoint.go"
+      ]
+    },
+    "log_security_audit": {
+      "params": [
+        "p_allowed",
+        "p_key_name",
+        "p_operation",
+        "p_reason"
+      ],
+      "callers": [
+        "vault/vault.go"
+      ]
+    },
+    "recall_memories": {
+      "params": [
+        "p_layer",
+        "p_limit",
+        "p_query"
+      ],
+      "callers": [
+        "memory/compactor.go"
+      ]
+    },
+    "record_failure": {
+      "params": [
+        "p_failure_category",
+        "p_failure_details",
+        "p_failure_type",
+        "p_task_id"
+      ],
+      "callers": [
+        "handlers_task.go"
+      ]
+    },
+    "record_model_failure": {
+      "params": [
+        "p_failure_category",
+        "p_failure_type",
+        "p_model_id",
+        "p_task_id"
+      ],
+      "callers": [
+        "handlers_plan.go",
+        "handlers_task.go",
+        "helpers.go"
+      ]
+    },
+    "record_model_success": {
+      "params": [
+        "p_duration_seconds",
+        "p_model_id",
+        "p_task_type",
+        "p_tokens_used"
+      ],
+      "callers": [
+        "handlers_maint.go",
+        "handlers_plan.go",
+        "handlers_task.go",
+        "helpers.go"
+      ]
+    },
+    "record_performance_metric": {
+      "params": [
+        "p_duration_ms",
+        "p_duration_seconds",
+        "p_entity_id",
+        "p_metadata",
+        "p_metric_type",
+        "p_success"
+      ],
+      "callers": [
+        "db/state.go",
+        "handlers_plan.go"
+      ]
+    },
+    "record_planner_revision": {
+      "params": [
+        "p_concerns",
+        "p_plan_id",
+        "p_tasks_needing_revision"
+      ],
+      "callers": [
+        "handlers_council.go"
+      ]
+    },
+    "record_revision_feedback": {
+      "params": [
+        "p_feedback",
+        "p_plan_id",
+        "p_source"
+      ],
+      "callers": [
+        "handlers_council.go"
+      ]
+    },
+    "record_state_transition": {
+      "params": [
+        "p_entity_id",
+        "p_entity_type",
+        "p_from_state",
+        "p_metadata",
+        "p_reason",
+        "p_to_state"
+      ],
+      "callers": [
+        "db/state.go"
+      ]
+    },
+    "recover_stale_processing": {
+      "params": [
+        "p_id",
+        "p_reason",
+        "p_table"
+      ],
+      "callers": [
+        "recovery.go"
+      ]
+    },
+    "save_checkpoint": {
+      "params": [
+        "p_files",
+        "p_output",
+        "p_progress",
+        "p_step",
+        "p_task_id",
+        "p_timestamp"
+      ],
+      "callers": [
+        "core/checkpoint.go",
+        "handlers_task.go"
+      ]
+    },
+    "set_council_consensus": {
+      "params": [
+        "p_consensus",
+        "p_plan_id"
+      ],
+      "callers": [
+        "handlers_council.go"
+      ]
+    },
+    "set_processing": {
+      "params": [
+        "p_id",
+        "p_processing_by",
+        "p_table"
+      ],
+      "callers": [
+        "handlers_council.go",
+        "handlers_maint.go",
+        "handlers_plan.go",
+        "handlers_research.go"
+      ]
+    },
+    "store_council_reviews": {
+      "params": [
+        "p_mode",
+        "p_models",
+        "p_plan_id",
+        "p_reviews"
+      ],
+      "callers": [
+        "handlers_council.go"
+      ]
+    },
+    "store_memory": {
+      "params": [
+        "p_key",
+        "p_layer",
+        "p_ttl_sec",
+        "p_value"
+      ],
+      "callers": [
+        "memory/compactor.go"
+      ]
+    },
+    "transition_task": {
+      "params": [
+        "p_failure_reason",
+        "p_new_status",
+        "p_result",
+        "p_task_id"
+      ],
+      "callers": [
+        "handlers_maint.go",
+        "handlers_task.go",
+        "handlers_testing.go",
+        "recovery.go"
+      ]
+    },
+    "unlock_dependent_tasks": {
+      "params": [
+        "p_completed_task_id"
+      ],
+      "callers": [
+        "handlers_maint.go",
+        "handlers_testing.go"
+      ]
+    },
+    "update_maintenance_command_status": {
+      "params": [
+        "p_id",
+        "p_result_notes",
+        "p_status"
+      ],
+      "callers": [
+        "handlers_maint.go"
+      ]
+    },
+    "update_model_learning": {
+      "params": [
+        "p_failure_category",
+        "p_failure_class",
+        "p_failure_detail",
+        "p_model_id",
+        "p_outcome",
+        "p_task_type"
+      ],
+      "callers": [
+        "handlers_task.go"
+      ]
+    },
+    "update_model_usage": {
+      "params": [
+        "p_cooldown_expires_at",
+        "p_last_rate_limit_at",
+        "p_learned",
+        "p_model_id",
+        "p_rate_limit_count",
+        "p_usage_windows"
+      ],
+      "callers": [
+        "runtime/usage_tracker.go"
+      ]
+    },
+    "update_plan_status": {
+      "params": [
+        "p_plan_id",
+        "p_plan_path",
+        "p_review_notes",
+        "p_status"
+      ],
+      "callers": [
+        "handlers_council.go",
+        "handlers_plan.go"
+      ]
+    },
+    "update_research_suggestion_status": {
+      "params": [
+        "p_id",
+        "p_review_notes",
+        "p_status"
+      ],
+      "callers": [
+        "handlers_research.go"
+      ]
+    },
+    "update_task_branch": {
+      "params": [
+        "p_branch_name",
+        "p_task_id"
+      ],
+      "callers": [
+        "handlers_task.go"
+      ]
+    }
+  }
+}
