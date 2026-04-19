@@ -127,9 +127,9 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		log.Printf("[Testing] Task %s → COMPLETE (testing passed)", truncateID(taskID))
 
 		// Unlock dependents now — task is done regardless of merge
-		h.database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
-			"p_completed_task_id": taskID,
-		})
+		// The DB unlock_dependent_tasks RPC searches by UUID, but our deps store
+		// task numbers (e.g. "T001"). Use Go-native unlock that matches by number.
+		unlockDependentsByTaskNumber(ctx, h.database, taskNumber)
 
 		// Auto-merge to module branch (best effort, does not affect completion)
 		targetBranch := h.getTargetBranch(sliceID)
