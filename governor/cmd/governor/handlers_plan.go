@@ -155,6 +155,8 @@ func handlePlanCreated(
 			raw = raw[:500]
 		}
 		log.Printf("[EventPlanCreated] Failed to parse planner output: %v\nRaw output (first 500): %s", err, raw)
+		// Also dump full output to file for analysis
+		os.WriteFile("/tmp/planner_output_debug.json", []byte(result.Output), 0644)
 		setPlanError(ctx, database, planID, "parse_failed")
 		clearProcessingLock()
 		return
@@ -261,39 +263,56 @@ func runPlanReview(
 		return
 	}
 
-	routingResult, err := connRouter.SelectRouting(ctx, runtime.RoutingRequest{
-		Role:        "supervisor",
-		TaskType:    "review",
-		RoutingFlag: "internal",
-	})
-	if err != nil || routingResult == nil {
-		log.Printf("[PlanReview] No routing available for supervisor")
-		setPlanError(ctx, database, planID, "no_routing")
-		return
-	}
-
-	session, err := factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.ConnectorID)
-	if err != nil {
-		log.Printf("[PlanReview] Failed to create supervisor session: %v", err)
-		setPlanError(ctx, database, planID, "session_failed")
-		return
-	}
-
-	result, err := session.Run(ctx, map[string]any{
-		"prd_content":  string(prdContent),
-		"plan_content": string(planContent),
-		"plan_id":      planID,
-	})
-	if err != nil {
-		log.Printf("[PlanReview] Supervisor execution failed: %v", err)
-		database.RPC(ctx, "record_model_failure", map[string]any{
-			"p_model_id":         routingResult.ModelID,
-			"p_task_id":          planID,
-			"p_failure_type":     "execution_error",
-			"p_failure_category": "model_issue",
+	// Try running supervisor with cascade retry on transient failures (429, 503, timeout)
+	var result *runtime.SessionResult
+	var routingResult *runtime.RoutingResult
+	var failedModels []string
+	maxRetries := 5
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 && routingResult != nil {
+			failedModels = append(failedModels, routingResult.ModelID)
+			log.Printf("[PlanReview] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
+		}
+		var routeErr error
+		routingResult, routeErr = connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+			Role:           "supervisor",
+			TaskType:       "review",
+			RoutingFlag:    "internal",
+			ExcludeModels:  failedModels,
 		})
-		setPlanError(ctx, database, planID, "execution_failed")
-		return
+		if routeErr != nil || routingResult == nil {
+			log.Printf("[PlanReview] No routing available for supervisor (attempt %d)", attempt+1)
+			setPlanError(ctx, database, planID, "no_routing")
+			return
+		}
+
+		session, err := factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.ConnectorID)
+		if err != nil {
+			log.Printf("[PlanReview] Failed to create supervisor session: %v", err)
+			setPlanError(ctx, database, planID, "session_failed")
+			return
+		}
+
+		result, err = session.Run(ctx, map[string]any{
+			"prd_content":  string(prdContent),
+			"plan_content": string(planContent),
+			"plan_id":      planID,
+		})
+		if err != nil {
+			log.Printf("[PlanReview] Supervisor attempt %d failed (model=%s, connector=%s): %v", attempt+1, routingResult.ModelID, routingResult.ConnectorID, err)
+			database.RPC(ctx, "record_model_failure", map[string]any{
+				"p_model_id":         routingResult.ModelID,
+				"p_task_id":          planID,
+				"p_failure_type":     "execution_error",
+				"p_failure_category": "model_issue",
+			})
+			if attempt < maxRetries-1 {
+				continue // try next model
+			}
+			setPlanError(ctx, database, planID, "execution_failed")
+			return
+		}
+		break // success
 	}
 
 	review, err := runtime.ParseInitialReview(result.Output)
