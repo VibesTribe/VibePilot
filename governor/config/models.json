@@ -74,7 +74,7 @@
         "gemini-api"
       ],
       "api_key_ref": "GEMINI_API_KEY",
-      "status": "paused",
+      "status": "active",
       "rate_limits": {
         "requests_per_minute": 10,
         "requests_per_hour": 150,
