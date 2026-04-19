@@ -94,3 +94,43 @@ Total: 11 tasks
 - Apr 19: Qwen3.6-Plus, Qwen3.5 Flash/Plus, MiniMax M2.7 added
 - Apr 19: Kimi K2 marked avoid for autonomous (bans after 5hrs)
 - Apr 19: Three sources of truth documented (GitHub + Supabase + Dashboard)
+
+## Dashboard Wiring Analysis (LOOK + UNDERSTAND, Apr 19)
+
+### WIRED AND WORKING (live Supabase data)
+- Task list with real-time status updates (5 table subscriptions via Postgres changes)
+- Model/Agent panel showing all 24 active models with logos, context limits, status
+- Slice progress (tasks grouped by slice_id with completion counts)
+- Token usage totals (summed from task_runs.tokens_used)
+- Event timeline (orchestrator_events mapped to MissionEvent[])
+- Real-time updates: any DB change auto-refreshes dashboard within seconds
+
+### WIRED BUT SHOWING $0 (data pipeline gap)
+- ROI calculation: Adapter code is correct (calculateROI sums cost columns from task_runs)
+  BUT: task_runs rows all have platform_theoretical_cost_usd=0, total_actual_cost_usd=0, total_savings_usd=0
+  ROOT CAUSE: calc_run_costs RPC in Go either not being called or returning 0
+  FIX NEEDED: Trace calc_run_costs RPC call in handlers_task.go, check if it writes to those columns
+- Subscription ROI: calculateSubscriptionROI reads subscription_* columns from models table
+  BUT: No models have subscription_status, subscription_cost_usd populated in DB
+  FIX NEEDED: Populate subscription fields for GLM-5 ($30/mo, ends May 1)
+
+### PRESENT BUT NEEDS INVESTIGATION
+- ReviewPanel: Exists with workflow dispatch to GitHub Actions (needs VITE_GH_TOKEN env)
+- AgentHangar: Agent overview modal exists, reads from models/platforms
+- LearningFeed: Component exists but unclear if wired to real data
+- Failures component: Exists but unclear if wired
+- AdminControlCenter modal: Exists in modals directory
+
+### NOT YET BUILT (from vibeflow architecture)
+- Visual QA agent integration (Gemini screenshot validation)
+- Courier chat URL display (chat_urls in task_runs for revision context)
+- Run task button (RunTaskButton.tsx exists - check if wired to governor API)
+- Voice interface (voice.ts exists)
+
+### DASHBOARD TECH STACK
+- Vite + React (NOT Next.js)
+- Supabase client for real-time subscriptions + queries
+- Adapter pattern: vibepilotAdapter.ts transforms Supabase rows to Dashboard types
+- Deployed: Vercel (vibeflow-dashboard.vercel.app)
+- Fallback: Mock JSON files if Supabase not configured
+- select("*") on tasks, task_runs, models, platforms — ANY dropped column breaks rendering
