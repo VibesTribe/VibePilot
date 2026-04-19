@@ -553,6 +553,32 @@ func (r *Router) GetAvailableConnectors() []string {
 	return result
 }
 
+// GetAvailableModelCount returns the number of active models across all active connectors.
+func (r *Router) GetAvailableModelCount() int {
+	if r.cfg.Connectors == nil || r.cfg.Models == nil {
+		return 0
+	}
+	count := 0
+	activeConnectors := make(map[string]bool)
+	for _, conn := range r.cfg.Connectors.Connectors {
+		if conn.Status == "active" && (conn.Type == "cli" || conn.Type == "api") {
+			activeConnectors[conn.ID] = true
+		}
+	}
+	for _, model := range r.cfg.Models.Models {
+		if model.Status != "active" {
+			continue
+		}
+		for _, via := range model.AccessVia {
+			if activeConnectors[via] {
+				count++
+				break
+			}
+		}
+	}
+	return count
+}
+
 // agentNeedsTools returns true for agents that need CLI connector with tools.
 // Planner/supervisor/tester/council receive file content in their prompt from the governor,
 // so they can use lightweight API connectors instead of spawning full CLI sessions.

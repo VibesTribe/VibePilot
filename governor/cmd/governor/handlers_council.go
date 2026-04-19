@@ -113,81 +113,125 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 		return
 	}
 
+	// Count available models to decide parallel vs sequential
+	availableModels := h.connRouter.GetAvailableModelCount()
 	councilMode := "sequential_same_model"
-	availableDests := h.connRouter.GetAvailableConnectors()
-	internalCount := 0
-	for _, d := range availableDests {
-		if h.cfg.GetConnectorCategory(d) == "internal" {
-			internalCount++
-		}
-	}
-	if internalCount >= memberCount {
+	if availableModels >= memberCount {
 		councilMode = "parallel_different_models"
 	}
 
-	log.Printf("[CouncilReview] Plan %s starting (mode: %s, members: %d)",
-		truncateID(planID), councilMode, memberCount)
+	log.Printf("[CouncilReview] Plan %s starting (mode: %s, members: %d, available_models: %d)",
+		truncateID(planID), councilMode, memberCount, availableModels)
 
 	reviews := make([]map[string]any, memberCount)
 	councilModels := make([]map[string]any, 0, memberCount)
+	var failedMembers []string
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
 	for i := 0; i < memberCount; i++ {
-		wg.Add(1)
-		go func(memberIndex int) {
-			defer wg.Done()
+		lens := lenses[i%len(lenses)]
 
-			lens := lenses[memberIndex%len(lenses)]
-			session, err := h.factory.CreateWithContext(ctx, "council", lens)
-			if err != nil {
-				log.Printf("[CouncilReview] Failed to create session for member %d: %v", memberIndex+1, err)
-				return
-			}
+		// Route each member independently through the cascade
+		memberRouting, routeErr := h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+			Role:          "council",
+			TaskType:      "council_review",
+			RoutingFlag:   "internal",
+			ExcludeModels: failedMembers,
+		})
+		if routeErr != nil || memberRouting == nil {
+			log.Printf("[CouncilReview] No routing for member %d, skipping", i+1)
+			continue
+		}
 
-			contextData := map[string]any{
-				"plan":          plan,
-				"lens":          lens,
-				"member_number": memberIndex + 1,
-			}
-			if prdContent != "" {
-				contextData["prd_content"] = prdContent
-			}
+		session, err := h.factory.CreateWithConnector(ctx, "council", lens, memberRouting.ConnectorID)
+		if err != nil {
+			log.Printf("[CouncilReview] Failed to create session for member %d: %v", i+1, err)
+			failedMembers = append(failedMembers, memberRouting.ModelID)
+			continue
+		}
 
+		contextData := map[string]any{
+			"plan":          plan,
+			"lens":          lens,
+			"member_number": i + 1,
+		}
+		if prdContent != "" {
+			contextData["prd_content"] = prdContent
+		}
+
+		if councilMode == "parallel_different_models" {
+			wg.Add(1)
+			go func(memberIndex int, sess *runtime.Session, routing *runtime.RoutingResult, memberLens string) {
+				defer wg.Done()
+				result, err := sess.Run(ctx, contextData)
+				if err != nil {
+					log.Printf("[CouncilReview] Member %d failed: %v", memberIndex+1, err)
+					mu.Lock()
+					failedMembers = append(failedMembers, routing.ModelID)
+					mu.Unlock()
+					return
+				}
+
+				h.factory.Compact(ctx, result, planID)
+
+				vote, parseErr := runtime.ParseCouncilVote(result.Output)
+				if parseErr != nil {
+					log.Printf("[CouncilReview] Failed to parse vote from member %d: %v", memberIndex+1, parseErr)
+					return
+				}
+
+				mu.Lock()
+				reviews[memberIndex] = map[string]any{
+					"member_number": memberIndex + 1,
+					"lens":          memberLens,
+					"vote":          vote.Vote,
+					"concerns":      vote.Concerns,
+					"reasoning":     vote.Reasoning,
+					"model_id":      routing.ModelID,
+				}
+				councilModels = append(councilModels, map[string]any{
+					"lens":  memberLens,
+					"model": routing.ModelID,
+				})
+				mu.Unlock()
+
+				log.Printf("[CouncilReview] Member %d (%s, model=%s) voted: %s", memberIndex+1, memberLens, routing.ModelID, vote.Vote)
+			}(i, session, memberRouting, lens)
+		} else {
+			// Sequential mode - run one at a time, reuse models if needed
 			result, err := session.Run(ctx, contextData)
 			if err != nil {
-				log.Printf("[CouncilReview] Member %d failed: %v", memberIndex+1, err)
-				return
+				log.Printf("[CouncilReview] Member %d failed: %v", i+1, err)
+				continue
 			}
 
-			// Compact session for context history
 			h.factory.Compact(ctx, result, planID)
 
 			vote, parseErr := runtime.ParseCouncilVote(result.Output)
 			if parseErr != nil {
-				log.Printf("[CouncilReview] Failed to parse vote from member %d: %v", memberIndex+1, parseErr)
-				return
+				log.Printf("[CouncilReview] Failed to parse vote from member %d: %v", i+1, parseErr)
+				continue
 			}
 
-			mu.Lock()
-			reviews[memberIndex] = map[string]any{
-				"member_number": memberIndex + 1,
+			reviews[i] = map[string]any{
+				"member_number": i + 1,
 				"lens":          lens,
 				"vote":          vote.Vote,
 				"concerns":      vote.Concerns,
 				"reasoning":     vote.Reasoning,
-				"model_id":      routingResult.ModelID,
+				"model_id":      memberRouting.ModelID,
 			}
 			councilModels = append(councilModels, map[string]any{
 				"lens":  lens,
-				"model": routingResult.ModelID,
+				"model": memberRouting.ModelID,
 			})
-			mu.Unlock()
-
-			log.Printf("[CouncilReview] Member %d (%s) voted: %s", memberIndex+1, lens, vote.Vote)
-		}(i)
+			log.Printf("[CouncilReview] Member %d (%s, model=%s) voted: %s", i+1, lens, memberRouting.ModelID, vote.Vote)
+		}
 	}
-	wg.Wait()
+	if councilMode == "parallel_different_models" {
+		wg.Wait()
+	}
 
 	validReviews := make([]map[string]any, 0, len(reviews))
 	for _, r := range reviews {
