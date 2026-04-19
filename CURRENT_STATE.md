@@ -134,3 +134,26 @@ Total: 11 tasks
 - Deployed: Vercel (vibeflow-dashboard.vercel.app)
 - Fallback: Mock JSON files if Supabase not configured
 - select("*") on tasks, task_runs, models, platforms — ANY dropped column breaks rendering
+
+## Session Update: 2026-04-19 06:58 UTC
+
+### Fixed: calc_run_costs contract drift
+- ROOT CAUSE: SQL returned keys 'theoretical'/'actual'/'savings'
+- Go struct expected: 'theoretical_cost_usd'/'actual_cost_usd'/'savings_usd'
+- json.Unmarshal silently mapped nothing → every task_run wrote $0
+- FIX: SQL function now returns USD-suffixed keys matching Go struct tags
+- BACKFILL: All 45 existing task_runs updated with correct costs via Supabase REST
+- RESULT: Dashboard ROI now shows $0.25 saved (was $0.000000)
+
+### Dashboard state verified:
+- Would Have Cost: $0.25
+- Actually Cost: $0.00 (all free models)
+- Total Savings: $0.25
+- CAD converter: wired at 1.36 exchange rate (hardcoded)
+- GLM-5 subscription: showing $30.00/mo, 11 days left, 483 tasks, $0.05/task
+
+### This was EXACTLY the contract drift Gemini diagnosed
+- Migration 122 created SQL with short keys
+- Go code updated to call it with wrong JSON tag expectations  
+- Both sides "correct" in isolation, mismatch at the interface
+- 14 previous migrations (112-125) were likely similar contract breaks
