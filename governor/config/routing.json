@@ -26,15 +26,19 @@
     "free_cascade": {
       "description": "Cascade through free API models in priority order. Used when agent has no model pin.",
       "priority": [
-        "glm-5",
+        "llama-3.3-70b-versatile",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "openai/gpt-oss-120b",
+        "groq/compound",
+        "qwen/qwen3-32b",
         "nvidia/llama-3.1-nemotron-ultra-253b-v1",
         "meta/llama-3.3-70b-instruct",
-        "qwen/qwen3-32b",
         "moonshotai/kimi-k2-instruct",
-        "llama-3.3-70b-versatile",
+        "glm-5",
         "llama-3.1-8b-instant",
-        "gemini-2.5-flash",
-        "deepseek-chat"
+        "groq/compound-mini",
+        "deepseek-chat",
+        "gemini-2.5-flash"
       ]
     }
   },
