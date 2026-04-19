@@ -19,10 +19,11 @@
       ],
       "status": "active",
       "rate_limits": {
-        "requests_per_minute": null,
-        "requests_per_hour": null,
-        "requests_per_day": null,
-        "tokens_per_day": null
+        "requests_per_minute": 3,
+        "requests_per_hour": 30,
+        "requests_per_day": 200,
+        "tokens_per_minute": 30000,
+        "tokens_per_day": 500000
       },
       "throttle_behavior": "slow_down",
       "buffer_pct": 80,
@@ -758,8 +759,11 @@
       "api_key_ref": "NVIDIA_API_KEY",
       "status": "active",
       "rate_limits": {
-        "requests_per_minute": null,
-        "requests_per_hour": null
+        "requests_per_minute": 10,
+        "requests_per_hour": 500,
+        "requests_per_day": 5000,
+        "tokens_per_minute": 8000,
+        "tokens_per_day": 100000
       },
       "throttle_behavior": "queue",
       "buffer_pct": 80,
@@ -798,8 +802,11 @@
       "api_key_ref": "NVIDIA_API_KEY",
       "status": "active",
       "rate_limits": {
-        "requests_per_minute": null,
-        "requests_per_hour": null
+        "requests_per_minute": 10,
+        "requests_per_hour": 500,
+        "requests_per_day": 5000,
+        "tokens_per_minute": 8000,
+        "tokens_per_day": 100000
       },
       "throttle_behavior": "queue",
       "buffer_pct": 80,
@@ -838,8 +845,11 @@
       "api_key_ref": "NVIDIA_API_KEY",
       "status": "active",
       "rate_limits": {
-        "requests_per_minute": null,
-        "requests_per_hour": null
+        "requests_per_minute": 10,
+        "requests_per_hour": 500,
+        "requests_per_day": 5000,
+        "tokens_per_minute": 8000,
+        "tokens_per_day": 100000
       },
       "throttle_behavior": "queue",
       "buffer_pct": 80,
@@ -879,7 +889,10 @@
       "status": "active",
       "rate_limits": {
         "requests_per_minute": 30,
-        "requests_per_hour": 14400
+        "requests_per_hour": 14400,
+        "requests_per_day": 14400,
+        "tokens_per_minute": 12000,
+        "tokens_per_day": 500000
       },
       "throttle_behavior": "wait_and_retry",
       "buffer_pct": 80,
@@ -919,7 +932,10 @@
       "status": "active",
       "rate_limits": {
         "requests_per_minute": 30,
-        "requests_per_hour": 14400
+        "requests_per_hour": 14400,
+        "requests_per_day": 14400,
+        "tokens_per_minute": 12000,
+        "tokens_per_day": 500000
       },
       "throttle_behavior": "wait_and_retry",
       "buffer_pct": 80,
@@ -959,7 +975,10 @@
       "status": "active",
       "rate_limits": {
         "requests_per_minute": 30,
-        "requests_per_hour": 14400
+        "requests_per_hour": 14400,
+        "requests_per_day": 14400,
+        "tokens_per_minute": 12000,
+        "tokens_per_day": 500000
       },
       "throttle_behavior": "wait_and_retry",
       "buffer_pct": 80,
@@ -998,7 +1017,10 @@
       "status": "active",
       "rate_limits": {
         "requests_per_minute": 30,
-        "requests_per_hour": 14400
+        "requests_per_hour": 14400,
+        "requests_per_day": 14400,
+        "tokens_per_minute": 12000,
+        "tokens_per_day": 500000
       },
       "throttle_behavior": "wait_and_retry",
       "buffer_pct": 80,
