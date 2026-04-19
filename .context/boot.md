@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-19T06:00:01Z | Commit: 6ce7d1ce | Branch: main
+# Generated: 2026-04-19T08:25:27Z | Commit: de6cc338 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -222,7 +222,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 6ce7d1ce
+- Commit: de6cc338
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -241,33 +241,33 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 5. Raw source = for implementation details only
 
 ## Current Status (from CURRENT_STATE.md)
-# VibePilot Current State - 2026-04-19
-## Status: Core fixes applied. Ready for hello world E2E test.
-### Fixes Applied This Session (Apr 19)
-1. **Cascade routing for executor+review** — both now use SelectRouting with 5-retry cascade (was legacy SelectDestination, single model)
-2. **Cooldown bypass removed** — all models in cooldown = wait, don't route anyway
-3. **Rate limits for all active models** — filled from provider docs (groq, nvidia, glm-5)
-4. **Test failure preserves work** — worktree+branch kept, executor reuses on retry
-5. **LLM Wiki PRD deleted** — was hallucinated without user consultation
-6. **Task branches/worktrees/tasks cleaned up**
----
-## What Actually Works (Proven)
-### Routing and Cascade
-- Groq API routing works (llama-3.3-70b-versatile via groq-api)
-- NVIDIA API routing works (nemotron-ultra-253b-v1 via nvidia-api)
-- GLM-5 via hermes CLI works (used for all earlier E2E runs)
-- Cascade retry works: planner/supervisor try models in order, accumulate failures, exclude on retry
-- Vault decryption works (Go encryption tool at /tmp/vault_encrypt2_bin)
-### Pipeline Stages
-- **Planner**: Parses prompts, produces plans, writes plan files. Proven with groq.
-- **Supervisor (plan review)**: Reviews plans, approves/rejects/escalates to council. Proven with groq.
-- **Council handler**: Routes members independently via cascade (fixed this session).
-- **Task creation**: Parses plan markdown, creates task rows in DB.
-- **Executor claim + worktree**: Claims available tasks, creates isolated worktrees.
-### What Was Proven Before Today
-- Full E2E pipeline with GLM-5 via hermes: task 93637196 completed full cycle
-- Pipeline: PRD push → webhook → planner → supervisor → tasks → executor → review → merge
----
-## What Is Broken
-### 1. No Dependency Resolution Logic
-- Tasks with dependencies are set to `pending` in validation.go (line 162)
+# VibePilot Current State
+# AUTO-UPDATED: 2026-04-19 08:24 UTC
+# RULE: Update this file after ANY change set. Resume from here, never from guesses.
+## Three Sources of Truth
+1. **GitHub (code):** https://github.com/VibesTribe/VibePilot — pushed=real
+2. **Supabase (data):** https://qtpdzsinvifkgpxyxlaz.supabase.co — in DB=real
+3. **Dashboard (live):** https://vibeflow-dashboard.vercel.app/ — rendering=working
+## Active Models (12) — All backed by verified API keys
+### Groq (3) — Free tier, rate limited
+- llama-3.3-70b-versatile (96K context)
+- llama-3.1-8b-instant (96K context)
+- qwen3-32b (96K context)
+### OpenRouter Free (5) — Account at -$0.57, free models work
+- qwen/qwen3.6-plus:free (197K context)
+- qwen/qwen3-coder:free (197K context)
+- nvidia/nemotron-3-super-120b:free (197K context)
+- google/gemma-4-31b-it:free (197K context)
+- z-ai/glm-4.5-air:free (98K context)
+### NVIDIA NIM (1) — Free tier
+- nvidia/llama-3.1-nemotron-ultra-253b-v1 (96K context)
+### Gemini API (2) — Key verified working (50 models available)
+- gemini-2.5-flash (750K context)
+- gemini-api (750K context)
+### Z.AI (1) — $30/mo subscription, ends May 1
+- glm-5 (152K context) — hermes interactive only
+## Paused Models (5)
+- deepseek-chat — out of credit (💰 Credit Needed on dashboard)
+- deepseek-reasoner — out of credit (💰 Credit Needed on dashboard)
+- gemini-2.0-flash — DEPRECATED by Google June 1 2026
+## Benched Models (14) — All visible as ⚠ Issue on dashboard
