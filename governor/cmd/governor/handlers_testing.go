@@ -162,18 +162,16 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			h.tryMergeModuleToTesting(ctx, taskID, sliceID, targetBranch)
 		}
 	} else {
-		// Tests failed → back to available with test output as feedback
+		// Tests failed → keep branch and worktree for iterative fixing
+		// The executor will resume on this same branch to fix the specific failures
 		log.Printf("[Testing] Task %s tests FAILED in %.1fs:\n%s", truncateID(taskID), duration, truncateOutput(testOutput))
 
-		if h.worktreeMgr != nil {
-			h.worktreeMgr.RemoveWorktree(ctx, taskID)
-		}
-		h.git.DeleteBranch(ctx, branchName)
 		h.database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":        taskID,
 			"p_new_status":     "available",
 			"p_failure_reason": "test_failed:\n" + testOutput,
 		})
+		log.Printf("[Testing] Task %s → available (branch %s preserved for fix)", truncateID(taskID), branchName)
 	}
 }
 
