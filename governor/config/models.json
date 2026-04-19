@@ -74,7 +74,7 @@
         "gemini-api"
       ],
       "api_key_ref": "GEMINI_API_KEY",
-      "status": "active",
+      "status": "paused",
       "rate_limits": {
         "requests_per_minute": 10,
         "requests_per_hour": 150,
@@ -1001,7 +1001,7 @@
       "name": "Qwen 3.5 Flash (Alibaba)",
       "vendor": "alibaba",
       "context_limit": 1000000,
-      "status": "active",
+      "status": "benched",
       "api_pricing": {
         "input_per_1m_usd": 0.05,
         "output_per_1m_usd": 0.15
@@ -1019,7 +1019,7 @@
       "name": "Qwen 3.5 Plus (Alibaba)",
       "vendor": "alibaba",
       "context_limit": 1000000,
-      "status": "active",
+      "status": "benched",
       "api_pricing": {
         "input_per_1m_usd": 0.2,
         "output_per_1m_usd": 0.6
@@ -1036,7 +1036,7 @@
       "name": "MiniMax M2.7 (MiniMax)",
       "vendor": "minimax",
       "context_limit": 205000,
-      "status": "active",
+      "status": "benched",
       "api_pricing": {
         "input_per_1m_usd": 0.26,
         "output_per_1m_usd": 1.2
