@@ -157,3 +157,34 @@ Total: 11 tasks
 - Go code updated to call it with wrong JSON tag expectations  
 - Both sides "correct" in isolation, mismatch at the interface
 - 14 previous migrations (112-125) were likely similar contract breaks
+
+
+## Session Update: 2026-04-19 07:39 UTC
+
+### Model/Platform Cleanup
+- DELETED: copilot (model + platform) — never had access, caused 16 duplicates on dashboard
+- PAUSED: deepseek-chat, deepseek-reasoner — credit_remaining_usd=0, triggers Credit Needed flag
+- BENCH: deepseek-web, gemini-web — browser automation not built
+- BENCH: kimi-k2-instruct — blacklisted (bans after 5hrs autonomous)
+- BENCH: opencode — CLI tool, not a model
+- BENCH: nemotron-ultra-253b — duplicate of nvidia/llama-3.1-nemotron-ultra-253b-v1
+- COURIER FIX: All Q (API) models set courier=false. Only qwen3.6-plus (web) = courier=true
+
+### Three Review Triggers (for human review button)
+1. Visual UI/UX approval (after changes)
+2. System researcher suggestions (after council review)
+3. API credit exhaustion (status=paused + status_reason contains "credit")
+
+### Status Filter Chain (verified working)
+- DB: status + status_reason → adapter: agentStatus → normalizeAgentStatus → filter button
+- credit_needed → "credit" → 💰 Credit Needed
+- cooldown (with expires_at) → "cooldown" → ⏳ Cooldown  
+- in_progress → "active" → ↻ Active
+- idle → "ready" → ✓ Ready
+
+### Current Active Models (16)
+Groq: llama-3.3-70b, llama-3.1-8b, qwen3-32b
+OpenRouter: qwen3.6-plus:free, qwen3-coder, nemotron-3-super-120b, gemma-4-31b, glm-4.5-air
+API: glm-5 (hermes), gemini-2.5-flash, gemini-api, qwen3.5-flash, qwen3.5-plus, minimax-m2.7
+Web: qwen3.6-plus (courier via chat.qwen.ai)
+NVIDIA: llama-3.1-nemotron-ultra-253b-v1
