@@ -739,66 +739,6 @@
       "notes": "NVIDIA NIM free tier: 40 RPM flat, 1000 credits total (token-based consumption), 4096 max output tokens. Credits are shared across all NIM models."
     },
     {
-      "id": "qwen/qwen3-32b",
-      "name": "Qwen3 32B (NVIDIA)",
-      "provider": "nvidia",
-      "access_type": "api",
-      "context_limit": 131072,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "api_key_ref": "NVIDIA_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 40,
-        "requests_per_day": 500,
-        "tokens_per_minute": 8000,
-        "tokens_per_day": 100000
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 1,
-      "api_pricing": {
-        "input_per_1m_usd": 0.59,
-        "output_per_1m_usd": 0.79
-      },
-      "recovery": {
-        "on_rate_limit": "wait_and_retry",
-        "cooldown_minutes": 2,
-        "timeout_seconds": 120
-      },
-      "learned": {},
-      "strengths": [
-        "code",
-        "reasoning",
-        "multilingual"
-      ],
-      "weaknesses": [],
-      "notes": "NVIDIA NIM free tier: 40 RPM flat, 1000 credits total (token-based consumption), 4096 max output tokens. Credits are shared across all NIM models.",
-      "rate_limits_by_connector": {
-        "groq-api": {
-          "requests_per_minute": 60,
-          "requests_per_day": 1000,
-          "tokens_per_minute": 6000,
-          "tokens_per_day": 500000
-        },
-        "nvidia-api": {
-          "requests_per_minute": 40,
-          "requests_per_day": 500,
-          "tokens_per_minute": 8000,
-          "tokens_per_day": 100000
-        },
-        "openrouter-api": {
-          "requests_per_minute": 20,
-          "requests_per_day": 200
-        }
-      }
-    },
-    {
       "id": "moonshotai/kimi-k2-instruct",
       "name": "Kimi K2 Instruct (NVIDIA)",
       "provider": "nvidia",
@@ -1041,82 +981,6 @@
       "access_type": "api"
     },
     {
-      "id": "qwen/qwen3.6-plus",
-      "name": "Qwen 3.6 Plus (OpenRouter)",
-      "vendor": "alibaba",
-      "context_limit": 1000000,
-      "status": "active",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0.33,
-        "output_per_1m_usd": 1.95
-      },
-      "strengths": [
-        "coding",
-        "reasoning",
-        "1M context",
-        "free on openrouter"
-      ],
-      "weaknesses": [
-        "20 RPM rate limit"
-      ],
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200,
-        "tokens_per_minute": null,
-        "tokens_per_day": null
-      },
-      "access_type": "api",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix."
-    },
-    {
-      "id": "qwen/qwen3-coder",
-      "name": "Qwen3 Coder 480B (OpenRouter)",
-      "vendor": "alibaba",
-      "context_limit": 262000,
-      "status": "active",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0.2,
-        "output_per_1m_usd": 0.6
-      },
-      "strengths": [
-        "coding",
-        "262K output",
-        "480B MoE",
-        "free on openrouter"
-      ],
-      "weaknesses": [
-        "20 RPM rate limit"
-      ],
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200,
-        "tokens_per_minute": null,
-        "tokens_per_day": null
-      },
-      "access_type": "api",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix."
-    },
-    {
       "id": "nvidia/nemotron-3-super-120b",
       "name": "Nemotron 3 Super 120B (OpenRouter)",
       "vendor": "nvidia",
@@ -1228,41 +1092,6 @@
       "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix."
     },
     {
-      "id": "meta-llama/llama-3.3-70b-instruct",
-      "name": "Llama 3.3 70B Instruct (OpenRouter)",
-      "vendor": "meta",
-      "context_limit": 131072,
-      "status": "active",
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
-      },
-      "strengths": [
-        "coding",
-        "general"
-      ],
-      "weaknesses": [
-        "free tier rate limits"
-      ],
-      "notes": "OpenRouter free tier. 20 RPM, 200 RPD. Use :free suffix."
-    },
-    {
       "id": "minimax/minimax-m2.5",
       "name": "MiniMax M2.5 (OpenRouter)",
       "vendor": "minimax",
@@ -1366,40 +1195,6 @@
         "5 RPM web limit"
       ],
       "notes": "Browser Use courier via gemini-web connector. 5 RPM, 100 RPD free tier."
-    },
-    {
-      "id": "copilot",
-      "name": "GitHub Copilot (Web)",
-      "vendor": "microsoft",
-      "context_limit": 128000,
-      "status": "active",
-      "access_type": "web",
-      "access_via": [
-        "copilot-web"
-      ],
-      "rate_limits": {
-        "requests_per_minute": 8,
-        "requests_per_day": 300
-      },
-      "buffer_pct": 80,
-      "spacing_min_seconds": 8,
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5
-      },
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "strengths": [
-        "coding",
-        "free tier"
-      ],
-      "weaknesses": [
-        "web-only",
-        "Microsoft account required"
-      ],
-      "notes": "Browser Use courier via copilot-web connector. Limited free coding assistance."
     },
     {
       "id": "deepseek-r1",
