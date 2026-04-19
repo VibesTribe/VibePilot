@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -74,7 +75,6 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 
 	taskID := getString(task, "id")
 	taskNumber := getString(task, "task_number")
-	taskType := getString(task, "type")
 	taskCategory := getString(task, "category")
 	sliceID := getStringOr(task, "slice_id", "default")
 
@@ -103,54 +103,65 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		log.Printf("[TaskAvailable] Task %s retry: appended revision notes (%d bytes)", truncateID(taskID), len(failureNotes))
 	}
 
-	// Route to model
-	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-		AgentID:  "task_runner",
-		TaskID:   taskID,
-		TaskType: taskCategory,
-	})
-	if err != nil || routingResult == nil {
-		routingResult, _ = h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-			AgentID:  "task_runner",
-			TaskID:   taskID,
-			TaskType: taskType,
+	// Route to model with cascade retry — same pattern as planner/supervisor
+	var routingResult *runtime.RoutingResult
+	var failedModels []string
+	var modelID, connectorID, routingFlag string
+	var connConfig *runtime.ConnectorConfig
+	maxRetries := 5
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		var routeErr error
+		if attempt > 0 {
+			log.Printf("[TaskAvailable] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
+		}
+		routingResult, routeErr = h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+			Role:          "task_runner",
+			TaskType:      taskCategory,
+			RoutingFlag:   "internal",
+			ExcludeModels: failedModels,
 		})
+		if routeErr != nil || routingResult == nil {
+			log.Printf("[TaskAvailable] No routing for task %s (attempt %d)", truncateID(taskID), attempt+1)
+			// All models in cooldown or unavailable — stop, don't retry
+			return
+		}
+
+		modelID = routingResult.ModelID
+		connectorID = routingResult.ConnectorID
+		connConfig = h.cfg.GetConnector(connectorID)
+		routingFlag = h.deriveRoutingFlag(connConfig)
+
+		// Check pool capacity
+		if !h.pool.HasCapacity(sliceID, connectorID) {
+			log.Printf("[TaskAvailable] Task %s pending - no capacity (slice=%s, dest=%s)", truncateID(taskID), sliceID, connectorID)
+			failedModels = append(failedModels, modelID)
+			continue
+		}
+
+		// Claim task
+		workerID := fmt.Sprintf("executor:%s:%d", modelID, time.Now().UnixNano())
+		claimed, err := h.database.RPC(ctx, "claim_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_worker_id":      workerID,
+			"p_model_id":       modelID,
+			"p_routing_flag":   routingFlag,
+			"p_routing_reason": fmt.Sprintf("Routed via %s (attempt %d)", connectorID, attempt+1),
+		})
+		if err != nil || !parseBool(claimed) {
+			log.Printf("[TaskAvailable] Task %s claim failed (model=%s): err=%v", truncateID(taskID), modelID, err)
+			failedModels = append(failedModels, modelID)
+			continue
+		}
+
+		// Successfully claimed
+		log.Printf("[TaskAvailable] Task %s claimed by %s via %s", truncateID(taskID), modelID, connectorID)
+		break
 	}
+
 	if routingResult == nil {
-		log.Printf("[TaskAvailable] No route for %s", truncateID(taskID))
+		log.Printf("[TaskAvailable] No routing available for task %s after %d attempts", truncateID(taskID), maxRetries)
 		return
 	}
-
-	modelID := routingResult.ModelID
-	connectorID := routingResult.DestinationID
-	connConfig := h.cfg.GetConnector(connectorID)
-	routingFlag := h.deriveRoutingFlag(connConfig)
-
-	// Check pool capacity BEFORE claiming
-	if !h.pool.HasCapacity(sliceID, connectorID) {
-		log.Printf("[TaskAvailable] Task %s pending - no capacity (slice=%s, dest=%s)", truncateID(taskID), sliceID, connectorID)
-		h.database.RPC(ctx, "transition_task", map[string]any{
-			"p_task_id":    taskID,
-			"p_new_status": "pending_resources",
-		})
-		return
-	}
-
-	// Atomically claim task
-	workerID := fmt.Sprintf("executor:%s:%d", modelID, time.Now().UnixNano())
-	claimed, err := h.database.RPC(ctx, "claim_task", map[string]any{
-		"p_task_id":        taskID,
-		"p_worker_id":      workerID,
-		"p_model_id":       modelID,
-		"p_routing_flag":   routingFlag,
-		"p_routing_reason": fmt.Sprintf("Routed via %s", connectorID),
-	})
-	if err != nil || !parseBool(claimed) {
-		log.Printf("[TaskAvailable] Task %s claim failed: err=%v, result=%s", truncateID(taskID), err, string(claimed))
-		return
-	}
-
-	log.Printf("[TaskAvailable] Task %s claimed by %s", truncateID(taskID), modelID)
 
 	// Setup branch
 	branchName := h.buildBranchName(sliceID, taskNumber, taskID)
@@ -163,18 +174,34 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 
 	if h.worktreeMgr != nil {
 		// Worktree mode: isolated checkout per task
-		if attempts > 0 {
-			h.worktreeMgr.RemoveWorktree(ctx, taskID)
-			h.git.DeleteBranch(ctx, branchName)
-		}
-		wtInfo, err := h.worktreeMgr.CreateWorktree(ctx, taskID, branchName)
-		if err != nil {
-			log.Printf("[TaskAvailable] Worktree create failed for %s: %v, falling back to branch-only", truncateID(taskID), err)
-			// Fallback: old behavior
-			h.git.CreateBranch(ctx, branchName)
+		existingPath := h.worktreeMgr.GetWorktreePath(taskID)
+		if attempts > 0 && existingPath != "" {
+			// Check if worktree directory still exists (preserved after test failure)
+			if _, err := os.Stat(existingPath); err == nil {
+				// Reuse existing worktree and branch — iterative fix, not fresh start
+				worktreePath = existingPath
+				log.Printf("[TaskAvailable] Task %s retry: reusing existing worktree at %s", truncateID(taskID), worktreePath)
+			} else {
+				// Worktree gone — create fresh
+				wtInfo, err := h.worktreeMgr.CreateWorktree(ctx, taskID, branchName)
+				if err != nil {
+					log.Printf("[TaskAvailable] Worktree create failed for %s: %v, falling back to branch-only", truncateID(taskID), err)
+					h.git.CreateBranch(ctx, branchName)
+				} else {
+					worktreePath = wtInfo.Path
+					log.Printf("[TaskAvailable] Worktree created for %s at %s", truncateID(taskID), worktreePath)
+				}
+			}
 		} else {
-			worktreePath = wtInfo.Path
-			log.Printf("[TaskAvailable] Worktree created for %s at %s", truncateID(taskID), worktreePath)
+			// First attempt: create fresh worktree
+			wtInfo, err := h.worktreeMgr.CreateWorktree(ctx, taskID, branchName)
+			if err != nil {
+				log.Printf("[TaskAvailable] Worktree create failed for %s: %v, falling back to branch-only", truncateID(taskID), err)
+				h.git.CreateBranch(ctx, branchName)
+			} else {
+				worktreePath = wtInfo.Path
+				log.Printf("[TaskAvailable] Worktree created for %s at %s", truncateID(taskID), worktreePath)
+			}
 		}
 	} else {
 		// Legacy mode: single directory, branch checkout
@@ -399,24 +426,41 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		return
 	}
 
-	// Route to supervisor
-	routingResult, _ := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-		AgentID:  "supervisor",
-		TaskID:   taskID,
-		TaskType: taskType,
-	})
+	// Route to supervisor with cascade retry — same pattern as planner/executor
+	var routingResult *runtime.RoutingResult
+	var failedModels []string
+	maxRetries := 5
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		var routeErr error
+		if attempt > 0 {
+			log.Printf("[TaskReview] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
+		}
+		routingResult, routeErr = h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+			Role:          "supervisor",
+			TaskType:      taskType,
+			RoutingFlag:   "internal",
+			ExcludeModels: failedModels,
+		})
+		if routeErr != nil || routingResult == nil {
+			log.Printf("[TaskReview] No supervisor for task %s (attempt %d)", truncateID(taskID), attempt+1)
+			// All models in cooldown — stop, don't retry
+			return
+		}
+		break // routing found
+	}
+
 	if routingResult == nil {
-		log.Printf("[TaskReview] No supervisor for %s", truncateID(taskID))
+		log.Printf("[TaskReview] No routing available for task %s after %d attempts", truncateID(taskID), maxRetries)
 		return
 	}
 
-	session, err := h.factory.CreateWithConnector(ctx, "supervisor", taskType, routingResult.DestinationID)
+	session, err := h.factory.CreateWithConnector(ctx, "supervisor", taskType, routingResult.ConnectorID)
 	if err != nil {
 		log.Printf("[TaskReview] Session error for %s: %v", truncateID(taskID), err)
 		return
 	}
 
-	err = h.pool.SubmitWithDestination(ctx, sliceID, routingResult.DestinationID, func() error {
+	err = h.pool.SubmitWithDestination(ctx, sliceID, routingResult.ConnectorID, func() error {
 		// Get context for review
 		taskPacket, _ := h.database.GetTaskPacket(ctx, taskID)
 		taskRunData, _ := h.database.REST(ctx, "GET", fmt.Sprintf("task_runs?task_id=eq.%s&order=created_at.desc&limit=1", taskID), nil)
@@ -458,7 +502,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			log.Printf("[TaskReview] Parse error for %s: %v, retrying...", truncateID(taskID), parseErr)
 
 			// Retry with explicit JSON enforcement
-			retrySession, retryErr := h.factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.DestinationID)
+			retrySession, retryErr := h.factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.ConnectorID)
 			if retryErr == nil {
 				retryResult, retryRunErr := retrySession.Run(ctx, map[string]any{
 					"previous_output": result.Output,

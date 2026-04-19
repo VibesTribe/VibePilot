@@ -268,21 +268,11 @@ func (r *Router) selectByCascade(ctx context.Context, connectors []ConnectorConf
 		}
 	}
 
-	// All models in cooldown or unavailable — return best fallback
+	// All models in cooldown — do NOT bypass cooldown. Return nil so caller waits.
+	// Cooldown exists to protect provider keys. Routing during cooldown defeats the purpose.
 	if shortestCooldownModel != "" {
-		connID := r.findConnectorForModel(shortestCooldownModel)
-		if connID != "" {
-			log.Printf("[Router] All models in cooldown, shortest wait: model=%s (%ds)", shortestCooldownModel, shortestCooldownSecs)
-			return &RoutingResult{
-				ConnectorID: connID,
-				ModelID:     shortestCooldownModel,
-				RoutingFlag: "internal",
-				Category:    "internal",
-			}, nil
-		}
+		log.Printf("[Router] All models in cooldown. Shortest wait: model=%s (%ds). Waiting.", shortestCooldownModel, shortestCooldownSecs)
 	}
-
-	log.Printf("[Router] No available models in cascade")
 	return nil, nil
 }
 
