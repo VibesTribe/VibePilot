@@ -861,6 +861,166 @@
       ],
       "weaknesses": [],
       "notes": "Moonshot Kimi K2 via NVIDIA API free tier"
+    },
+    {
+      "id": "meta-llama/llama-4-scout-17b-16e-instruct",
+      "name": "Llama 4 Scout 17B (Groq)",
+      "provider": "groq",
+      "access_type": "free_tier",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "groq-api"
+      ],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_hour": 14400
+      },
+      "throttle_behavior": "wait_and_retry",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 2,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 2,
+        "timeout_seconds": 120
+      },
+      "learned": {},
+      "strengths": [
+        "code",
+        "reasoning",
+        "multilingual"
+      ],
+      "weaknesses": [],
+      "notes": "Llama 4 Scout MoE via Groq free tier"
+    },
+    {
+      "id": "openai/gpt-oss-120b",
+      "name": "GPT-OSS 120B (Groq)",
+      "provider": "groq",
+      "access_type": "free_tier",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "groq-api"
+      ],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_hour": 14400
+      },
+      "throttle_behavior": "wait_and_retry",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 2,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 2,
+        "timeout_seconds": 120
+      },
+      "learned": {},
+      "strengths": [
+        "reasoning",
+        "code",
+        "instruction_following"
+      ],
+      "weaknesses": [],
+      "notes": "OpenAI GPT-OSS 120B via Groq free tier"
+    },
+    {
+      "id": "groq/compound",
+      "name": "Groq Compound (Groq)",
+      "provider": "groq",
+      "access_type": "free_tier",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "groq-api"
+      ],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_hour": 14400
+      },
+      "throttle_behavior": "wait_and_retry",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 2,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 2,
+        "timeout_seconds": 120
+      },
+      "learned": {},
+      "strengths": [
+        "reasoning",
+        "agentic"
+      ],
+      "weaknesses": [],
+      "notes": "Groq Compound reasoning model via Groq free tier"
+    },
+    {
+      "id": "groq/compound-mini",
+      "name": "Groq Compound Mini (Groq)",
+      "provider": "groq",
+      "access_type": "free_tier",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "groq-api"
+      ],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_hour": 14400
+      },
+      "throttle_behavior": "wait_and_retry",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 2,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 2,
+        "timeout_seconds": 120
+      },
+      "learned": {},
+      "strengths": [
+        "fast",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "smaller_capacity"
+      ],
+      "notes": "Groq Compound Mini via Groq free tier, faster but smaller"
     }
   ],
   "defaults": {
