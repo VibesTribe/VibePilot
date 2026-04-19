@@ -759,8 +759,8 @@
       "api_key_ref": "NVIDIA_API_KEY",
       "status": "active",
       "rate_limits": {
-        "requests_per_minute": 10,
-        "requests_per_hour": 500,
+        "requests_per_minute": 40,
+        "requests_per_hour": 2400,
         "requests_per_day": 5000,
         "tokens_per_minute": 8000,
         "tokens_per_day": 100000
@@ -802,8 +802,8 @@
       "api_key_ref": "NVIDIA_API_KEY",
       "status": "active",
       "rate_limits": {
-        "requests_per_minute": 10,
-        "requests_per_hour": 500,
+        "requests_per_minute": 40,
+        "requests_per_hour": 2400,
         "requests_per_day": 5000,
         "tokens_per_minute": 8000,
         "tokens_per_day": 100000
@@ -845,8 +845,8 @@
       "api_key_ref": "NVIDIA_API_KEY",
       "status": "active",
       "rate_limits": {
-        "requests_per_minute": 10,
-        "requests_per_hour": 500,
+        "requests_per_minute": 40,
+        "requests_per_hour": 2400,
         "requests_per_day": 5000,
         "tokens_per_minute": 8000,
         "tokens_per_day": 100000

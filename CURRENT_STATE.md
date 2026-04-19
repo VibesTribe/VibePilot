@@ -123,23 +123,45 @@ The PRD at `docs/prd/llm-wiki.md` was committed by "VibePilot Server" (governor/
 
 ## Rate Limit Reference (What We Know)
 
-### Groq Free Tier (from docs)
-- llama-3.3-70b-versatile: 30 RPM, 1000 RPD, 12K TPM, 100K TPD
-- llama-4-scout: 30 RPM, 14400 RPH (no daily/token limits set yet)
-- gpt-oss-120b: 30 RPM, 14400 RPH
-- compound/compound-mini: 30 RPM, 14400 RPH
-- **Policy: 80% buffer = stop at 24 RPM, 800 RPD, etc.**
+### NVIDIA Free Tier (from Gemini research, Apr 2026)
+- 40 RPM default (individual developer accounts)
+- 1,000 free credits (token-based consumption, ~$1/credit)
+- 128K context (most models), 262K for specialty
+- Max output: 4,096 tokens per response
+- Hard stop at 40 RPM — no soft landing
+- **80% safety: 32 RPM, 800 credits**
 
-### NVIDIA Free Tier
-- nemotron-ultra-253b: 10 RPM, 500 RPD, 8K TPM, 100K TPD
-- Other nvidia models: NO limits set (dangerous)
+### Groq Free Tier (from Gemini research, Apr 2026)
+- Per-model buckets — rotating models gives fresh RPM/TPM buckets
+- TPM is often the real bottleneck, not RPM
+- All keys under one account share organization-wide limits
+- Cached tokens do NOT count toward TPM/TPD limits
+- Response headers: `x-ratelimit-remaining-tokens`, `x-ratelimit-remaining-requests`
+- **80% safety: 70B models 24 RPM/9.6K TPM, 8B models 24 RPM/4.8K TPM**
+
+| Model             | RPM | RPD   | TPM   | TPD   | Context |
+|-------------------|-----|-------|-------|-------|---------|
+| llama-3.3-70b     | 30  | 1,000 | 12K   | 100K  | 128K    |
+| llama-3.1-8b      | 30  | 14,400| 6K    | 500K  | 128K    |
+| qwen-3-32b        | 60  | 1,000 | 6K    | 500K  | 128K    |
+| llama-4-scout     | 30  | 14,400| 12K   | 500K  | 128K    |
+| gpt-oss-120b      | 30  | 14,400| 12K   | 500K  | 128K    |
+| compound/mini     | 30  | 14,400| 12K   | 500K  | 128K    |
+
+### Gemini Free Tier (from Gemini research, Apr 2026)
+- Privacy trade-off: free tier data used for training
+- Grounding with Google Search: 500 RPD free
+
+| Model             | RPM | RPD   | TPM     | Context |
+|-------------------|-----|-------|---------|---------|
+| Gemini 2.5 Pro    | 5   | 100   | 250K    | 1M      |
+| Gemini 2.5 Flash  | 10  | 250   | 250K    | 1M      |
+| Gemini 2.5 Flash-Lite | 15 | 1,000 | 250K | 1M      |
 
 ### GLM-5 (Z.AI Pro subscription)
 - No published limits. Subscription ends May 1.
 - Route only as last resort, one task at a time
-
-### Gemini (if key valid)
-- gemini-2.5-flash: 10 RPM, 150 RPH, 250 RPD, 250K TPM, 1M TPD
+- 3 RPM, 30 RPH, 200 RPD (conservative estimates)
 
 ---
 
