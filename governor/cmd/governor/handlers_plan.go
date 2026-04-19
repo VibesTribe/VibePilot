@@ -437,9 +437,31 @@ func handlePlanReview(
 		return
 	}
 
+	planID, _ := plan["id"].(string)
 	planPath, _ := plan["plan_path"].(string)
+	if planPath == "" && planID != "" {
+		// Realtime event may not include plan_path (only changed columns).
+		// Fetch full plan from DB.
+		raw, err := database.Query(ctx, "plans", map[string]any{"id": planID})
+		if err == nil && raw != nil {
+			var plans []map[string]any
+			if json.Unmarshal(raw, &plans) == nil && len(plans) > 0 {
+				fullPlan := plans[0]
+				if fp, ok := fullPlan["plan_path"].(string); ok {
+					planPath = fp
+					plan["plan_path"] = fp
+				}
+				// Merge other missing fields
+				for k, v := range fullPlan {
+					if _, exists := plan[k]; !exists {
+						plan[k] = v
+					}
+				}
+			}
+		}
+	}
 	if planPath == "" {
-		log.Printf("[EventPlanReview] Plan has no plan_path, skipping")
+		log.Printf("[EventPlanReview] Plan %s has no plan_path, skipping", truncateID(planID))
 		return
 	}
 
