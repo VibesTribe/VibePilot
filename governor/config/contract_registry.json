@@ -611,10 +611,11 @@
     },
     "dashboard": {
       "role": "RENDERING truth \u2014 what the user actually sees",
-      "url": "Vercel deployment of vibeflow",
+      "url": "https://vibeflow-dashboard.vercel.app/",
       "what_lives_here": "apps/dashboard/ \u2014 React components, hooks, adapters",
       "repo": "https://github.com/VibesTribe/vibeflow",
-      "rule": "If the dashboard can't render it, it doesn't matter. select(*) means ANY dropped column = break."
+      "rule": "If the dashboard can't render it, it doesn't matter. select(*) means ANY dropped column = break.",
+      "note": "LIVE data from Supabase. vibestribe.github.io/vibeflow/ is OLD mock prototype."
     }
   }
 }
