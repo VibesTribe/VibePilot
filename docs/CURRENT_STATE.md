@@ -8,7 +8,7 @@
 - **Dashboard**: READ-ONLY React frontend, Supabase Realtime subscriptions (NEVER polls)
 - **Webhooks**: `webhooks.vibestribe.rocks` (Cloudflare Tunnel) → Supabase
 
-## Model Fleet (50 models)
+## Model Fleet (55 models)
 
 | Provider | Active | Benched | Connector | Free Tier |
 |----------|--------|---------|-----------|-----------|
@@ -16,8 +16,8 @@
 | OpenRouter | 19 | 0 | openrouter-api | Yes ($0 credit, max spend limit set) |
 | Google Gemini | 4 | 1 | gemini-api-courier/researcher/visual/general | Yes (4 projects, 60 RPM combined) |
 | NVIDIA NIM | 3 | 0 | nvidia-api | Yes |
-| Web (browser) | 9 | 0 | Various web connectors | N/A |
-| **Total** | **42** | **8** | | |
+| Web (browser) | 14 | 0 | Various web connectors | Varies |
+| **Total** | **47** | **8** | | |
 
 ### Benched Models
 | Model | Status | Reason |
@@ -42,7 +42,7 @@
 
 **Combined free capacity**: 60 RPM / ~5500 RPD, $0 cost.
 
-## Connectors (19 total, 15 active)
+## Connectors (24 total, 20 active)
 
 ### API Connectors (7 active)
 | ID | Provider | Status | Notes |
@@ -55,7 +55,7 @@
 | gemini-api-visual | Google | active | Visual/Brain project |
 | gemini-api-general | Google | active | General/fallback project |
 
-### Web Connectors (8 active)
+### Web Connectors (13 active)
 Browser-use connectors for courier agents. All verified working April 20, 2026 via live "hello" test.
 
 | Connector | URL | Model Seen | Notes |
@@ -66,16 +66,18 @@ Browser-use connectors for courier agents. All verified working April 20, 2026 v
 | deepseek-web | chat.deepseek.com | DeepSeek Instant | Google SSO |
 | qwen-web | chat.qwen.ai | Qwen3.6-Plus | Google SSO |
 | mistral-web | chat.mistral.ai/chat | Mistral Large | Google SSO |
-| notegpt-web | notegpt.io/chat-deepseek | DeepSeek V3 | No auth needed, 3 free/day |
+| notegpt-web | notegpt.io/chat-deepseek | DeepSeek V3 | No auth, 3 free/day |
+| kimi-web | kimi.com | K2.6 Instant | Google SSO, agent swarm |
+| huggingchat-web | huggingface.co/chat | Kimi-K2-Instruct-0905 | No auth, unlimited, MCP |
+| aistudio-web | aistudio.google.com | Gemini 3.1 Pro Preview | Google SSO, native tools |
+| poe-web | poe.com | Multi-model aggregator | Google SSO, 3K pts/day |
+| chatbox-web | app.chatbox.ai | GPT-4o mini | No auth, free |
 
-### Additional Verified Platforms (not yet in connectors.json)
-These work but need connector entries added before courier can use them:
-
-| Platform | URL | Model Seen | Notes |
-|----------|-----|------------|-------|
-| Kimi | kimi.com | K2.6 Instant | Google SSO, agent swarm feature |
-| HuggingChat | huggingface.co/chat | Kimi-K2-Instruct-0905 | No auth, unlimited, multi-model |
-| Google AI Studio | aistudio.google.com | Gemini 3.1 Pro Preview | Best for apps/design, free |
+### Platform with Native Tool Use
+**Google AI Studio** (aistudio-web) has built-in tools that may work without Playwright/browser-use:
+- Function calling, Google Search grounding, Google Maps grounding
+- URL context, code execution, structured outputs
+- Potential for direct API-like interaction via web interface
 
 ### Inactive (4)
 opencode, claude-code, kimi, deepseek-api

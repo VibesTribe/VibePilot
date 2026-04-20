@@ -339,11 +339,11 @@
       "name": "Qwen Web",
       "type": "web",
       "status": "active",
-      "url": "https://qwen.ai",
+      "url": "https://chat.qwen.ai",
       "provider": "alibaba",
       "requires_auth": "none",
       "models_available": [
-        "qwen-3",
+        "qwen-3.6-plus",
         "qwen-2.5"
       ],
       "provides_tools": [],
@@ -391,6 +391,103 @@
         "tokens_per_day": 2000000
       },
       "notes": "Courier destination. Free DeepSeek R1 & V3. No login required. Good backup."
+    },
+    {
+      "id": "kimi-web",
+      "name": "Kimi AI",
+      "type": "web",
+      "status": "active",
+      "url": "https://www.kimi.com",
+      "provider": "moonshot",
+      "requires_auth": "browser_login",
+      "models_available": [
+        "kimi-k2.6-instant"
+      ],
+      "provides_tools": [],
+      "limit_schema": {
+        "messages_per_day": 50,
+        "tokens_per_day": null
+      },
+      "notes": "Courier destination. Google SSO. K2.6 Instant model. Agent swarm feature available."
+    },
+    {
+      "id": "huggingchat-web",
+      "name": "HuggingChat",
+      "type": "web",
+      "status": "active",
+      "url": "https://huggingface.co/chat/",
+      "provider": "huggingface",
+      "requires_auth": "none",
+      "models_available": [
+        "kimi-k2-instruct-0905-hf"
+      ],
+      "provides_tools": [
+        "mcp"
+      ],
+      "limit_schema": {
+        "messages_per_day": null,
+        "tokens_per_day": null
+      },
+      "notes": "Courier destination. Unlimited free. Multi-model switcher. MCP servers. Currently defaulting to Kimi-K2-Instruct-0905 via novita."
+    },
+    {
+      "id": "aistudio-web",
+      "name": "Google AI Studio",
+      "type": "web",
+      "status": "active",
+      "url": "https://aistudio.google.com/prompts/new_chat",
+      "provider": "google",
+      "requires_auth": "browser_login",
+      "models_available": [
+        "gemini-3.1-pro-preview-web"
+      ],
+      "provides_tools": [
+        "function_calling",
+        "grounding_search",
+        "grounding_maps",
+        "url_context",
+        "code_execution"
+      ],
+      "limit_schema": {
+        "requests_per_day": 1500,
+        "tokens_per_day": null
+      },
+      "notes": "Courier destination. Best for apps/design. Has native tools: function calling, Google Search grounding, Maps, URL context. Google SSO. Free."
+    },
+    {
+      "id": "poe-web",
+      "name": "Poe",
+      "type": "web",
+      "status": "active",
+      "url": "https://poe.com/",
+      "provider": "poe",
+      "requires_auth": "browser_login",
+      "models_available": [
+        "poe-mix"
+      ],
+      "provides_tools": [],
+      "limit_schema": {
+        "compute_points_per_day": 3000
+      },
+      "notes": "Courier destination. Multi-model aggregator. 3000 compute points/day free. Models: DeepSeek-R1, Gemma-4-31B, Gemini-3.1-Flash-Lite and more. Google SSO."
+    },
+    {
+      "id": "chatbox-web",
+      "name": "Chatbox AI",
+      "type": "web",
+      "status": "active",
+      "url": "https://app.chatbox.ai/",
+      "provider": "chatbox",
+      "requires_auth": "none",
+      "models_available": [
+        "gpt-4o-mini-chatbox"
+      ],
+      "provides_tools": [],
+      "limit_schema": {
+        "messages_per_day": null,
+        "tokens_per_day": null
+      },
+      "notes": "Courier destination. Provides GPT-4o mini for free. No auth needed. URL redirects from chatboxapp.ai to app.chatbox.ai."
     }
   ]
 }
