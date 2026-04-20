@@ -56,7 +56,26 @@
 | gemini-api-general | Google | active | General/fallback project |
 
 ### Web Connectors (8 active)
-Browser-use connectors: chatgpt-web, claude-web, gemini-web, deepseek-web, qwen-web, mistral-web, notegpt-web, hermes
+Browser-use connectors for courier agents. All verified working April 20, 2026 via live "hello" test.
+
+| Connector | URL | Model Seen | Notes |
+|-----------|-----|------------|-------|
+| chatgpt-web | chatgpt.com | GPT free tier | Google SSO |
+| claude-web | claude.ai/new | Sonnet 4.6 | Google SSO, free plan |
+| gemini-web | gemini.google.com/app | Gemini 2.5 Pro | Google SSO |
+| deepseek-web | chat.deepseek.com | DeepSeek Instant | Google SSO |
+| qwen-web | chat.qwen.ai | Qwen3.6-Plus | Google SSO |
+| mistral-web | chat.mistral.ai/chat | Mistral Large | Google SSO |
+| notegpt-web | notegpt.io/chat-deepseek | DeepSeek V3 | No auth needed, 3 free/day |
+
+### Additional Verified Platforms (not yet in connectors.json)
+These work but need connector entries added before courier can use them:
+
+| Platform | URL | Model Seen | Notes |
+|----------|-----|------------|-------|
+| Kimi | kimi.com | K2.6 Instant | Google SSO, agent swarm feature |
+| HuggingChat | huggingface.co/chat | Kimi-K2-Instruct-0905 | No auth, unlimited, multi-model |
+| Google AI Studio | aistudio.google.com | Gemini 3.1 Pro Preview | Best for apps/design, free |
 
 ### Inactive (4)
 opencode, claude-code, kimi, deepseek-api
