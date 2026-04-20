@@ -8,7 +8,7 @@
 - **Dashboard**: READ-ONLY React frontend, Supabase Realtime subscriptions (NEVER polls)
 - **Webhooks**: `webhooks.vibestribe.rocks` (Cloudflare Tunnel) → Supabase
 
-## Model Fleet (55 models)
+## Model Fleet (57 models)
 
 | Provider | Active | Benched | Connector | Free Tier |
 |----------|--------|---------|-----------|-----------|
@@ -16,8 +16,8 @@
 | OpenRouter | 19 | 0 | openrouter-api | Yes ($0 credit, max spend limit set) |
 | Google Gemini | 4 | 1 | gemini-api-courier/researcher/visual/general | Yes (4 projects, 60 RPM combined) |
 | NVIDIA NIM | 3 | 0 | nvidia-api | Yes |
-| Web (browser) | 14 | 0 | Various web connectors | Varies |
-| **Total** | **47** | **8** | | |
+| Web (browser) | 16 | 0 | Various web connectors | Varies |
+| **Total** | **49** | **8** | | |
 
 ### Benched Models
 | Model | Status | Reason |
@@ -42,7 +42,7 @@
 
 **Combined free capacity**: 60 RPM / ~5500 RPD, $0 cost.
 
-## Connectors (24 total, 20 active)
+## Connectors (26 total, 22 active)
 
 ### API Connectors (7 active)
 | ID | Provider | Status | Notes |
@@ -55,29 +55,32 @@
 | gemini-api-visual | Google | active | Visual/Brain project |
 | gemini-api-general | Google | active | General/fallback project |
 
-### Web Connectors (13 active)
+### Web Connectors (15 active)
 Browser-use connectors for courier agents. All verified working April 20, 2026 via live "hello" test.
 
-| Connector | URL | Model Seen | Notes |
-|-----------|-----|------------|-------|
-| chatgpt-web | chatgpt.com | GPT free tier | Google SSO |
-| claude-web | claude.ai/new | Sonnet 4.6 | Google SSO, free plan |
-| gemini-web | gemini.google.com/app | Gemini 2.5 Pro | Google SSO |
-| deepseek-web | chat.deepseek.com | DeepSeek Instant | Google SSO |
-| qwen-web | chat.qwen.ai | Qwen3.6-Plus | Google SSO |
-| mistral-web | chat.mistral.ai/chat | Mistral Large | Google SSO |
-| notegpt-web | notegpt.io/chat-deepseek | DeepSeek V3 | No auth, 3 free/day |
-| kimi-web | kimi.com | K2.6 Instant | Google SSO, agent swarm |
-| huggingchat-web | huggingface.co/chat | Kimi-K2-Instruct-0905 | No auth, unlimited, MCP |
-| aistudio-web | aistudio.google.com | Gemini 3.1 Pro Preview | Google SSO, native tools |
-| poe-web | poe.com | Multi-model aggregator | Google SSO, 3K pts/day |
-| chatbox-web | app.chatbox.ai | GPT-4o mini | No auth, free |
+| Connector | URL | Model Seen | Best For | Notes |
+|-----------|-----|------------|----------|-------|
+| chatgpt-web | chatgpt.com | GPT free tier | General | Google SSO |
+| claude-web | claude.ai/new | Sonnet 4.6 | Coding, reasoning | Google SSO |
+| gemini-web | gemini.google.com/app | Gemini 2.5 Pro | General, vision | Google SSO |
+| deepseek-web | chat.deepseek.com | DeepSeek Instant | Coding, R1 reasoning | Google SSO |
+| qwen-web | chat.qwen.ai | Qwen3.6-Plus | Coding, multilingual | Google SSO |
+| mistral-web | chat.mistral.ai/chat | Mistral Large | Vision (Pixtral), coding | Google SSO |
+| notegpt-web | notegpt.io/chat-deepseek | DeepSeek V3 | Quick queries | No auth, 3 free/day |
+| kimi-web | kimi.com | K2.6 Instant | Agent tasks | Google SSO, agent swarm |
+| huggingchat-web | huggingface.co/chat | Kimi-K2-Instruct | Open source, unlimited | No auth, MCP |
+| aistudio-web | aistudio.google.com | Gemini 3.1 Pro Preview | Apps, design, tools | Google SSO, native tools |
+| poe-web | poe.com | Multi-model | Prototyping, comparison | Google SSO, 3K pts/day |
+| chatbox-web | app.chatbox.ai | GPT-4o mini | Quick GPT access | No auth, free |
+| aizolo-web | chat.aizolo.com/new | Multi-model | Research, coding, fallback | Free tier limited, $9.90/mo 3M tokens |
+| perplexity-web | perplexity.ai | Search + citations | **System Researcher** | Google SSO, 5 Pro/day, unlimited basic |
 
-### Platform with Native Tool Use
+### Platform with Native Tool Use (Lighter Path)
 **Google AI Studio** (aistudio-web) has built-in tools that may work without Playwright/browser-use:
 - Function calling, Google Search grounding, Google Maps grounding
 - URL context, code execution, structured outputs
 - Potential for direct API-like interaction via web interface
+- Best candidate for lighter courier path -- no browser automation needed for tool tasks
 
 ### Inactive (4)
 opencode, claude-code, kimi, deepseek-api
