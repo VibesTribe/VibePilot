@@ -29,6 +29,12 @@ type TaskHandler struct {
 	usageTracker  *runtime.UsageTracker
 	worktreeMgr   *gitree.WorktreeManager
 	courierRunner *connectors.CourierRunner
+	vault         vaultProvider
+}
+
+// vaultProvider abstracts secret access for the task handler.
+type vaultProvider interface {
+	GetSecret(ctx context.Context, keyName string) (string, error)
 }
 
 func NewTaskHandler(
@@ -43,6 +49,7 @@ func NewTaskHandler(
 	usageTracker *runtime.UsageTracker,
 	worktreeMgr *gitree.WorktreeManager,
 	courierRunner *connectors.CourierRunner,
+	v vaultProvider,
 ) *TaskHandler {
 	return &TaskHandler{
 		database:      database,
@@ -56,6 +63,7 @@ func NewTaskHandler(
 		usageTracker:  usageTracker,
 		worktreeMgr:   worktreeMgr,
 		courierRunner: courierRunner,
+		vault:         v,
 	}
 }
 
@@ -467,14 +475,29 @@ func (h *TaskHandler) executeCourierTask(
 	taskID, taskNumber, modelID, connectorID, branchName, taskCategory, platformID, platformURL string,
 	runStart time.Time,
 ) error {
-	// Build the courier task packet with all required fields
+	// Resolve the LLM API key for browser-use from the vault
+	// The courier uses the same connector's key to drive browser automation
+	llmAPIKey := ""
+	llmKeyRef := h.deriveLLMKeyRef(connectorID)
+	if h.vault != nil && llmKeyRef != "" {
+		if key, err := h.vault.GetSecret(ctx, llmKeyRef); err == nil {
+			llmAPIKey = key
+		} else {
+			log.Printf("[CourierTask] Warning: could not resolve LLM key %s: %v", llmKeyRef, err)
+		}
+	}
+
+	// Build the courier task packet with ALL fields the GitHub Action needs
 	packet := map[string]any{
-		"task_id":             taskID,
-		"task_prompt":         taskPacket.Prompt,
-		"branch_name":         branchName,
-		"llm_provider":        h.deriveLLMProvider(connectorID),
-		"llm_model":           modelID,
-		"web_platform_url":    platformURL,
+		"task_id":          taskID,
+		"task_prompt":      taskPacket.Prompt,
+		"branch_name":      branchName,
+		"llm_provider":     h.deriveLLMProvider(connectorID),
+		"llm_model":        modelID,
+		"llm_api_key":      llmAPIKey,
+		"web_platform_url": platformURL,
+		"supabase_url":     h.cfg.GetDatabaseURL(),
+		"supabase_key":     h.cfg.GetDatabaseKey(),
 	}
 
 	packetJSON, err := json.Marshal(packet)
@@ -505,22 +528,25 @@ func (h *TaskHandler) executeCourierTask(
 	}
 	h.commitOutput(ctx, branchName, nil, output, summary, modelID, taskID, duration.Seconds())
 
-	// Record task run via RPC
+	// Record task run via RPC (params match create_task_run signature exactly)
 	totalTokens := tokensIn + tokensOut
 	h.database.RPC(ctx, "create_task_run", map[string]any{
 		"p_task_id":      taskID,
 		"p_model_id":     modelID,
-		"p_status":       "completed",
+		"p_status":       "success",
 		"p_tokens_in":    tokensIn,
 		"p_tokens_out":   tokensOut,
-		"p_routing_flag": "web",
+		"p_tokens_used":  totalTokens,
+		"p_courier":      "github-actions",
+		"p_platform":     platformID,
 		"p_started_at":   runStart.UTC().Format(time.RFC3339),
 		"p_completed_at": time.Now().UTC().Format(time.RFC3339),
 	})
 
+	// Transition task to review (params match transition_task signature)
 	h.database.RPC(ctx, "transition_task", map[string]any{
-		"p_task_id": taskID,
-		"p_status":  "review",
+		"p_task_id":    taskID,
+		"p_new_status": "review",
 		"p_result": map[string]any{
 			"output":           output,
 			"model_id":         modelID,
@@ -557,6 +583,22 @@ func (h *TaskHandler) deriveLLMProvider(connectorID string) string {
 		return "deepseek"
 	default:
 		return connectorID
+	}
+}
+
+// deriveLLMKeyRef maps a connector ID to the vault key name for its API key.
+func (h *TaskHandler) deriveLLMKeyRef(connectorID string) string {
+	switch {
+	case strings.Contains(connectorID, "groq"):
+		return "GROQ_API_KEY"
+	case strings.Contains(connectorID, "nvidia"):
+		return "NVIDIA_API_KEY"
+	case strings.Contains(connectorID, "gemini"):
+		return "GEMINI_API_KEY"
+	case strings.Contains(connectorID, "openrouter"):
+		return "OPENROUTER_API_KEY"
+	default:
+		return ""
 	}
 }
 
@@ -1069,8 +1111,9 @@ func setupTaskHandlers(
 	usageTracker *runtime.UsageTracker,
 	worktreeMgr *gitree.WorktreeManager,
 	courierRunner *connectors.CourierRunner,
+	v vaultProvider,
 ) {
-	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg, usageTracker, worktreeMgr, courierRunner)
+	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg, usageTracker, worktreeMgr, courierRunner, v)
 	handler.Register(router)
 }
 
