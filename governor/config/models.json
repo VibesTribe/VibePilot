@@ -441,10 +441,9 @@
       "status": "benched",
       "rate_limits": {
         "requests_per_minute": null,
-        "requests_per_hour": null,
-        "requests_per_day": null,
-        "tokens_per_day": null,
-        "messages_per_hour": "varies"
+        "messages_per_day": 20,
+        "limit_type": "dynamic_context_dependent",
+        "limit_source": "Anthropic: ~10-20/day rolling. Shorter conversations = more."
       },
       "throttle_behavior": "queue",
       "buffer_pct": 80,
@@ -1363,7 +1362,10 @@
       ],
       "rate_limits": {
         "requests_per_minute": 5,
-        "requests_per_day": 100
+        "requests_per_day": 25,
+        "tokens_per_minute": 250000,
+        "limit_type": "verified_api_docs",
+        "limit_source": "Google AI docs: 2.5 Pro Preview 5 RPM/250K TPM/25 RPD"
       },
       "buffer_pct": 80,
       "spacing_min_seconds": 12,
@@ -2434,10 +2436,9 @@
       "status": "active",
       "rate_limits": {
         "requests_per_minute": null,
-        "requests_per_hour": null,
         "requests_per_day": null,
-        "tokens_per_day": null,
-        "messages_per_3_hours": null
+        "limit_type": "unlimited_mostly",
+        "limit_source": "HuggingFace: community-driven, mostly unlimited"
       },
       "throttle_behavior": "soft_throttle",
       "buffer_pct": 80,
@@ -2612,10 +2613,9 @@
       "status": "active",
       "rate_limits": {
         "requests_per_minute": null,
-        "requests_per_hour": null,
         "requests_per_day": null,
-        "tokens_per_day": null,
-        "messages_per_3_hours": null
+        "limit_type": "unknown",
+        "limit_source": "No published limits. Wrapper service."
       },
       "throttle_behavior": "soft_throttle",
       "buffer_pct": 80,
