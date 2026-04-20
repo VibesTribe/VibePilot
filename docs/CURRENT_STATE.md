@@ -134,7 +134,6 @@ No E2E test has been executed. Potential gaps may exist in runtime integration.
 |-----|---------|
 | VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md | Essential context for any agent |
 | docs/CURRENT_STATE.md | This file |
-| docs/plans/courier-implementation-plan.md | 10-step courier plan |
 | docs/plans/strategic-optimization-plan.md | Full strategic plan |
 | governor/config/models.json | 50 models, 42 active |
 | governor/config/connectors.json | 19 connectors, 15 active |
