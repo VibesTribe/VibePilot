@@ -591,10 +591,18 @@ func (h *TaskHandler) deriveLLMKeyRef(connectorID string) string {
 	switch {
 	case strings.Contains(connectorID, "groq"):
 		return "GROQ_API_KEY"
-	case strings.Contains(connectorID, "nvidia"):
+	case strings.Contains(connectorID, "nvidia-api"):
 		return "NVIDIA_API_KEY"
+	case strings.Contains(connectorID, "gemini-api-courier"):
+		return "GEMINI_COURIER_KEY"
+	case strings.Contains(connectorID, "gemini-api-researcher"):
+		return "GEMINI_RESEARCHER_KEY"
+	case strings.Contains(connectorID, "gemini-api-visual"):
+		return "GEMINI_VISUAL_TESTER_KEY"
+	case strings.Contains(connectorID, "gemini-api-general"):
+		return "GEMINI_GENERAL_KEY"
 	case strings.Contains(connectorID, "gemini"):
-		return "GEMINI_API_KEY"
+		return "GEMINI_GENERAL_KEY"
 	case strings.Contains(connectorID, "openrouter"):
 		return "OPENROUTER_API_KEY"
 	default:

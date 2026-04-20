@@ -104,19 +104,80 @@
       "notes": "Web search enabled"
     },
     {
-      "id": "gemini-api",
-      "name": "Gemini API",
+      "id": "gemini-api-courier",
+      "name": "Gemini API (Courier Project)",
       "type": "api",
       "status": "active",
       "provider": "google",
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
-      "api_key_ref": "GEMINI_API_KEY",
+      "api_key_ref": "GEMINI_COURIER_KEY",
       "models_available": [
-        "gemini-2.0-flash",
-        "gemini-1.5-pro"
+        "gemini-2.5-flash",
+        "gemini-2.0-flash"
       ],
       "provides_tools": [],
-      "notes": "Re-enabled after vault fix"
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500
+      },
+      "notes": "Dedicated Google Cloud project for courier tasks. Independent free-tier quota."
+    },
+    {
+      "id": "gemini-api-researcher",
+      "name": "Gemini API (Researcher Project)",
+      "type": "api",
+      "status": "active",
+      "provider": "google",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+      "api_key_ref": "GEMINI_RESEARCHER_KEY",
+      "models_available": [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash"
+      ],
+      "provides_tools": [],
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500
+      },
+      "notes": "Dedicated Google Cloud project for research tasks. Independent free-tier quota."
+    },
+    {
+      "id": "gemini-api-visual",
+      "name": "Gemini API (Visual Tester Project)",
+      "type": "api",
+      "status": "active",
+      "provider": "google",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+      "api_key_ref": "GEMINI_VISUAL_TESTER_KEY",
+      "models_available": [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash"
+      ],
+      "provides_tools": [],
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500
+      },
+      "notes": "Dedicated Google Cloud project for visual QA testing. Independent free-tier quota."
+    },
+    {
+      "id": "gemini-api-general",
+      "name": "Gemini API (General Project)",
+      "type": "api",
+      "status": "active",
+      "provider": "google",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+      "api_key_ref": "GEMINI_GENERAL_KEY",
+      "models_available": [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash"
+      ],
+      "provides_tools": [],
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500
+      },
+      "notes": "Dedicated Google Cloud project for general tasks. Independent free-tier quota."
     },
     {
       "id": "deepseek-api",
