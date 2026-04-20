@@ -99,6 +99,8 @@ func main() {
 
 	v := vault.New(database)
 
+	var courierRunner *connectors.CourierRunner // initialized after ctx is created
+
 	leakDetector := security.NewLeakDetector()
 
 	// TODO: Wire in maintenance package after type refactoring
@@ -147,6 +149,15 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Initialize CourierRunner for web platform dispatch (courier agent system)
+	// Nil if GITHUB_TOKEN is not available — web routing falls back to internal gracefully
+	if githubToken, err := v.GetSecret(ctx, "GITHUB_TOKEN"); err == nil && githubToken != "" {
+		courierRunner = connectors.NewCourierRunner(githubToken, "VibesTribe/VibePilot", database, 0)
+		log.Println("[Courier] Runner initialized (GitHub Actions dispatch enabled)")
+	} else {
+		log.Printf("[Courier] Runner disabled (GITHUB_TOKEN unavailable: %v)", err)
+	}
 
 	// Initialize MCP registry (connects to approved external MCP servers)
 	var mcpRegistry *govmcp.Registry
@@ -229,7 +240,7 @@ func main() {
 
 	go runProcessingRecovery(ctx, database, cfg)
 
-	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr)
+	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner)
 
 	// Periodically persist usage tracker state to Supabase for dashboard
 	go func() {
@@ -345,8 +356,8 @@ func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v 
 	}
 }
 
-func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector, usageTracker *runtime.UsageTracker, worktreeMgr *gitree.WorktreeManager) {
-	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector, usageTracker, worktreeMgr)
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector, usageTracker *runtime.UsageTracker, worktreeMgr *gitree.WorktreeManager, courierRunner *connectors.CourierRunner) {
+	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner)
 	setupPlanHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)
 	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter, git)

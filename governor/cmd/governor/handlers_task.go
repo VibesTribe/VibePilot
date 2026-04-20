@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vibepilot/governor/internal/connectors"
 	"github.com/vibepilot/governor/internal/core"
 	"github.com/vibepilot/governor/internal/db"
 	"github.com/vibepilot/governor/internal/gitree"
@@ -27,6 +28,7 @@ type TaskHandler struct {
 	cfg           *runtime.Config
 	usageTracker  *runtime.UsageTracker
 	worktreeMgr   *gitree.WorktreeManager
+	courierRunner *connectors.CourierRunner
 }
 
 func NewTaskHandler(
@@ -40,6 +42,7 @@ func NewTaskHandler(
 	cfg *runtime.Config,
 	usageTracker *runtime.UsageTracker,
 	worktreeMgr *gitree.WorktreeManager,
+	courierRunner *connectors.CourierRunner,
 ) *TaskHandler {
 	return &TaskHandler{
 		database:      database,
@@ -52,6 +55,7 @@ func NewTaskHandler(
 		cfg:           cfg,
 		usageTracker:  usageTracker,
 		worktreeMgr:   worktreeMgr,
+		courierRunner: courierRunner,
 	}
 }
 
@@ -154,7 +158,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		routingResult, routeErr = h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
 			Role:          "task_runner",
 			TaskType:      taskCategory,
-			RoutingFlag:   "internal",
+			RoutingFlag:   "", // empty = router decides (web courier if available, internal fallback)
 			ExcludeModels: failedModels,
 		})
 		if routeErr != nil || routingResult == nil {
@@ -256,7 +260,23 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	h.saveCheckpoint(ctx, taskID, "execution_start", 0, "", nil)
 	runStart := time.Now()
 
-	// Execute
+	// Web courier dispatch: if router selected a web platform, use CourierRunner
+	if routingFlag == "web" && h.courierRunner != nil {
+		platformURL := routingResult.PlatformURL
+		platformID := routingResult.PlatformID
+		log.Printf("[TaskAvailable] Courier dispatch for %s → %s (%s)", truncateID(taskID), platformID, platformURL)
+
+		err = h.pool.SubmitWithDestination(ctx, sliceID, connectorID, func() error {
+			return h.executeCourierTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, platformID, platformURL, runStart)
+		})
+		if err != nil {
+			log.Printf("[TaskAvailable] Courier pool error for %s: %v", truncateID(taskID), err)
+			h.failTask(ctx, taskID, modelID, branchName, "courier_submit_failed")
+		}
+		return
+	}
+
+	// Internal execution: standard agent dispatch via pool
 	err = h.pool.SubmitWithDestination(ctx, sliceID, connectorID, func() error {
 		return h.executeTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, worktreePath, runStart)
 	})
@@ -436,6 +456,108 @@ func (h *TaskHandler) executeTask(
 
 	log.Printf("[TaskAvailable] Task %s → review", truncateID(taskID))
 	return nil
+}
+
+// executeCourierTask dispatches a task to a web platform via the CourierRunner.
+// The courier navigates to the platform URL, pastes the prompt, and returns the response.
+func (h *TaskHandler) executeCourierTask(
+	ctx context.Context,
+	task map[string]any,
+	taskPacket *db.TaskPacket,
+	taskID, taskNumber, modelID, connectorID, branchName, taskCategory, platformID, platformURL string,
+	runStart time.Time,
+) error {
+	// Build the courier task packet with all required fields
+	packet := map[string]any{
+		"task_id":             taskID,
+		"task_prompt":         taskPacket.Prompt,
+		"branch_name":         branchName,
+		"llm_provider":        h.deriveLLMProvider(connectorID),
+		"llm_model":           modelID,
+		"web_platform_url":    platformURL,
+	}
+
+	packetJSON, err := json.Marshal(packet)
+	if err != nil {
+		log.Printf("[CourierTask] Failed to marshal packet for %s: %v", truncateID(taskID), err)
+		h.failTask(ctx, taskID, modelID, branchName, "courier_packet_failed")
+		return err
+	}
+
+	// Execute via CourierRunner with timeout
+	courierCtx, courierCancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer courierCancel()
+
+	output, tokensIn, tokensOut, err := h.courierRunner.Run(courierCtx, string(packetJSON), 600)
+	if err != nil {
+		log.Printf("[CourierTask] Courier failed for %s: %v", truncateID(taskID), err)
+		h.failTask(ctx, taskID, modelID, branchName, "courier_execution_failed")
+		return err
+	}
+
+	duration := time.Since(runStart)
+	log.Printf("[CourierTask] Courier completed for %s in %.1fs (tokens: %d/%d)", truncateID(taskID), duration.Seconds(), tokensIn, tokensOut)
+
+	// Commit output and transition to review, same as internal execution
+	summary := output
+	if len(output) > 500 {
+		summary = output[:500] + "..."
+	}
+	h.commitOutput(ctx, branchName, nil, output, summary, modelID, taskID, duration.Seconds())
+
+	// Record task run via RPC
+	totalTokens := tokensIn + tokensOut
+	h.database.RPC(ctx, "create_task_run", map[string]any{
+		"p_task_id":      taskID,
+		"p_model_id":     modelID,
+		"p_status":       "completed",
+		"p_tokens_in":    tokensIn,
+		"p_tokens_out":   tokensOut,
+		"p_routing_flag": "web",
+		"p_started_at":   runStart.UTC().Format(time.RFC3339),
+		"p_completed_at": time.Now().UTC().Format(time.RFC3339),
+	})
+
+	h.database.RPC(ctx, "transition_task", map[string]any{
+		"p_task_id": taskID,
+		"p_status":  "review",
+		"p_result": map[string]any{
+			"output":           output,
+			"model_id":         modelID,
+			"routing_flag":     "web",
+			"platform_id":      platformID,
+			"tokens_used":      totalTokens,
+			"duration_seconds": duration.Seconds(),
+		},
+	})
+
+	h.recordSuccess(ctx, taskID, modelID, taskCategory, duration.Seconds(), totalTokens)
+
+	if h.usageTracker != nil {
+		h.usageTracker.RecordCompletion(ctx, modelID, taskCategory, duration.Seconds(), true)
+	}
+
+	h.deleteCheckpoint(ctx, taskID)
+	log.Printf("[CourierTask] Task %s → review", truncateID(taskID))
+	return nil
+}
+
+// deriveLLMProvider maps a connector ID to an LLM provider name for the courier packet.
+func (h *TaskHandler) deriveLLMProvider(connectorID string) string {
+	switch {
+	case strings.Contains(connectorID, "groq"):
+		return "groq"
+	case strings.Contains(connectorID, "nvidia"):
+		return "nvidia"
+	case strings.Contains(connectorID, "gemini"):
+		return "google"
+	case strings.Contains(connectorID, "openrouter"):
+		return "openrouter"
+	case strings.Contains(connectorID, "deepseek"):
+		return "deepseek"
+	default:
+		return connectorID
+	}
 }
 
 // ============================================================================
@@ -946,8 +1068,9 @@ func setupTaskHandlers(
 	leakDetector *security.LeakDetector,
 	usageTracker *runtime.UsageTracker,
 	worktreeMgr *gitree.WorktreeManager,
+	courierRunner *connectors.CourierRunner,
 ) {
-	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg, usageTracker, worktreeMgr)
+	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg, usageTracker, worktreeMgr, courierRunner)
 	handler.Register(router)
 }
 
