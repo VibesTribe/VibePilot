@@ -81,12 +81,18 @@ def update_supabase(task_id: str, status: str, output: str = "",
     supabase_url = os.environ["SUPABASE_URL"]
     supabase_key = os.environ["SUPABASE_KEY"]
 
+    # task_runs.result is JSONB — store output and metadata as a JSON object
+    result_json = json.dumps({
+        "output": output,
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+    })
+
     data = {
         "status": status,
         "completed_at": datetime.now(timezone.utc).isoformat(),
+        "result": result_json,
     }
-    if output:
-        data["output"] = output
     if error:
         data["error"] = error
     if tokens_in > 0:
@@ -95,8 +101,9 @@ def update_supabase(task_id: str, status: str, output: str = "",
         data["tokens_out"] = tokens_out
 
     payload = json.dumps(data).encode()
+    # Match on task_id (UUID from the task), not the auto-generated row id
     req = urllib.request.Request(
-        f"{supabase_url}/rest/v1/task_runs?id=eq.{task_id}",
+        f"{supabase_url}/rest/v1/task_runs?task_id=eq.{task_id}&order=created_at.desc&limit=1",
         data=payload,
         method="PATCH",
     )

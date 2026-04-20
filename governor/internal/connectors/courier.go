@@ -122,9 +122,10 @@ func (r *CourierRunner) Run(ctx context.Context, prompt string, timeout int) (st
 
 	// Create task_runs row so the GitHub Action can update it
 	_, err := r.db.Insert(ctx, "task_runs", map[string]any{
-		"id":         taskID,
-		"status":     "running",
-		"started_at": time.Now().UTC().Format(time.RFC3339),
+		"task_id":     taskID,
+		"status":      "running",
+		"courier":     "github-actions",
+		"started_at":  time.Now().UTC().Format(time.RFC3339),
 	})
 	if err != nil {
 		return "", 0, 0, fmt.Errorf("create task_run: %w", err)
