@@ -81,20 +81,20 @@ AES-GCM encrypted, PBKDF2 SHA256 100k iterations. ~15 keys stored:
 ## Courier Agent Pipeline
 
 ### Implementation Status
-Steps 1-5 of 10 complete (committed, pushed to main):
+Steps 1-5 of 10 complete. Step 8 scaffold exists but untested. Steps 6-7 and 9-10 remaining.
 
-| Step | Description | Status | Commit |
+| Step | Description | Status | Detail |
 |------|-------------|--------|--------|
-| 1 | Model capabilities + courier markers | Done | 833a94cf |
-| 2 | Connector courier config + PlatformID/URL | Done | 833a94cf |
-| 3 | CourierRunner scaffold | Done | 833a94cf |
-| 4 | Vault threading to TaskHandler | Done | c2e94151 |
-| 5 | Pipeline gap fixes (RPC, result format) | Done | c2e94151 |
-| 6 | GitHub Actions workflow | Done | b0b55235 |
-| 7 | Supabase realtime listener | Done | 57d9c237 |
-| 8 | End-to-end test | Pending | - |
-| 9 | Error handling + retry logic | Pending | - |
-| 10 | Dashboard courier visibility | Pending | - |
+| 1 | Model capabilities + courier markers | Done | 11 models marked courier: true |
+| 2 | Add missing vision models to models.json | Done | 4 vision models added |
+| 3 | PlatformID/PlatformURL in RoutingResult | Done | router.go updated |
+| 4 | Remove hardcoded RoutingFlag "internal" | Done | Task runner uses "" (router decides) |
+| 5 | courierRunner on TaskHandler struct | Done | Struct wired up |
+| 6 | Web routing branch in executeTask | **Not done** | No executeViaCourier method yet |
+| 7 | Install browser-use + playwright | **Not done** | pip: package not found |
+| 8 | Write courier_run.py | **Scaffold exists** | File written, not tested |
+| 9 | Local dispatch in CourierRunner | **Not done** | Still uses GitHub Actions API |
+| 10 | E2E test with chat.deepseek.com | **Not done** | |
 
 ### Courier Flow
 ```
