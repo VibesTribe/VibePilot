@@ -1457,8 +1457,8 @@
       "notes": "Browser Use courier via notegpt-web connector."
     },
     {
-      "id": "qwen-3",
-      "name": "Qwen 3 (Web)",
+      "id": "qwen-3.6-plus",
+      "name": "Qwen 3.6 Plus",
       "vendor": "alibaba",
       "context_limit": 131072,
       "status": "active",
@@ -1488,7 +1488,7 @@
       "weaknesses": [
         "web-only"
       ],
-      "notes": "Browser Use courier via qwen-web connector."
+      "notes": "Web-only via browser use. Verified serving Qwen3.6-Plus on chat.qwen.ai (April 2026)."
     },
     {
       "id": "qwen-2.5",
@@ -1522,7 +1522,7 @@
         "web-only",
         "older model"
       ],
-      "notes": "Browser Use courier via qwen-web connector."
+      "notes": "Web-only via browser use. Available on chat.qwen.ai as selectable model."
     },
     {
       "id": "mistral-large",
@@ -2363,6 +2363,290 @@
         "smaller_than_120b"
       ],
       "notes": "Free on OpenRouter. OpenAI open-source 20B. Companion to the 120B variant on Groq."
+    },
+    {
+      "id": "kimi-k2.6-instant",
+      "name": "Kimi K2.6 Instant",
+      "provider": "moonshot",
+      "access_type": "web",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "agents"
+      ],
+      "access_via": [
+        "kimi-web"
+      ],
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null,
+        "requests_per_day": 50,
+        "tokens_per_day": null,
+        "messages_per_3_hours": null
+      },
+      "throttle_behavior": "soft_throttle",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 60,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "fast_response",
+        "agent_swarm",
+        "coding"
+      ],
+      "weaknesses": [
+        "unknown_limits"
+      ],
+      "notes": "Web-only via browser use. K2.6 Instant model. Agent swarm feature.",
+      "status_reason": null
+    },
+    {
+      "id": "kimi-k2-instruct-0905-hf",
+      "name": "Kimi K2 Instruct 0905 (HuggingFace)",
+      "provider": "moonshot",
+      "access_type": "web",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "agentic"
+      ],
+      "access_via": [
+        "huggingchat-web"
+      ],
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null,
+        "requests_per_day": null,
+        "tokens_per_day": null,
+        "messages_per_3_hours": null
+      },
+      "throttle_behavior": "soft_throttle",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 30,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "unlimited_free",
+        "multi_model_switcher",
+        "mcp",
+        "agentic"
+      ],
+      "weaknesses": [
+        "shared_infrastructure"
+      ],
+      "notes": "Web-only via HuggingChat. Currently defaults to this model via novita. Has MCP servers. Unlimited free.",
+      "status_reason": null
+    },
+    {
+      "id": "gemini-3.1-pro-preview-web",
+      "name": "Gemini 3.1 Pro Preview (AI Studio)",
+      "provider": "google",
+      "access_type": "web",
+      "context_limit": 1000000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "function_calling",
+        "grounding",
+        "url_context"
+      ],
+      "access_via": [
+        "aistudio-web"
+      ],
+      "status": "active",
+      "courier": true,
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null,
+        "requests_per_day": 1500,
+        "tokens_per_day": null,
+        "messages_per_3_hours": null
+      },
+      "throttle_behavior": "soft_throttle",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 60,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [
+          "design",
+          "apps",
+          "visual_qa"
+        ],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "1M_context",
+        "function_calling",
+        "grounding_search",
+        "grounding_maps",
+        "url_context",
+        "code_execution",
+        "best_for_design"
+      ],
+      "weaknesses": [
+        "preview_model",
+        "web_only"
+      ],
+      "notes": "Best platform for apps and design. Has native tools: function calling, Google Search grounding, Maps, URL context, code execution. May not need Playwright/browser-use -- could use native tool calling.",
+      "status_reason": null
+    },
+    {
+      "id": "poe-mix",
+      "name": "Poe Multi-Model",
+      "provider": "poe",
+      "access_type": "web",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "multi_model"
+      ],
+      "access_via": [
+        "poe-web"
+      ],
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null,
+        "requests_per_day": 100,
+        "tokens_per_day": null,
+        "messages_per_3_hours": null,
+        "compute_points_per_day": 3000
+      },
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 60,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [
+          "research",
+          "comparison"
+        ],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "multi_model_access",
+        "deepseek-r1",
+        "gemma-4",
+        "gemini-3.1-flash-lite"
+      ],
+      "weaknesses": [
+        "compute_point_system",
+        "variable_quality"
+      ],
+      "notes": "Aggregator platform. 3000 compute points/day. Can switch between models. Google SSO.",
+      "status_reason": null
+    },
+    {
+      "id": "gpt-4o-mini-chatbox",
+      "name": "GPT-4o Mini (Chatbox)",
+      "provider": "openai",
+      "access_type": "web",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "chatbox-web"
+      ],
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_hour": null,
+        "requests_per_day": null,
+        "tokens_per_day": null,
+        "messages_per_3_hours": null
+      },
+      "throttle_behavior": "soft_throttle",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 30,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "free_gpt4o_mini",
+        "no_auth"
+      ],
+      "weaknesses": [
+        "unknown_limits",
+        "wrapper_service"
+      ],
+      "notes": "Free GPT-4o mini via Chatbox wrapper. No auth needed. URL: app.chatbox.ai.",
+      "status_reason": null
     }
   ],
   "defaults": {
