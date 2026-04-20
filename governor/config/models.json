@@ -1036,7 +1036,7 @@
       "name": "Gemma 4 31B (OpenRouter)",
       "vendor": "google",
       "context_limit": 262000,
-      "status": "benched",
+      "status": "active",
       "access_via": [
         "openrouter-api"
       ],
@@ -1083,7 +1083,7 @@
       "name": "GLM 4.5 Air (OpenRouter)",
       "vendor": "zhipu",
       "context_limit": 131000,
-      "status": "benched",
+      "status": "active",
       "access_via": [
         "openrouter-api"
       ],
@@ -1125,7 +1125,7 @@
       "name": "MiniMax M2.5 (OpenRouter)",
       "vendor": "minimax",
       "context_limit": 131072,
-      "status": "benched",
+      "status": "active",
       "access_type": "api",
       "access_via": [
         "openrouter-api"
@@ -1165,7 +1165,7 @@
       "name": "Nemotron 3 Super 120B (OpenRouter)",
       "vendor": "nvidia",
       "context_limit": 262144,
-      "status": "benched",
+      "status": "active",
       "access_type": "api",
       "access_via": [
         "openrouter-api"
@@ -1658,7 +1658,7 @@
         "openrouter-api"
       ],
       "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "benched",
+      "status": "active",
       "rate_limits": {
         "requests_per_minute": 20,
         "requests_per_hour": 200,
@@ -1856,7 +1856,7 @@
       "courier": true
     },
     {
-      "id": "google/gemma-3n-2b-it:free",
+      "id": "google/gemma-3n-e2b-it:free",
       "name": "Gemma 3n 2B IT (Free)",
       "vendor": "google",
       "access_type": "api",
@@ -1906,7 +1906,7 @@
       "notes": "Free on OpenRouter. Newest Gemma 3n line. Ultra-lightweight. Mobile-class."
     },
     {
-      "id": "google/gemma-3n-4b-it:free",
+      "id": "google/gemma-3n-e4b-it:free",
       "name": "Gemma 3n 4B IT (Free)",
       "vendor": "google",
       "access_type": "api",
@@ -1956,6 +1956,262 @@
         "tiny_context"
       ],
       "notes": "Free on OpenRouter. Newest Gemma 3n with audio+vision. Mobile-optimized."
+    },
+    {
+      "id": "meta-llama/llama-3.3-70b-instruct:free",
+      "name": "Llama 3.3 70B Instruct (Free)",
+      "vendor": "meta",
+      "access_type": "api",
+      "context_limit": 65536,
+      "capabilities": [
+        "text",
+        "reasoning",
+        "code",
+        "multilingual",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "large_model",
+        "reasoning",
+        "code",
+        "instruction_following",
+        "multilingual"
+      ],
+      "weaknesses": [
+        "medium_context"
+      ],
+      "notes": "Free on OpenRouter. 70B params - best free quality available. Flagship-level.",
+      "courier": true
+    },
+    {
+      "id": "nousresearch/hermes-3-llama-3.1-405b:free",
+      "name": "Hermes 3 Llama 3.1 405B (Free)",
+      "vendor": "nousresearch",
+      "access_type": "api",
+      "context_limit": 131072,
+      "capabilities": [
+        "text",
+        "reasoning",
+        "code",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 5,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "largest_free_model",
+        "reasoning",
+        "code",
+        "long_context",
+        "tool_calling"
+      ],
+      "weaknesses": [
+        "slow_response",
+        "may_queue"
+      ],
+      "notes": "Free on OpenRouter. 405B params - largest free model. Slow but excellent quality.",
+      "courier": true
+    },
+    {
+      "id": "qwen/qwen3-coder:free",
+      "name": "Qwen3 Coder (Free)",
+      "vendor": "alibaba",
+      "access_type": "api",
+      "context_limit": 262000,
+      "capabilities": [
+        "text",
+        "code",
+        "reasoning",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "code_specialist",
+        "huge_context",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "narrow_focus"
+      ],
+      "notes": "Free on OpenRouter. Code specialist with 262K context. Best free coding model.",
+      "courier": true
+    },
+    {
+      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
+      "name": "Nemotron 3 Nano 30B (Free)",
+      "vendor": "nvidia",
+      "access_type": "api",
+      "context_limit": 256000,
+      "capabilities": [
+        "text",
+        "reasoning"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "huge_context",
+        "fast",
+        "efficient"
+      ],
+      "weaknesses": [
+        "sparse_model"
+      ],
+      "notes": "Free on OpenRouter. MoE 30B (3B active). 256K context. Fast and efficient."
+    },
+    {
+      "id": "openai/gpt-oss-20b:free",
+      "name": "GPT-OSS 20B (Free via OpenRouter)",
+      "vendor": "openai",
+      "access_type": "api",
+      "context_limit": 131072,
+      "capabilities": [
+        "text",
+        "reasoning",
+        "code"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "openai_quality",
+        "fast",
+        "code"
+      ],
+      "weaknesses": [
+        "smaller_than_120b"
+      ],
+      "notes": "Free on OpenRouter. OpenAI open-source 20B. Companion to the 120B variant on Groq."
     }
   ],
   "defaults": {
