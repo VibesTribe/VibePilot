@@ -69,7 +69,8 @@
         "code",
         "reasoning",
         "vision",
-        "multimodal"
+        "multimodal",
+        "tool_calling"
       ],
       "access_via": [
         "gemini-api"
@@ -108,13 +109,14 @@
         "long_context",
         "multimodal",
         "vision",
-        "fast"
+        "fast",
+        "courier_fuel"
       ],
       "weaknesses": [
         "strict_rate_limits"
       ],
       "notes": "Best free tier but strict rate limits. Space requests 5s apart minimum.",
-      "courier": false
+      "courier": true
     },
     {
       "id": "deepseek-chat",
@@ -788,7 +790,10 @@
       "context_limit": 131072,
       "capabilities": [
         "code",
-        "reasoning"
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
       ],
       "access_via": [
         "groq-api"
@@ -815,12 +820,16 @@
       },
       "learned": {},
       "strengths": [
-        "code",
-        "reasoning",
-        "multilingual"
+        "multimodal",
+        "vision",
+        "multilingual",
+        "courier_fuel"
       ],
-      "weaknesses": [],
-      "notes": "Groq free tier (unverified limits). Using conservative TPD=100K until actual limits confirmed from API headers."
+      "weaknesses": [
+        "large_memory_footprint"
+      ],
+      "notes": "Groq free tier (unverified limits). Using conservative TPD=100K until actual limits confirmed from API headers.",
+      "courier": true
     },
     {
       "id": "openai/gpt-oss-120b",
@@ -1015,7 +1024,12 @@
         "cooldown_minutes": 5,
         "timeout_seconds": 120
       },
-      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix."
+      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix.",
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tool_calling"
+      ]
     },
     {
       "id": "google/gemma-4-31b-it",
@@ -1031,12 +1045,14 @@
         "output_per_1m_usd": 0.38
       },
       "strengths": [
+        "vision",
         "balanced",
-        "262K context",
-        "free on openrouter"
+        "large_context",
+        "courier_fuel"
       ],
       "weaknesses": [
-        "20 RPM rate limit"
+        "openrouter_rate_limits",
+        "quality_varies"
       ],
       "rate_limits": {
         "requests_per_minute": 20,
@@ -1052,7 +1068,15 @@
         "cooldown_minutes": 5,
         "timeout_seconds": 120
       },
-      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix."
+      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix.",
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "courier": true
     },
     {
       "id": "z-ai/glm-4.5-air",
@@ -1089,7 +1113,12 @@
         "cooldown_minutes": 5,
         "timeout_seconds": 120
       },
-      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix."
+      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix.",
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tool_calling"
+      ]
     },
     {
       "id": "minimax/minimax-m2.5",
@@ -1124,7 +1153,12 @@
       "weaknesses": [
         "free tier rate limits"
       ],
-      "notes": "OpenRouter free tier. 20 RPM, 200 RPD. Use :free suffix."
+      "notes": "OpenRouter free tier. 20 RPM, 200 RPD. Use :free suffix.",
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tool_calling"
+      ]
     },
     {
       "id": "nvidia/nemotron-3-super-120b-a12b",
@@ -1159,7 +1193,12 @@
       "weaknesses": [
         "free tier rate limits"
       ],
-      "notes": "OpenRouter free tier. 20 RPM, 200 RPD. Use :free suffix."
+      "notes": "OpenRouter free tier. 20 RPM, 200 RPD. Use :free suffix.",
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tool_calling"
+      ]
     },
     {
       "id": "gemini-2.5-pro",
@@ -1433,6 +1472,232 @@
         "web-only"
       ],
       "notes": "Browser Use courier via mistral-web connector. Vision/multimodal."
+    },
+    {
+      "id": "google/gemma-4-26b-a4b-it:free",
+      "name": "Gemma 4 26B MoE (OpenRouter Free)",
+      "provider": "google",
+      "access_type": "api",
+      "context_limit": 262144,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "vision",
+        "efficient_moe",
+        "large_context",
+        "courier_fuel"
+      ],
+      "weaknesses": [
+        "openrouter_rate_limits",
+        "smaller_than_31b"
+      ],
+      "notes": "MoE variant, efficient. Free on OpenRouter. Courier fuel model.",
+      "courier": true
+    },
+    {
+      "id": "nvidia/nemotron-nano-12b-v2-vl:free",
+      "name": "Nemotron Nano 12B VL (OpenRouter Free)",
+      "provider": "nvidia",
+      "access_type": "api",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "vision",
+        "video",
+        "small_fast",
+        "courier_fuel"
+      ],
+      "weaknesses": [
+        "smaller_model",
+        "openrouter_rate_limits"
+      ],
+      "notes": "Video+image vision. Free on OpenRouter. Courier fuel model.",
+      "courier": true
+    },
+    {
+      "id": "google/gemma-3-27b-it:free",
+      "name": "Gemma 3 27B (OpenRouter Free)",
+      "provider": "google",
+      "access_type": "api",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "vision",
+        "balanced",
+        "courier_fuel"
+      ],
+      "weaknesses": [
+        "previous_gen",
+        "openrouter_rate_limits"
+      ],
+      "notes": "Previous gen Gemma. Free on OpenRouter. Courier fuel model.",
+      "courier": true
+    },
+    {
+      "id": "bytedance/ui-tars-1.5-7b",
+      "name": "UI-TARS 1.5 7B (GUI Specialist)",
+      "provider": "bytedance",
+      "access_type": "api",
+      "context_limit": 32768,
+      "capabilities": [
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0.1,
+        "output_per_1m_usd": 0.2
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "gui_automation",
+        "courier_fuel",
+        "ultra_cheap",
+        "purpose_built"
+      ],
+      "weaknesses": [
+        "small_model",
+        "less_reasoning",
+        "tiny_context"
+      ],
+      "notes": "Purpose-built for GUI automation. Ultra-cheap. Ideal courier fuel for browser navigation.",
+      "courier": true
     }
   ],
   "defaults": {
