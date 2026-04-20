@@ -1,0 +1,61 @@
+name: Courier Task
+
+on:
+  repository_dispatch:
+    types: [courier_task]
+
+jobs:
+  courier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install --quiet browser-use playwright supabase
+          playwright install chromium --with-deps
+
+      - name: Checkout repo (for courier script)
+        uses: actions/checkout@v4
+
+      - name: Run courier task
+        env:
+          TASK_ID: ${{ github.event.client_payload.task_id }}
+          PROMPT: ${{ github.event.client_payload.prompt }}
+          BRANCH_NAME: ${{ github.event.client_payload.branch_name }}
+          LLM_PROVIDER: ${{ github.event.client_payload.llm_provider }}
+          LLM_MODEL: ${{ github.event.client_payload.llm_model }}
+          LLM_API_KEY: ${{ github.event.client_payload.llm_api_key }}
+          WEB_PLATFORM_URL: ${{ github.event.client_payload.web_platform_url }}
+          SUPABASE_URL: ${{ github.event.client_payload.supabase_url }}
+          SUPABASE_KEY: ${{ github.event.client_payload.supabase_key }}
+        run: python scripts/courier_run.py
+
+      - name: Report failure
+        if: failure()
+        env:
+          TASK_ID: ${{ github.event.client_payload.task_id }}
+          SUPABASE_URL: ${{ github.event.client_payload.supabase_url }}
+          SUPABASE_KEY: ${{ github.event.client_payload.supabase_key }}
+          ERROR_MSG: "Courier GitHub Action failed"
+        run: |
+          python -c "
+          import os, json, urllib.request
+          task_id = os.environ['TASK_ID']
+          url = os.environ['SUPABASE_URL']
+          key = os.environ['SUPABASE_KEY']
+          data = json.dumps({'status': 'failed', 'error': os.environ['ERROR_MSG'], 'completed_at': __import__('datetime').datetime.utcnow().isoformat()+'Z'}).encode()
+          req = urllib.request.Request(f'{url}/rest/v1/task_runs?id=eq.{task_id}', data=data, method='PATCH')
+          req.add_header('apikey', key)
+          req.add_header('Authorization', f'Bearer {key}')
+          req.add_header('Content-Type', 'application/json')
+          req.add_header('Prefer', 'return=minimal')
+          urllib.request.urlopen(req)
+          "
