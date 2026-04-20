@@ -29,7 +29,7 @@ A global, massively scalable, multilingual, multimedia social media platform whe
 - **Runtime:** Single Go binary (~12MB), systemd user service
 - **Network:** Phone USB tethered (wifi chip died during repaste), planning ethernet + headless
 - **Architecture:** Config-driven plug-and-play modules, YAML DAG pipeline
-- **Model Strategy:** Cloud free tier cascade (Groq, Google AI Studio, OpenRouter, SambaNova). Local inference too slow on this hardware (tested, 2 tok/s).
+- **Model Strategy:** Cloud free tier cascade across 4 providers: Groq (7 models), OpenRouter (19 free models, $0 credit), Gemini 4-Project (4 independent Google Cloud projects = 60 RPM free), NVIDIA NIM (3 models). Total: ~47 models, ~39 active, ~11 courier-capable. Local inference too slow on this hardware (tested, 2 tok/s).
 - **Dashboard:** https://vibeflow-dashboard.vercel.app/ (sacred, Vercel auto-deploy)
 - **Tunnel:** vibestribe.rocks via cloudflared (sacred, don't touch)
 - **TTS:** edge-tts (fast, free, no API key)
@@ -297,24 +297,45 @@ Fix the Go code that writes to Supabase.
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 6. ROUTER SELECTS MODEL                                     │
+│ 6. ROUTER SELECTS MODEL AND ROUTING PATH                    │
 │    - Checks task type, category, requirements               │
-│    - Selects from active models/connectors                  │
-│    - Writes to tasks.assigned_to                            │
-│    - Writes to tasks.routing_flag                           │
+│    - Selects from active models/connectors                   │
+│    - Writes to tasks.assigned_to                             │
+│    - Sets routing_flag: "internal", "web", or "mcp"         │
+│    - "web" = courier agent (external LLM via free API)       │
+│    - "internal" = local worktree execution                   │
 └─────────────────────────────────────────────────────────────┘
                               │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 7. TASK RUNNER EXECUTES (IN ISOLATED WORKTREE)             │
-│    - Creates git worktree at ~/VibePilot-work/{taskID}      │
-│    - Bootstraps symlinks (config, prompts, .context)        │
-│    - Sends prompt packet to model                           │
-│    - Model generates code IN the worktree                   │
-│    - Commits to task branch inside worktree                  │
-│    - Creates task_runs record with tokens/costs             │
-│    - No agent confusion about which branch -- each isolated │
-└─────────────────────────────────────────────────────────────┘
+              ┌───────────────┴───────────────┐
+              │ routing_flag?                  │
+              ▼                               ▼
+┌──────────────────────────┐  ┌─────────────────────────────────────────────────┐
+│ 7a. INTERNAL EXECUTION   │  │ 7b. COURIER AGENT (routing_flag = "web")        │
+│ (isolated worktree)      │  │                                                 │
+│ - git worktree           │  │ Courier agents execute tasks on external free    │
+│ - prompt packet sent     │  │ tier LLMs (Groq, OpenRouter, Gemini, NVIDIA).   │
+│ - model generates code   │  │                                                 │
+│ - commit to task branch  │  │ Flow:                                          │
+│ - task_runs record       │  │ 1. Governor builds courier packet with:         │
+│                          │  │    - prompt (task context)                      │
+│                          │  │    - model_id + connector_id                    │
+│                          │  │    - supabase_url/key (for result writing)      │
+│                          │  │    - llm_api_key (decrypted from vault)         │
+│                          │  │ 2. CourierRunner dispatches to LLM API          │
+│                          │  │ 3. LLM generates response                      │
+│                          │  │ 4. Result written to task_runs (JSONB)          │
+│                          │  │ 5. Tokens counted client-side (never trust      │
+│                          │  │    external counts)                             │
+│                          │  │ 6. Task transitioned to next status             │
+│                          │  │                                                 │
+│                          │  │ Gemini 4-Project: Each role gets its own        │
+│                          │  │ Google Cloud project with independent quota:    │
+│                          │  │ - Courier  -> gemini-2.5-flash-lite (15 RPM)    │
+│                          │  │ - Researcher -> gemini-3.1-flash-lite-preview   │
+│                          │  │ - Visual QA -> gemini-3-flash-preview           │
+│                          │  │ - General   -> gemini-2.5-flash-lite (fallback) │
+│                          │  │ Combined: 60 RPM / 6000 RPD free                │
+└──────────────────────────┘  └─────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -474,15 +495,69 @@ Merge problems are solved by agents, not human.
 
 **Fallback:** If worktree creation fails, falls back to legacy single-dir branch mode.
 
+### Courier Agent System
+
+Courier agents are the primary execution path for tasks routed to external free-tier LLMs. When `routing_flag = "web"`, the governor dispatches a courier instead of running code locally.
+
+**How it works:**
+```
+Governor receives task with routing_flag="web"
+        │
+        ▼
+TaskHandler.deriveLLMKeyRef(connectorID) → vault key name
+        │
+        ▼
+Vault.GetSecret(key_name) → decrypted API key
+        │
+        ▼
+Build courier packet:
+  - prompt (task context from context_builder)
+  - model_id + connector_id
+  - supabase_url + supabase_anon_key
+  - llm_api_key (decrypted)
+        │
+        ▼
+CourierRunner.Run() → calls LLM API
+        │
+        ▼
+Result → task_runs.result (JSONB)
+Tokens → task_runs.tokens_in, tokens_out (client-side count)
+Cost → calculated from tokens × model pricing
+        │
+        ▼
+transition_task(task_id, "available") → next stage
+```
+
+**Key files:**
+| File | Role |
+|------|------|
+| `governor/internal/connectors/courier.go` | CourierRunner struct, API dispatch |
+| `governor/cmd/governor/handlers_task.go` | Vault threading, courier packet assembly, deriveLLMKeyRef |
+| `scripts/courier_run.py` | Python courier runner (GitHub Actions path) |
+| `docs/plans/courier-implementation-plan.md` | 10-step implementation plan |
+
+**Vault keys (courier-relevant):**
+| Vault Key | Provider | Used By |
+|-----------|----------|---------|
+| `GROQ_API_KEY` | Groq | 7 free models |
+| `OPENROUTER_API_KEY` | OpenRouter | 19 free models ($0 credit, max spend limit set) |
+| `GEMINI_COURIER_KEY` | Google AI | Courier tasks (gemini-2.5-flash-lite) |
+| `GEMINI_RESEARCHER_KEY` | Google AI | Research tasks (gemini-3.1-flash-lite-preview) |
+| `GEMINI_VISUAL_TESTER_KEY` | Google AI | Visual QA (gemini-3-flash-preview) |
+| `GEMINI_GENERAL_KEY` | Google AI | General/fallback (gemini-2.5-flash-lite) |
+| `NVIDIA_API_KEY` | NVIDIA NIM | 3 free models |
+
+**Implementation status:** Steps 1-5 of 10 complete. Steps 6-10 (GitHub Actions workflow, Supabase realtime listener, E2E test) pending.
+
 ---
 
 ## 7. GitHub and Supabase as Sources of Truth
 
-### ⛔ CRITICAL: No Webhooks
+### ⚠️ CRITICAL: Supabase Realtime (NEVER Poll)
 
-**VibePilot uses Supabase Live (realtime subscriptions), NOT webhooks.**
+**VibePilot uses Supabase Realtime subscriptions, NOT polling.** Polling nearly killed the project (Supabase egress costs). All dashboard updates, task state changes, and event tracking use realtime subscriptions.
 
-Webhooks failed. We switched to Supabase Live.
+GitHub push events are received via webhooks (webhooks.vibestribe.rocks) and written to Supabase. Governor watches Supabase via realtime -- never polls GitHub either.
 
 ### GitHub: Code & Schema Source of Truth
 
@@ -540,7 +615,7 @@ Webhooks failed. We switched to Supabase Live.
 │  - Model/platform status                                     │
 └─────────────────────────────────────────────────────────────┘
                               │
-                              │ Dashboard polls every 5s
+                              │ Realtime subscriptions (NEVER poll)
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ DASHBOARD (React Frontend)                                   │
@@ -819,12 +894,14 @@ cd ~/VibePilot && git add docs/prd/test-feature.md && git commit -m "test: add t
 ## Remember
 
 - **Dashboard is READ-ONLY** - Fix Go code, not dashboard
-- **No webhooks** - We use Supabase Live
+- **NEVER poll Supabase** - Realtime subscriptions only (polling nearly killed the project)
 - **No hardcoding** - Everything in config files
 - **GitHub = Code source of truth**
 - **Supabase = State source of truth**
 - **User service, not system** - `systemctl --user`, not `sudo systemctl`
-- **Cloud free tiers = primary** - Local inference too slow on x220
+- **Cloud free tiers = primary** - 47 models, 39 active, 11 courier-capable, $0 cost
+- **Token counting = client-side** - Never trust external counts
+- **4 Gemini projects = 4x free quota** - Independent keys, 60 RPM combined
 
 **Need more detail?** See Section 9 for deep dive references.
 
