@@ -60,8 +60,8 @@
       "spacing_min_seconds": 20
     },
     {
-      "id": "gemini-2.5-flash",
-      "name": "Gemini 2.5 Flash (Gemini API)",
+      "id": "gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash Lite (Courier)",
       "provider": "google",
       "access_type": "api",
       "context_limit": 1000000,
@@ -73,33 +73,25 @@
         "tool_calling"
       ],
       "access_via": [
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general"
+        "gemini-api-courier"
       ],
-      "api_key_ref": "GEMINI_GENERAL_KEY",
+      "api_key_ref": "GEMINI_COURIER_KEY",
       "status": "active",
       "rate_limits": {
-        "requests_per_minute": 60,
-        "requests_per_hour": 600,
-        "requests_per_day": 6000,
-        "tokens_per_minute": 4000000,
-        "tokens_per_day": 4000000
+        "requests_per_minute": 15,
+        "requests_per_day": 1000
       },
-      "throttle_behavior": "hard_cutoff",
+      "throttle_behavior": "queue",
       "buffer_pct": 80,
-      "spacing_min_seconds": 6,
+      "spacing_min_seconds": 5,
       "api_pricing": {
-        "input_per_1m_usd": 0.3,
-        "output_per_1m_usd": 2.5
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
       },
       "recovery": {
         "on_rate_limit": "cooldown",
-        "cooldown_minutes": 60,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
       },
       "learned": {
         "avg_task_duration_seconds": null,
@@ -109,17 +101,173 @@
         "avoid_for_task_types": []
       },
       "strengths": [
+        "stable",
+        "high_throughput",
         "long_context",
-        "multimodal",
-        "vision",
-        "fast",
-        "courier_fuel"
+        "multimodal"
       ],
       "weaknesses": [
-        "strict_rate_limits"
+        "lite_model"
       ],
-      "notes": "Best free tier but strict rate limits. Space requests 5s apart minimum.",
+      "notes": "Stable workhorse for high-throughput courier tasks. 1000 RPD free-tier. Safest choice.",
       "courier": true
+    },
+    {
+      "id": "gemini-3.1-flash-lite-preview",
+      "name": "Gemini 3.1 Flash Lite Preview (Researcher)",
+      "provider": "google",
+      "access_type": "api",
+      "context_limit": 1000000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "gemini-api-researcher"
+      ],
+      "api_key_ref": "GEMINI_RESEARCHER_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 5,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "best_intelligence",
+        "long_context",
+        "multimodal",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "preview_mode",
+        "may_change"
+      ],
+      "notes": "Best intelligence for daily system researcher. Smarter than 2.5 but in preview mode."
+    },
+    {
+      "id": "gemini-3-flash-preview",
+      "name": "Gemini 3 Flash Preview (Visual QA / Brain)",
+      "provider": "google",
+      "access_type": "api",
+      "context_limit": 1000000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "gemini-api-visual"
+      ],
+      "api_key_ref": "GEMINI_VISUAL_TESTER_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 5,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "strong_reasoning",
+        "code_generation",
+        "visual_qa",
+        "preview_features"
+      ],
+      "weaknesses": [
+        "preview_mode",
+        "may_change"
+      ],
+      "notes": "Best available on free tier for code/visual QA. 3.1-pro-preview requires billing. 3-flash is free and capable."
+    },
+    {
+      "id": "gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash Lite (General / Legacy Fallback)",
+      "provider": "google",
+      "access_type": "api",
+      "context_limit": 1000000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal"
+      ],
+      "access_via": [
+        "gemini-api-general"
+      ],
+      "api_key_ref": "GEMINI_GENERAL_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 5,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 2,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "ultra_stable",
+        "fast",
+        "long_context",
+        "never_overloaded"
+      ],
+      "weaknesses": [
+        "lite_model"
+      ],
+      "notes": "The Tank. gemini-1.5-flash removed from API. 2.5-flash-lite is the new stable fallback."
     },
     {
       "id": "deepseek-chat",
