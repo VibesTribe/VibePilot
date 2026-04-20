@@ -523,10 +523,9 @@ Tokens counted client-side → Cost calculated → transition_task → review
 **Key files:**
 | File | Role |
 |------|------|
-| `governor/internal/connectors/courier.go` | CourierRunner struct, API dispatch |
+| `governor/internal/connectors/courier.go` | CourierRunner, GitHub Actions dispatch |
 | `governor/cmd/governor/handlers_task.go` | Vault threading, courier packet assembly, deriveLLMKeyRef |
 | `scripts/courier_run.py` | Python courier runner (GitHub Actions path) |
-| `docs/plans/courier-implementation-plan.md` | 10-step implementation plan |
 
 **Vault keys (courier-relevant):**
 | Vault Key | Provider | Used By |
