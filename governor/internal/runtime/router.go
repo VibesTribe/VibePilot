@@ -45,11 +45,13 @@ type RoutingRequest struct {
 }
 
 type RoutingResult struct {
-	ConnectorID string
-	ModelID     string
-	RoutingFlag string
-	Category    string
-	IsFallback  bool // true when routed to Hermes because all models in cooldown
+	ConnectorID  string
+	ModelID      string
+	RoutingFlag  string
+	Category     string
+	PlatformID   string // Web courier destination platform ID
+	PlatformURL  string // Web courier destination URL
+	IsFallback   bool   // true when routed to Hermes because all models in cooldown
 }
 
 func (r *Router) SelectRouting(ctx context.Context, req RoutingRequest) (*RoutingResult, error) {
@@ -129,6 +131,8 @@ func (r *Router) tryWebRouting(ctx context.Context, req RoutingRequest) *Routing
 		ModelID:     courierModel,
 		RoutingFlag: "web",
 		Category:    "external",
+		PlatformID:  dest.PlatformID,
+		PlatformURL: dest.URL,
 	}
 }
 
