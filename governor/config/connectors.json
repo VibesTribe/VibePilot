@@ -112,15 +112,14 @@
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
       "api_key_ref": "GEMINI_COURIER_KEY",
       "models_available": [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash"
+        "gemini-2.5-flash-lite"
       ],
       "provides_tools": [],
       "rate_limits": {
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "Dedicated Google Cloud project for courier tasks. Independent free-tier quota."
+      "notes": "Stable workhorse for high-throughput courier tasks. 1000 RPD free-tier limit. Safest choice."
     },
     {
       "id": "gemini-api-researcher",
@@ -131,53 +130,50 @@
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
       "api_key_ref": "GEMINI_RESEARCHER_KEY",
       "models_available": [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash"
+        "gemini-3.1-flash-lite-preview"
       ],
       "provides_tools": [],
       "rate_limits": {
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "Dedicated Google Cloud project for research tasks. Independent free-tier quota."
+      "notes": "Best intelligence for daily system researcher. Smarter than 2.5 but in preview mode."
     },
     {
       "id": "gemini-api-visual",
-      "name": "Gemini API (Visual Tester Project)",
+      "name": "Gemini API (Visual Tester / Brain)",
       "type": "api",
       "status": "active",
       "provider": "google",
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
       "api_key_ref": "GEMINI_VISUAL_TESTER_KEY",
       "models_available": [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash"
+        "gemini-3-flash-preview"
       ],
       "provides_tools": [],
       "rate_limits": {
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "Dedicated Google Cloud project for visual QA testing. Independent free-tier quota."
+      "notes": "Best available on free tier for code/visual QA. 3.1-pro-preview requires billing. 3-flash-preview is free and capable."
     },
     {
       "id": "gemini-api-general",
-      "name": "Gemini API (General Project)",
+      "name": "Gemini API (General / Legacy Fallback)",
       "type": "api",
       "status": "active",
       "provider": "google",
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
       "api_key_ref": "GEMINI_GENERAL_KEY",
       "models_available": [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash"
+        "gemini-2.5-flash-lite"
       ],
       "provides_tools": [],
       "rate_limits": {
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "Dedicated Google Cloud project for general tasks. Independent free-tier quota."
+      "notes": "The Tank. gemini-1.5-flash removed from API. 2.5-flash-lite is the new stable fallback."
     },
     {
       "id": "deepseek-api",
