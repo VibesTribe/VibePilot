@@ -272,10 +272,12 @@
       ],
       "provides_tools": [],
       "limit_schema": {
-        "messages_per_3h": 10,
-        "tokens_per_day": 1000000
+        "messages_per_3h": 40,
+        "model": "GPT-4o limited, GPT-4o mini unlimited fallback"
       },
-      "notes": "Courier destination. Free tier: ~10 messages/3hrs. Manual or browser automation."
+      "notes": "Courier destination. Free tier: ~10 messages/3hrs. Manual or browser automation.",
+      "limit_source": "OpenAI docs: dynamic ~10-40 per 3hr window. No fixed published number. GPT-4o mini has no effective limit.",
+      "popup_handling": null
     },
     {
       "id": "claude-web",
@@ -290,10 +292,12 @@
       ],
       "provides_tools": [],
       "limit_schema": {
-        "messages_per_8h": 40,
-        "tokens_per_day": 2000000
+        "messages_per_day": 20,
+        "limit_type": "dynamic_context_dependent"
       },
-      "notes": "Courier destination. Variable daily limits. Good for PRD review."
+      "notes": "Courier destination. Variable daily limits. Good for PRD review.",
+      "limit_source": "Anthropic docs: ~10-20/day rolling window. Varies by conversation length. Shorter = more messages.",
+      "popup_handling": null
     },
     {
       "id": "gemini-web",
@@ -309,11 +313,12 @@
       ],
       "provides_tools": [],
       "limit_schema": {
-        "messages_per_session": 100,
-        "tokens_per_day": 1000000,
-        "sessions_per_day": 50
+        "messages_per_day": null,
+        "limit_type": "undocumented_chat_interface"
       },
-      "notes": "Courier destination. 1M tokens/day free tier."
+      "notes": "Courier destination. 1M tokens/day free tier.",
+      "limit_source": "Google: chat interface limits unpublished. API well-documented (15 RPM/1500 RPD for Flash).",
+      "popup_handling": null
     },
     {
       "id": "deepseek-web",
@@ -329,10 +334,12 @@
       ],
       "provides_tools": [],
       "limit_schema": {
-        "messages_per_day": 500,
-        "tokens_per_day": 5000000
+        "messages_per_day": null,
+        "limit_type": "server_capacity_only"
       },
-      "notes": "Courier destination. Generous free tier. Works without login."
+      "notes": "Courier destination. Generous free tier. Works without login.",
+      "limit_source": "DeepSeek: no published limit. Server busy errors during peak times only limitation.",
+      "popup_handling": null
     },
     {
       "id": "qwen-web",
@@ -348,10 +355,12 @@
       ],
       "provides_tools": [],
       "limit_schema": {
-        "messages_per_day": 500,
-        "tokens_per_day": 5000000
+        "messages_per_day": null,
+        "limit_type": "undocumented_varies_by_model"
       },
-      "notes": "Courier destination. Works without login."
+      "notes": "Courier destination. Works without login.",
+      "limit_source": "Alibaba: limits not published in English. Varies by model (Turbo > Plus > Max).",
+      "popup_handling": null
     },
     {
       "id": "mistral-web",
@@ -368,10 +377,12 @@
       ],
       "provides_tools": [],
       "limit_schema": {
-        "messages_per_day": 500,
-        "tokens_per_day": 2000000
+        "messages_per_day": null,
+        "limit_type": "no_documented_limit"
       },
-      "notes": "Courier destination. Free tier available. Good for code."
+      "notes": "Courier destination. Free tier available. Good for code.",
+      "limit_source": "Mistral: free Le Chat has no published message caps. Very generous.",
+      "popup_handling": null
     },
     {
       "id": "notegpt-web",
@@ -387,10 +398,12 @@
       ],
       "provides_tools": [],
       "limit_schema": {
-        "messages_per_day": 200,
-        "tokens_per_day": 2000000
+        "messages_per_day": 3,
+        "limit_type": "hard_cutoff"
       },
-      "notes": "Courier destination. Free DeepSeek R1 & V3. No login required. Good backup."
+      "notes": "Courier destination. Free DeepSeek R1 & V3. No login required. Good backup.",
+      "limit_source": "User reported: 3 free messages per day.",
+      "popup_handling": null
     },
     {
       "id": "kimi-web",
@@ -406,9 +419,11 @@
       "provides_tools": [],
       "limit_schema": {
         "messages_per_day": 50,
-        "tokens_per_day": null
+        "limit_type": "estimated"
       },
-      "notes": "Courier destination. Google SSO. K2.6 Instant model. Agent swarm feature available."
+      "notes": "Courier destination. Google SSO. K2.6 Instant model. Agent swarm feature available.",
+      "limit_source": "Estimated from Moonshot docs. Not precisely published.",
+      "popup_handling": null
     },
     {
       "id": "huggingchat-web",
@@ -426,9 +441,11 @@
       ],
       "limit_schema": {
         "messages_per_day": null,
-        "tokens_per_day": null
+        "limit_type": "unlimited_mostly"
       },
-      "notes": "Courier destination. Unlimited free. Multi-model switcher. MCP servers. Currently defaulting to Kimi-K2-Instruct-0905 via novita."
+      "notes": "Courier destination. Unlimited free. Multi-model switcher. MCP servers. Currently defaulting to Kimi-K2-Instruct-0905 via novita.",
+      "limit_source": "HuggingFace: community-driven, mostly unlimited. Shared infrastructure may throttle.",
+      "popup_handling": null
     },
     {
       "id": "aistudio-web",
@@ -450,9 +467,13 @@
       ],
       "limit_schema": {
         "requests_per_day": 1500,
-        "tokens_per_day": null
+        "requests_per_minute": 15,
+        "tokens_per_minute": 1000000,
+        "limit_type": "verified_api_docs"
       },
-      "notes": "Courier destination. Best for apps/design. Has native tools: function calling, Google Search grounding, Maps, URL context. Google SSO. Free."
+      "notes": "Courier destination. Best for apps/design. Has native tools: function calling, Google Search grounding, Maps, URL context. Google SSO. Free.",
+      "limit_source": "Google AI docs VERIFIED: Gemini Flash 15 RPM/1M TPM/1500 RPD. Pro: 2 RPM/32K TPM/50 RPD.",
+      "popup_handling": null
     },
     {
       "id": "poe-web",
@@ -467,9 +488,12 @@
       ],
       "provides_tools": [],
       "limit_schema": {
-        "compute_points_per_day": 3000
+        "compute_points_per_day": 3000,
+        "limit_type": "verified"
       },
-      "notes": "Courier destination. Multi-model aggregator. 3000 compute points/day free. Models: DeepSeek-R1, Gemma-4-31B, Gemini-3.1-Flash-Lite and more. Google SSO."
+      "notes": "Courier destination. Multi-model aggregator. 3000 compute points/day free. Models: DeepSeek-R1, Gemma-4-31B, Gemini-3.1-Flash-Lite and more. Google SSO.",
+      "limit_source": "Poe official: 3000 compute points/day. Different models cost different points.",
+      "popup_handling": null
     },
     {
       "id": "chatbox-web",
@@ -485,9 +509,11 @@
       "provides_tools": [],
       "limit_schema": {
         "messages_per_day": null,
-        "tokens_per_day": null
+        "limit_type": "unknown"
       },
-      "notes": "Courier destination. Provides GPT-4o mini for free. No auth needed. URL redirects from chatboxapp.ai to app.chatbox.ai."
+      "notes": "Courier destination. Provides GPT-4o mini for free. No auth needed. URL redirects from chatboxapp.ai to app.chatbox.ai.",
+      "limit_source": "No published limits found. Wrapper service for GPT-4o mini.",
+      "popup_handling": null
     },
     {
       "id": "aizolo-web",
@@ -502,15 +528,18 @@
       ],
       "provides_tools": [],
       "limit_schema": {
-        "messages_per_day": 5,
-        "tokens_per_year": 255000000
+        "messages_per_day_free": 5,
+        "tokens_per_year": 255000000,
+        "limit_type": "verified"
       },
       "best_for": [
         "research",
         "coding",
         "multi_model_comparison"
       ],
-      "notes": "Multi-AI aggregator. Free tier: limited messages then paywall. Has Claude, Gemini, DeepSeek, GPT. Premium $9.90/mo for 3M tokens across all premium models. Good for when free credits run dry on primary platforms."
+      "notes": "Multi-AI aggregator. Free tier: limited messages then paywall. Has Claude, Gemini, DeepSeek, GPT. Premium $9.90/mo for 3M tokens across all premium models. Good for when free credits run dry on primary platforms.",
+      "limit_source": "AiZolo site: 255M tokens/year free. Very limited messages before paywall popup.",
+      "popup_handling": "DISMISS_POPUP: close subscribe/purchase popup via X button before interaction"
     },
     {
       "id": "perplexity-web",
@@ -529,7 +558,8 @@
       ],
       "limit_schema": {
         "pro_searches_per_day": 5,
-        "basic_searches": "unlimited"
+        "basic_searches": "unlimited",
+        "limit_type": "verified"
       },
       "best_for": [
         "search",
@@ -537,7 +567,9 @@
         "citations",
         "live_data"
       ],
-      "notes": "System Researcher primary. Best citation accuracy. Live web search with sources. 5 Pro searches/day free. Google SSO."
+      "notes": "System Researcher primary. Best citation accuracy. Live web search with sources. 5 Pro searches/day free. Google SSO.",
+      "limit_source": "Perplexity official: 5 Pro searches/day free. Basic/unlimited for standard.",
+      "popup_handling": null
     }
   ]
 }
