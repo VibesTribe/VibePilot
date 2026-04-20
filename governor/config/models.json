@@ -73,16 +73,19 @@
         "tool_calling"
       ],
       "access_via": [
-        "gemini-api"
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general"
       ],
-      "api_key_ref": "GEMINI_API_KEY",
+      "api_key_ref": "GEMINI_GENERAL_KEY",
       "status": "active",
       "rate_limits": {
-        "requests_per_minute": 10,
-        "requests_per_hour": 150,
-        "requests_per_day": 250,
-        "tokens_per_minute": 250000,
-        "tokens_per_day": 1000000
+        "requests_per_minute": 60,
+        "requests_per_hour": 600,
+        "requests_per_day": 6000,
+        "tokens_per_minute": 4000000,
+        "tokens_per_day": 4000000
       },
       "throttle_behavior": "hard_cutoff",
       "buffer_pct": 80,
