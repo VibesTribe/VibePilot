@@ -33,12 +33,12 @@
 
 | Component | Gap | Impact |
 |-----------|-----|--------|
+| **Courier connector not registered** | main.go only registers `cli` and `api` types, skips `web` silently | Courier tasks fail immediately: connector not found |
+| **Courier workflow (courier.yml)** | Hardcoded gemini-2.0-flash, doesn't read dispatch payload, no web_platform_url navigation, fake tokens | Couriers can't actually run |
+| **Courier browser automation** | No per-platform navigation templates (find chat box, paste, wait, copy output + chat URL) | Even if dispatch works, browser-use doesn't know what to do on each platform |
 | E2E pipeline test | Never tested full chain PRD→merge | Can't trust the system until proven |
-| Courier workflow (courier.yml) | Hardcoded gemini-2.0-flash, doesn't read dispatch payload | Couriers can't actually run |
 | System researcher | Prompt exists, not wired to cron or Supabase | No automated landscape monitoring |
-| Visual QA agent | Concept only, no implementation | No automated screenshot testing |
 | Multi-key Gemini strategy | Research done, needs Google Cloud project creation | Single point of failure for couriers |
-| SiliconFlow connector | Research done, no account or connector entry | Missing cheaper alternative |
 | Gap analysis doc | Stale -- lists 3 "broken" things that are all fixed | Misleading documentation |
 
 ---
