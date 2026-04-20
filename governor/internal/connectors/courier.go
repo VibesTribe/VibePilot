@@ -7,11 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
-)
-
-const (
-	CourierPollIntervalSecs = 5
 )
 
 type CourierDB interface {
@@ -20,12 +17,23 @@ type CourierDB interface {
 	Update(ctx context.Context, table, id string, data map[string]any) (json.RawMessage, error)
 }
 
+// courierWaiter holds a channel that gets signaled when a courier task completes.
+type courierWaiter struct {
+	result chan *TaskRunResult
+}
+
+// CourierRunner dispatches tasks to GitHub Actions for browser-based execution
+// and waits for results via Supabase realtime (not polling).
 type CourierRunner struct {
 	githubToken string
 	githubRepo  string
 	db          CourierDB
 	httpClient  *http.Client
 	timeout     time.Duration
+
+	// waiters maps taskID -> channel for realtime result delivery
+	waiters map[string]*courierWaiter
+	mu      sync.RWMutex
 }
 
 func NewCourierRunner(githubToken, githubRepo string, db CourierDB, timeoutSecs int) *CourierRunner {
@@ -39,9 +47,12 @@ func NewCourierRunner(githubToken, githubRepo string, db CourierDB, timeoutSecs 
 		db:          db,
 		httpClient:  &http.Client{Timeout: 30 * time.Second},
 		timeout:     time.Duration(timeout) * time.Second,
+		waiters:     make(map[string]*courierWaiter),
 	}
 }
 
+// Run dispatches a courier task to GitHub Actions and waits for the result.
+// Results are delivered via Supabase realtime (zero polling).
 func (r *CourierRunner) Run(ctx context.Context, prompt string, timeout int) (string, int, int, error) {
 	if r.githubToken == "" {
 		return "", 0, 0, fmt.Errorf("GITHUB_TOKEN not configured")
@@ -93,9 +104,6 @@ func (r *CourierRunner) Run(ctx context.Context, prompt string, timeout int) (st
 	supabaseURL, _ := task["supabase_url"].(string)
 	supabaseKey, _ := task["supabase_key"].(string)
 
-	if llmProvider == "" || llmModel == "" || llmAPIKey == "" {
-		return "", 0, 0, fmt.Errorf("orchestrator must provide browser_llm_provider, browser_llm_model, browser_llm_api_key")
-	}
 	if webPlatformURL == "" {
 		return "", 0, 0, fmt.Errorf("orchestrator must provide web_platform_url")
 	}
@@ -108,6 +116,11 @@ func (r *CourierRunner) Run(ctx context.Context, prompt string, timeout int) (st
 	ctx, cancel := context.WithTimeout(ctx, effectiveTimeout)
 	defer cancel()
 
+	// Register as a waiter BEFORE dispatching, so we don't miss the realtime event
+	w := r.registerWaiter(taskID)
+	defer r.unregisterWaiter(taskID)
+
+	// Create task_runs row so the GitHub Action can update it
 	_, err := r.db.Insert(ctx, "task_runs", map[string]any{
 		"id":         taskID,
 		"status":     "running",
@@ -117,17 +130,61 @@ func (r *CourierRunner) Run(ctx context.Context, prompt string, timeout int) (st
 		return "", 0, 0, fmt.Errorf("create task_run: %w", err)
 	}
 
+	// Dispatch to GitHub Actions
 	if err := r.dispatch(ctx, taskID, taskPrompt, branchName, llmProvider, llmModel, llmAPIKey, webPlatformURL, supabaseURL, supabaseKey); err != nil {
 		r.failTaskRun(ctx, taskID, err.Error())
 		return "", 0, 0, err
 	}
 
-	result, err := r.pollCompletion(ctx, taskID)
+	// Wait for result via channel (fed by Supabase realtime, zero polling)
+	result, err := r.waitForCompletion(ctx, w)
 	if err != nil {
 		return "", 0, 0, err
 	}
 
 	return result.Output, result.TokensIn, result.TokensOut, nil
+}
+
+// NotifyResult is called by the event handler when a realtime EventCourierResult arrives.
+// It finds the waiting goroutine and delivers the result.
+func (r *CourierRunner) NotifyResult(taskID string, result *TaskRunResult) {
+	r.mu.RLock()
+	w, ok := r.waiters[taskID]
+	r.mu.RUnlock()
+
+	if ok {
+		select {
+		case w.result <- result:
+		default:
+			// Channel full or already delivered, skip
+		}
+	}
+}
+
+func (r *CourierRunner) registerWaiter(taskID string) *courierWaiter {
+	w := &courierWaiter{result: make(chan *TaskRunResult, 1)}
+	r.mu.Lock()
+	r.waiters[taskID] = w
+	r.mu.Unlock()
+	return w
+}
+
+func (r *CourierRunner) unregisterWaiter(taskID string) {
+	r.mu.Lock()
+	delete(r.waiters, taskID)
+	r.mu.Unlock()
+}
+
+func (r *CourierRunner) waitForCompletion(ctx context.Context, w *courierWaiter) (*TaskRunResult, error) {
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("timeout waiting for courier completion")
+	case result := <-w.result:
+		if result.Status == "failed" {
+			return nil, fmt.Errorf("courier failed: %s", result.Error)
+		}
+		return result, nil
+	}
 }
 
 func (r *CourierRunner) failTaskRun(ctx context.Context, id, errMsg string) {
@@ -183,52 +240,13 @@ func (r *CourierRunner) dispatch(ctx context.Context, taskID, taskPrompt, branch
 	return nil
 }
 
-type taskRunResult struct {
+// TaskRunResult holds the result of a courier task execution.
+type TaskRunResult struct {
 	Status    string `json:"status"`
 	Output    string `json:"output"`
 	Error     string `json:"error"`
 	TokensIn  int    `json:"tokens_in"`
 	TokensOut int    `json:"tokens_out"`
-}
-
-func (r *CourierRunner) pollCompletion(ctx context.Context, taskID string) (*taskRunResult, error) {
-	ticker := time.NewTicker(time.Duration(CourierPollIntervalSecs) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("timeout waiting for courier completion")
-		case <-ticker.C:
-			data, err := r.db.Query(ctx, "task_runs", map[string]any{
-				"id":     taskID,
-				"select": "status,output,error,tokens_in,tokens_out",
-			})
-			if err != nil {
-				continue
-			}
-
-			var results []taskRunResult
-			if err := json.Unmarshal(data, &results); err != nil {
-				continue
-			}
-
-			if len(results) == 0 {
-				continue
-			}
-
-			result := &results[0]
-			if result.Status == "running" {
-				continue
-			}
-
-			if result.Status == "failed" {
-				return nil, fmt.Errorf("courier failed: %s", result.Error)
-			}
-
-			return result, nil
-		}
-	}
 }
 
 func min(a, b int) int {

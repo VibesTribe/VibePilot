@@ -246,6 +246,7 @@ func (c *Client) SubscribeToAllTables() error {
 		"maintenance_commands",
 		"research_suggestions",
 		"test_results",
+		"task_runs",
 	}
 
 	for _, table := range tables {
@@ -515,6 +516,13 @@ func (c *Client) mapToEventType(change *ChangeEvent) string {
 
 	case table == "test_results":
 		return string(runtime.EventTestResults)
+
+	case table == "task_runs":
+		// Only emit when status transitions away from "running" (completed or failed)
+		status, _ := change.New["status"].(string)
+		if status == "completed" || status == "failed" {
+			return string(runtime.EventCourierResult)
+		}
 	}
 
 	return ""
