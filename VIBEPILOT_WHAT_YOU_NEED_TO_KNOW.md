@@ -312,29 +312,18 @@ Fix the Go code that writes to Supabase.
 ┌──────────────────────────┐  ┌─────────────────────────────────────────────────┐
 │ 7a. INTERNAL EXECUTION   │  │ 7b. COURIER AGENT (routing_flag = "web")        │
 │ (isolated worktree)      │  │                                                 │
-│ - git worktree           │  │ Courier agents execute tasks on external free    │
-│ - prompt packet sent     │  │ tier LLMs (Groq, OpenRouter, Gemini, NVIDIA).   │
-│ - model generates code   │  │                                                 │
-│ - commit to task branch  │  │ Flow:                                          │
-│ - task_runs record       │  │ 1. Governor builds courier packet with:         │
-│                          │  │    - prompt (task context)                      │
-│                          │  │    - model_id + connector_id                    │
-│                          │  │    - supabase_url/key (for result writing)      │
-│                          │  │    - llm_api_key (decrypted from vault)         │
-│                          │  │ 2. CourierRunner dispatches to LLM API          │
-│                          │  │ 3. LLM generates response                      │
-│                          │  │ 4. Result written to task_runs (JSONB)          │
-│                          │  │ 5. Tokens counted client-side (never trust      │
-│                          │  │    external counts)                             │
-│                          │  │ 6. Task transitioned to next status             │
-│                          │  │                                                 │
-│                          │  │ Gemini 4-Project: Each role gets its own        │
-│                          │  │ Google Cloud project with independent quota:    │
-│                          │  │ - Courier  -> gemini-2.5-flash-lite (15 RPM)    │
-│                          │  │ - Researcher -> gemini-3.1-flash-lite-preview   │
-│                          │  │ - Visual QA -> gemini-3-flash-preview           │
-│                          │  │ - General   -> gemini-2.5-flash-lite (fallback) │
-│                          │  │ Combined: 60 RPM / 6000 RPD free                │
+│ - git worktree           │  │ Dispatches to GitHub Actions for browser-use:   │
+│ - prompt packet sent     │  │ - Zero local weight (runs in cloud)             │
+│ - model generates code   │  │ - Zero polling (Supabase Realtime results)      │
+│ - commit to task branch  │  │                                                 │
+│ - task_runs record       │  │ 1. executeCourierTask() builds packet           │
+│                          │  │ 2. Vault decrypts key via deriveLLMKeyRef       │
+│                          │  │ 3. CourierRunner.dispatch() → GitHub Actions    │
+│                          │  │ 4. courier_run.py: browser-use + playwright     │
+│                          │  │ 5. Result → task_runs via Supabase REST         │
+│                          │  │ 6. Realtime fires EventCourierResult            │
+│                          │  │ 7. NotifyResult() → waiting goroutine           │
+│                          │  │ 8. Task → "review"                              │
 └──────────────────────────┘  └─────────────────────────────────────────────────┘
                               │
                               ▼
@@ -501,31 +490,34 @@ Courier agents are the primary execution path for tasks routed to external free-
 
 **How it works:**
 ```
-Governor receives task with routing_flag="web"
+Governor receives task → router selects routing_flag="web"
         │
         ▼
-TaskHandler.deriveLLMKeyRef(connectorID) → vault key name
+TaskHandler.executeCourierTask() builds courier packet
         │
         ▼
-Vault.GetSecret(key_name) → decrypted API key
+Vault.GetSecret(deriveLLMKeyRef(connectorID)) → decrypted API key
         │
         ▼
-Build courier packet:
-  - prompt (task context from context_builder)
-  - model_id + connector_id
-  - supabase_url + supabase_anon_key
-  - llm_api_key (decrypted)
+CourierRunner.dispatch() → repository_dispatch to GitHub Actions
         │
         ▼
-CourierRunner.Run() → calls LLM API
+GitHub Actions: ubuntu-latest + browser-use + playwright
         │
         ▼
-Result → task_runs.result (JSONB)
-Tokens → task_runs.tokens_in, tokens_out (client-side count)
-Cost → calculated from tokens × model pricing
+courier_run.py: navigate platform URL → paste prompt → extract response
         │
         ▼
-transition_task(task_id, "available") → next stage
+courier_run.py writes to task_runs via Supabase REST
+        │
+        ▼
+Supabase Realtime fires UPDATE → EventCourierResult
+        │
+        ▼
+CourierRunner.NotifyResult() → channel delivery to waiting goroutine
+        │
+        ▼
+Tokens counted client-side → Cost calculated → transition_task → review
 ```
 
 **Key files:**

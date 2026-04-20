@@ -80,39 +80,46 @@ AES-GCM encrypted, PBKDF2 SHA256 100k iterations. ~15 keys stored:
 
 ## Courier Agent Pipeline
 
+### Architecture: GitHub Actions + Supabase Realtime (zero polling)
+
+The courier dispatches browser-use tasks to GitHub Actions (free, zero local weight). Results come back via Supabase Realtime subscriptions -- never polls.
+
+```
+Governor → router selects routing_flag="web"
+        → CourierRunner.dispatch() sends repository_dispatch to GitHub
+        → GitHub Actions spins up ubuntu-latest + browser-use + playwright
+        → courier_run.py navigates to web platform, pastes prompt, extracts response
+        → courier_run.py writes result to task_runs table via Supabase REST
+        → Supabase Realtime fires UPDATE on task_runs
+        → Governor realtime client receives EventCourierResult
+        → CourierRunner.NotifyResult() delivers to waiting goroutine via channel
+        → Task transitions to "review"
+```
+
 ### Implementation Status
-Steps 1-5 of 10 complete. Step 8 scaffold exists but untested. Steps 6-7 and 9-10 remaining.
 
-| Step | Description | Status | Detail |
-|------|-------------|--------|--------|
-| 1 | Model capabilities + courier markers | Done | 11 models marked courier: true |
-| 2 | Add missing vision models to models.json | Done | 4 vision models added |
-| 3 | PlatformID/PlatformURL in RoutingResult | Done | router.go updated |
-| 4 | Remove hardcoded RoutingFlag "internal" | Done | Task runner uses "" (router decides) |
-| 5 | courierRunner on TaskHandler struct | Done | Struct wired up |
-| 6 | Web routing branch in executeTask | **Not done** | No executeViaCourier method yet |
-| 7 | Install browser-use + playwright | **Not done** | pip: package not found |
-| 8 | Write courier_run.py | **Scaffold exists** | File written, not tested |
-| 9 | Local dispatch in CourierRunner | **Not done** | Still uses GitHub Actions API |
-| 10 | E2E test with chat.deepseek.com | **Not done** | |
+All core pipeline wired and committed. Verified by code audit.
 
-### Courier Flow
-```
-Task created → Planner assigns → Router selects model
-    → routing_flag="web" → CourierRunner builds packet
-    → Vault decrypts API key → LLM API call
-    → Result → task_runs (JSONB)
-    → Tokens counted client-side → Cost calculated
-    → transition_task → next stage
-```
+| Component | Status | Commit | Detail |
+|-----------|--------|--------|--------|
+| Model capabilities + courier markers | Done | bc0197a7 | 11 models marked courier: true |
+| Missing vision models added | Done | bc0197a7 | 4 vision models added to models.json |
+| PlatformID/PlatformURL in RoutingResult | Done | e4e807ca | router.go carries destination info |
+| Hardcoded RoutingFlag removed | Done | e4e807ca | Task runner passes "" (router decides) |
+| CourierRunner on TaskHandler struct | Done | e4e807ca | Wired through main.go to TaskHandler |
+| Web routing branch in executeTask | Done | e4e807ca | executeCourierTask() method added |
+| GitHub Actions workflow | Done | b0b55235 | .github/workflows/courier_dispatch.yml |
+| courier_run.py script | Done | b0b55235 | scripts/courier_run.py (browser-use) |
+| Supabase Realtime (replaced polling) | Done | 57d9c237 | Zero-polling: channel-based waiters, task_runs subscription |
+| EventCourierResult handler | Done | 57d9c237 | main.go wires realtime event to CourierRunner.NotifyResult |
+| Pipeline gap fixes (5 gaps) | Done | c2e94151 | Vault threading, RPC params, task_runs columns, result format |
+| Vault key derivation (deriveLLMKeyRef) | Done | c2e94151 | Maps connectorID → vault key name |
+| Gemini 4-project connectors | Done | 0897340f, 3a16958c | 4 independent keys, correct models, all tested |
 
-### Key Files
-| File | Purpose |
-|------|---------|
-| governor/internal/connectors/courier.go | CourierRunner, API dispatch |
-| governor/cmd/governor/handlers_task.go | Vault threading, deriveLLMKeyRef |
-| scripts/courier_run.py | Python runner (GitHub Actions path) |
-| .github/workflows/courier-dispatch.yml | GitHub Actions workflow |
+### Not Yet Verified End-to-End
+
+The full pipeline is wired but has never been tested with governor running and a real task.
+No E2E test has been executed. Potential gaps may exist in runtime integration.
 
 ## Budget
 - **OpenRouter**: $0 credit account. Max spend limit configured for future-proofing. No payment added.
