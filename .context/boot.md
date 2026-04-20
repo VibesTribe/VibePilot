@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-19T22:08:20Z | Commit: 91a388d6 | Branch: main
+# Generated: 2026-04-20T02:32:00Z | Commit: c5193423 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -171,7 +171,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Codebase Structure (auto-discovered)
 - governor/cmd/cleanup/ (1 files, 1 funcs, 0 types)
 - governor/cmd/encrypt_secret/ (1 files, 1 funcs, 0 types)
-- governor/cmd/governor/ (14 files, 116 funcs, 13 types)
+- governor/cmd/governor/ (14 files, 117 funcs, 13 types)
 - governor/cmd/migrate_vault/ (1 files, 5 funcs, 1 types)
 - governor/internal/connectors/ (2 files, 23 funcs, 8 types)
 - governor/internal/core/ (4 files, 35 funcs, 27 types)
@@ -183,7 +183,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
 - governor/internal/memory/ (2 files, 19 funcs, 5 types)
 - governor/internal/realtime/ (1 files, 23 funcs, 8 types)
-- governor/internal/runtime/ (11 files, 175 funcs, 92 types)
+- governor/internal/runtime/ (13 files, 202 funcs, 98 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 15 funcs, 4 types)
@@ -222,7 +222,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 91a388d6
+- Commit: c5193423
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -242,32 +242,32 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-19 08:24 UTC
+# AUTO-UPDATED: 2026-04-19 20:30 UTC
 # RULE: Update this file after ANY change set. Resume from here, never from guesses.
 ## Three Sources of Truth
 1. **GitHub (code):** https://github.com/VibesTribe/VibePilot — pushed=real
 2. **Supabase (data):** https://qtpdzsinvifkgpxyxlaz.supabase.co — in DB=real
 3. **Dashboard (live):** https://vibeflow-dashboard.vercel.app/ — rendering=working
-## Active Models (12) — All backed by verified API keys
-### Groq (3) — Free tier, rate limited
-- llama-3.3-70b-versatile (96K context)
-- llama-3.1-8b-instant (96K context)
-- qwen3-32b (96K context)
-### OpenRouter Free (5) — Account at -$0.57, free models work
-- qwen/qwen3.6-plus:free (197K context)
-- qwen/qwen3-coder:free (197K context)
-- nvidia/nemotron-3-super-120b:free (197K context)
-- google/gemma-4-31b-it:free (197K context)
-- z-ai/glm-4.5-air:free (98K context)
-### NVIDIA NIM (1) — Free tier
-- nvidia/llama-3.1-nemotron-ultra-253b-v1 (96K context)
-### Gemini API (2) — Key verified working (50 models available)
-- gemini-2.5-flash (750K context)
-- gemini-api (750K context)
-### Z.AI (1) — $30/mo subscription, ends May 1
-- glm-5 (152K context) — hermes interactive only
-## Paused Models (5)
-- deepseek-chat — out of credit (💰 Credit Needed on dashboard)
-- deepseek-reasoner — out of credit (💰 Credit Needed on dashboard)
-- gemini-2.0-flash — DEPRECATED by Google June 1 2026
-## Benched Models (14) — All visible as ⚠ Issue on dashboard
+## Active Models (33 total, 26 API + 7 web courier)
+### Groq API (7) — Free tier, org-level 100K TPD shared (now tracked)
+- llama-3.3-70b-versatile, llama-3.1-8b-instant, qwen3-32b
+- meta-llama/llama-4-scout-17b-16e-instruct, openai/gpt-oss-120b
+- groq/compound, groq/compound-mini
+### OpenRouter Free (6) — Account at -$0.57, free models only
+- google/gemma-4-31b-it, z-ai/glm-4.5-air, minimax/minimax-m2.5
+- nvidia/nemotron-3-super-120b, nvidia/nemotron-3-super-120b-a12b, openai/gpt-oss-120b
+### NVIDIA NIM (3) — Free tier
+- meta/llama-3.3-70b-instruct, moonshotai/kimi-k2-instruct, nvidia/llama-3.1-nemotron-ultra-253b-v1
+### Gemini API (1) — Key verified working
+- gemini-2.5-flash
+### Hermes/CLI (1) — Z.AI subscription, ends May 1
+- glm-5 (hermes interactive only)
+### Web Courier Destinations (untested, need browser automation)
+- gemini-web: gemini-2.5-pro
+- deepseek-web: deepseek-r1, deepseek-v3 (also on notegpt-web)
+- qwen-web: qwen-2.5, qwen-3
+- mistral-web: mistral-large, codestral, pixtral
+- notegpt-web: deepseek-r1, deepseek-v3
+## Paused Models (2)
+- deepseek-chat — out of credit
+- deepseek-reasoner — out of credit
