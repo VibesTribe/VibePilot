@@ -248,6 +248,18 @@ type ToolsFile struct {
 	Tools map[string]ToolConfig `json:"tools"`
 }
 
+// PlatformLimitSchema describes free-tier limits for web platform destinations
+// (courier destinations like chatgpt.com, claude.ai, etc.). Only fields with
+// known/documented values are set; nil means no limit or unknown.
+type PlatformLimitSchema struct {
+	MessagesPer3h      *int `json:"messages_per_3h,omitempty"`
+	MessagesPer8h      *int `json:"messages_per_8h,omitempty"`
+	MessagesPerDay     *int `json:"messages_per_day,omitempty"`
+	MessagesPerSession *int `json:"messages_per_session,omitempty"`
+	TokensPerDay       *int `json:"tokens_per_day,omitempty"`
+	SessionsPerDay     *int `json:"sessions_per_day,omitempty"`
+}
+
 type ConnectorConfig struct {
 	ID             string                 `json:"id"`
 	Name           string                 `json:"name"`
@@ -260,6 +272,8 @@ type ConnectorConfig struct {
 	APIKeyRef      string                 `json:"api_key_ref,omitempty"`
 	Models         []string               `json:"models_available,omitempty"`
 	TimeoutSeconds int                    `json:"timeout_seconds,omitempty"`
+	SharedLimits   RateLimits             `json:"shared_limits,omitempty"`
+	LimitSchema    PlatformLimitSchema    `json:"limit_schema,omitempty"`
 	Extra          map[string]interface{} `json:"-"`
 }
 

@@ -131,6 +131,10 @@ var defaultRPCAllowlist = map[string]bool{
 
 	// Task creation (migration 077)
 	"create_task_if_not_exists": true,
+
+	// Usage persistence (migration 126)
+	"upsert_connector_usage": true,
+	"update_platform_usage":  true,
 }
 
 type RPCAllowlist struct {

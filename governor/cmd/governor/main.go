@@ -138,6 +138,13 @@ func main() {
 		log.Printf("Warning: Failed to load model profiles: %v", err)
 	}
 
+	// Restore persisted usage state (rate limits, cooldowns, learned data) from database
+	loadCtx, loadCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	if err := usageTracker.LoadFromDatabase(loadCtx); err != nil {
+		log.Printf("[UsageTracker] Warning: failed to load persisted state: %v", err)
+	}
+	loadCancel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

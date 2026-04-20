@@ -37,6 +37,9 @@ func startupValidate(configDir string, database interface {
 	// 5. Agent IDs used in handlers match config
 	errors += validateAgentIDs(configDir)
 
+	// 6. Cascade model IDs in routing.json exist in models.json
+	errors += validateCascadeModelIDs(configDir)
+
 	if errors > 0 {
 		log.Printf("[Startup] FAILED: %d issue(s) found. Fix above before deploying tasks.", errors)
 	} else {
@@ -405,6 +408,68 @@ func validateAgentIDs(configDir string) int {
 			if !hasActive && len(m.AccessVia) > 0 {
 				log.Printf("[Startup] WARNING: model '%s' access_via %v has no active connectors", m.ID, m.AccessVia)
 			}
+		}
+	}
+
+	return errors
+}
+
+// validateCascadeModelIDs checks that every model ID listed in routing cascade
+// strategies actually exists in models.json. Dead entries waste cascade slots.
+func validateCascadeModelIDs(configDir string) int {
+	errors := 0
+
+	// Load model IDs
+	type modelStub struct {
+		ID string `json:"id"`
+	}
+	type modelsConfig struct {
+		Models []modelStub `json:"models"`
+	}
+
+	modelCfg, err := loadJSONFile[modelsConfig](filepath.Join(configDir, "models.json"))
+	if err != nil {
+		log.Printf("[Startup] ERROR: cannot parse models.json for cascade validation: %v", err)
+		return 1
+	}
+
+	modelIDs := map[string]bool{}
+	for _, m := range modelCfg.Models {
+		modelIDs[m.ID] = true
+	}
+
+	// Load routing config
+	type strategyStub struct {
+		Priority []string `json:"priority"`
+	}
+	type routingConfig struct {
+		Strategies map[string]strategyStub `json:"strategies"`
+	}
+
+	routingCfg, err := loadJSONFile[routingConfig](filepath.Join(configDir, "routing.json"))
+	if err != nil {
+		log.Printf("[Startup] ERROR: cannot parse routing.json for cascade validation: %v", err)
+		return 1
+	}
+
+	// Check each strategy's priority list for model IDs not in models.json
+	for name, strategy := range routingCfg.Strategies {
+		for _, modelID := range strategy.Priority {
+			// Skip non-model entries like "external", "internal" which are category names
+			if modelID == "external" || modelID == "internal" {
+				continue
+			}
+			if !modelIDs[modelID] {
+				log.Printf("[Startup] ERROR: routing strategy '%s' references model '%s' which does not exist in models.json -- remove it from routing.json", name, modelID)
+				errors++
+			}
+		}
+	}
+
+	if errors == 0 {
+		// Log how many cascade entries were validated
+		if fc, ok := routingCfg.Strategies["free_cascade"]; ok {
+			log.Printf("[Startup] OK: free_cascade has %d entries, all valid in models.json", len(fc.Priority))
 		}
 	}
 

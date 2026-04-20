@@ -68,7 +68,6 @@ func (l *ModelLoader) Load(ctx context.Context) error {
 
 	return nil
 }
-
 func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) error {
 	rateLimitsJSON, _ := json.Marshal(profile.RateLimits)
 	recoveryJSON, _ := json.Marshal(profile.Recovery)
@@ -187,7 +186,88 @@ func LoadModelsFromConfig(configDir string, database *db.DB, tracker *UsageTrack
 		return nil, err
 	}
 
+	// Load connector shared limits from connectors.json
+	connectorsPath := filepath.Join(configDir, "connectors.json")
+	if tracker != nil {
+		loadConnectorSharedLimits(connectorsPath, tracker)
+		loadWebPlatformLimits(connectorsPath, tracker)
+	}
+
 	return loader, nil
+}
+
+// loadConnectorSharedLimits reads connectors.json and registers any connector
+// that has a "shared_limits" field with the UsageTracker's ConnectorUsageTracker.
+func loadConnectorSharedLimits(connectorsPath string, tracker *UsageTracker) {
+	data, err := os.ReadFile(connectorsPath)
+	if err != nil {
+		return // connectors.json not required
+	}
+
+	var file ConnectorsFile
+	if err := json.Unmarshal(data, &file); err != nil {
+		log.Printf("[ModelLoader] Warning: failed to parse connectors.json for shared limits: %v", err)
+		return
+	}
+
+	registered := 0
+	for _, conn := range file.Connectors {
+		// Only register if at least one shared limit is set
+		if conn.SharedLimits.RequestsPerMinute == nil &&
+			conn.SharedLimits.RequestsPerDay == nil &&
+			conn.SharedLimits.TokensPerMinute == nil &&
+			conn.SharedLimits.TokensPerDay == nil &&
+			conn.SharedLimits.RequestsPerHour == nil {
+			continue
+		}
+
+		tracker.RegisterConnectorSharedLimits(conn.ID, conn.SharedLimits)
+		registered++
+	}
+
+	if registered > 0 {
+		log.Printf("[ModelLoader] Registered shared limits for %d connectors", registered)
+	}
+}
+
+// loadWebPlatformLimits reads connectors.json and registers any web-type connector
+// that has a "limit_schema" field with the UsageTracker's PlatformUsageTracker.
+func loadWebPlatformLimits(connectorsPath string, tracker *UsageTracker) {
+	data, err := os.ReadFile(connectorsPath)
+	if err != nil {
+		return // connectors.json not required
+	}
+
+	var file ConnectorsFile
+	if err := json.Unmarshal(data, &file); err != nil {
+		log.Printf("[ModelLoader] Warning: failed to parse connectors.json for platform limits: %v", err)
+		return
+	}
+
+	registered := 0
+	for _, conn := range file.Connectors {
+		// Only register web destinations with limit_schema
+		if conn.Type != "web" {
+			continue
+		}
+
+		// Only register if at least one limit is set
+		if conn.LimitSchema.MessagesPer3h == nil &&
+			conn.LimitSchema.MessagesPer8h == nil &&
+			conn.LimitSchema.MessagesPerDay == nil &&
+			conn.LimitSchema.MessagesPerSession == nil &&
+			conn.LimitSchema.TokensPerDay == nil &&
+			conn.LimitSchema.SessionsPerDay == nil {
+			continue
+		}
+
+		tracker.RegisterPlatformLimits(conn.ID, conn.LimitSchema)
+		registered++
+	}
+
+	if registered > 0 {
+		log.Printf("[ModelLoader] Registered platform limits for %d web destinations", registered)
+	}
 }
 
 func (l *ModelLoader) GetModel(modelID string) *ModelProfile {
