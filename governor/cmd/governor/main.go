@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"os/signal"
@@ -363,4 +364,29 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupTestingHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, worktreeMgr)
 	setupResearchHandlers(ctx, router, factory, pool, database, cfg, connRouter)
+
+	// Courier result handler: delivers Supabase realtime notifications to waiting courier goroutines
+	if courierRunner != nil {
+		router.On(runtime.EventCourierResult, func(event runtime.Event) {
+			var record struct {
+				ID        string `json:"id"`
+				Status    string `json:"status"`
+				Output    string `json:"output"`
+				Error     string `json:"error"`
+				TokensIn  int    `json:"tokens_in"`
+				TokensOut int    `json:"tokens_out"`
+			}
+			if err := json.Unmarshal(event.Record, &record); err != nil {
+				log.Printf("[CourierResult] Failed to parse record: %v", err)
+				return
+			}
+			courierRunner.NotifyResult(record.ID, &connectors.TaskRunResult{
+				Status:    record.Status,
+				Output:    record.Output,
+				Error:     record.Error,
+				TokensIn:  record.TokensIn,
+				TokensOut: record.TokensOut,
+			})
+		})
+	}
 }
