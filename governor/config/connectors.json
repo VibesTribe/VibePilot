@@ -488,6 +488,56 @@
         "tokens_per_day": null
       },
       "notes": "Courier destination. Provides GPT-4o mini for free. No auth needed. URL redirects from chatboxapp.ai to app.chatbox.ai."
+    },
+    {
+      "id": "aizolo-web",
+      "name": "AiZolo",
+      "type": "web",
+      "status": "active",
+      "url": "https://chat.aizolo.com/new",
+      "provider": "aizolo",
+      "requires_auth": "none",
+      "models_available": [
+        "aizolo-mix"
+      ],
+      "provides_tools": [],
+      "limit_schema": {
+        "messages_per_day": 5,
+        "tokens_per_year": 255000000
+      },
+      "best_for": [
+        "research",
+        "coding",
+        "multi_model_comparison"
+      ],
+      "notes": "Multi-AI aggregator. Free tier: limited messages then paywall. Has Claude, Gemini, DeepSeek, GPT. Premium $9.90/mo for 3M tokens across all premium models. Good for when free credits run dry on primary platforms."
+    },
+    {
+      "id": "perplexity-web",
+      "name": "Perplexity",
+      "type": "web",
+      "status": "active",
+      "url": "https://www.perplexity.ai/",
+      "provider": "perplexity",
+      "requires_auth": "none",
+      "models_available": [
+        "perplexity-free"
+      ],
+      "provides_tools": [
+        "web_search",
+        "citations"
+      ],
+      "limit_schema": {
+        "pro_searches_per_day": 5,
+        "basic_searches": "unlimited"
+      },
+      "best_for": [
+        "search",
+        "research",
+        "citations",
+        "live_data"
+      ],
+      "notes": "System Researcher primary. Best citation accuracy. Live web search with sources. 5 Pro searches/day free. Google SSO."
     }
   ]
 }

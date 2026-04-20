@@ -2647,6 +2647,133 @@
       ],
       "notes": "Free GPT-4o mini via Chatbox wrapper. No auth needed. URL: app.chatbox.ai.",
       "status_reason": null
+    },
+    {
+      "id": "aizolo-mix",
+      "name": "AiZolo Multi-Model",
+      "provider": "aizolo",
+      "access_type": "web",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "research",
+        "multi_model"
+      ],
+      "access_via": [
+        "aizolo-web"
+      ],
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_day": 5,
+        "tokens_per_year": 255000000,
+        "messages_per_3_hours": null
+      },
+      "throttle_behavior": "hard_cutoff",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "failover",
+        "cooldown_minutes": 60,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [
+          "research",
+          "coding",
+          "comparison"
+        ],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "multi_model",
+        "claude_access",
+        "gemini_access",
+        "deepseek_access",
+        "cheap_premium_fallback"
+      ],
+      "weaknesses": [
+        "free_tier_very_limited",
+        "paywall_after_few_messages"
+      ],
+      "notes": "Aggregator. Free tier very limited (few messages). $9.90/mo gets 3M tokens across ALL premium models -- cheapest paid fallback. Best for when primary platform credits exhaust.",
+      "status_reason": null
+    },
+    {
+      "id": "perplexity-free",
+      "name": "Perplexity Free Search",
+      "provider": "perplexity",
+      "access_type": "web",
+      "context_limit": 32000,
+      "capabilities": [
+        "search",
+        "citations",
+        "live_data",
+        "research"
+      ],
+      "access_via": [
+        "perplexity-web"
+      ],
+      "status": "active",
+      "courier": true,
+      "courier_role": "system_researcher",
+      "rate_limits": {
+        "requests_per_minute": null,
+        "requests_per_day": null,
+        "pro_searches_per_day": 5,
+        "messages_per_3_hours": null
+      },
+      "throttle_behavior": "soft_throttle",
+      "buffer_pct": 80,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 60,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [
+          "search",
+          "research",
+          "live_data",
+          "citation"
+        ],
+        "avoid_for_task_types": [
+          "code_generation",
+          "long_form"
+        ]
+      },
+      "strengths": [
+        "live_web_search",
+        "citations_with_links",
+        "source_accuracy",
+        "technical_docs",
+        "unlimited_basic"
+      ],
+      "weaknesses": [
+        "not_for_code_gen",
+        "limited_pro_searches",
+        "basic_model_for_free"
+      ],
+      "notes": "System Researcher primary platform. Best for sourcing GitHub repos, API docs, live data. 5 Pro searches/day, unlimited basic. Google SSO. Citations make it ideal for research verification.",
+      "status_reason": null
     }
   ],
   "defaults": {
