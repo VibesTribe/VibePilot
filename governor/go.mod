@@ -7,7 +7,7 @@ require (
 	golang.org/x/crypto v0.48.0
 )
 
-require gopkg.in/yaml.v3 v3.0.1 // indirect
+require gopkg.in/yaml.v3 v3.0.1
 
 require (
 	github.com/google/jsonschema-go v0.4.2 // indirect

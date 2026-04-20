@@ -10,6 +10,15 @@ import (
 	"github.com/vibepilot/governor/internal/db"
 )
 
+// defaultCourierEstimatedTokens is a conservative estimate for how many tokens
+// a courier task will consume (prompt + response). Refined later when exact
+// prompt size is known.
+const defaultCourierEstimatedTokens = 4000
+
+// defaultInternalEstimatedTokens is a conservative estimate for internal routing
+// tasks, which are typically smaller than courier tasks (planner, supervisor, etc.).
+const defaultInternalEstimatedTokens = 2000
+
 type Router struct {
 	cfg           *Config
 	database      *db.DB
@@ -91,7 +100,29 @@ func (r *Router) tryWebRouting(ctx context.Context, req RoutingRequest) *Routing
 		return nil
 	}
 
-	log.Printf("[Router] Web routing: connector=%s model=%s destination=%s", courierConn, courierModel, dest.PlatformID)
+	// Final dual-envelope gate: verify BOTH envelopes have headroom before
+	// committing to courier dispatch. This catches edge cases where the
+	// per-function checks passed but the combined state has changed (e.g.
+	// concurrent requests consumed the remaining quota between checks).
+	if r.usageTracker != nil {
+		// Envelope A: fueling model + connector API rate limits
+		decision := r.usageTracker.CanMakeRequestVia(ctx, courierModel, courierConn, defaultCourierEstimatedTokens)
+		if !decision.CanProceed {
+			log.Printf("[Router] Dual-envelope abort: envelope A failed for model=%s conn=%s (%s, wait %v)",
+				courierModel, courierConn, decision.Reason, decision.WaitTime)
+			return nil
+		}
+
+		// Envelope B: web platform free-tier limits
+		canProceed, waitTime := r.usageTracker.PlatformCanMakeRequest(ctx, dest.PlatformID, defaultCourierEstimatedTokens)
+		if !canProceed {
+			log.Printf("[Router] Dual-envelope abort: envelope B failed for platform=%s (wait %v)",
+				dest.PlatformID, waitTime)
+			return nil
+		}
+	}
+
+	log.Printf("[Router] Web routing: connector=%s model=%s destination=%s (dual-envelope OK)", courierConn, courierModel, dest.PlatformID)
 
 	return &RoutingResult{
 		ConnectorID: courierConn,
@@ -151,9 +182,9 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 					break
 				}
 			}
-			decision := r.usageTracker.CanMakeRequestVia(ctx, agentModelID, agentConnID, 0)
+			decision := r.usageTracker.CanMakeRequestVia(ctx, agentModelID, agentConnID, defaultInternalEstimatedTokens)
 			if !decision.CanProceed {
-				log.Printf("[Router] Agent %s model %s unavailable (%s), falling through to cascade", req.Role, agentModelID, decision.Reason)
+				log.Printf("[Router] Agent %s model %s unavailable via connector %s (%s), falling through to cascade", req.Role, agentModelID, agentConnID, decision.Reason)
 			} else if agentConnID != "" {
 				log.Printf("[Router] Internal routing: connector=%s model=%s (from agent %s)", agentConnID, agentModelID, req.Role)
 				return &RoutingResult{
@@ -217,6 +248,16 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 		modelID := r.selectModelForConnector(ctx, conn.ID, req.TaskType, req.TaskCategory)
 		if modelID == "" {
 			continue
+		}
+
+		// Connector-aware rate limit check: skip models whose connectors
+		// have hit shared limits (e.g., Groq org TPD across all models).
+		if r.usageTracker != nil {
+			decision := r.usageTracker.CanMakeRequestVia(ctx, modelID, conn.ID, defaultInternalEstimatedTokens)
+			if !decision.CanProceed {
+				log.Printf("[Router] Internal fallback skip: model=%s connector=%s reason=%s wait=%v", modelID, conn.ID, decision.Reason, decision.WaitTime)
+				continue
+			}
 		}
 
 		log.Printf("[Router] Internal routing: connector=%s model=%s", conn.ID, modelID)
@@ -294,11 +335,14 @@ func (r *Router) selectByCascade(ctx context.Context, connectors []ConnectorConf
 			continue // No connector available for this model
 		}
 
-		decision := r.usageTracker.CanMakeRequestVia(ctx, modelID, connID, 0)
+		decision := r.usageTracker.CanMakeRequestVia(ctx, modelID, connID, defaultInternalEstimatedTokens)
 		if decision.CanProceed {
 			candidates = append(candidates, candidate{modelID: modelID, connID: connID})
 			continue
 		}
+
+		// Log the reason for skipping this model (connector-aware limit check)
+		log.Printf("[Router] Cascade skip: model=%s connector=%s reason=%s wait=%v", modelID, connID, decision.Reason, decision.WaitTime)
 
 		// Track model with shortest cooldown for fallback info
 		waitSecs := int(decision.WaitTime.Seconds())
@@ -377,6 +421,23 @@ func (r *Router) selectCourierModel(ctx context.Context) string {
 			continue
 		}
 
+		// Envelope A: Check fueling model + connector rate limit headroom.
+		// findConnectorForModel already checks rate limits and returns ""
+		// if no connector has headroom. We verify explicitly here too so
+		// we can log the reason for skipping.
+		connID := r.findConnectorForModel(model.ID)
+		if connID == "" {
+			log.Printf("[Router] Skipping courier model %s: no connector with envelope A headroom", model.ID)
+			continue
+		}
+		if r.usageTracker != nil {
+			decision := r.usageTracker.CanMakeRequestVia(ctx, model.ID, connID, defaultCourierEstimatedTokens)
+			if !decision.CanProceed {
+				log.Printf("[Router] Skipping courier model %s: envelope A failed (%s)", model.ID, decision.Reason)
+				continue
+			}
+		}
+
 		score := r.getModelScore(ctx, model.ID, "courier", "browser")
 		if score > bestScore {
 			bestScore = score
@@ -406,6 +467,14 @@ func (r *Router) findConnectorForModel(modelID string) string {
 	for _, accessConn := range model.AccessVia {
 		conn := r.cfg.GetConnector(accessConn)
 		if conn != nil && conn.Status == "active" && r.isConnectorExecutable(conn) {
+			// Envelope A: Verify the model+connector has rate limit headroom.
+			if r.usageTracker != nil {
+				decision := r.usageTracker.CanMakeRequestVia(context.Background(), modelID, conn.ID, defaultCourierEstimatedTokens)
+				if !decision.CanProceed {
+					log.Printf("[Router] Skipping connector %s for model %s: envelope A failed (%s)", conn.ID, modelID, decision.Reason)
+					continue
+				}
+			}
 			return conn.ID
 		}
 	}
@@ -423,6 +492,18 @@ func (r *Router) selectDestination(ctx context.Context, taskType string, taskCat
 			continue
 		}
 
+		// Envelope B (primary): Check in-memory platform free-tier limits.
+		// This is the proactive check so we don't dispatch to an exhausted platform.
+		if r.usageTracker != nil {
+			canProceed, waitTime := r.usageTracker.PlatformCanMakeRequest(ctx, conn.ID, 0) // 0 tokens = just check message limits
+			if !canProceed {
+				log.Printf("[Router] Skipping destination %s: envelope B platform limit hit (wait %v)", conn.ID, waitTime)
+				continue
+			}
+		}
+
+		// Secondary validation: Supabase RPC check for platform availability.
+		// Kept as a backup / external source of truth.
 		if !r.isDestinationAvailable(ctx, conn.ID) {
 			continue
 		}

@@ -101,16 +101,20 @@ type ModelUsage struct {
 }
 
 type UsageTracker struct {
-	mu       sync.RWMutex
-	models   map[string]*ModelUsage
-	defaults ModelProfile
-	db       Querier
+	mu               sync.RWMutex
+	models           map[string]*ModelUsage
+	defaults         ModelProfile
+	db               Querier
+	connectorTracker *ConnectorUsageTracker
+	platformTracker  *PlatformUsageTracker
 }
 
 func NewUsageTracker(db Querier) *UsageTracker {
 	return &UsageTracker{
-		models: make(map[string]*ModelUsage),
-		db:     db,
+		models:           make(map[string]*ModelUsage),
+		db:               db,
+		connectorTracker: NewConnectorUsageTracker(80),
+		platformTracker:  NewPlatformUsageTracker(80),
 		defaults: ModelProfile{
 			ThrottleBehavior: ThrottleSlowDown,
 			BufferPct:        80,
@@ -132,6 +136,44 @@ func (t *UsageTracker) SetDefaults(defaults ModelProfile) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.defaults = defaults
+	if defaults.BufferPct > 0 && t.connectorTracker != nil {
+		t.connectorTracker.bufferPct = defaults.BufferPct
+	}
+}
+
+// RegisterConnectorSharedLimits registers shared rate limits for a connector.
+// These limits are aggregated across all models using the connector.
+func (t *UsageTracker) RegisterConnectorSharedLimits(connectorID string, sharedLimits RateLimits) {
+	if t.connectorTracker != nil {
+		t.connectorTracker.RegisterConnector(connectorID, sharedLimits)
+	}
+}
+
+// RegisterPlatformLimits registers free-tier limits for a web platform destination.
+func (t *UsageTracker) RegisterPlatformLimits(platformID string, limits PlatformLimitSchema) {
+	if t.platformTracker != nil {
+		t.platformTracker.RegisterPlatform(platformID, limits)
+	}
+}
+
+// PlatformCanMakeRequest checks whether a web platform has capacity for another request.
+func (t *UsageTracker) PlatformCanMakeRequest(ctx context.Context, platformID string, estimatedTokens int) (bool, time.Duration) {
+	if t.platformTracker == nil {
+		return true, 0
+	}
+	return t.platformTracker.CanMakeRequest(ctx, platformID, estimatedTokens)
+}
+
+// RecordPlatformMessage records a message sent to a web platform destination.
+func (t *UsageTracker) RecordPlatformMessage(ctx context.Context, platformID string, tokensUsed int) {
+	if t.platformTracker != nil {
+		t.platformTracker.RecordMessageSent(ctx, platformID, tokensUsed)
+	}
+}
+
+// GetPlatformTracker returns the underlying PlatformUsageTracker for direct access.
+func (t *UsageTracker) GetPlatformTracker() *PlatformUsageTracker {
+	return t.platformTracker
 }
 
 func (t *UsageTracker) RegisterModel(profile ModelProfile) {
@@ -274,6 +316,19 @@ func (t *UsageTracker) CanMakeRequestVia(ctx context.Context, modelID string, co
 		}
 	}
 
+	// Check connector-level shared limits (e.g., Groq org 100K TPD across all models)
+	if t.connectorTracker != nil && connectorID != "" {
+		canProceed, waitTime := t.connectorTracker.CanMakeRequest(ctx, connectorID, estimatedTokens)
+		if !canProceed {
+			return RequestDecision{
+				CanProceed: false,
+				WaitTime:   waitTime,
+				Reason:     "connector_shared_limit_reached",
+				WindowType: "connector",
+			}
+		}
+	}
+
 	return RequestDecision{CanProceed: true}
 }
 
@@ -304,6 +359,13 @@ func (t *UsageTracker) RecordUsage(ctx context.Context, modelID string, tokensIn
 	usage.UsageWindows.Week.Tokens += totalTokens
 
 	usage.LastRequestAt = now
+
+	// Record usage on all connectors this model uses (shared limits tracking)
+	if t.connectorTracker != nil {
+		for _, connectorID := range usage.Profile.AccessVia {
+			t.connectorTracker.RecordUsage(ctx, connectorID, tokensIn, tokensOut)
+		}
+	}
 
 	return nil
 }
@@ -506,6 +568,111 @@ func (t *UsageTracker) ExportForDashboard() ([]byte, error) {
 	return json.Marshal(models)
 }
 
+func (t *UsageTracker) LoadFromDatabase(ctx context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	// Query models that have persisted usage state
+	data, err := t.db.Query(ctx, "models", map[string]any{
+		"or":   "usage_windows.not.is.null,cooldown_expires_at.not.is.null",
+		"limit": 200,
+	})
+	if err != nil {
+		return fmt.Errorf("query models: %w", err)
+	}
+
+	var rows []map[string]interface{}
+	if err := json.Unmarshal(data, &rows); err != nil {
+		return fmt.Errorf("unmarshal models: %w", err)
+	}
+
+	restored := 0
+	for _, row := range rows {
+		modelID, _ := row["id"].(string)
+		if modelID == "" {
+			continue
+		}
+
+		usage, exists := t.models[modelID]
+		if !exists {
+			continue // model not registered, skip
+		}
+
+		// Restore usage_windows (stored as TEXT containing JSON)
+		if raw, ok := row["usage_windows"]; ok && raw != nil {
+			var windows UsageWindows
+			if str, ok := raw.(string); ok && str != "" {
+				if err := json.Unmarshal([]byte(str), &windows); err != nil {
+					log.Printf("[UsageTracker] Warning: failed to parse usage_windows for %s: %v", modelID, err)
+				} else {
+					usage.UsageWindows = windows
+				}
+			}
+		}
+
+		// Restore cooldown_expires_at (TIMESTAMPTZ)
+		if raw, ok := row["cooldown_expires_at"]; ok && raw != nil {
+			if str, ok := raw.(string); ok && str != "" {
+				cooldownTime, err := time.Parse(time.RFC3339Nano, str)
+				if err != nil {
+					log.Printf("[UsageTracker] Warning: failed to parse cooldown_expires_at for %s: %v", modelID, err)
+				} else {
+					usage.CooldownExpiresAt = &cooldownTime
+				}
+			}
+		}
+
+		// Restore rate_limit_count
+		if raw, ok := row["rate_limit_count"]; ok && raw != nil {
+			switch v := raw.(type) {
+			case float64:
+				usage.RateLimitCount = int(v)
+			case json.Number:
+				n, _ := v.Int64()
+				usage.RateLimitCount = int(n)
+			}
+		}
+
+		// Restore last_rate_limit_at (TIMESTAMPTZ)
+		if raw, ok := row["last_rate_limit_at"]; ok && raw != nil {
+			if str, ok := raw.(string); ok && str != "" {
+				lastRL, err := time.Parse(time.RFC3339Nano, str)
+				if err != nil {
+					log.Printf("[UsageTracker] Warning: failed to parse last_rate_limit_at for %s: %v", modelID, err)
+				} else {
+					usage.LastRateLimitAt = &lastRL
+				}
+			}
+		}
+
+		// Restore learned (stored as TEXT containing JSON)
+		if raw, ok := row["learned"]; ok && raw != nil {
+			var learned LearnedData
+			if str, ok := raw.(string); ok && str != "" {
+				if err := json.Unmarshal([]byte(str), &learned); err != nil {
+					log.Printf("[UsageTracker] Warning: failed to parse learned for %s: %v", modelID, err)
+				} else {
+					usage.Learned = learned
+				}
+			}
+		}
+
+		restored++
+	}
+
+	log.Printf("[UsageTracker] Restored persisted state for %d/%d models from database", restored, len(t.models))
+
+	// Also restore connector and platform usage state
+	if t.connectorTracker != nil {
+		t.connectorTracker.LoadFromDatabase(ctx, t.db)
+	}
+	if t.platformTracker != nil {
+		t.platformTracker.LoadFromDatabase(ctx, t.db)
+	}
+
+	return nil
+}
+
 func (t *UsageTracker) PersistToDatabase(ctx context.Context) {
 	t.mu.RLock()
 	data := make(map[string]*ModelUsage)
@@ -529,6 +696,14 @@ func (t *UsageTracker) PersistToDatabase(ctx context.Context) {
 		if err != nil {
 			log.Printf("[UsageTracker] Failed to persist model %s: %v", modelID, err)
 		}
+	}
+
+	// Also persist connector and platform usage state
+	if t.connectorTracker != nil {
+		t.connectorTracker.PersistToDatabase(ctx, t.db)
+	}
+	if t.platformTracker != nil {
+		t.platformTracker.PersistToDatabase(ctx, t.db)
 	}
 }
 

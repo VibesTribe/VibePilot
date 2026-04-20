@@ -150,7 +150,11 @@
         "groq/compound-mini"
       ],
       "provides_tools": [],
-      "notes": "Re-enabled after vault fix"
+      "shared_limits": {
+        "tokens_per_day": 100000,
+        "requests_per_day": 14400
+      },
+      "notes": "Re-enabled after vault fix. Org-level shared limits: 100K TPD and 14.4K RPD across ALL models."
     },
     {
       "id": "openrouter-api",
@@ -206,6 +210,10 @@
         "chatgpt-4o-mini"
       ],
       "provides_tools": [],
+      "limit_schema": {
+        "messages_per_3h": 10,
+        "tokens_per_day": 1000000
+      },
       "notes": "Courier destination. Free tier: ~10 messages/3hrs. Manual or browser automation."
     },
     {
@@ -220,6 +228,10 @@
         "claude-sonnet"
       ],
       "provides_tools": [],
+      "limit_schema": {
+        "messages_per_8h": 40,
+        "tokens_per_day": 2000000
+      },
       "notes": "Courier destination. Variable daily limits. Good for PRD review."
     },
     {
@@ -235,6 +247,11 @@
         "gemini-2.5-pro"
       ],
       "provides_tools": [],
+      "limit_schema": {
+        "messages_per_session": 100,
+        "tokens_per_day": 1000000,
+        "sessions_per_day": 50
+      },
       "notes": "Courier destination. 1M tokens/day free tier."
     },
     {
@@ -250,6 +267,10 @@
         "deepseek-r1"
       ],
       "provides_tools": [],
+      "limit_schema": {
+        "messages_per_day": 500,
+        "tokens_per_day": 5000000
+      },
       "notes": "Courier destination. Generous free tier. Works without login."
     },
     {
@@ -265,6 +286,10 @@
         "qwen-2.5"
       ],
       "provides_tools": [],
+      "limit_schema": {
+        "messages_per_day": 500,
+        "tokens_per_day": 5000000
+      },
       "notes": "Courier destination. Works without login."
     },
     {
@@ -281,6 +306,10 @@
         "pixtral"
       ],
       "provides_tools": [],
+      "limit_schema": {
+        "messages_per_day": 500,
+        "tokens_per_day": 2000000
+      },
       "notes": "Courier destination. Free tier available. Good for code."
     },
     {
@@ -296,6 +325,10 @@
         "deepseek-v3"
       ],
       "provides_tools": [],
+      "limit_schema": {
+        "messages_per_day": 200,
+        "tokens_per_day": 2000000
+      },
       "notes": "Courier destination. Free DeepSeek R1 & V3. No login required. Good backup."
     }
   ]
