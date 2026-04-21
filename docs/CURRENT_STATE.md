@@ -1,12 +1,34 @@
 # VibePilot Current State
-> Last updated: April 20, 2026
+> Last updated: April 21, 2026
 
 ## System Status
-- **Governor**: Stopped (`systemctl --user stop vibepilot-governor`)
+- **Governor**: Stopped (intelligence overhaul committed, needs E2E test)
 - **Supabase**: Live, project `kbhfepwpqztrrzwefskg.supabase.co`
 - **GitHub**: `VibesTribe/VibePilot` (public, main branch)
 - **Dashboard**: READ-ONLY React frontend, Supabase Realtime subscriptions (NEVER polls)
 - **Webhooks**: `webhooks.vibestribe.rocks` (Cloudflare Tunnel) → Supabase
+
+## Recent Changes (April 21, 2026)
+
+### Governor Intelligence Overhaul (commit 57654556)
+Four interdependent root causes fixed as one coherent unit:
+
+1. **Fresh Code Map**: CodeMapConfig in system.json (path, cache_ttl_mins, refresh_on_startup). TTL-based cache replaces sync.Once. jcodemunch index_folder runs on startup via MCP.
+
+2. **Config-Driven Agent Context**: context_policy field on agents.json. 4 policies: full_map (planner), file_tree (supervisor/council/etc), targeted (task_runner), none (watcher). Single buildAgentContext() method, no hardcoded switches. New agents get context from config.
+
+3. **Task Packet Enrichment**: Planner requires Target Files per task. Parser extracts and sanitizes. Stored in tasks.result.target_files. At execution, only those files are read from disk and injected into executor prompt.
+
+4. **Supervisor Plan Review**: 3 objective checks: file reference verification, PRD traceability, dependency cycle detection. No subjective limits.
+
+### Design Document
+Full design with rationale at `docs/designs/governor-intelligence-fix.md`.
+
+### Pre-existing Fixes (committed earlier April 20-21)
+- Plan review race condition: retry loop (3 attempts, 3s sleep) in runPlanReview()
+- Stale lock cleanup in recovery.go
+- Supervisor routing flag: ExcludeModels checks both test_failed_by: and exec_failed_by: prefixes
+- routing_flag_reason set via REST PATCH after transition_task RPC
 
 ## Model Fleet (57 models)
 
@@ -75,13 +97,6 @@ Browser-use connectors for courier agents. All verified working April 20, 2026 v
 | aizolo-web | chat.aizolo.com/new | Multi-model | Research, coding, fallback | Free tier limited, $9.90/mo 3M tokens |
 | perplexity-web | perplexity.ai | Search + citations | **System Researcher** | Google SSO, 5 Pro/day, unlimited basic |
 
-### Platform with Native Tool Use (Lighter Path)
-**Google AI Studio** (aistudio-web) has built-in tools that may work without Playwright/browser-use:
-- Function calling, Google Search grounding, Google Maps grounding
-- URL context, code execution, structured outputs
-- Potential for direct API-like interaction via web interface
-- Best candidate for lighter courier path -- no browser automation needed for tool tasks
-
 ### Inactive (4)
 opencode, claude-code, kimi, deepseek-api
 
@@ -140,10 +155,15 @@ All core pipeline wired and committed. Verified by code audit.
 | Vault key derivation (deriveLLMKeyRef) | Done | c2e94151 | Maps connectorID → vault key name |
 | Gemini 4-project connectors | Done | 0897340f, 3a16958c | 4 independent keys, correct models, all tested |
 
-### Not Yet Verified End-to-End
+### E2E Pipeline Status
+First E2E test attempted April 21, 2026 with "Greeting and Farewell Endpoints" PRD.
+Pipeline reached Stage 2 (Planner) but failed at Supervisor review due to:
+- Race condition in plan review (fixed)
+- Supervisor rubber-stamping bad plans (fixed in intelligence overhaul)
+- Planner over-engineering (fixed with code map context + supervisor verification)
+- Task executor producing generic output (fixed with targeted file injection)
 
-The full pipeline is wired but has never been tested with governor running and a real task.
-No E2E test has been executed. Potential gaps may exist in runtime integration.
+Intelligence overhaul (commit 57654556) addresses all root causes. Needs re-test.
 
 ## Budget
 - **OpenRouter**: $0 credit account. Max spend limit configured for future-proofing. No payment added.
@@ -158,13 +178,22 @@ No E2E test has been executed. Potential gaps may exist in runtime integration.
 |-----|---------|
 | VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md | Essential context for any agent |
 | docs/CURRENT_STATE.md | This file |
+| docs/designs/governor-intelligence-fix.md | Intelligence overhaul design |
 | docs/plans/strategic-optimization-plan.md | Full strategic plan |
 | governor/config/models.json | 50 models, 42 active |
 | governor/config/connectors.json | 19 connectors, 15 active |
-| prompts/courier.md | Courier agent system prompt |
-| prompts/orchestrator.md | Orchestrator system prompt |
+| config/prompts/*.md | Agent prompts (planner, supervisor, council, etc.) |
 
 ## Hardware
 - **Machine**: Lenovo x220, 16GB RAM, ~12GB free
 - **OS**: Linux (user-level systemd services)
 - **Local inference**: Too slow (2 tok/s tested). Cloud API only.
+
+## Known Gaps (not yet addressed)
+- Maintenance agent not wired (git write access disconnected)
+- Module branches never created (merge has nowhere to go)
+- Worktrees disabled (all tasks share same directory)
+- Orchestrator is NOT an LLM call -- just hardcoded cascade in Go
+- Dashboard reads mock data in some views, not all live Supabase
+- Consultant agent not set up (PRD quality depends on manual input)
+- Periodic jcodemunch refresh (only runs on startup currently)
