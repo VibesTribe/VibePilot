@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-21T00:41:25Z | Commit: 1e7ffde1 | Branch: main
+# Generated: 2026-04-21T00:44:41Z | Commit: faea1e29 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -222,7 +222,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 1e7ffde1
+- Commit: faea1e29
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -242,32 +242,32 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-20 20:15 UTC
+# AUTO-UPDATED: 2026-04-20 21:00 UTC
 # RULE: Update this file after ANY change set. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data first.
 ## Three Sources of Truth
 1. **GitHub (code):** https://github.com/VibesTribe/VibePilot — pushed=real
 2. **Supabase (data):** https://qtpdzsinvifkgpxyxlaz.supabase.co — in DB=real
 3. **Dashboard (live):** https://vibeflow-dashboard.vercel.app/ — rendering=working
+   - Dashboard is USER DOMAIN. Hermes never modifies dashboard code.
 ## System Status
 - **Governor:** STOPPED + DISABLED (won't auto-start on boot)
 - **Git:** main branch, clean, synced with origin
 - **Dashboard:** Live, 0 tasks, 0 task_runs (clean slate)
 - **Chrome CDP:** 127.0.0.1:9222
-## Models — Config (models.json): 57 total
-### Active API Models (33)
-**Groq (7)** — key WORKS (needs User-Agent header)
-- meta-llama/llama-4-scout-17b-16e-instruct, openai/gpt-oss-120b
-- groq/compound, groq/compound-mini
-- llama-3.3-70b-versatile, llama-3.1-8b-instant, qwen3-32b
-**OpenRouter Paid (5)**
-- google/gemma-4-31b-it, z-ai/glm-4.5-air, minimax/minimax-m2.5
-- nvidia/nemotron-3-super-120b-a12b, nvidia/nemotron-3-super-120b
-**OpenRouter Free (12)**
-- google/gemma-4-26b-a4b-it:free, google/gemma-3-27b-it:free
-- google/gemma-3-12b-it:free, google/gemma-3-4b-it:free
-- google/gemma-3n-e2b-it:free, google/gemma-3n-e4b-it:free
-- meta-llama/llama-3.2-3b-instruct:free, meta-llama/llama-3.3-70b-instruct:free
-- nousresearch/hermes-3-llama-3.1-405b:free, qwen/qwen3-coder:free
-- nvidia/nemotron-3-nano-30b-a3b:free, nvidia/nemotron-nano-12b-v2-vl:free
-- openai/gpt-oss-20b:free
+## Models: 57 in config, 58 in DB (synced)
+### Active API (33) — all keys verified working via vault
+**Groq (7):** llama-4-scout, gpt-oss-120b, compound, compound-mini, llama-3.3-70b, llama-3.1-8b, qwen3-32b
+**OpenRouter Paid (5):** gemma-4-31b-it, glm-4.5-air, minimax-m2.5, nemotron-3-super-120b-a12b, nemotron-3-super-120b
+**OpenRouter Free (12):** gemma-4-26b-a4b-it, gemma-3-27b-it, gemma-3-12b-it, gemma-3-4b-it, gemma-3n-e2b-it, gemma-3n-e4b-it, llama-3.2-3b, llama-3.3-70b, hermes-3-llama-3.1-405b, qwen3-coder, nemotron-3-nano-30b, nemotron-nano-12b-v2-vl, gpt-oss-20b
+**NVIDIA NIM (3):** llama-3.3-70b-instruct, kimi-k2-instruct, nemotron-ultra-253b-v1 (format issue not auth)
+**Gemini (4 keys):** 2.5-flash-lite (Courier), 3.1-flash-lite-preview (Researcher), 3-flash-preview (Visual), 2.5-flash-lite (General)
+**Other (1):** bytedance/ui-tars-1.5-7b (courier vision)
+**Hermes/CLI (1):** glm-5 (interactive only, not pipeline-routable, ends May 1)
+### Active Web Courier (16)
+All need browser automation (not built yet). gemini-2.5-pro, deepseek-r1/v3, qwen-2.5/3.6-plus, mistral-large/codestral/pixtral, chatgpt-4o-mini-chatbox, perplexity, poe, aizolo, kimi-k2.6, gpt-4o-mini-chatbox
+### Paused (2): deepseek-chat, deepseek-reasoner (out of credit)
+### Benched (8): chatgpt-4o-mini, claude-sonnet, gemini-web, kimi-k2-instruct, minimax-m2.7, nemotron-3-super-120b, gemini-2.5-flash (legacy), qwen-3 (legacy name)
+## Connectors: 26 total (7 API, 14 web, 1 CLI, 4 inactive)
+## Secrets Vault: 15 entries, 10 decrypt OK, 4 can't (different encryption)
+## Learning System — FULLY WIRED (all 5 gaps resolved)
