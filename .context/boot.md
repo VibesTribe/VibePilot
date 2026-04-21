@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-21T04:38:14Z | Commit: 0d115a70 | Branch: main
+# Generated: 2026-04-21T05:30:37Z | Commit: 75277ec6 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -183,7 +183,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
 - governor/internal/memory/ (2 files, 19 funcs, 5 types)
 - governor/internal/realtime/ (1 files, 23 funcs, 8 types)
-- governor/internal/runtime/ (13 files, 203 funcs, 98 types)
+- governor/internal/runtime/ (14 files, 218 funcs, 101 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 15 funcs, 4 types)
@@ -222,7 +222,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 0d115a70
+- Commit: 75277ec6
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -242,7 +242,8 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-21 01:30 UTC — ALL DATA VERIFIED AGAINST ACTUAL CODE/DB
+# AUTO-UPDATED: 2026-04-21 02:00 UTC — VERIFIED AGAINST CODE AND SUPABASE
+# NOTE: CONFIG/DB DISCREPANCY EXISTS — SEE BELOW
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 ## Three Sources of Truth
@@ -267,7 +268,6 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 1. **Visual UI/UX review** — after visual tester agent has reviewed
 2. **Paid API benched** — out of credit, human decides add credits or keep benched
 3. **Research after council** — council-reviewed suggestions, human gives final yes/no
-## Models (from Supabase — verified)
-Total: **58 in DB** | 16 in config/models.json (config is subset)
-### Active: 48
-- **API (37):** groq-api (7), openrouter-api free (11), openrouter-api paid (3), nvidia-api (3), gemini-api (4 standalone), other (2), groq-api new (3), hermes/cli (1)
+## MODELS: CONFIG VS DB DISCREPANCY
+### Config (models.json): **16 models** — intended source of truth
+- API: 11 (Groq 3, NVIDIA 3, OpenRouter paid 3, Gemini 2)
