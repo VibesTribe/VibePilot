@@ -13,12 +13,13 @@ import (
 )
 
 type ResearchHandler struct {
-	database     *db.DB
-	factory      *runtime.SessionFactory
-	pool         *runtime.AgentPool
-	connRouter   *runtime.Router
-	cfg          *runtime.Config
-	usageTracker *runtime.UsageTracker
+	database       *db.DB
+	factory        *runtime.SessionFactory
+	pool           *runtime.AgentPool
+	connRouter     *runtime.Router
+	cfg            *runtime.Config
+	usageTracker   *runtime.UsageTracker
+	actionApplier  *runtime.ResearchActionApplier
 }
 
 func NewResearchHandler(
@@ -28,14 +29,16 @@ func NewResearchHandler(
 	connRouter *runtime.Router,
 	cfg *runtime.Config,
 	usageTracker *runtime.UsageTracker,
+	actionApplier *runtime.ResearchActionApplier,
 ) *ResearchHandler {
 	return &ResearchHandler{
-		database:     database,
-		factory:      factory,
-		pool:         pool,
-		connRouter:   connRouter,
-		cfg:          cfg,
-		usageTracker: usageTracker,
+		database:      database,
+		factory:       factory,
+		pool:          pool,
+		connRouter:    connRouter,
+		cfg:           cfg,
+		usageTracker:  usageTracker,
+		actionApplier: actionApplier,
 	}
 }
 
@@ -143,6 +146,36 @@ func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 
 		switch review.Decision {
 		case "approved":
+			// For model/platform/pricing changes: apply directly (no LLM middleman)
+			modelRelatedTypes := map[string]bool{
+				"new_model": true, "new_platform": true,
+				"pricing_change": true, "config_tweak": true,
+			}
+			if modelRelatedTypes[suggestionType] && h.actionApplier != nil {
+				details, _ := suggestion["details"].(map[string]any)
+				if len(details) > 0 {
+					summary, applyErr := h.actionApplier.ApplyResearchAction(ctx, suggestionType, details)
+					if applyErr != nil {
+						log.Printf("[ResearchReady] Direct apply failed for %s: %v", suggestionType, applyErr)
+						// Fall through to maintenance command as fallback
+					} else {
+						log.Printf("[ResearchReady] Directly applied %s: %s", suggestionType, summary)
+						// Update suggestion status to implemented
+						_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
+							"p_id":     suggestionID,
+							"p_status": "implemented",
+							"p_review_notes": map[string]any{
+								"reasoning":        review.Reasoning,
+								"notes":            review.Notes,
+								"applied_directly": summary,
+							},
+						})
+						break // skip maintenance command path
+					}
+				}
+			}
+
+			// Non-model types or fallback: delegate to maintenance command
 			if review.MaintenanceCommand != nil {
 				cmdJSON, _ := json.Marshal(review.MaintenanceCommand.Details)
 				_, err := h.database.RPC(ctx, "create_maintenance_command", map[string]any{
@@ -440,7 +473,8 @@ func setupResearchHandlers(
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	usageTracker *runtime.UsageTracker,
+	actionApplier *runtime.ResearchActionApplier,
 ) {
-	handler := NewResearchHandler(database, factory, pool, connRouter, cfg, usageTracker)
+	handler := NewResearchHandler(database, factory, pool, connRouter, cfg, usageTracker, actionApplier)
 	handler.Register(router)
 }
