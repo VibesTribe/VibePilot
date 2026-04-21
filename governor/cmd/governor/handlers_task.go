@@ -155,6 +155,15 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	// Route to model with cascade retry — same pattern as planner/supervisor
 	var routingResult *runtime.RoutingResult
 	var failedModels []string
+
+	// If this task was previously failed by a specific model (test failure reroute),
+	// exclude that model to prevent re-assigning to the same one that failed.
+	if flagReason := getString(task, "routing_flag_reason"); flagReason != "" {
+		if after, ok := strings.CutPrefix(flagReason, "test_failed_by:"); ok && after != "" {
+			failedModels = append(failedModels, after)
+			log.Printf("[TaskAvailable] Task %s: excluding previously-failed model %s", taskNumber, after)
+		}
+	}
 	var modelID, connectorID, routingFlag string
 	var connConfig *runtime.ConnectorConfig
 	maxRetries := 5
