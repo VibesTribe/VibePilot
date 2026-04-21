@@ -133,8 +133,15 @@
 ### NOT WIRED (data leaks)
 | Handler | Status | Impact |
 |---------|--------|--------|
-| handlers_testing.go | NO learning hooks | Test pass/fail not recorded, no model quality signal |
-| Review approval | NO learning | Supervisor approvals not recorded as success signal |
+| Review rejection (fail case) | WIRED (recordFailure + recordModelLearning) | |
+| Review needs_revision | WIRED (recordModelLearning) | |
+| Review reroute | WIRED (recordModelLearning) | |
+| Review council_review | NOT wired (no learning) | Low impact — rare case |
+| Review timeout | NOT wired | Low impact — failure signal only |
+
+**NOTE:** All review outcomes except council_review and timeout ARE wired.
+Previous analysis was wrong -- the hooks were added but had a compile bug (undefined reviewStart).
+Bug fixed in commit 1b1cc612.
 
 ### Learning RPCs Available in Supabase
 - record_model_success(p_model_id, p_task_id, p_task_type, p_duration_seconds, p_tokens_used)
