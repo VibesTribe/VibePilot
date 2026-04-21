@@ -1,4 +1,4 @@
-# VibePilot TODO - 2026-04-15 (night)
+# VibePilot TODO - 2026-04-21 (updated)
 
 ## Critical (do next)
 
@@ -16,35 +16,50 @@ ZAI/GLM subscription ends May 1. Before then:
 - Time each tier's response to confirm latency is acceptable
 - Document any that fail
 
+### 3. Reconcile config/models.json with Supabase DB
+Config has 30 models, DB has 58. The ResearchActionApplier keeps them in sync going forward,
+but existing orphans need cleaning:
+- Verify which DB models are real vs stale
+- Add missing models to config OR remove orphans from DB
+- Then sync should be 1:1
+
 ---
 
 ## High Priority
 
-### 3. Visual QA agent
+### 4. Visual QA agent
 - Wire browser-use to capture screenshots of dashboard after changes
 - Compare to baseline, flag visual regressions
 - Present to human for UI/UX yes/no
 - This is the courier pattern applied to our own app
 
-### 4. Daily landscape research cron
+### 5. Daily landscape research cron
 The researcher prompt exists (`prompts/daily_landscape_researcher.md`).
 Need to wire it:
 - Cron job that runs researcher daily
 - Checks GitHub trending, HuggingFace new models, provider changelogs
 - Posts findings to Supabase for Supervisor review
 - Supervisor approves minor, escalates major to Council -> Human
+- Approved findings now auto-sync to config + DB via ResearchActionApplier
 
-### 5. Pre-execution design preview
+### 6. Pre-execution design preview
 For UI tasks, show human a design choice BEFORE writing code:
 - Courier generates mockup/plan, presents to human
 - Human picks direction, THEN agent writes code
 - Skip for non-UI tasks (conditional pipeline stage)
 
+### 7. Dashboard model management
+Dashboard shows models but can't add/edit them. Need:
+- "Add model" form → calls ResearchActionApplier via API
+- "Edit model" → same path
+- Dashboard becomes self-service, no Hermes required
+- Any channel (dashboard, telegram, curl) hits same guaranteed-sync path
+
 ---
 
 ## Medium Priority
 
-### 6. LogAct patterns (from Meta research)
+### 8. LogAct patterns (from Meta research)
 `research/2026-04-14-logact-agent-bus.md` -- maps directly to our architecture.
 Adopt after pipeline is working end-to-end:
 - Intent logging: record what agent PLANS to do before execution
@@ -52,11 +67,11 @@ Adopt after pipeline is working end-to-end:
 - Append-only task_events table in Supabase (currently we update rows in-place)
 - Stupidity diagnosis: agent reads own failed output from log, rewrites
 
-### 7. JourneyKits implementation
+### 9. JourneyKits implementation
 95 kits scanned, 20 mapped to VibePilot gaps (`research/2026-04-08-journeykits-landscape-analysis.md`).
 Need to go through them and decide which patterns to adopt.
 
-### 8. Make .context/ hooks async
+### 10. Make .context/ hooks async
 Post-checkout, post-merge, pre-commit hooks rebuild entire knowledge layer synchronously.
 On x220 this causes command timeouts. Fix:
 - Run rebuild in background (don't block git)
@@ -67,11 +82,11 @@ On x220 this causes command timeouts. Fix:
 
 ## Lower Priority
 
-### 9. Enable governor MCP server
+### 11. Enable governor MCP server
 The governor can expose its tools as an MCP server (SSE on port 8081).
 Currently disabled. Enable when there's a consumer for it.
 
-### 10. Ethernet + headless setup
+### 12. Ethernet + headless setup
 x220 currently tethered via phone WiFi. More stable:
 - USB ethernet adapter for wired connection
 - Configure headless boot (no display manager)
@@ -120,6 +135,13 @@ x220 currently tethered via phone WiFi. More stable:
 - [x] Chrome CDP working (port 9222, auto-login Gmail/Gemini/Sheets)
 - [x] Gmail app password updated in vault
 - [x] Tier0 rules expanded (migration workflow, no shortcuts, post-task discipline)
+- [x] Self-learning feedback loops wired across all 6 handlers (plan, council, task, testing, research, maint)
+- [x] Supervisor model tracking in plan review, task review, research review
+- [x] All legacy SelectDestination calls removed from handlers (SelectRouting only)
+- [x] Courier system fully built (courier.go, courier_run.py, courier.yml, Supabase realtime)
+- [x] Research→config+DB sync (ResearchActionApplier, deterministic, no LLM middleman)
+- [x] 4 new web platforms added (kimi-ai, perplexity, poe, aizolo)
+- [x] WYNTK and TODO updated to match verified system state (Apr 21)
 
 ## Not Viable (abandoned)
 
@@ -129,4 +151,4 @@ x220 currently tethered via phone WiFi. More stable:
 
 ---
 
-**Last Updated:** 2026-04-15 (night)
+**Last Updated:** 2026-04-21

@@ -29,7 +29,8 @@ A global, massively scalable, multilingual, multimedia social media platform whe
 - **Runtime:** Single Go binary (~12MB), systemd user service
 - **Network:** Phone USB tethered (wifi chip died during repaste), planning ethernet + headless
 - **Architecture:** Config-driven plug-and-play modules, YAML DAG pipeline
-- **Model Strategy:** Cloud free tier cascade across 4 providers: Groq (7 models), OpenRouter (19 free models, $0 credit), Gemini 4-Project (4 independent Google Cloud projects = 60 RPM free), NVIDIA NIM (3 models). Total: ~47 models, ~39 active, ~11 courier-capable. Local inference too slow on this hardware (tested, 2 tok/s).
+- **Model Strategy:** Cloud free tier cascade across multiple providers. Counts change frequently — see `CURRENT_STATE.md` for verified numbers. Providers include Groq, OpenRouter (free + low-cost), Gemini (4 independent Google Cloud projects = 60 RPM free), NVIDIA NIM. Local inference too slow on this hardware (tested, 2 tok/s).
+- **Config/DB Sync:** Research findings write to config/models.json AND Supabase atomically via `ResearchActionApplier`. No LLM middleman. Both sources stay in sync automatically.
 - **Dashboard:** https://vibeflow-dashboard.vercel.app/ (sacred, Vercel auto-deploy)
 - **Tunnel:** vibestribe.rocks via cloudflared (sacred, don't touch)
 - **TTS:** edge-tts (fast, free, no API key)
@@ -369,10 +370,11 @@ Fix the Go code that writes to Supabase.
 
 ## ⚠️ HUMAN ROLE (VERY LIMITED)
 
-**Human ONLY does these 2 things:**
+**Human ONLY does these 3 things:**
 
 1. **Visual UI/UX review** - Looks at visual tester output. Requests changes or approves.
-2. **Architecture decisions** - Receives Council-reviewed suggestions. Asks questions. Final yes/no.
+2. **Paid API benched** - When paid models run out of credit, human decides: add credits or keep benched.
+3. **Research after council** - Receives Council-reviewed suggestions. Final yes/no.
 
 **Human NEVER:**
 - Reviews code
@@ -538,7 +540,39 @@ Tokens counted client-side → Cost calculated → transition_task → review
 | `GEMINI_GENERAL_KEY` | Google AI | General/fallback (gemini-2.5-flash-lite) |
 | `NVIDIA_API_KEY` | NVIDIA NIM | 3 free models |
 
-**Implementation status:** Steps 1-5 of 10 complete. Steps 6-10 (GitHub Actions workflow, Supabase realtime listener, E2E test) pending.
+**Implementation status:** Fully built and wired. All components exist: CourierRunner (courier.go), browser-use script (courier_run.py), GitHub Actions workflow (courier.yml), Supabase realtime result delivery. Not yet E2E tested (governor stopped).
+
+---
+
+## 6b. Self-Learning Feedback Loops
+
+Every agent receives feedback from downstream outcomes. The system learns which models work best for which roles.
+
+### Handler Learning Coverage (all verified by grep)
+
+| Handler | Tracking Calls | Coverage |
+|---------|---------------|----------|
+| plan | 10 | 95% |
+| council | 6 | 95% |
+| task | 21 | 98% |
+| testing | 3 | 90% |
+| research | 4 | 90% |
+| maint | 7 | 95% |
+
+### What Gets Tracked
+- **Supervisor model performance:** Tracked in plan review, task review, and research review. Correct rejections = success signal.
+- **Per-model vote alignment:** Council members get success/failure based on consensus alignment.
+- **Per-role learning:** Router learns which models make good supervisors, council members, planners.
+- **Rule creation:** Supervisor AND council create planner rules on rejection. Approved plans reinforce active rules.
+- **Failed model exclusion:** Test failures store failed model, excluded from next routing via ExcludeModels.
+
+### Config ↔ DB Sync
+
+When supervisor approves research findings (new_model, pricing_change, config_tweak, new_platform):
+1. `ResearchActionApplier` writes config file (models.json or connectors.json) **and** upserts Supabase DB
+2. Both sources update atomically — no LLM middleman, no drift
+3. Fallback to maintenance command if direct apply fails
+4. Thread-safe with mutex-protected config writes
 
 ---
 
@@ -686,6 +720,7 @@ governor/
 │   │   ├── config.go      # Runtime config loading
 │   │   ├── context_builder.go  # Context assembly
 │   │   ├── model_loader.go     # Model config loading
+│   │   ├── research_action.go  # Config↔DB sync on research approval
 │   │   ├── usage_tracker.go    # Token/cost tracking
 │   │   └── tools.go       # Runtime tools
 │   │
@@ -761,7 +796,7 @@ governor/
 | `governor/cmd/governor/main.go` | Entry point, starts all services |
 | `governor/cmd/governor/handlers_task.go` | Task execution logic |
 | `governor/cmd/governor/handlers_plan.go` | Plan creation logic |
-| `governor/internal/runtime/router.go` | Routing logic (SelectDestination) |
+| `governor/internal/runtime/router.go` | Routing logic (SelectRouting) |
 | `governor/internal/dag/engine.go` | DAG execution engine |
 | `governor/internal/gitree/gitree.go` | Git branch + worktree management (isolated worktrees per parallel agent) |
 | `governor/internal/db/supabase.go` | Database client |
@@ -890,7 +925,7 @@ cd ~/VibePilot && git add docs/prd/test-feature.md && git commit -m "test: add t
 - **GitHub = Code source of truth**
 - **Supabase = State source of truth**
 - **User service, not system** - `systemctl --user`, not `sudo systemctl`
-- **Cloud free tiers = primary** - 47 models, 39 active, 11 courier-capable, $0 cost
+- **Cloud free tiers = primary** — Multiple providers, free and near-free. Counts change, see CURRENT_STATE.md.
 - **Token counting = client-side** - Never trust external counts
 - **4 Gemini projects = 4x free quota** - Independent keys, 60 RPM combined
 
