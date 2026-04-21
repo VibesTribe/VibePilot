@@ -1,6 +1,7 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-19 20:30 UTC
+# AUTO-UPDATED: 2026-04-20 19:30 UTC
 # RULE: Update this file after ANY change set. Resume from here, never from guesses.
+# RULE: NEVER update from assumptions. ALWAYS verify against actual code/data first.
 
 ## Three Sources of Truth
 
@@ -8,79 +9,157 @@
 2. **Supabase (data):** https://qtpdzsinvifkgpxyxlaz.supabase.co — in DB=real
 3. **Dashboard (live):** https://vibeflow-dashboard.vercel.app/ — rendering=working
 
-## Active Models (33 total, 26 API + 7 web courier)
+## System Status
 
-### Groq API (7) — Free tier, org-level 100K TPD shared (now tracked)
-- llama-3.3-70b-versatile, llama-3.1-8b-instant, qwen3-32b
+- **Governor:** STOPPED + DISABLED (won't auto-start on boot)
+- **Git:** main branch, clean, synced with origin
+- **Dashboard:** Live, 0 tasks, 0 task_runs (clean slate)
+- **Chrome CDP:** 127.0.0.1:9222
+
+## Models — Config (models.json): 57 total
+
+### Active API Models (33)
+**Groq (7)** — key WORKS (needs User-Agent header)
 - meta-llama/llama-4-scout-17b-16e-instruct, openai/gpt-oss-120b
 - groq/compound, groq/compound-mini
+- llama-3.3-70b-versatile, llama-3.1-8b-instant, qwen3-32b
 
-### OpenRouter Free (6) — Account at -$0.57, free models only
+**OpenRouter Paid (5)**
 - google/gemma-4-31b-it, z-ai/glm-4.5-air, minimax/minimax-m2.5
-- nvidia/nemotron-3-super-120b, nvidia/nemotron-3-super-120b-a12b, openai/gpt-oss-120b
+- nvidia/nemotron-3-super-120b-a12b, nvidia/nemotron-3-super-120b
 
-### NVIDIA NIM (3) — Free tier
-- meta/llama-3.3-70b-instruct, moonshotai/kimi-k2-instruct, nvidia/llama-3.1-nemotron-ultra-253b-v1
+**OpenRouter Free (12)**
+- google/gemma-4-26b-a4b-it:free, google/gemma-3-27b-it:free
+- google/gemma-3-12b-it:free, google/gemma-3-4b-it:free
+- google/gemma-3n-e2b-it:free, google/gemma-3n-e4b-it:free
+- meta-llama/llama-3.2-3b-instruct:free, meta-llama/llama-3.3-70b-instruct:free
+- nousresearch/hermes-3-llama-3.1-405b:free, qwen/qwen3-coder:free
+- nvidia/nemotron-3-nano-30b-a3b:free, nvidia/nemotron-nano-12b-v2-vl:free
+- openai/gpt-oss-20b:free
 
-### Gemini API (1) — Key verified working
-- gemini-2.5-flash
+**NVIDIA NIM (3)** — key WORKS
+- meta/llama-3.3-70b-instruct, moonshotai/kimi-k2-instruct
+- nvidia/llama-3.1-nemotron-ultra-253b-v1 (response format issue, not auth)
 
-### Hermes/CLI (1) — Z.AI subscription, ends May 1
-- glm-5 (hermes interactive only)
+**Gemini API (4 keys, all WORKING)** — 4 independent Google Cloud projects
+- gemini-2.5-flash-lite (Courier key)
+- gemini-3.1-flash-lite-preview (Researcher key)
+- gemini-3-flash-preview (Visual Tester key)
+- gemini-2.5-flash-lite (General key) — same model, different project/quota
 
-### Web Courier Destinations (untested, need browser automation)
-- gemini-web: gemini-2.5-pro
-- deepseek-web: deepseek-r1, deepseek-v3 (also on notegpt-web)
-- qwen-web: qwen-2.5, qwen-3
-- mistral-web: mistral-large, codestral, pixtral
-- notegpt-web: deepseek-r1, deepseek-v3
+**Other API (1)**
+- bytedance/ui-tars-1.5-7b (courier vision model)
 
-## Paused Models (2)
+**Hermes/CLI (1)** — Z.AI subscription, ends May 1
+- glm-5 (hermes interactive only, not pipeline-routable)
+
+### Active Web Courier Models (16)
+- gemini-2.5-pro, gemini-3.1-pro-preview-web (Google)
+- deepseek-r1, deepseek-v3 (DeepSeek Web)
+- qwen-2.5, qwen-3.6-plus (Qwen Web)
+- mistral-large, codestral, pixtral (Mistral Le Chat)
+- chatgpt-4o-mini-chatbox (Chatbox AI)
+- perplexity-free (Perplexity)
+- poe-mix (Poe)
+- aizolo-mix (AiZolo)
+- kimi-k2.6-instant, kimi-k2-instruct-0905-hf (Kimi AI)
+**NOTE:** All need browser automation. None can execute tasks via API.
+
+### Paused Models (2)
 - deepseek-chat — out of credit
 - deepseek-reasoner — out of credit
 
-## Benched Models (5)
-- chatgpt-4o-mini — Web-only via browser use (ChatGPT free tier)
-- claude-sonnet — Web-only via browser use (Anthropic free tier)
-- gemini-web — Web-only via browser use (Gemini free tier)
+### Benched Models (6)
+- chatgpt-4o-mini — Web-only, browser automation not built
+- claude-sonnet — Web-only, no API key
+- gemini-web — Web-only, browser automation not built
 - kimi-k2-instruct — Benched from Groq, use NVIDIA version instead
-- minimax-m2.7 — No API access, only available via OpenRouter as m2.5
+- minimax-m2.7 — No API access, only via OpenRouter as m2.5
+- nvidia/nemotron-3-super-120b — Duplicate of -a12b variant
 
-## Orchestrator Enhancements (this session)
+## Config <-> Supabase Sync Issues (VERIFIED)
 
-### New: Persistent Usage Tracking
-- Usage windows, cooldowns, and learned data now survive governor restarts
-- LoadFromDatabase on startup, PersistToDatabase every 30s + on shutdown
+**25 models in models.json NOT in Supabase DB** (added in previous session, not synced):
+- All 12 OpenRouter :free models
+- All 4 new Gemini keys (gemini-2.5-flash-lite, gemini-3.1-flash-lite-preview, gemini-3-flash-preview)
+- New web platforms: aizolo-mix, perplexity-free, poe-mix, gpt-4o-mini-chatbox, kimi-k2.6-instant, kimi-k2-instruct-0905-hf
+- bytedance/ui-tars-1.5-7b, gemini-3.1-pro-preview-web, qwen-3.6-plus (listed as web)
 
-### New: Connector-Level Shared Limits
-- ConnectorUsageTracker aggregates usage across models on same connector
-- Groq org 100K TPD now proactively tracked (not just reactive after 429)
-- shared_limits field added to connectors.json for connector-level caps
+**2 models in Supabase NOT in models.json:**
+- gemini-2.5-flash (old single-key entry, replaced by 4-project entries)
+- qwen-3 (replaced by qwen-3.6-plus with correct name)
 
-### New: Web Platform Limit Tracking
-- PlatformUsageTracker with structured limit_schema per web destination
-- 7 web destinations configured with messages/3h/8h/day/session + tokens/day limits
-- 80% buffer threshold same as model-level tracking
+**1 status mismatch:**
+- nvidia/nemotron-3-super-120b: config=benched, db=active
 
-### New: Courier Dual-Envelope Routing
-- Router checks BOTH fueling model limits AND web platform limits before dispatching courier
-- Falls back to internal routing if either envelope has no headroom
+## Connectors (26 total)
 
-### New: Startup Cascade Validation
-- Validates all model IDs in routing.json cascade exist in models.json
-- Logs errors for dead entries before they cause silent routing failures
+### Active API (7)
+- Groq Cloud API — shared org 100K TPD tracked
+- OpenRouter API — free tier, $0.50 credit
+- NVIDIA NIM API — free tier
+- Gemini API x4 (Courier/Researcher/Visual/General projects)
 
-### New: Connector/Platform Persistence
-- connector_usage table (migration 126) for connector state
-- platforms.usage_windows column for web destination state
-- Both loaded on startup, persisted every 30s
+### Active Web (14)
+- ChatGPT, Claude, Gemini, DeepSeek, Qwen, Mistral, NoteGPT, Kimi, HuggingChat, Google AI Studio, Poe, Chatbox, AiZolo, Perplexity
+
+### Active CLI (1)
+- Hermes Agent
+
+### Inactive (4)
+- OpenCode CLI, Claude Code CLI, Kimi CLI, DeepSeek API (out of credit)
+
+## Secrets Vault (15 entries)
+
+### Decrypted + Verified (10)
+- GROQ_API_KEY — WORKS
+- OPENROUTER_API_KEY — WORKS
+- NVIDIA_API_KEY — WORKS
+- GEMINI_COURIER_KEY — WORKS
+- GEMINI_RESEARCHER_KEY — WORKS
+- GEMINI_VISUAL_TESTER_KEY — WORKS
+- GEMINI_GENERAL_KEY — WORKS
+- GEMINI_API_KEY — WORKS (legacy single-key, still valid)
+- GITHUB_TOKEN — Valid
+- ZAI_API_KEY — Decrypted
+
+### Can't Decrypt (4) — likely different encryption
+- SUPABASE_SERVICE_KEY
+- VIBEPILOT_GMAIL_EMAIL
+- VIBEPILOT_GMAIL_PASSWORD
+- webhook_secret
+
+## Learning System — Committed State
+
+### WIRED (recording data on every task lifecycle event)
+| Handler | RecordUsage | RecordCompletion | recordSuccess/Failure | update_model_learning |
+|---------|-------------|-----------------|----------------------|----------------------|
+| handlers_task.go | YES | YES | YES | YES |
+| handlers_plan.go | YES | YES | YES | YES |
+| handlers_maint.go | — | — | YES | — |
+
+### NOT WIRED (data leaks)
+| Handler | Status | Impact |
+|---------|--------|--------|
+| handlers_testing.go | NO learning hooks | Test pass/fail not recorded, no model quality signal |
+| Review approval | NO learning | Supervisor approvals not recorded as success signal |
+
+### Learning RPCs Available in Supabase
+- record_model_success(p_model_id, p_task_id, p_task_type, p_duration_seconds, p_tokens_used)
+- record_model_failure(p_model_id, p_task_id, p_failure_type)
+- update_model_learning(p_model_id, p_task_type, p_outcome, p_failure_class, p_failure_category, p_failure_detail)
+
+### Persistence
+- UsageTracker: LoadFromDatabase on startup, PersistToDatabase every 30s + shutdown
+- ConnectorUsageTracker: shared connector limits (migration 126)
+- PlatformUsageTracker: web platform limits (migration 126)
 
 ## Dashboard Status Model
-- ✓ Ready — active, idle
-- ↻ Active — active, working on tasks
-- ⏳ Cooldown — paused with cooldown_expires_at timer
-- 💰 Credit Needed — paused + status_reason contains "credit"
-- ⚠ Issue — everything else non-active (benched, deprecated, no key)
+- OK Ready — active, idle
+- ~> Active — active, working on tasks
+- ... Cooldown — paused with cooldown_expires_at timer
+- $ Credit Needed — paused + status_reason contains "credit"
+- ! Issue — everything else non-active (benched, deprecated, no key)
 - **NOTHING is hidden** — benched models visible with reason
 
 ## Three Review Triggers (escalate to human)
@@ -94,23 +173,16 @@
 - Connectors = how we reach the model (API keys, endpoints)
 - One model can be reached via multiple connectors
 - Pipeline picks best model FIRST, then picks best available connector
-- Benched ≠ invisible. Everything shows with truth about why.
+- Benched != invisible. Everything shows with truth about why.
 - Token counting always on OUR side (prompt packets + outputs), never trust external counts
+- Credentials live in Supabase vault. Period. No .env files.
+- API test caveat: Groq needs User-Agent header or gets Cloudflare 1010
 
-## Files Changed This Session
-- governor/config/models.json — removed 5 broken models, synced with DB
-- governor/config/connectors.json — removed zai-api/copilot-web, added shared_limits + limit_schema
-- governor/config/routing.json — removed dead cascade entries
-- governor/internal/runtime/usage_tracker.go — LoadFromDatabase, connector/platform delegation
-- governor/internal/runtime/connector_tracker.go — NEW: shared connector limits
-- governor/internal/runtime/platform_tracker.go — NEW: web platform limits
-- governor/internal/runtime/router.go — dual-envelope courier, connector-aware internal routing
-- governor/internal/runtime/model_loader.go — loads connector/platform limits from config
-- governor/internal/runtime/config.go — PlatformLimitSchema, SharedLimits structs
-- governor/cmd/governor/startup_validate.go — cascade model ID validation
-- governor/cmd/governor/main.go — LoadFromDatabase on startup
-- migrations/126_connector_and_platform_usage_persistence.sql — NEW
-
-## Contract Registry & Global Manifest
-- governor/config/contract_registry.json — 5 dashboard tables, 49 Go→SQL RPCs (2 new)
-- governor/config/global_manifest.json — 9 slices, 3 data flows, 4 shared-state joints
+## Files Changed (last session commits on main)
+- e6770a52 feat: research and document actual platform limits with sources
+- d8edeb8e feat: add AiZolo + Perplexity, tag platforms with best_for roles
+- 276454c9 feat: add 5 new web platforms, fix stale Qwen model names
+- 0897340f feat: 4 independent Gemini projects = 4x free tier (60 RPM)
+- 7c76aa21 models: expand OpenRouter free lineup to 19 active models
+- c2e94151 fix: close 4 courier pipeline gaps found in audit
+- b0b55235 feat: GitHub Actions courier workflow + browser-use script

@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-20T20:38:18Z | Commit: fd3e0002 | Branch: main
+# Generated: 2026-04-21T00:11:27Z | Commit: e6770a52 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -171,7 +171,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Codebase Structure (auto-discovered)
 - governor/cmd/cleanup/ (1 files, 1 funcs, 0 types)
 - governor/cmd/encrypt_secret/ (1 files, 1 funcs, 0 types)
-- governor/cmd/governor/ (14 files, 120 funcs, 14 types)
+- governor/cmd/governor/ (14 files, 121 funcs, 14 types)
 - governor/cmd/migrate_vault/ (1 files, 5 funcs, 1 types)
 - governor/internal/connectors/ (2 files, 26 funcs, 9 types)
 - governor/internal/core/ (4 files, 35 funcs, 27 types)
@@ -222,7 +222,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: fd3e0002
+- Commit: e6770a52
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -242,32 +242,32 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-19 20:30 UTC
+# AUTO-UPDATED: 2026-04-20 19:30 UTC
 # RULE: Update this file after ANY change set. Resume from here, never from guesses.
+# RULE: NEVER update from assumptions. ALWAYS verify against actual code/data first.
 ## Three Sources of Truth
 1. **GitHub (code):** https://github.com/VibesTribe/VibePilot — pushed=real
 2. **Supabase (data):** https://qtpdzsinvifkgpxyxlaz.supabase.co — in DB=real
 3. **Dashboard (live):** https://vibeflow-dashboard.vercel.app/ — rendering=working
-## Active Models (33 total, 26 API + 7 web courier)
-### Groq API (7) — Free tier, org-level 100K TPD shared (now tracked)
-- llama-3.3-70b-versatile, llama-3.1-8b-instant, qwen3-32b
+## System Status
+- **Governor:** STOPPED + DISABLED (won't auto-start on boot)
+- **Git:** main branch, clean, synced with origin
+- **Dashboard:** Live, 0 tasks, 0 task_runs (clean slate)
+- **Chrome CDP:** 127.0.0.1:9222
+## Models — Config (models.json): 57 total
+### Active API Models (33)
+**Groq (7)** — key WORKS (needs User-Agent header)
 - meta-llama/llama-4-scout-17b-16e-instruct, openai/gpt-oss-120b
 - groq/compound, groq/compound-mini
-### OpenRouter Free (6) — Account at -$0.57, free models only
+- llama-3.3-70b-versatile, llama-3.1-8b-instant, qwen3-32b
+**OpenRouter Paid (5)**
 - google/gemma-4-31b-it, z-ai/glm-4.5-air, minimax/minimax-m2.5
-- nvidia/nemotron-3-super-120b, nvidia/nemotron-3-super-120b-a12b, openai/gpt-oss-120b
-### NVIDIA NIM (3) — Free tier
-- meta/llama-3.3-70b-instruct, moonshotai/kimi-k2-instruct, nvidia/llama-3.1-nemotron-ultra-253b-v1
-### Gemini API (1) — Key verified working
-- gemini-2.5-flash
-### Hermes/CLI (1) — Z.AI subscription, ends May 1
-- glm-5 (hermes interactive only)
-### Web Courier Destinations (untested, need browser automation)
-- gemini-web: gemini-2.5-pro
-- deepseek-web: deepseek-r1, deepseek-v3 (also on notegpt-web)
-- qwen-web: qwen-2.5, qwen-3
-- mistral-web: mistral-large, codestral, pixtral
-- notegpt-web: deepseek-r1, deepseek-v3
-## Paused Models (2)
-- deepseek-chat — out of credit
-- deepseek-reasoner — out of credit
+- nvidia/nemotron-3-super-120b-a12b, nvidia/nemotron-3-super-120b
+**OpenRouter Free (12)**
+- google/gemma-4-26b-a4b-it:free, google/gemma-3-27b-it:free
+- google/gemma-3-12b-it:free, google/gemma-3-4b-it:free
+- google/gemma-3n-e2b-it:free, google/gemma-3n-e4b-it:free
+- meta-llama/llama-3.2-3b-instruct:free, meta-llama/llama-3.3-70b-instruct:free
+- nousresearch/hermes-3-llama-3.1-405b:free, qwen/qwen3-coder:free
+- nvidia/nemotron-3-nano-30b-a3b:free, nvidia/nemotron-nano-12b-v2-vl:free
+- openai/gpt-oss-20b:free
