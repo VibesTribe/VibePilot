@@ -35,6 +35,20 @@ Five-phase consultant process synthesized from 6 open-source spec-driven tools:
 PRD template at `config/templates/prd-template.md`. Every requirement traces to user intent = zero drift.
 Consultant prompt at `config/prompts/consultant.md`.
 
+### Hermes Subagent Delegation (config change, no commit)
+Parent agent (GLM-5.1) stays on Z.AI Pro. Subagents now route to gemini-2.5-flash via delegation config in `~/.hermes/config.yaml`:
+
+- **Provider**: gemini (free tier, 1M context)
+- **Model**: gemini-2.5-flash
+- **Credential pool**: 2 Gemini keys, round_robin strategy (key A gets subagent 1, key B gets subagent 2, etc.)
+- **Concurrency**: max 3 children, 30 iterations each
+- **Effective capacity**: ~30 RPM (2 keys x 15 RPM each), spread evenly
+- **Scaling path**: Pull more keys from VibePilot Supabase vault → 4 keys = 60 RPM
+- **Fallback**: If Gemini bloats too much, could assign a superlight CLI agent instead
+- **Activates**: on `/new` or Hermes restart
+
+Config at `~/.hermes/config.yaml` delegation + credential_pool_strategies sections.
+
 ### Pre-existing Fixes (committed earlier April 20-21)
 - Plan review race condition: retry loop (3 attempts, 3s sleep) in runPlanReview()
 - Stale lock cleanup in recovery.go
