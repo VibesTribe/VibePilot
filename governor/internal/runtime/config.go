@@ -29,6 +29,23 @@ type SystemConfig struct {
 	MCPServers  []MCPServerConfig      `json:"mcp_servers,omitempty"`
 	GovernorMCP *GovernorMCPConfig     `json:"governor_mcp,omitempty"`
 	Worktrees   *WorktreeConfig        `json:"worktrees,omitempty"`
+	CodeMap     *CodeMapConfig         `json:"code_map,omitempty"`
+}
+
+// CodeMapConfig configures the code map (jcodemunch) integration.
+type CodeMapConfig struct {
+	Path              string `json:"path"`                          // relative to repo root, default ".context/map.md"
+	CacheTTLMins      int    `json:"cache_ttl_mins"`                // cache TTL in minutes, default 60
+	RefreshOnStartup  bool   `json:"refresh_on_startup"`            // run jcodemunch on boot, default true
+}
+
+// DefaultCodeMapConfig returns sensible defaults for code map configuration.
+func DefaultCodeMapConfig() *CodeMapConfig {
+	return &CodeMapConfig{
+		Path:             ".context/map.md",
+		CacheTTLMins:     60,
+		RefreshOnStartup: true,
+	}
 }
 
 // GovernorMCPConfig configures the MCP server that exposes governor tools to external agents.
@@ -207,6 +224,7 @@ type AgentConfig struct {
 	Model            string   `json:"model,omitempty"`
 	DefaultConnector string   `json:"default_connector"`
 	Description      string   `json:"description,omitempty"`
+	ContextPolicy    string   `json:"context_policy,omitempty"`
 }
 
 func (a *AgentConfig) HasCapability(capability string) bool {

@@ -165,5 +165,10 @@
   "worktrees": {
     "enabled": true,
     "base_path": "/home/vibes/VibePilot-work"
+  },
+  "code_map": {
+    "path": ".context/map.md",
+    "cache_ttl_mins": 60,
+    "refresh_on_startup": true
   }
 }

@@ -25,6 +25,7 @@ type TaskData struct {
 	SliceID          string
 	Dependencies     []string
 	RequiresCodebase bool
+	TargetFiles      []string
 	PromptPacket     string
 	ExpectedOutput   string
 }
@@ -215,6 +216,7 @@ func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[
 			"result": map[string]any{
 				"prompt_packet":   task.PromptPacket,
 				"expected_output": task.ExpectedOutput,
+				"target_files":    task.TargetFiles,
 			},
 			"max_attempts": maxAttempts,
 		}
@@ -357,6 +359,24 @@ func parseTaskSection(section string) (TaskData, error) {
 		task.RequiresCodebase = strings.ToLower(codebaseMatch[1]) == "true"
 	}
 
+	// Parse target files from "Target Files" or "Deliverables" section
+	targetFilesMatch := regexp.MustCompile(`\*\*Target Files:\*\*\s*(.+)`).FindStringSubmatch(body)
+	if len(targetFilesMatch) > 1 {
+		filesStr := strings.TrimSpace(targetFilesMatch[1])
+		if filesStr != "none" && filesStr != "-" && filesStr != "N/A" {
+			if strings.HasPrefix(filesStr, "[") {
+				var parsed []string
+				if err := json.Unmarshal([]byte(filesStr), &parsed); err == nil {
+					task.TargetFiles = parsed
+				}
+			} else {
+				// Comma-separated or space-separated
+				task.TargetFiles = strings.Fields(strings.ReplaceAll(filesStr, ",", " "))
+			}
+		}
+	}
+	task.TargetFiles = sanitizeFilePaths(task.TargetFiles)
+
 	task.PromptPacket = extractSection(body, "#### Prompt Packet")
 	task.ExpectedOutput = extractSection(body, "#### Expected Output")
 
@@ -392,4 +412,25 @@ func extractSection(body, heading string) string {
 	}
 
 	return strings.TrimSpace(content)
+}
+
+// sanitizeFilePaths cleans up file paths extracted from planner output.
+// Strips quotes, backticks, and path traversal attempts.
+func sanitizeFilePaths(paths []string) []string {
+	var clean []string
+	for _, p := range paths {
+		p = strings.TrimSpace(p)
+		p = strings.Trim(p, "\"`'")
+		p = strings.TrimPrefix(p, "./")
+		// Reject path traversal
+		if strings.Contains(p, "..") {
+			continue
+		}
+		// Reject empty or obviously non-file strings
+		if p == "" || len(p) < 3 || strings.Contains(p, " ") {
+			continue
+		}
+		clean = append(clean, p)
+	}
+	return clean
 }
