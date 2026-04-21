@@ -13,11 +13,12 @@ import (
 )
 
 type ResearchHandler struct {
-	database   *db.DB
-	factory    *runtime.SessionFactory
-	pool       *runtime.AgentPool
-	connRouter *runtime.Router
-	cfg        *runtime.Config
+	database     *db.DB
+	factory      *runtime.SessionFactory
+	pool         *runtime.AgentPool
+	connRouter   *runtime.Router
+	cfg          *runtime.Config
+	usageTracker *runtime.UsageTracker
 }
 
 func NewResearchHandler(
@@ -26,13 +27,15 @@ func NewResearchHandler(
 	pool *runtime.AgentPool,
 	connRouter *runtime.Router,
 	cfg *runtime.Config,
+	usageTracker *runtime.UsageTracker,
 ) *ResearchHandler {
 	return &ResearchHandler{
-		database:   database,
-		factory:    factory,
-		pool:       pool,
-		connRouter: connRouter,
-		cfg:        cfg,
+		database:     database,
+		factory:      factory,
+		pool:         pool,
+		connRouter:   connRouter,
+		cfg:          cfg,
+		usageTracker: usageTracker,
 	}
 }
 
@@ -96,29 +99,38 @@ func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 		return
 	}
 
-	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-		AgentID:  "supervisor",
-		TaskID:   suggestionID,
-		TaskType: "research_review",
+	routingResult, err := h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+		Role:        "supervisor",
+		TaskType:    "research_review",
+		RoutingFlag: "internal",
 	})
 	if err != nil || routingResult == nil {
-		log.Printf("[ResearchReady] No destination for %s", truncateID(suggestionID))
+		log.Printf("[ResearchReady] No routing for %s", truncateID(suggestionID))
 		return
 	}
 
-	session, err := h.factory.CreateWithContext(ctx, "supervisor", "research_review")
+	session, err := h.factory.CreateWithConnector(ctx, "supervisor", "research_review", routingResult.ConnectorID)
 	if err != nil {
 		log.Printf("[ResearchReady] Failed to create session for %s: %v", truncateID(suggestionID), err)
 		return
 	}
 
-	err = h.pool.SubmitWithDestination(ctx, "research", routingResult.DestinationID, func() error {
+	err = h.pool.SubmitWithDestination(ctx, "research", routingResult.ConnectorID, func() error {
+		reviewStart := time.Now()
 		result, err := session.Run(ctx, map[string]any{
 			"event":      "research_review",
 			"suggestion": suggestion,
 		})
+		reviewDuration := time.Since(reviewStart).Seconds()
 		if err != nil {
+			if h.usageTracker != nil {
+				h.usageTracker.RecordCompletion(ctx, routingResult.ModelID, "research_review", reviewDuration, false)
+			}
 			return err
+		}
+
+		if h.usageTracker != nil {
+			h.usageTracker.RecordCompletion(ctx, routingResult.ModelID, "research_review", reviewDuration, true)
 		}
 
 		review, parseErr := runtime.ParseResearchReview(result.Output)
@@ -233,47 +245,56 @@ func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 		memberCount = 3
 	}
 
-	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-		AgentID:  "council",
-		TaskID:   suggestionID,
-		TaskType: "research_council",
-	})
-	if err != nil || routingResult == nil {
-		log.Printf("[ResearchCouncil] No destination for %s", truncateID(suggestionID))
-		_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
-			"p_id":           suggestionID,
-			"p_status":       "pending_human",
-			"p_review_notes": map[string]any{"error": "no_destination"},
-		})
-		return
-	}
-
 	reviews := make([]map[string]any, memberCount)
+	councilModels := make([]map[string]any, 0, memberCount)
+	var failedMembers []string
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
 	for i := 0; i < memberCount; i++ {
+		lens := lenses[i%len(lenses)]
+
+		// Route each member independently through the cascade
+		memberRouting, routeErr := h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+			Role:          "council",
+			TaskType:      "research_council",
+			RoutingFlag:   "internal",
+			ExcludeModels: failedMembers,
+		})
+		if routeErr != nil || memberRouting == nil {
+			log.Printf("[ResearchCouncil] No routing for member %d, skipping", i+1)
+			continue
+		}
+
+		session, err := h.factory.CreateWithConnector(ctx, "council", lens, memberRouting.ConnectorID)
+		if err != nil {
+			log.Printf("[ResearchCouncil] Failed to create session for member %d: %v", i+1, err)
+			failedMembers = append(failedMembers, memberRouting.ModelID)
+			continue
+		}
+
+		contextData := map[string]any{
+			"research":      suggestion,
+			"lens":          lens,
+			"member_number": i + 1,
+			"review_type":   "research",
+		}
+
 		wg.Add(1)
-		go func(memberIndex int) {
+		go func(memberIndex int, sess *runtime.Session, routing *runtime.RoutingResult, memberLens string) {
 			defer wg.Done()
 
-			lens := lenses[memberIndex%len(lenses)]
-			session, err := h.factory.CreateWithContext(ctx, "council", lens)
-			if err != nil {
-				log.Printf("[ResearchCouncil] Failed to create session for member %d: %v", memberIndex+1, err)
-				return
-			}
-
-			contextData := map[string]any{
-				"research":      suggestion,
-				"lens":          lens,
-				"member_number": memberIndex + 1,
-				"review_type":   "research",
-			}
-
-			result, err := session.Run(ctx, contextData)
+			memberStart := time.Now()
+			result, err := sess.Run(ctx, contextData)
+			memberDuration := time.Since(memberStart).Seconds()
 			if err != nil {
 				log.Printf("[ResearchCouncil] Member %d failed: %v", memberIndex+1, err)
+				mu.Lock()
+				failedMembers = append(failedMembers, routing.ModelID)
+				mu.Unlock()
+				if h.usageTracker != nil {
+					h.usageTracker.RecordCompletion(ctx, routing.ModelID, "research_council", memberDuration, false)
+				}
 				return
 			}
 
@@ -286,15 +307,24 @@ func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 			mu.Lock()
 			reviews[memberIndex] = map[string]any{
 				"member_number": memberIndex + 1,
-				"lens":          lens,
+				"lens":          memberLens,
 				"vote":          vote.Vote,
 				"concerns":      vote.Concerns,
 				"reasoning":     vote.Reasoning,
+				"model_id":      routing.ModelID,
 			}
+			councilModels = append(councilModels, map[string]any{
+				"lens":  memberLens,
+				"model": routing.ModelID,
+			})
 			mu.Unlock()
 
-			log.Printf("[ResearchCouncil] Member %d (%s) voted: %s", memberIndex+1, lens, vote.Vote)
-		}(i)
+			if h.usageTracker != nil {
+				h.usageTracker.RecordCompletion(ctx, routing.ModelID, "research_council", memberDuration, true)
+			}
+
+			log.Printf("[ResearchCouncil] Member %d (%s, model=%s) voted: %s", memberIndex+1, memberLens, routing.ModelID, vote.Vote)
+		}(i, session, memberRouting, lens)
 	}
 	wg.Wait()
 
@@ -409,7 +439,8 @@ func setupResearchHandlers(
 	database *db.DB,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
+	usageTracker *runtime.UsageTracker,
 ) {
-	handler := NewResearchHandler(database, factory, pool, connRouter, cfg)
+	handler := NewResearchHandler(database, factory, pool, connRouter, cfg, usageTracker)
 	handler.Register(router)
 }
