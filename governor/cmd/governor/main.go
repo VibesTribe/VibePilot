@@ -360,7 +360,7 @@ func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v 
 func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector, usageTracker *runtime.UsageTracker, worktreeMgr *gitree.WorktreeManager, courierRunner *connectors.CourierRunner, v *vault.Vault) {
 	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v)
 	setupPlanHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)
-	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter, git)
+	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)
 	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupTestingHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, worktreeMgr, usageTracker)
 	setupResearchHandlers(ctx, router, factory, pool, database, cfg, connRouter)

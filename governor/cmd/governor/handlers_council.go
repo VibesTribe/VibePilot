@@ -16,12 +16,13 @@ import (
 )
 
 type CouncilHandler struct {
-	database   *db.DB
-	factory    *runtime.SessionFactory
-	pool       *runtime.AgentPool
-	connRouter *runtime.Router
-	cfg        *runtime.Config
-	git        *gitree.Gitree
+	database     *db.DB
+	factory      *runtime.SessionFactory
+	pool         *runtime.AgentPool
+	connRouter   *runtime.Router
+	cfg          *runtime.Config
+	git          *gitree.Gitree
+	usageTracker *runtime.UsageTracker
 }
 
 func NewCouncilHandler(
@@ -31,14 +32,16 @@ func NewCouncilHandler(
 	connRouter *runtime.Router,
 	cfg *runtime.Config,
 	git *gitree.Gitree,
+	usageTracker *runtime.UsageTracker,
 ) *CouncilHandler {
 	return &CouncilHandler{
-		database:   database,
-		factory:    factory,
-		pool:       pool,
-		connRouter: connRouter,
-		cfg:        cfg,
-		git:        git,
+		database:     database,
+		factory:      factory,
+		pool:         pool,
+		connRouter:   connRouter,
+		cfg:          cfg,
+		git:          git,
+		usageTracker: usageTracker,
 	}
 }
 
@@ -164,16 +167,27 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 			wg.Add(1)
 			go func(memberIndex int, sess *runtime.Session, routing *runtime.RoutingResult, memberLens string) {
 				defer wg.Done()
+				memberStart := time.Now()
 				result, err := sess.Run(ctx, contextData)
+				memberDuration := time.Since(memberStart).Seconds()
 				if err != nil {
 					log.Printf("[CouncilReview] Member %d failed: %v", memberIndex+1, err)
 					mu.Lock()
 					failedMembers = append(failedMembers, routing.ModelID)
 					mu.Unlock()
+					// Record failure for the model
+					if h.usageTracker != nil {
+						h.usageTracker.RecordCompletion(ctx, routing.ModelID, "council_review", memberDuration, false)
+					}
 					return
 				}
 
 				h.factory.Compact(ctx, result, planID)
+
+				// Record token usage and completion for the council member model
+				if h.usageTracker != nil {
+					h.usageTracker.RecordCompletion(ctx, routing.ModelID, "council_review", memberDuration, true)
+				}
 
 				vote, parseErr := runtime.ParseCouncilVote(result.Output)
 				if parseErr != nil {
@@ -200,13 +214,23 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 			}(i, session, memberRouting, lens)
 		} else {
 			// Sequential mode - run one at a time, reuse models if needed
+			memberStart := time.Now()
 			result, err := session.Run(ctx, contextData)
+			memberDuration := time.Since(memberStart).Seconds()
 			if err != nil {
 				log.Printf("[CouncilReview] Member %d failed: %v", i+1, err)
+				if h.usageTracker != nil {
+					h.usageTracker.RecordCompletion(ctx, memberRouting.ModelID, "council_review", memberDuration, false)
+				}
 				continue
 			}
 
 			h.factory.Compact(ctx, result, planID)
+
+			// Record token usage and completion for the council member model
+			if h.usageTracker != nil {
+				h.usageTracker.RecordCompletion(ctx, memberRouting.ModelID, "council_review", memberDuration, true)
+			}
 
 			vote, parseErr := runtime.ParseCouncilVote(result.Output)
 			if parseErr != nil {
@@ -248,6 +272,34 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 	consensus := h.determineConsensus(validReviews, memberCount)
 	log.Printf("[CouncilReview] Plan %s consensus: %s (votes: %d/%d)",
 		truncateID(planID), consensus, len(validReviews), memberCount)
+
+	// Record per-model learning based on vote alignment with consensus.
+	// Models whose vote aligned with the final consensus get success signal.
+	// Models that voted against consensus get a gentle failure signal.
+	// This teaches the router which models make good council members.
+	if h.usageTracker != nil {
+		for _, r := range validReviews {
+			modelID, _ := r["model_id"].(string)
+			vote, _ := r["vote"].(string)
+			if modelID == "" {
+				continue
+			}
+			voteAligned := false
+			switch consensus {
+			case "approved":
+				voteAligned = vote == "APPROVED"
+			case "blocked":
+				voteAligned = vote == "BLOCKED"
+			case "revision_needed":
+				voteAligned = vote == "REVISION_NEEDED"
+			}
+			if voteAligned {
+				h.usageTracker.RecordCompletion(ctx, modelID, "council_vote", 0, true)
+			} else {
+				h.usageTracker.RecordCompletion(ctx, modelID, "council_vote", 0, false)
+			}
+		}
+	}
 
 	reviewsJSON, _ := json.Marshal(validReviews)
 	modelsJSON, _ := json.Marshal(councilModels)
@@ -533,7 +585,8 @@ func setupCouncilHandlers(
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
+	usageTracker *runtime.UsageTracker,
 ) {
-	handler := NewCouncilHandler(database, factory, pool, connRouter, cfg, git)
+	handler := NewCouncilHandler(database, factory, pool, connRouter, cfg, git, usageTracker)
 	handler.Register(router)
 }
