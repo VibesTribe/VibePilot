@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-21T03:30:49Z | Commit: ccd6697c | Branch: main
+# Generated: 2026-04-21T03:33:06Z | Commit: 65f03985 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -222,7 +222,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: ccd6697c
+- Commit: 65f03985
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -242,32 +242,32 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-20 21:00 UTC
-# RULE: Update this file after ANY change set. Resume from here, never from guesses.
-# RULE: NEVER update from assumptions. ALWAYS verify against actual code/data first.
+# AUTO-UPDATED: 2026-04-21 00:30 UTC
+# RULE: Update after ANY change. Resume from here, never from guesses.
+# RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 ## Three Sources of Truth
 1. **GitHub (code):** https://github.com/VibesTribe/VibePilot — pushed=real
 2. **Supabase (data):** https://qtpdzsinvifkgpxyxlaz.supabase.co — in DB=real
 3. **Dashboard (live):** https://vibeflow-dashboard.vercel.app/ — rendering=working
    - Dashboard is USER DOMAIN. Hermes never modifies dashboard code.
+## Hierarchy (everything serves what's above it)
+```
+VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
+  ↓ governs
+Dashboard (what user sees and controls)
+  ↓ reads from
+Supabase (data layer)
+  ↓ fed by
+Governor (pipeline executor)
+  ↓ assisted by
+Hermes (maintenance, audit, contract enforcement)
+```
 ## System Status
-- **Governor:** STOPPED + DISABLED (won't auto-start on boot)
+- **Governor:** STOPPED + DISABLED
 - **Git:** main branch, clean, synced with origin
-- **Dashboard:** Live, 0 tasks, 0 task_runs (clean slate)
+- **Dashboard:** Live, 0 tasks
 - **Chrome CDP:** 127.0.0.1:9222
-## Models: 57 in config, 58 in DB (synced)
-### Active API (33) — all keys verified working via vault
-**Groq (7):** llama-4-scout, gpt-oss-120b, compound, compound-mini, llama-3.3-70b, llama-3.1-8b, qwen3-32b
-**OpenRouter Paid (5):** gemma-4-31b-it, glm-4.5-air, minimax-m2.5, nemotron-3-super-120b-a12b, nemotron-3-super-120b
-**OpenRouter Free (12):** gemma-4-26b-a4b-it, gemma-3-27b-it, gemma-3-12b-it, gemma-3-4b-it, gemma-3n-e2b-it, gemma-3n-e4b-it, llama-3.2-3b, llama-3.3-70b, hermes-3-llama-3.1-405b, qwen3-coder, nemotron-3-nano-30b, nemotron-nano-12b-v2-vl, gpt-oss-20b
-**NVIDIA NIM (3):** llama-3.3-70b-instruct, kimi-k2-instruct, nemotron-ultra-253b-v1 (format issue not auth)
-**Gemini (4 keys):** 2.5-flash-lite (Courier), 3.1-flash-lite-preview (Researcher), 3-flash-preview (Visual), 2.5-flash-lite (General)
-**Other (1):** bytedance/ui-tars-1.5-7b (courier vision)
-**Hermes/CLI (1):** glm-5 (interactive only, not pipeline-routable, ends May 1)
-### Active Web Courier (16)
-All need browser automation (not built yet). gemini-2.5-pro, deepseek-r1/v3, qwen-2.5/3.6-plus, mistral-large/codestral/pixtral, chatgpt-4o-mini-chatbox, perplexity, poe, aizolo, kimi-k2.6, gpt-4o-mini-chatbox
-### Paused (2): deepseek-chat, deepseek-reasoner (out of credit)
-### Benched (8): chatgpt-4o-mini, claude-sonnet, gemini-web, kimi-k2-instruct, minimax-m2.7, nemotron-3-super-120b, gemini-2.5-flash (legacy), qwen-3 (legacy name)
-## Connectors: 26 total (7 API, 14 web, 1 CLI, 4 inactive)
-## Secrets Vault: 15 entries, 10 decrypt OK, 4 can't (different encryption)
-## Learning System — FULLY WIRED (all 5 gaps resolved)
+## Human Role (VERY LIMITED — 3 things only)
+1. **Visual UI/UX review** — after visual tester agent has reviewed
+2. **Paid API benched** — out of credit, human decides add credits or keep benched
+3. **Research after council** — council-reviewed suggestions, human gives final yes/no
