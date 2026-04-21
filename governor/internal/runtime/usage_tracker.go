@@ -720,6 +720,60 @@ func (t *UsageTracker) GetMinuteRequestCount(ctx context.Context, modelID string
 	return usage.UsageWindows.Minute.Requests
 }
 
+// GetModelLearnedScore returns a routing preference score for a model given a task type.
+// Higher = better. Returns 0.5 (neutral) for models with no learned data.
+// Scoring: success on this task type = +0.3, failure history = -0.2 per failure (capped),
+// avoid_for_task_types = -0.5, best_for_task_types = +0.2.
+func (t *UsageTracker) GetModelLearnedScore(modelID string, taskType string) float64 {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	usage, exists := t.models[modelID]
+	if !exists || taskType == "" {
+		return 0.5 // neutral
+	}
+
+	score := 0.5 // baseline
+
+	learned := &usage.Learned
+
+	// Bonus for being best at this task type
+	for _, best := range learned.BestForTaskTypes {
+		if best == taskType {
+			score += 0.2
+			break
+		}
+	}
+
+	// Penalty for being bad at this task type
+	for _, avoid := range learned.AvoidForTaskTypes {
+		if avoid == taskType {
+			score -= 0.5
+			break
+		}
+	}
+
+	// Penalty for failure rate on this task type
+	if learned.FailureRateByType != nil {
+		if failCount, ok := learned.FailureRateByType[taskType]; ok && failCount > 0 {
+			penalty := 0.2 * failCount
+			if penalty > 0.4 {
+				penalty = 0.4
+			}
+			score -= penalty
+		}
+	}
+
+	// Clamp to [0, 1]
+	if score < 0 {
+		score = 0
+	}
+	if score > 1 {
+		score = 1
+	}
+	return score
+}
+
 // GetModelCooldownMinutes returns the configured cooldown minutes for a model.
 func (t *UsageTracker) GetModelCooldownMinutes(modelID string) int {
 	t.mu.RLock()
