@@ -18,13 +18,14 @@ import (
 )
 
 type TestingHandler struct {
-	database    *db.DB
-	factory     *runtime.SessionFactory
-	pool        *runtime.AgentPool
-	connRouter  *runtime.Router
-	git         *gitree.Gitree
-	cfg         *runtime.Config
-	worktreeMgr *gitree.WorktreeManager
+	database     *db.DB
+	factory      *runtime.SessionFactory
+	pool         *runtime.AgentPool
+	connRouter   *runtime.Router
+	git          *gitree.Gitree
+	cfg          *runtime.Config
+	worktreeMgr  *gitree.WorktreeManager
+	usageTracker *runtime.UsageTracker
 }
 
 func NewTestingHandler(
@@ -35,15 +36,17 @@ func NewTestingHandler(
 	git *gitree.Gitree,
 	cfg *runtime.Config,
 	worktreeMgr *gitree.WorktreeManager,
+	usageTracker *runtime.UsageTracker,
 ) *TestingHandler {
 	return &TestingHandler{
-		database:    database,
-		factory:     factory,
-		pool:        pool,
-		connRouter:  connRouter,
-		git:         git,
-		cfg:         cfg,
-		worktreeMgr: worktreeMgr,
+		database:     database,
+		factory:      factory,
+		pool:         pool,
+		connRouter:   connRouter,
+		git:          git,
+		cfg:          cfg,
+		worktreeMgr:  worktreeMgr,
+		usageTracker: usageTracker,
 	}
 }
 
@@ -109,6 +112,14 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 	if passed {
 		log.Printf("[Testing] Task %s tests PASSED in %.1fs", truncateID(taskID), duration)
 
+		// Feed test result back to executor model learning.
+		// This is the strongest quality signal: code that passes tests.
+		executorModelID := h.getExecutorModelID(ctx, taskID)
+		if executorModelID != "" && h.usageTracker != nil {
+			h.usageTracker.RecordCompletion(ctx, executorModelID, "code_test", duration, true)
+			log.Printf("[Testing] Recorded test PASS for executor model %s", executorModelID)
+		}
+
 		// TASK IS COMPLETE. Period. Testing passed = success.
 		// Record completion with model tracking data. This is the source of truth
 		// for model success/failure stats. Merge is a separate concern below.
@@ -165,6 +176,25 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		// Tests failed → keep branch and worktree for iterative fixing
 		// The executor will resume on this same branch to fix the specific failures
 		log.Printf("[Testing] Task %s tests FAILED in %.1fs:\n%s", truncateID(taskID), duration, truncateOutput(testOutput))
+
+		// Feed test failure back to executor model learning.
+		// Test failure = code quality issue = strongest negative signal.
+		executorModelID := h.getExecutorModelID(ctx, taskID)
+		if executorModelID != "" {
+			if h.usageTracker != nil {
+				h.usageTracker.RecordCompletion(ctx, executorModelID, "code_test", duration, false)
+			}
+			// Record to DB model learning for cross-session persistence
+			h.database.RPC(ctx, "update_model_learning", map[string]any{
+				"p_model_id":         executorModelID,
+				"p_task_type":        "code_test",
+				"p_outcome":          "failure",
+				"p_failure_class":    "test_failure",
+				"p_failure_category": "quality",
+				"p_failure_detail":   truncateOutput(testOutput),
+			})
+			log.Printf("[Testing] Recorded test FAIL for executor model %s", executorModelID)
+		}
 
 		h.database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":        taskID,
@@ -445,8 +475,9 @@ func setupTestingHandlers(
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
 	worktreeMgr *gitree.WorktreeManager,
+	usageTracker *runtime.UsageTracker,
 ) {
-	handler := NewTestingHandler(database, factory, pool, connRouter, git, cfg, worktreeMgr)
+	handler := NewTestingHandler(database, factory, pool, connRouter, git, cfg, worktreeMgr, usageTracker)
 	handler.Register(router)
 }
 
@@ -539,4 +570,27 @@ func (h *TestingHandler) extractFilesFromTask(task map[string]any) []string {
 		}
 	}
 	return nil
+}
+
+// getExecutorModelID looks up the model_id from the latest task_run for a task.
+// This connects the test result back to the model that wrote the code.
+func (h *TestingHandler) getExecutorModelID(ctx context.Context, taskID string) string {
+	data, err := h.database.Query(ctx, "task_runs", map[string]any{
+		"task_id": "eq." + taskID,
+		"select":  "model_id",
+		"order":   "created_at.desc",
+		"limit":   "1",
+	})
+	if err != nil {
+		log.Printf("[Testing] Failed to query executor model for task %s: %v", truncateID(taskID), err)
+		return ""
+	}
+
+	var runs []map[string]any
+	if err := json.Unmarshal(data, &runs); err != nil || len(runs) == 0 {
+		return ""
+	}
+
+	modelID, _ := runs[0]["model_id"].(string)
+	return modelID
 }
