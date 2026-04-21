@@ -241,18 +241,29 @@ func runPlanReview(
 	log.Printf("[PlanReview] Starting review for plan %s", truncateID(planID))
 
 	processingBy := fmt.Sprintf("supervisor:%d", time.Now().UnixNano())
-	claimed, err := database.RPC(ctx, "set_processing", map[string]any{
-		"p_table":         "plans",
-		"p_id":            planID,
-		"p_processing_by": processingBy,
-	})
-	if err != nil {
-		log.Printf("[PlanReview] Failed to claim plan %s: %v", truncateID(planID), err)
-		return
-	}
+	// Retry claiming: planner may still hold the lock briefly after transitioning
+	// plan to "review" (race between clear_processing and update_plan_status).
 	var claimSuccess bool
-	if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
-		log.Printf("[PlanReview] Plan %s already being processed", truncateID(planID))
+	for claimAttempt := 0; claimAttempt < 3; claimAttempt++ {
+		claimed, err := database.RPC(ctx, "set_processing", map[string]any{
+			"p_table":         "plans",
+			"p_id":            planID,
+			"p_processing_by": processingBy,
+		})
+		if err != nil {
+			log.Printf("[PlanReview] Failed to claim plan %s: %v", truncateID(planID), err)
+			return
+		}
+		if err := json.Unmarshal(claimed, &claimSuccess); err == nil && claimSuccess {
+			break
+		}
+		if claimAttempt < 2 {
+			log.Printf("[PlanReview] Plan %s locked, retrying in 3s (attempt %d/3)", truncateID(planID), claimAttempt+1)
+			time.Sleep(3 * time.Second)
+		}
+	}
+	if !claimSuccess {
+		log.Printf("[PlanReview] Plan %s still locked after 3 attempts, will retry via recovery", truncateID(planID))
 		return
 	}
 

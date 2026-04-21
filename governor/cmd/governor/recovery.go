@@ -122,6 +122,10 @@ func runProcessingRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 			recoverStaleProcessing(ctx, database, "maintenance_commands", timeout)
 			// Also check for tasks waiting for resources
 			recoverPendingResources(ctx, database)
+			// Recover plans stuck in active status without processing_by
+			recoverOrphanedPlans(ctx, database)
+			// Recover tasks stuck in review/testing with no processing_by
+			recoverOrphanedTasks(ctx, database)
 		}
 	}
 }
@@ -254,6 +258,76 @@ func runCheckpointRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 	}
 
 	log.Printf("[CheckpointRecovery] Recovery complete - processed %d task(s)", len(tasks))
+}
+
+// recoverOrphanedPlans finds plans in active statuses (review, council_review, etc.)
+// that have no processing_by lock — meaning the handler bailed and never re-dispatched.
+// It uses a temporary processing lock to trigger a realtime UPDATE event that re-routes
+// to the correct handler, then immediately clears the lock so the handler can claim it.
+func recoverOrphanedPlans(ctx context.Context, database *db.DB) {
+	result, err := database.Query(ctx, "plans", map[string]any{
+		"status":        "in.(review,council_review,revision_needed)",
+		"processing_by": "is.null",
+		"select":        "id,status",
+	})
+	if err != nil {
+		return
+	}
+	var plans []map[string]any
+	if err := json.Unmarshal(result, &plans); err != nil || len(plans) == 0 {
+		return
+	}
+	for _, plan := range plans {
+		planID, _ := plan["id"].(string)
+		status, _ := plan["status"].(string)
+		log.Printf("[PlanRecovery] Plan %s stuck in %s with no processing_by, clearing via set/clear processing", truncateID(planID), status)
+		// Set then immediately clear processing_by to trigger a realtime UPDATE.
+		// The status hasn't changed so the realtime mapper may skip it, but the
+		// clear_processing RPC sets updated_at = NOW() which fires the event.
+		database.RPC(ctx, "set_processing", map[string]any{
+			"p_table":         "plans",
+			"p_id":            planID,
+			"p_processing_by": fmt.Sprintf("recovery:%d", time.Now().UnixNano()),
+		})
+		database.RPC(ctx, "clear_processing", map[string]any{
+			"p_table": "plans",
+			"p_id":    planID,
+		})
+	}
+}
+
+// recoverOrphanedTasks finds tasks in review/testing status with no processing_by lock.
+// These are stuck because a handler claimed them via claim_for_review but then failed
+// without releasing the lock (e.g., empty API response). It clears processing_by so
+// the task can be re-claimed on the next realtime event.
+func recoverOrphanedTasks(ctx context.Context, database *db.DB) {
+	result, err := database.Query(ctx, "tasks", map[string]any{
+		"status":        "in.(review,testing)",
+		"processing_by": "is.null",
+		"select":        "id,task_number,status",
+	})
+	if err != nil {
+		return
+	}
+	var tasks []map[string]any
+	if err := json.Unmarshal(result, &tasks); err != nil || len(tasks) == 0 {
+		return
+	}
+	for _, task := range tasks {
+		taskID, _ := task["id"].(string)
+		taskNumber, _ := task["task_number"].(string)
+		status, _ := task["status"].(string)
+		log.Printf("[TaskRecovery] Task %s (%s) stuck in %s with no processing_by, re-dispatching via set/clear processing", taskNumber, truncateID(taskID), status)
+		database.RPC(ctx, "set_processing", map[string]any{
+			"p_table":         "tasks",
+			"p_id":            taskID,
+			"p_processing_by": fmt.Sprintf("recovery:%d", time.Now().UnixNano()),
+		})
+		database.RPC(ctx, "clear_processing", map[string]any{
+			"p_table": "tasks",
+			"p_id":    taskID,
+		})
+	}
 }
 
 // recoverPendingResources checks for tasks in pending_resources status and moves them
