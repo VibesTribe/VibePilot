@@ -18,18 +18,19 @@ import (
 )
 
 type TaskHandler struct {
-	database      *db.DB
-	factory       *runtime.SessionFactory
-	pool          *runtime.AgentPool
-	connRouter    *runtime.Router
-	git           *gitree.Gitree
-	checkpointMgr *core.CheckpointManager
-	leakDetector  *security.LeakDetector
-	cfg           *runtime.Config
-	usageTracker  *runtime.UsageTracker
-	worktreeMgr   *gitree.WorktreeManager
-	courierRunner *connectors.CourierRunner
-	vault         vaultProvider
+	database       *db.DB
+	factory        *runtime.SessionFactory
+	pool           *runtime.AgentPool
+	connRouter     *runtime.Router
+	git            *gitree.Gitree
+	checkpointMgr  *core.CheckpointManager
+	leakDetector   *security.LeakDetector
+	cfg            *runtime.Config
+	usageTracker   *runtime.UsageTracker
+	worktreeMgr    *gitree.WorktreeManager
+	courierRunner  *connectors.CourierRunner
+	vault          vaultProvider
+	contextBuilder *runtime.ContextBuilder
 }
 
 // vaultProvider abstracts secret access for the task handler.
@@ -65,6 +66,11 @@ func NewTaskHandler(
 		courierRunner: courierRunner,
 		vault:         v,
 	}
+}
+
+// SetContextBuilder injects the code map context builder for targeted file injection.
+func (h *TaskHandler) SetContextBuilder(cb *runtime.ContextBuilder) {
+	h.contextBuilder = cb
 }
 
 func (h *TaskHandler) Register(router *runtime.EventRouter) {
@@ -152,16 +158,45 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		log.Printf("[TaskAvailable] Task %s retry: appended revision notes (%d bytes)", truncateID(taskID), len(failureNotes))
 	}
 
+	// Inject targeted file contents for task_runner (context_policy: targeted)
+	// Read target_files from task result JSONB and load actual file contents
+	if result, ok := task["result"].(map[string]any); ok {
+		if rawFiles, ok := result["target_files"]; ok {
+			var targetFiles []string
+			switch v := rawFiles.(type) {
+			case []string:
+				targetFiles = v
+			case []interface{}:
+				for _, f := range v {
+					if s, ok := f.(string); ok {
+						targetFiles = append(targetFiles, s)
+					}
+				}
+			}
+			if len(targetFiles) > 0 && h.contextBuilder != nil {
+				fileContext := h.contextBuilder.BuildTargetedContext(targetFiles)
+				if fileContext != "" {
+					taskPacket.Prompt += fileContext
+					log.Printf("[TaskAvailable] Task %s: injected %d target files into prompt", taskNumber, len(targetFiles))
+				}
+			}
+		}
+	}
+
 	// Route to model with cascade retry — same pattern as planner/supervisor
 	var routingResult *runtime.RoutingResult
 	var failedModels []string
 
-	// If this task was previously failed by a specific model (test failure reroute),
-	// exclude that model to prevent re-assigning to the same one that failed.
+	// If this task was previously failed by a specific model, exclude that model
+	// to prevent re-assigning to the same one that failed.
 	if flagReason := getString(task, "routing_flag_reason"); flagReason != "" {
 		if after, ok := strings.CutPrefix(flagReason, "test_failed_by:"); ok && after != "" {
 			failedModels = append(failedModels, after)
-			log.Printf("[TaskAvailable] Task %s: excluding previously-failed model %s", taskNumber, after)
+			log.Printf("[TaskAvailable] Task %s: excluding test-failed model %s", taskNumber, after)
+		}
+		if after, ok := strings.CutPrefix(flagReason, "exec_failed_by:"); ok && after != "" {
+			failedModels = append(failedModels, after)
+			log.Printf("[TaskAvailable] Task %s: excluding exec-failed model %s", taskNumber, after)
 		}
 	}
 	var modelID, connectorID, routingFlag string
@@ -886,7 +921,11 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 				"p_new_status":     "available",
 				"p_failure_reason": failureNotes,
 			})
-			log.Printf("[TaskReview] Task %s failed: %s (%s) → available", truncateID(taskID), failureClass, failureDetail)
+			// Exclude the executor model from retry so a different model picks it up
+			h.database.REST(ctx, "PATCH", fmt.Sprintf("tasks?id=eq.%s", taskID), map[string]any{
+				"routing_flag_reason": fmt.Sprintf("exec_failed_by:%s", modelID),
+			})
+			log.Printf("[TaskReview] Task %s failed: %s (%s) → available (excluding model %s)", truncateID(taskID), failureClass, failureDetail, modelID)
 
 		case "needs_revision":
 			// Needs revision → back to available with FULL feedback for retry
@@ -1226,8 +1265,10 @@ func setupTaskHandlers(
 	worktreeMgr *gitree.WorktreeManager,
 	courierRunner *connectors.CourierRunner,
 	v vaultProvider,
+	contextBuilder *runtime.ContextBuilder,
 ) {
 	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg, usageTracker, worktreeMgr, courierRunner, v)
+	handler.SetContextBuilder(contextBuilder)
 	handler.Register(router)
 }
 

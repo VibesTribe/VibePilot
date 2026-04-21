@@ -121,7 +121,7 @@ func main() {
 	sessionFactory := runtime.NewSessionFactory(cfg)
 	registerConnectors(sessionFactory, cfg, v, repoPath)
 
-	contextBuilder := runtime.NewContextBuilder(database)
+	contextBuilder := runtime.NewContextBuilder(database, repoPath, cfg.System.CodeMap)
 	sessionFactory.SetContextBuilder(contextBuilder)
 
 	// Wire compactor for automatic session summary generation
@@ -173,6 +173,28 @@ func main() {
 		mcpRegistry.RegisterToolsInRegistry(toolRegistry)
 	} else {
 		log.Println("[MCP] No MCP servers configured")
+	}
+
+	// Refresh code map on startup if configured
+	if cfg.System.CodeMap != nil && cfg.System.CodeMap.RefreshOnStartup {
+		go func() {
+			// Small delay to let MCP servers finish connecting
+			time.Sleep(2 * time.Second)
+			if mcpRegistry != nil && mcpRegistry.HasTool("index_folder") {
+				log.Println("[CodeMap] Refreshing code map via jcodemunch...")
+				_, err := mcpRegistry.CallTool(ctx, "index_folder", map[string]any{
+					"path": repoPath,
+				})
+				if err != nil {
+					log.Printf("[CodeMap] Refresh failed: %v (will use existing map.md)", err)
+				} else {
+					contextBuilder.InvalidateCache()
+					log.Println("[CodeMap] Refresh complete, cache invalidated")
+				}
+			} else {
+				log.Println("[CodeMap] jcodemunch index_folder tool not available, skipping refresh")
+			}
+		}()
 	}
 
 	// Start MCP server to expose governor tools to external agents
@@ -241,7 +263,7 @@ func main() {
 
 	go runProcessingRecovery(ctx, database, cfg)
 
-	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, configDir)
+	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, configDir, contextBuilder)
 
 	// Periodically persist usage tracker state to Supabase for dashboard
 	go func() {
@@ -357,8 +379,8 @@ func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v 
 	}
 }
 
-func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector, usageTracker *runtime.UsageTracker, worktreeMgr *gitree.WorktreeManager, courierRunner *connectors.CourierRunner, v *vault.Vault, configDir string) {
-	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v)
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database *db.DB, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector, usageTracker *runtime.UsageTracker, worktreeMgr *gitree.WorktreeManager, courierRunner *connectors.CourierRunner, v *vault.Vault, configDir string, contextBuilder *runtime.ContextBuilder) {
+	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, contextBuilder)
 	setupPlanHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)
 	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)
 	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)

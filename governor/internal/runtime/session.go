@@ -136,6 +136,48 @@ func (f *SessionFactory) GetConnectorConfig(id string) *ConnectorConfig {
 	return f.config.GetConnector(id)
 }
 
+// buildAgentContext resolves context for an agent based on its context_policy from config.
+// Single source of truth -- no hardcoded agent type switches.
+func (f *SessionFactory) buildAgentContext(ctx context.Context, agentID string, taskType string) string {
+	if f.contextBuilder == nil || taskType == "" {
+		return ""
+	}
+
+	agent := f.config.GetAgent(agentID)
+	if agent == nil {
+		return ""
+	}
+
+	policy := agent.ContextPolicy
+	if policy == "" {
+		policy = "file_tree" // sensible default
+	}
+
+	switch policy {
+	case "full_map":
+		extra, err := f.contextBuilder.BuildPlannerContext(ctx, taskType)
+		if err != nil {
+			return ""
+		}
+		return extra
+
+	case "file_tree":
+		return f.contextBuilder.BuildBaseContext()
+
+	case "targeted":
+		// Targeted context (specific task files) is injected separately at execution time
+		// via BuildTargetedContext in handlers_task.go. This returns nothing here.
+		return ""
+
+	case "none":
+		return ""
+
+	default:
+		// Unknown policy -- default to file_tree
+		return f.contextBuilder.BuildBaseContext()
+	}
+}
+
 func (f *SessionFactory) Create(agentID string, opts ...SessionOption) (*Session, error) {
 	agent := f.config.GetAgent(agentID)
 	if agent == nil {
@@ -174,17 +216,8 @@ func (f *SessionFactory) CreateWithContext(ctx context.Context, agentID string, 
 		return nil, fmt.Errorf("load prompt: %w", err)
 	}
 
-	if f.contextBuilder != nil && taskType != "" {
-		var extraContext string
-		switch agentID {
-		case "planner":
-			extraContext, _ = f.contextBuilder.BuildPlannerContext(ctx, taskType)
-		case "supervisor":
-			extraContext, _ = f.contextBuilder.BuildSupervisorContext(ctx, taskType)
-		}
-		if extraContext != "" {
-			prompt += extraContext
-		}
+	if extra := f.buildAgentContext(ctx, agentID, taskType); extra != "" {
+		prompt += extra
 	}
 
 	connID := agent.DefaultConnector
@@ -214,17 +247,8 @@ func (f *SessionFactory) CreateWithConnector(ctx context.Context, agentID string
 		return nil, fmt.Errorf("load prompt: %w", err)
 	}
 
-	if f.contextBuilder != nil && taskType != "" {
-		var extraContext string
-		switch agentID {
-		case "planner":
-			extraContext, _ = f.contextBuilder.BuildPlannerContext(ctx, taskType)
-		case "supervisor":
-			extraContext, _ = f.contextBuilder.BuildSupervisorContext(ctx, taskType)
-		}
-		if extraContext != "" {
-			prompt += extraContext
-		}
+	if extra := f.buildAgentContext(ctx, agentID, taskType); extra != "" {
+		prompt += extra
 	}
 
 	conn, ok := f.connectors[connectorID]

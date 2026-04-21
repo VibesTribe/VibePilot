@@ -392,6 +392,19 @@ The `routing_flag` determines WHERE a task can run. The `suggested_agent` is a h
 - Hide coupling (make all dependencies explicit)
 - Design so one change breaks multiple slices
 - Skip isolation validation
+- Invent file paths that are not in the codebase map
+- Create tasks without specifying Target Files
+
+## Required Fields Per Task
+
+Every task section MUST include **Target Files:** listing the exact file paths
+(from the codebase map) that the task will create or modify. Example:
+
+**Target Files:** ["src/handlers/greeting.go", "src/handlers/greeting_test.go"]
+
+If the task creates new files, list the paths it will create. If it modifies
+existing files, list those paths. This is used to inject only those files into
+the executor's context — so be precise. No extra files, no missing files.
 
 ## Red Flags (Escalate to Council)
 
