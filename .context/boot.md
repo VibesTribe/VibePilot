@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-21T05:30:37Z | Commit: 75277ec6 | Branch: main
+# Generated: 2026-04-21T05:35:49Z | Commit: 576e93f8 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -222,7 +222,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 75277ec6
+- Commit: 576e93f8
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -242,8 +242,8 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-21 02:00 UTC — VERIFIED AGAINST CODE AND SUPABASE
-# NOTE: CONFIG/DB DISCREPANCY EXISTS — SEE BELOW
+# AUTO-UPDATED: 2026-04-21 02:45 UTC — VERIFIED AGAINST CODE AND SUPABASE
+# NOTE: CONFIG AND DB ARE NOW IN SYNC VIA DETERMINISTIC RESEARCH PIPELINE
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 ## Three Sources of Truth
@@ -261,13 +261,13 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 ```
 ## System Status
 - **Governor:** STOPPED + DISABLED (inactive/dead)
-- **Git:** main branch, clean, synced. Last: 169dc0ef
+- **Git:** main branch, clean, synced. Last: 576e93f8
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app
 - **Chrome CDP:** 127.0.0.1:9222
 ## Human Role (3 things only)
 1. **Visual UI/UX review** — after visual tester agent has reviewed
 2. **Paid API benched** — out of credit, human decides add credits or keep benched
 3. **Research after council** — council-reviewed suggestions, human gives final yes/no
-## MODELS: CONFIG VS DB DISCREPANCY
-### Config (models.json): **16 models** — intended source of truth
-- API: 11 (Groq 3, NVIDIA 3, OpenRouter paid 3, Gemini 2)
+## MODELS: CONFIG ↔ DB SYNC VIA RESEARCH PIPELINE
+### Current State (Verified)
+- **Config/models.json:** 30 models (source of truth)
