@@ -747,10 +747,18 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 					"p_new_status":     "review",
 					"p_failure_reason": "supervisor_review_timeout",
 				})
+				// Release processing_by lock so task can be re-claimed
+				h.database.REST(ctx, "PATCH", fmt.Sprintf("tasks?id=eq.%s", taskID), map[string]any{
+					"processing_by": nil,
+				})
 				return nil
 			}
-			log.Printf("[TaskReview] Session failed for %s: %v", truncateID(taskID), err)
-			return err
+			log.Printf("[TaskReview] Session failed for %s: %v — releasing lock for re-claim", truncateID(taskID), err)
+			// Release processing_by lock so the task can be re-claimed by recovery or realtime
+			h.database.REST(ctx, "PATCH", fmt.Sprintf("tasks?id=eq.%s", taskID), map[string]any{
+				"processing_by": nil,
+			})
+			return nil
 		}
 
 		// Compact session for context history
