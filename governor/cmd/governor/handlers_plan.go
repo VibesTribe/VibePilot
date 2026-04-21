@@ -378,6 +378,28 @@ func runPlanReview(
 			return
 		}
 
+		// Reinforce learned rules — plan approved after incorporating context
+		// that included learned rules. Increment effectiveness of active rules
+		// that apply to this project type, so the system learns which rules help.
+		rulesResult, rulesErr := database.RPC(ctx, "get_planner_rules", map[string]any{
+			"p_applies_to": "*",
+			"p_limit":      50,
+		})
+		if rulesErr == nil && rulesResult != nil {
+			var rulesList []map[string]any
+			if json.Unmarshal(rulesResult, &rulesList) == nil {
+				for _, rule := range rulesList {
+					if ruleID, ok := rule["id"].(string); ok && ruleID != "" {
+						if active, _ := rule["active"].(bool); active {
+							_, _ = database.RPC(ctx, "record_planner_rule_prevented_issue", map[string]any{
+								"p_rule_id": ruleID,
+							})
+						}
+					}
+				}
+			}
+		}
+
 		database.RPC(ctx, "record_model_success", map[string]any{
 			"p_model_id":         routingResult.ModelID,
 			"p_task_type":        "review",
