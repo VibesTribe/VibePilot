@@ -13,12 +13,13 @@ import (
 )
 
 type MaintenanceHandler struct {
-	database   *db.DB
-	factory    *runtime.SessionFactory
-	pool       *runtime.AgentPool
-	connRouter *runtime.Router
-	cfg        *runtime.Config
-	git        *gitree.Gitree
+	database     *db.DB
+	factory      *runtime.SessionFactory
+	pool         *runtime.AgentPool
+	connRouter   *runtime.Router
+	cfg          *runtime.Config
+	git          *gitree.Gitree
+	usageTracker *runtime.UsageTracker
 }
 
 func NewMaintenanceHandler(
@@ -28,14 +29,16 @@ func NewMaintenanceHandler(
 	connRouter *runtime.Router,
 	cfg *runtime.Config,
 	git *gitree.Gitree,
+	usageTracker *runtime.UsageTracker,
 ) *MaintenanceHandler {
 	return &MaintenanceHandler{
-		database:   database,
-		factory:    factory,
-		pool:       pool,
-		connRouter: connRouter,
-		cfg:        cfg,
-		git:        git,
+		database:     database,
+		factory:      factory,
+		pool:         pool,
+		connRouter:   connRouter,
+		cfg:          cfg,
+		git:          git,
+		usageTracker: usageTracker,
 	}
 }
 
@@ -80,22 +83,22 @@ func (h *MaintenanceHandler) handleMaintenanceCommand(event runtime.Event) {
 
 	log.Printf("[MaintenanceCmd] Processing command %s (type: %s)", truncateID(cmdID), cmdType)
 
-	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-		AgentID:  "maintenance",
-		TaskID:   cmdID,
-		TaskType: cmdType,
+	routingResult, err := h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+		Role:        "maintenance",
+		TaskType:    cmdType,
+		RoutingFlag: "internal",
 	})
 	if err != nil || routingResult == nil {
-		log.Printf("[MaintenanceCmd] No destination for command %s", truncateID(cmdID))
+		log.Printf("[MaintenanceCmd] No routing for command %s", truncateID(cmdID))
 		_, _ = h.database.RPC(ctx, "update_maintenance_command_status", map[string]any{
 			"p_id":           cmdID,
 			"p_status":       "failed",
-			"p_result_notes": map[string]any{"error": "no_destination"},
+			"p_result_notes": map[string]any{"error": "no_routing"},
 		})
 		return
 	}
 
-	session, err := h.factory.CreateWithContext(ctx, "maintenance", cmdType)
+	session, err := h.factory.CreateWithConnector(ctx, "maintenance", cmdType, routingResult.ConnectorID)
 	if err != nil {
 		log.Printf("[MaintenanceCmd] Failed to create session for %s: %v", truncateID(cmdID), err)
 		_, _ = h.database.RPC(ctx, "update_maintenance_command_status", map[string]any{
@@ -106,7 +109,7 @@ func (h *MaintenanceHandler) handleMaintenanceCommand(event runtime.Event) {
 		return
 	}
 
-	err = h.pool.SubmitWithDestination(ctx, "maintenance", routingResult.DestinationID, func() error {
+	err = h.pool.SubmitWithDestination(ctx, "maintenance", routingResult.ConnectorID, func() error {
 		start := time.Now()
 		result, sessionErr := session.Run(ctx, map[string]any{
 			"command":      cmd,
@@ -114,7 +117,7 @@ func (h *MaintenanceHandler) handleMaintenanceCommand(event runtime.Event) {
 			"payload":      payload,
 			"event":        "maintenance_command",
 		})
-		duration := time.Since(start)
+		duration := time.Since(start).Seconds()
 
 		if sessionErr != nil {
 			log.Printf("[MaintenanceCmd] Execution failed for %s: %v", truncateID(cmdID), sessionErr)
@@ -123,25 +126,52 @@ func (h *MaintenanceHandler) handleMaintenanceCommand(event runtime.Event) {
 				"p_status":       "failed",
 				"p_result_notes": map[string]any{"error": sessionErr.Error()},
 			})
+			// Record failure for the maintenance model
+			if h.usageTracker != nil {
+				h.usageTracker.RecordCompletion(ctx, routingResult.ModelID, "maintenance_"+cmdType, duration, false)
+			}
+			h.database.RPC(ctx, "record_model_failure", map[string]any{
+				"p_model_id":         routingResult.ModelID,
+				"p_task_type":        "maintenance_" + cmdType,
+				"p_failure_class":    "execution_error",
+				"p_failure_detail":   sessionErr.Error(),
+				"p_duration_seconds": duration,
+			})
 			return sessionErr
 		}
 
-		log.Printf("[MaintenanceCmd] Command %s executed via %s in %v", truncateID(cmdID), routingResult.DestinationID, duration)
+		log.Printf("[MaintenanceCmd] Command %s executed via %s (model=%s) in %.1fs", truncateID(cmdID), routingResult.ConnectorID, routingResult.ModelID, duration)
 
 		_, _ = h.database.RPC(ctx, "update_maintenance_command_status", map[string]any{
 			"p_id":     cmdID,
 			"p_status": "completed",
 			"p_result_notes": map[string]any{
 				"output":       result.Output,
-				"duration_ms":  duration.Milliseconds(),
+				"duration_ms":  int(duration * 1000),
 				"tokens_in":    result.TokensIn,
 				"tokens_out":   result.TokensOut,
-				"connector_id": routingResult.DestinationID,
+				"connector_id": routingResult.ConnectorID,
 				"model_id":     routingResult.ModelID,
 			},
 		})
 
-		h.recordSuccess(ctx, routingResult.ModelID, cmdType, duration.Seconds(), result.TokensIn+result.TokensOut)
+		// Record success for the maintenance model
+		if h.usageTracker != nil {
+			h.usageTracker.RecordCompletion(ctx, routingResult.ModelID, "maintenance_"+cmdType, duration, true)
+		}
+		h.database.RPC(ctx, "record_model_success", map[string]any{
+			"p_model_id":         routingResult.ModelID,
+			"p_task_type":        "maintenance_" + cmdType,
+			"p_duration_seconds": duration,
+			"p_tokens_used":      result.TokensIn + result.TokensOut,
+		})
+		h.database.RPC(ctx, "record_performance_metric", map[string]any{
+			"p_agent_id":         "maintenance",
+			"p_model_id":         routingResult.ModelID,
+			"p_metric_type":      "maintenance_" + cmdType,
+			"p_duration_seconds": duration,
+			"p_success":          true,
+		})
 
 		return nil
 	})
@@ -190,6 +220,13 @@ func (h *MaintenanceHandler) handleTaskApproved(event runtime.Event) {
 			"p_new_status":     "approval",
 			"p_failure_reason": "merge_failed",
 		})
+		// Record the merge failure for analytics
+		h.database.RPC(ctx, "record_failure", map[string]any{
+			"p_agent_id":       "maintenance",
+			"p_failure_class":  "merge_failed",
+			"p_failure_detail": fmt.Sprintf("branch=%s target=%s: %v", branchName, targetBranch, err),
+			"p_task_id":        taskID,
+		})
 		return
 	}
 
@@ -201,6 +238,12 @@ func (h *MaintenanceHandler) handleTaskApproved(event runtime.Event) {
 	})
 	h.database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
 		"p_completed_task_id": taskID,
+	})
+	// Record successful merge for analytics
+	h.database.RPC(ctx, "record_performance_metric", map[string]any{
+		"p_agent_id":    "maintenance",
+		"p_metric_type": "merge",
+		"p_success":     true,
 	})
 	log.Printf("[TaskApproved] Task %s merged to %s", truncateID(taskID), targetBranch)
 }
@@ -278,21 +321,6 @@ func (h *MaintenanceHandler) getTargetBranch(sliceID string) string {
 	return "TEST_MODULES/" + sliceID
 }
 
-func (h *MaintenanceHandler) recordSuccess(ctx context.Context, modelID, taskType string, durationSeconds float64, tokensUsed int) {
-	if modelID == "" {
-		return
-	}
-	_, err := h.database.RPC(ctx, "record_model_success", map[string]any{
-		"p_model_id":         modelID,
-		"p_task_type":        taskType,
-		"p_duration_seconds": durationSeconds,
-		"p_tokens_used":      tokensUsed,
-	})
-	if err != nil {
-		log.Printf("[Learning] Failed to record success: %v", err)
-	}
-}
-
 func setupMaintenanceHandler(
 	ctx context.Context,
 	router *runtime.EventRouter,
@@ -302,7 +330,8 @@ func setupMaintenanceHandler(
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
+	usageTracker *runtime.UsageTracker,
 ) {
-	handler := NewMaintenanceHandler(database, factory, pool, connRouter, cfg, git)
+	handler := NewMaintenanceHandler(database, factory, pool, connRouter, cfg, git, usageTracker)
 	handler.Register(router)
 }
