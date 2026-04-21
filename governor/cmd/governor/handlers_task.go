@@ -726,9 +726,22 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			"task_packet": taskPacket,
 			"task_run":    latestRun,
 		})
+		reviewDuration := time.Since(reviewStart).Seconds()
+		supervisorModelID := routingResult.ModelID
 		if err != nil {
+			// Record supervisor model failure
+			if h.usageTracker != nil {
+				h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, false)
+			}
+			h.database.RPC(ctx, "record_model_failure", map[string]any{
+				"p_model_id":         supervisorModelID,
+				"p_task_type":        "supervisor_review",
+				"p_failure_class":    "session_error",
+				"p_failure_detail":   err.Error(),
+				"p_duration_seconds": reviewDuration,
+			})
 			if reviewCtx.Err() == context.DeadlineExceeded {
-				log.Printf("[TaskReview] TIMEOUT reviewing task %s after 2m", truncateID(taskID))
+				log.Printf("[TaskReview] TIMEOUT reviewing task %s after 2m (supervisor=%s)", truncateID(taskID), supervisorModelID)
 				h.database.RPC(ctx, "transition_task", map[string]any{
 					"p_task_id":        taskID,
 					"p_new_status":     "review",
@@ -762,6 +775,17 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 			if parseErr != nil {
 				log.Printf("[TaskReview] Retry also failed to parse for %s: %v", truncateID(taskID), parseErr)
+				// Record supervisor model failure for bad output format
+				if h.usageTracker != nil {
+					h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, false)
+				}
+				h.database.RPC(ctx, "record_model_failure", map[string]any{
+					"p_model_id":         supervisorModelID,
+					"p_task_type":        "supervisor_review",
+					"p_failure_class":    "json_parse_error",
+					"p_failure_detail":   fmt.Sprintf("Failed to produce valid JSON after retry: %v", parseErr),
+					"p_duration_seconds": reviewDuration,
+				})
 				// Set to failed status instead of leaving in limbo
 				h.database.RPC(ctx, "transition_task", map[string]any{
 					"p_task_id":        taskID,
@@ -775,31 +799,42 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 		log.Printf("[TaskReview] Task %s decision: %s", truncateID(taskID), decision.Decision)
 
-		switch decision.Decision {
-		case "approved", "pass":
-			// Approved → testing
-			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":    taskID,
-				"p_new_status": "testing",
-			})
+	switch decision.Decision {
+	case "approved", "pass":
+		// Approved → testing
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":    taskID,
+			"p_new_status": "testing",
+		})
 
-			// Record supervisor approval as success for the supervisor model.
-			// Also record a success signal for the executor model (passed review).
-			h.database.RPC(ctx, "update_model_learning", map[string]any{
-				"p_model_id":         modelID,
-				"p_task_type":        taskType,
-				"p_outcome":          "review_passed",
-				"p_failure_class":    "",
-				"p_failure_category": "",
-				"p_failure_detail":   "",
-			})
-			if h.usageTracker != nil {
-				h.usageTracker.RecordCompletion(ctx, modelID, "review", time.Since(reviewStart).Seconds(), true)
-			}
-			h.recordEvent(ctx, "approved", taskID, modelID, "review_passed", map[string]any{
-				"checks": decision.Checks,
-			})
-			log.Printf("[TaskReview] Task %s → testing (supervisor approved)", truncateID(taskID))
+		// Record supervisor approval as success for the supervisor model.
+		if h.usageTracker != nil {
+			h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
+		}
+		h.database.RPC(ctx, "record_model_success", map[string]any{
+			"p_model_id":         supervisorModelID,
+			"p_task_type":        "supervisor_review",
+			"p_duration_seconds": reviewDuration,
+			"p_tokens_used":      result.TokensIn + result.TokensOut,
+		})
+
+		// Also record a success signal for the executor model (passed review).
+		h.database.RPC(ctx, "update_model_learning", map[string]any{
+			"p_model_id":         modelID,
+			"p_task_type":        taskType,
+			"p_outcome":          "review_passed",
+			"p_failure_class":    "",
+			"p_failure_category": "",
+			"p_failure_detail":   "",
+		})
+		if h.usageTracker != nil {
+			h.usageTracker.RecordCompletion(ctx, modelID, "review", time.Since(reviewStart).Seconds(), true)
+		}
+		h.recordEvent(ctx, "approved", taskID, modelID, "review_passed", map[string]any{
+			"checks":          decision.Checks,
+			"supervisor_model": supervisorModelID,
+		})
+		log.Printf("[TaskReview] Task %s → testing (supervisor=%s approved)", truncateID(taskID), supervisorModelID)
 
 		case "fail", "failed":
 			// Failed → back to available with full failure context
@@ -824,11 +859,16 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 				}
 			}
 
-			h.recordFailure(ctx, modelID, taskID, failureClass)
-			h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
-			h.recordEvent(ctx, "failure", taskID, modelID, failureClass, map[string]any{
-				"class": failureClass, "detail": failureDetail,
-			})
+		h.recordFailure(ctx, modelID, taskID, failureClass)
+		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
+		// Record supervisor model success (it correctly identified the failure)
+		if h.usageTracker != nil {
+			h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
+		}
+		h.recordEvent(ctx, "failure", taskID, modelID, failureClass, map[string]any{
+			"class": failureClass, "detail": failureDetail,
+			"supervisor_model": supervisorModelID,
+		})
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
@@ -869,10 +909,15 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 				}
 			}
 
-			h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
-			h.recordEvent(ctx, "revision_needed", taskID, modelID, failureClass, map[string]any{
-				"class": failureClass, "detail": failureDetail, "revision_notes": revisionNotes,
-			})
+		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
+		// Record supervisor model success (it correctly identified revision needed)
+		if h.usageTracker != nil {
+			h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
+		}
+		h.recordEvent(ctx, "revision_needed", taskID, modelID, failureClass, map[string]any{
+			"class": failureClass, "detail": failureDetail, "revision_notes": revisionNotes,
+			"supervisor_model": supervisorModelID,
+		})
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
@@ -884,13 +929,17 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			})
 			log.Printf("[TaskReview] Task %s needs revision: %s (%s) → available", truncateID(taskID), failureClass, failureDetail)
 
-		case "council_review":
-			// Complex → escalate to council
-			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":    taskID,
-				"p_new_status": "council_review",
-			})
-			log.Printf("[TaskReview] Task %s → council_review", truncateID(taskID))
+	case "council_review":
+		// Complex → escalate to council
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":    taskID,
+			"p_new_status": "council_review",
+		})
+		// Record supervisor success (correctly identified complexity)
+		if h.usageTracker != nil {
+			h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
+		}
+		log.Printf("[TaskReview] Task %s → council_review (supervisor=%s escalated)", truncateID(taskID), supervisorModelID)
 
 		case "reroute":
 			// Reroute → back to available for different assignment
@@ -902,10 +951,15 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			if failureDetail == "" {
 				failureDetail = "Supervisor recommends different model"
 			}
-			h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
-			h.recordEvent(ctx, "reroute", taskID, modelID, failureClass, map[string]any{
-				"class": failureClass, "detail": failureDetail,
-			})
+		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
+		// Record supervisor model success (correctly identified model limitation)
+		if h.usageTracker != nil {
+			h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
+		}
+		h.recordEvent(ctx, "reroute", taskID, modelID, failureClass, map[string]any{
+			"class": failureClass, "detail": failureDetail,
+			"supervisor_model": supervisorModelID,
+		})
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
