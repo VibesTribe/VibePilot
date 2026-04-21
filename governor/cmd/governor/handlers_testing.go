@@ -201,6 +201,14 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			"p_new_status":     "available",
 			"p_failure_reason": "test_failed:\n" + testOutput,
 		})
+
+		// Store the failed executor model ID so the task handler avoids re-routing to it.
+		// This prevents the same model from being assigned a task it just failed on.
+		if executorModelID != "" {
+			h.database.REST(ctx, "PATCH", fmt.Sprintf("tasks?id=eq.%s", taskID), map[string]any{
+				"routing_flag_reason": fmt.Sprintf("test_failed_by:%s", executorModelID),
+			})
+		}
 		log.Printf("[Testing] Task %s → available (branch %s preserved for fix)", truncateID(taskID), branchName)
 	}
 }
