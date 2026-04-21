@@ -363,7 +363,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)
 	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter, git)
 	setupTestingHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, worktreeMgr, usageTracker)
-	setupResearchHandlers(ctx, router, factory, pool, database, cfg, connRouter)
+	setupResearchHandlers(ctx, router, factory, pool, database, cfg, connRouter, usageTracker)
 
 	// Courier result handler: delivers Supabase realtime notifications to waiting courier goroutines
 	if courierRunner != nil {
