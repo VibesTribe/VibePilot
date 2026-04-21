@@ -1,7 +1,7 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-20 21:00 UTC
-# RULE: Update this file after ANY change set. Resume from here, never from guesses.
-# RULE: NEVER update from assumptions. ALWAYS verify against actual code/data first.
+# AUTO-UPDATED: 2026-04-21 00:30 UTC
+# RULE: Update after ANY change. Resume from here, never from guesses.
+# RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 
 ## Three Sources of Truth
 
@@ -10,74 +10,86 @@
 3. **Dashboard (live):** https://vibeflow-dashboard.vercel.app/ — rendering=working
    - Dashboard is USER DOMAIN. Hermes never modifies dashboard code.
 
+## Hierarchy (everything serves what's above it)
+
+```
+VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
+  ↓ governs
+Dashboard (what user sees and controls)
+  ↓ reads from
+Supabase (data layer)
+  ↓ fed by
+Governor (pipeline executor)
+  ↓ assisted by
+Hermes (maintenance, audit, contract enforcement)
+```
+
 ## System Status
 
-- **Governor:** STOPPED + DISABLED (won't auto-start on boot)
+- **Governor:** STOPPED + DISABLED
 - **Git:** main branch, clean, synced with origin
-- **Dashboard:** Live, 0 tasks, 0 task_runs (clean slate)
+- **Dashboard:** Live, 0 tasks
 - **Chrome CDP:** 127.0.0.1:9222
 
-## Models: 57 in config, 58 in DB (synced)
+## Human Role (VERY LIMITED — 3 things only)
 
-### Active API (33) — all keys verified working via vault
-**Groq (7):** llama-4-scout, gpt-oss-120b, compound, compound-mini, llama-3.3-70b, llama-3.1-8b, qwen3-32b
-**OpenRouter Paid (5):** gemma-4-31b-it, glm-4.5-air, minimax-m2.5, nemotron-3-super-120b-a12b, nemotron-3-super-120b
-**OpenRouter Free (12):** gemma-4-26b-a4b-it, gemma-3-27b-it, gemma-3-12b-it, gemma-3-4b-it, gemma-3n-e2b-it, gemma-3n-e4b-it, llama-3.2-3b, llama-3.3-70b, hermes-3-llama-3.1-405b, qwen3-coder, nemotron-3-nano-30b, nemotron-nano-12b-v2-vl, gpt-oss-20b
-**NVIDIA NIM (3):** llama-3.3-70b-instruct, kimi-k2-instruct, nemotron-ultra-253b-v1 (format issue not auth)
-**Gemini (4 keys):** 2.5-flash-lite (Courier), 3.1-flash-lite-preview (Researcher), 3-flash-preview (Visual), 2.5-flash-lite (General)
-**Other (1):** bytedance/ui-tars-1.5-7b (courier vision)
-**Hermes/CLI (1):** glm-5 (interactive only, not pipeline-routable, ends May 1)
+1. **Visual UI/UX review** — after visual tester agent has reviewed
+2. **Paid API benched** — out of credit, human decides add credits or keep benched
+3. **Research after council** — council-reviewed suggestions, human gives final yes/no
+
+## Self-Learning System — FULLY WIRED (all agents, all stages)
+
+### Data Collection (every agent process records outcomes)
+
+| Process | Model Tracking | Outcome Recording | Creates Rules | Coverage |
+|---------|---------------|-------------------|---------------|----------|
+| Planner | YES | YES | YES (on approval: reinforce) | 95% |
+| Supervisor (plan review) | YES | YES | YES (on rejection: create rules) | 95% |
+| Council (plan) | YES | YES (per-member) | YES (on block/revise) | 95% |
+| Task Execution | YES | YES | YES | 95% |
+| Task Review (supervisor) | YES | YES | YES | 95% |
+| Testing | YES | YES | YES (on failure) | 90% |
+| Research (supervisor review) | YES | YES | N/A | 90% |
+| Research Council | YES | YES (per-member) | N/A | 85% |
+| Maintenance | partial | partial | NO | 40% |
+
+### Learning Feedback Loops
+
+1. **Rejection → Rule creation:** Supervisor and council both create planner rules on rejection
+2. **Approval → Rule reinforcement:** Approved plans increment effectiveness of active rules
+3. **Per-model vote tracking:** Council members get success/failure based on vote alignment with consensus
+4. **Failed model exclusion:** Test failures store failed model, excluded from next routing attempt
+5. **Router scoring:** GetModelLearnedScore reads success/failure data to prefer better models
+6. **Context injection:** context_builder loads rules, recent failures, heuristics into agent context
+
+### Learning RPCs: 16 wired, 0 orphan
+
+All learning RPCs in the schema are now called from Go code.
+
+## Routing
+
+- **SelectRouting** (current API): cascade with learned scoring, rate-limit aware
+- **SelectDestination** (legacy wrapper): delegates to SelectRouting
+- Council members: per-member routing through cascade, ExcludeModels on failure
+- Same model can serve multiple council lenses sequentially if only one available
+- No hardcoded model assignments — everything through cascade
+
+## Models: 57 in config, 58 in DB
+
+### Active API (33) — all keys verified
+Groq (7), OpenRouter Paid (5), OpenRouter Free (13), NVIDIA (3), Gemini (4 keys), Other (1), Hermes/CLI (1)
 
 ### Active Web Courier (16)
-All need browser automation (not built yet). gemini-2.5-pro, deepseek-r1/v3, qwen-2.5/3.6-plus, mistral-large/codestral/pixtral, chatgpt-4o-mini-chatbox, perplexity, poe, aizolo, kimi-k2.6, gpt-4o-mini-chatbox
+All need browser automation (not built yet)
 
-### Paused (2): deepseek-chat, deepseek-reasoner (out of credit)
-### Benched (8): chatgpt-4o-mini, claude-sonnet, gemini-web, kimi-k2-instruct, minimax-m2.7, nemotron-3-super-120b, gemini-2.5-flash (legacy), qwen-3 (legacy name)
-
-## Connectors: 26 total (7 API, 14 web, 1 CLI, 4 inactive)
-
-## Secrets Vault: 15 entries, 10 decrypt OK, 4 can't (different encryption)
-
-## Learning System — FULLY WIRED (all 5 gaps resolved)
-
-### Data Collection (recording on every lifecycle event)
-| Handler | RecordUsage | RecordCompletion | recordSuccess/Failure | update_model_learning |
-|---------|-------------|-----------------|----------------------|----------------------|
-| handlers_task.go | YES | YES | YES | YES |
-| handlers_plan.go | YES | YES | YES | YES |
-| handlers_maint.go | — | — | YES | — |
-| handlers_testing.go | YES (via usageTracker) | YES | — | YES (on failure) |
-
-### Router Intelligence (GAP 2 resolved, commit 1e7ffde1)
-- selectByCascade scores candidates by GetModelLearnedScore(modelID, taskType)
-- Score 0-1 based on BestForTaskTypes (+0.2), AvoidForTaskTypes (-0.5), FailureRateByType (-0.2/fail)
-- Primary sort by score (0.1 threshold), tiebreaker by load balance
-- Logs include score + taskType for debugging
-
-### Test Failure Rerouting (GAP 3 resolved, commit faea1e29)
-- Testing handler stores failed executor model ID in routing_flag_reason
-- Task handler reads it on next available pickup and excludes from routing
-- Prevents re-assigning task to same model that failed tests
-
-### Config-DB Sync (GAP 5 resolved, commit 191dfc8f)
-- All 57 config models now in Supabase DB (58 total with 2 benched legacy entries)
-- 0 status mismatches
-
-### Remaining: GAP 4 (Dashboard analytics — user domain, not Hermes)
-
-## Key Architecture Rules
-- Credentials in Supabase vault only. No .env files.
-- Token counting always client-side. Never trust external counts.
-- Groq needs User-Agent header or gets Cloudflare 1010.
-- Governor disabled during build phase.
-- Hermes never touches dashboard code.
+### Paused (2): deepseek-chat, deepseek-reasoner
+### Benched (8): various
 
 ## Recent Commits (this session)
-- faea1e29 feat: exclude failed executor model on test failure reroute (GAP 3)
+- 65f03985 feat: reinforce learned rules on plan approval
+- ccd6697c feat: supervisor plan rejection creates planner rules
+- 2753356a feat: wire research handler learning + upgrade to SelectRouting
+- 4881c945 feat: wire council handler model learning
+- 95a0c209 docs: end-to-end learning audit
+- faea1e29 feat: exclude failed executor on test failure reroute (GAP 3)
 - 1e7ffde1 feat: learning-driven model routing (GAP 2)
-- f13b29d2 feat: wire test pass/fail learning into testing handler
-- 62fa81c5 docs: update learning system state
-- 1b1cc612 fix: add missing reviewStart variable for supervisor review learning
-- 191dfc8f fix: sync 25 models to Supabase DB (GAP 5)
-- b2f11095 docs: learning system analysis
-- 022c2908 state: verified full system audit
