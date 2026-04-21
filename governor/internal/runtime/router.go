@@ -239,7 +239,7 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 			}
 			cascade = filtered
 		}
-		return r.selectByCascade(ctx, connectors, cascade)
+		return r.selectByCascade(ctx, connectors, cascade, req.TaskType)
 	}
 
 	// Fallback: original task-based model selection
@@ -301,7 +301,7 @@ func (r *Router) getModelCascade() []string {
 // selectByCascade picks the least-loaded available model from the cascade.
 // Uses round-robin rotation to distribute load across models.
 // If all models are in cooldown, falls back to Hermes (the human's agent).
-func (r *Router) selectByCascade(ctx context.Context, connectors []ConnectorConfig, cascade []string) (*RoutingResult, error) {
+func (r *Router) selectByCascade(ctx context.Context, connectors []ConnectorConfig, cascade []string, taskType string) (*RoutingResult, error) {
 	if len(cascade) == 0 {
 		return nil, nil
 	}
@@ -357,18 +357,41 @@ func (r *Router) selectByCascade(ctx context.Context, connectors []ConnectorConf
 	}
 
 	if len(candidates) > 0 {
-		// Pick the candidate with fewest recent requests (load-balancing)
-		best := candidates[0]
-		bestCount := r.usageTracker.GetMinuteRequestCount(ctx, best.modelID)
-		for _, c := range candidates[1:] {
-			count := r.usageTracker.GetMinuteRequestCount(ctx, c.modelID)
-			if count < bestCount {
-				best = c
-				bestCount = count
-			}
+		// Score candidates using learned data + load balancing.
+		// Learned score (0-1) is primary: models that succeed at this task type rank higher.
+		// Load balance (minute requests) is tiebreaker: spread load when scores are equal.
+		type scored struct {
+			candidate
+			learnedScore float64
+			loadCount    int
 		}
-		log.Printf("[Router] Cascade routing: model=%s connector=%s (%d candidates available, picked least-loaded with %d min-requests)",
-			best.modelID, best.connID, len(candidates), bestCount)
+		scored_candidates := make([]scored, len(candidates))
+		for i, c := range candidates {
+			loadCount := 0
+			learnedScore := 0.5
+			if r.usageTracker != nil {
+				loadCount = r.usageTracker.GetMinuteRequestCount(ctx, c.modelID)
+				learnedScore = r.usageTracker.GetModelLearnedScore(c.modelID, taskType)
+			}
+			scored_candidates[i] = scored{c, learnedScore, loadCount}
+		}
+
+		// Sort: highest learned score first, then lowest load
+		sort.Slice(scored_candidates, func(i, j int) bool {
+			// If scores differ by more than 0.1, prefer higher score
+			if scored_candidates[i].learnedScore > scored_candidates[j].learnedScore+0.1 {
+				return true
+			}
+			if scored_candidates[j].learnedScore > scored_candidates[i].learnedScore+0.1 {
+				return false
+			}
+			// Similar scores: prefer lower load
+			return scored_candidates[i].loadCount < scored_candidates[j].loadCount
+		})
+
+		best := scored_candidates[0]
+		log.Printf("[Router] Cascade routing: model=%s connector=%s score=%.2f load=%d (%d candidates, taskType=%s)",
+			best.modelID, best.connID, best.learnedScore, best.loadCount, len(candidates), taskType)
 		return &RoutingResult{
 			ConnectorID: best.connID,
 			ModelID:     best.modelID,
