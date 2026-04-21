@@ -1,5 +1,5 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-20 19:30 UTC
+# AUTO-UPDATED: 2026-04-20 20:15 UTC
 # RULE: Update this file after ANY change set. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data first.
 
@@ -77,20 +77,12 @@
 - minimax-m2.7 — No API access, only via OpenRouter as m2.5
 - nvidia/nemotron-3-super-120b — Duplicate of -a12b variant
 
-## Config <-> Supabase Sync Issues (VERIFIED)
+## Config <-> Supabase Sync: VERIFIED IN SYNC (2026-04-20 20:15)
 
-**25 models in models.json NOT in Supabase DB** (added in previous session, not synced):
-- All 12 OpenRouter :free models
-- All 4 new Gemini keys (gemini-2.5-flash-lite, gemini-3.1-flash-lite-preview, gemini-3-flash-preview)
-- New web platforms: aizolo-mix, perplexity-free, poe-mix, gpt-4o-mini-chatbox, kimi-k2.6-instant, kimi-k2-instruct-0905-hf
-- bytedance/ui-tars-1.5-7b, gemini-3.1-pro-preview-web, qwen-3.6-plus (listed as web)
-
-**2 models in Supabase NOT in models.json:**
-- gemini-2.5-flash (old single-key entry, replaced by 4-project entries)
-- qwen-3 (replaced by qwen-3.6-plus with correct name)
-
-**1 status mismatch:**
-- nvidia/nemotron-3-super-120b: config=benched, db=active
+- 56 models in both config and DB
+- 2 additional benched entries in DB only (gemini-2.5-flash, qwen-3 -- replaced)
+- 0 status mismatches
+- GAP 5 RESOLVED
 
 ## Connectors (26 total)
 
