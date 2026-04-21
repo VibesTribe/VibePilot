@@ -230,6 +230,7 @@ func runPlanReview(
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
+	usageTracker *runtime.UsageTracker,
 	plan map[string]any,
 ) {
 	startTime := time.Now()
@@ -348,6 +349,13 @@ func runPlanReview(
 
 		if err != nil {
 			log.Printf("[PlanReview] Retry also failed to parse: %v", err)
+			// Record supervisor model failure for bad output format
+			database.RPC(ctx, "record_model_failure", map[string]any{
+				"p_model_id":       routingResult.ModelID,
+				"p_task_type":      "plan_review",
+				"p_failure_class":  "json_parse_error",
+				"p_failure_detail": fmt.Sprintf("Failed to produce valid JSON after retry: %v", err),
+			})
 			setPlanError(ctx, database, planID, "parse_failed")
 			return
 		}
@@ -405,6 +413,9 @@ func runPlanReview(
 			"p_task_type":        "review",
 			"p_duration_seconds": int(time.Since(startTime).Seconds()),
 		})
+		if usageTracker != nil {
+			usageTracker.RecordCompletion(ctx, routingResult.ModelID, "plan_review", time.Since(startTime).Seconds(), true)
+		}
 
 		log.Printf("[PlanReview] Plan %s approved and tasks created in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
 
@@ -464,11 +475,15 @@ func runPlanReview(
 
 		// Track the revision for analytics
 		_, _ = database.RPC(ctx, "record_planner_revision", map[string]any{
-			"p_plan_id":       planID,
-			"p_source":        "supervisor",
-			"p_failure_class": failureClass,
+			"p_plan_id":        planID,
+			"p_source":         "supervisor",
+			"p_failure_class":  failureClass,
 			"p_failure_detail": failureDetail,
 		})
+		// Record supervisor model success (correctly identified plan quality issues)
+		if usageTracker != nil {
+			usageTracker.RecordCompletion(ctx, routingResult.ModelID, "plan_review", time.Since(startTime).Seconds(), true)
+		}
 
 		log.Printf("[PlanReview] Plan %s needs revision: %s (%s)", truncateID(planID), failureClass, failureDetail)
 
@@ -485,8 +500,12 @@ func runPlanReview(
 			log.Printf("[PlanReview] Failed to update plan status: %v", err)
 			return
 		}
+		// Record supervisor model success (correctly identified need for council review)
+		if usageTracker != nil {
+			usageTracker.RecordCompletion(ctx, routingResult.ModelID, "plan_review", time.Since(startTime).Seconds(), true)
+		}
 
-		log.Printf("[PlanReview] Plan %s sent to council review", truncateID(planID))
+		log.Printf("[PlanReview] Plan %s sent to council review (supervisor=%s)", truncateID(planID), routingResult.ModelID)
 
 	default:
 		log.Printf("[PlanReview] Unknown decision: %s", review.Decision)
@@ -539,7 +558,7 @@ func handlePlanReview(
 		return
 	}
 
-	runPlanReview(ctx, factory, pool, database, cfg, connRouter, git, plan)
+	runPlanReview(ctx, factory, pool, database, cfg, connRouter, git, usageTracker, plan)
 }
 
 func setPlanError(ctx context.Context, database *db.DB, planID string, reason string) {
