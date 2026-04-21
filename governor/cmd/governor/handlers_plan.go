@@ -399,17 +399,54 @@ func runPlanReview(
 			"p_plan_id": planID,
 			"p_status":  "revision_needed",
 			"p_review_notes": map[string]any{
-				"decision":      review.Decision,
-				"failure_class": failureClass,
+				"decision":       review.Decision,
+				"failure_class":  failureClass,
 				"failure_detail": failureDetail,
-				"reasoning":     review.Reasoning,
-				"concerns":      review.Concerns,
+				"reasoning":      review.Reasoning,
+				"concerns":       review.Concerns,
 			},
 		})
 		if err != nil {
 			log.Printf("[PlanReview] Failed to update plan status: %v", err)
 			return
 		}
+
+		// Learn from supervisor rejection — create planner rules so the
+		// planner learns what to avoid, same pattern as council feedback.
+		if failureDetail != "" {
+			_, _ = database.RPC(ctx, "create_planner_rule", map[string]any{
+				"p_applies_to": "*",
+				"p_rule_type":  "supervisor_rejection",
+				"p_rule_text":  "Avoid: " + failureDetail,
+				"p_source":     "supervisor",
+			})
+		}
+		if review.Reasoning != "" && review.Reasoning != failureDetail {
+			_, _ = database.RPC(ctx, "create_planner_rule", map[string]any{
+				"p_applies_to": "*",
+				"p_rule_type":  "supervisor_rejection",
+				"p_rule_text":  "Context: " + review.Reasoning,
+				"p_source":     "supervisor",
+			})
+		}
+		for _, concern := range review.Concerns {
+			if concern != "" {
+				_, _ = database.RPC(ctx, "create_planner_rule", map[string]any{
+					"p_applies_to": "*",
+					"p_rule_type":  "supervisor_rejection",
+					"p_rule_text":  "Avoid: " + concern,
+					"p_source":     "supervisor",
+				})
+			}
+		}
+
+		// Track the revision for analytics
+		_, _ = database.RPC(ctx, "record_planner_revision", map[string]any{
+			"p_plan_id":       planID,
+			"p_source":        "supervisor",
+			"p_failure_class": failureClass,
+			"p_failure_detail": failureDetail,
+		})
 
 		log.Printf("[PlanReview] Plan %s needs revision: %s (%s)", truncateID(planID), failureClass, failureDetail)
 
