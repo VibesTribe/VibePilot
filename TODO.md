@@ -2,21 +2,29 @@
 
 ## Critical (do next)
 
-### 1. Test the pipeline end-to-end
-THE blocker for everything else. The YAML pipeline is written but never tested against real governor:
-- Queue a real task through Supabase
-- Watch it flow through: plan -> supervisor -> execute -> review -> test -> merge
-- Verify gitree branch management works with parallel tasks
-- Fix whatever breaks (will be things)
+### 1. Consultant agent for PRD quality
+The root cause of the entire cascade of failures: bad PRD → bad plan → bad execution.
+Need a multi-stage consultant process:
+- Raw idea → market research + clarification questions
+- Tech spec design (best options aligned with user intent)
+- Zero-drift, zero-gap PRD output
+- PRD good enough that planner can produce an excellent plan without guessing
+Research existing tech-spec-to-PRD prompts/templates online before designing from scratch.
 
-### 2. Test full fallback chain before May 1
+### 2. Test the pipeline end-to-end
+After consultant agent produces a proper PRD, run the full pipeline:
+- PRD → planner (with fresh code map) → supervisor review → task creation → execution (with targeted files) → task review → completion
+- Verify the intelligence overhaul (commit 57654556) actually works
+- This is THE proof point. Nothing else matters until this works.
+
+### 3. Test full fallback chain before May 1
 ZAI/GLM subscription ends May 1. Before then:
 - Force each fallback tier to activate (disable tiers above it temporarily)
 - Verify Groq, NVIDIA NIM, OpenRouter all actually work through the governor router
 - Time each tier's response to confirm latency is acceptable
 - Document any that fail
 
-### 3. Reconcile config/models.json with Supabase DB
+### 4. Reconcile config/models.json with Supabase DB
 Config has 30 models, DB has 58. The ResearchActionApplier keeps them in sync going forward,
 but existing orphans need cleaning:
 - Verify which DB models are real vs stale
@@ -27,13 +35,13 @@ but existing orphans need cleaning:
 
 ## High Priority
 
-### 4. Visual QA agent
+### 5. Visual QA agent
 - Wire browser-use to capture screenshots of dashboard after changes
 - Compare to baseline, flag visual regressions
 - Present to human for UI/UX yes/no
 - This is the courier pattern applied to our own app
 
-### 5. Daily landscape research cron
+### 6. Daily landscape research cron
 The researcher prompt exists (`prompts/daily_landscape_researcher.md`).
 Need to wire it:
 - Cron job that runs researcher daily
@@ -42,13 +50,13 @@ Need to wire it:
 - Supervisor approves minor, escalates major to Council -> Human
 - Approved findings now auto-sync to config + DB via ResearchActionApplier
 
-### 6. Pre-execution design preview
+### 7. Pre-execution design preview
 For UI tasks, show human a design choice BEFORE writing code:
 - Courier generates mockup/plan, presents to human
 - Human picks direction, THEN agent writes code
 - Skip for non-UI tasks (conditional pipeline stage)
 
-### 7. Dashboard model management
+### 8. Dashboard model management
 Dashboard shows models but can't add/edit them. Need:
 - "Add model" form → calls ResearchActionApplier via API
 - "Edit model" → same path
@@ -59,7 +67,7 @@ Dashboard shows models but can't add/edit them. Need:
 
 ## Medium Priority
 
-### 8. LogAct patterns (from Meta research)
+### 9. LogAct patterns (from Meta research)
 `research/2026-04-14-logact-agent-bus.md` -- maps directly to our architecture.
 Adopt after pipeline is working end-to-end:
 - Intent logging: record what agent PLANS to do before execution
@@ -67,11 +75,11 @@ Adopt after pipeline is working end-to-end:
 - Append-only task_events table in Supabase (currently we update rows in-place)
 - Stupidity diagnosis: agent reads own failed output from log, rewrites
 
-### 9. JourneyKits implementation
+### 10. JourneyKits implementation
 95 kits scanned, 20 mapped to VibePilot gaps (`research/2026-04-08-journeykits-landscape-analysis.md`).
 Need to go through them and decide which patterns to adopt.
 
-### 10. Make .context/ hooks async
+### 11. Make .context/ hooks async
 Post-checkout, post-merge, pre-commit hooks rebuild entire knowledge layer synchronously.
 On x220 this causes command timeouts. Fix:
 - Run rebuild in background (don't block git)
@@ -82,11 +90,11 @@ On x220 this causes command timeouts. Fix:
 
 ## Lower Priority
 
-### 11. Enable governor MCP server
+### 12. Enable governor MCP server
 The governor can expose its tools as an MCP server (SSE on port 8081).
 Currently disabled. Enable when there's a consumer for it.
 
-### 12. Ethernet + headless setup
+### 13. Ethernet + headless setup
 x220 currently tethered via phone WiFi. More stable:
 - USB ethernet adapter for wired connection
 - Configure headless boot (no display manager)
@@ -96,6 +104,14 @@ x220 currently tethered via phone WiFi. More stable:
 
 ## Done (April 2026)
 
+- [x] Governor intelligence overhaul (commit 57654556) -- context, routing, verification
+- [x] Config-driven agent context policy (full_map/file_tree/targeted/none)
+- [x] Task packet enrichment chain (planner → parser → storage → file injection)
+- [x] Supervisor objective verification (file refs, PRD traceability, dep cycles)
+- [x] Code map TTL cache + startup refresh via jcodemunch MCP
+- [x] Plan review race condition fixed (retry loop + stale lock cleanup)
+- [x] Supervisor routing flag feedback (exec_failed_by prefix + REST PATCH)
+- [x] Hermes vibepilot-thinking skill (architectural reasoning framework)
 - [x] .context/ knowledge layer built (knowledge.db, boot.md, tier0)
 - [x] Tier 0 hand-crafted rules (single source of truth for all docs)
 - [x] All doc contradictions fixed (9 across 5 files)
@@ -142,6 +158,7 @@ x220 currently tethered via phone WiFi. More stable:
 - [x] Research→config+DB sync (ResearchActionApplier, deterministic, no LLM middleman)
 - [x] 4 new web platforms added (kimi-ai, perplexity, poe, aizolo)
 - [x] WYNTK and TODO updated to match verified system state (Apr 21)
+- [x] CURRENT_STATE updated with intelligence overhaul details (Apr 21)
 
 ## Not Viable (abandoned)
 
