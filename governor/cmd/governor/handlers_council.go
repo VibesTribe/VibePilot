@@ -101,21 +101,6 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 		}
 	}
 
-	routingResult, err := h.connRouter.SelectDestination(ctx, runtime.LegacyRoutingRequest{
-		AgentID:  "council",
-		TaskID:   planID,
-		TaskType: "council_review",
-	})
-	if err != nil || routingResult == nil {
-		log.Printf("[CouncilReview] No destination for plan %s", truncateID(planID))
-		_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
-			"p_plan_id":      planID,
-			"p_status":       "error",
-			"p_review_notes": map[string]any{"error": "no_destination"},
-		})
-		return
-	}
-
 	// Count available models to decide parallel vs sequential
 	availableModels := h.connRouter.GetAvailableModelCount()
 	councilMode := "sequential_same_model"
@@ -266,6 +251,11 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 
 	if len(validReviews) == 0 {
 		log.Printf("[CouncilReview] No valid votes for plan %s", truncateID(planID))
+		_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
+			"p_plan_id":      planID,
+			"p_status":       "error",
+			"p_review_notes": map[string]any{"error": "no_routing_available"},
+		})
 		return
 	}
 
