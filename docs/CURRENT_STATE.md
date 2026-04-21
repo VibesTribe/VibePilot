@@ -24,6 +24,17 @@ Four interdependent root causes fixed as one coherent unit:
 ### Design Document
 Full design with rationale at `docs/designs/governor-intelligence-fix.md`.
 
+### Consultant Agent + PRD Template (commit 7fbd059e)
+Five-phase consultant process synthesized from 6 open-source spec-driven tools:
+1. **Discovery**: Fluid conversation (not forms), natural questions one at a time
+2. **Research & Architecture**: Tech stack, ADRs, patterns with rationale
+3. **Structured Specification**: FR-XXX IDs, Given/When/Then scenarios, typed data contracts, P1/P2/P3 priorities
+4. **Constitution Check**: Validate against project principles before PRD
+5. **PRD Generation**: Machine-parseable output with self-critique loop (max 3 revisions)
+
+PRD template at `config/templates/prd-template.md`. Every requirement traces to user intent = zero drift.
+Consultant prompt at `config/prompts/consultant.md`.
+
 ### Pre-existing Fixes (committed earlier April 20-21)
 - Plan review race condition: retry loop (3 attempts, 3s sleep) in runPlanReview()
 - Stale lock cleanup in recovery.go
@@ -195,5 +206,5 @@ Intelligence overhaul (commit 57654556) addresses all root causes. Needs re-test
 - Worktrees disabled (all tasks share same directory)
 - Orchestrator is NOT an LLM call -- just hardcoded cascade in Go
 - Dashboard reads mock data in some views, not all live Supabase
-- Consultant agent not set up (PRD quality depends on manual input)
+- Consultant agent not wired into pipeline (prompt and template exist, needs integration into governor flow)
 - Periodic jcodemunch refresh (only runs on startup currently)
