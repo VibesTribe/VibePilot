@@ -514,6 +514,16 @@ func (h *TaskHandler) executeCourierTask(
 	output, tokensIn, tokensOut, err := h.courierRunner.Run(courierCtx, string(packetJSON), 600)
 	if err != nil {
 		log.Printf("[CourierTask] Courier failed for %s: %v", truncateID(taskID), err)
+		// Record failure learning data for the fueling model
+		if h.usageTracker != nil {
+			if isRateLimitError(err) {
+				h.usageTracker.RecordRateLimit(ctx, modelID)
+				if connectorID != "" {
+					h.usageTracker.RecordConnectorCooldown(ctx, connectorID, 30)
+				}
+			}
+			h.usageTracker.RecordCompletion(ctx, modelID, taskCategory, time.Since(runStart).Seconds(), false)
+		}
 		h.failTask(ctx, taskID, modelID, branchName, "courier_execution_failed")
 		return err
 	}
@@ -560,6 +570,13 @@ func (h *TaskHandler) executeCourierTask(
 	h.recordSuccess(ctx, taskID, modelID, taskCategory, duration.Seconds(), totalTokens)
 
 	if h.usageTracker != nil {
+		// Record token usage to in-memory windows (minute/hour/day/week)
+		if err := h.usageTracker.RecordUsage(ctx, modelID, tokensIn, tokensOut); err != nil {
+			log.Printf("[CourierTask] UsageTracker RecordUsage error for %s: %v", modelID, err)
+		}
+		// Record platform message for free-tier limit tracking
+		h.usageTracker.RecordPlatformMessage(ctx, platformID, totalTokens)
+		// Record completion for learned data (avg duration, best_for_task_types)
 		h.usageTracker.RecordCompletion(ctx, modelID, taskCategory, duration.Seconds(), true)
 	}
 
@@ -693,6 +710,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, 2*time.Minute)
 		defer reviewCancel()
 
+		reviewStart := time.Now()
 		result, err := session.Run(reviewCtx, map[string]any{
 			"task":        task,
 			"event":       "task_review",
@@ -755,7 +773,24 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 				"p_task_id":    taskID,
 				"p_new_status": "testing",
 			})
-			log.Printf("[TaskReview] Task %s → testing", truncateID(taskID))
+
+			// Record supervisor approval as success for the supervisor model.
+			// Also record a success signal for the executor model (passed review).
+			h.database.RPC(ctx, "update_model_learning", map[string]any{
+				"p_model_id":         modelID,
+				"p_task_type":        taskType,
+				"p_outcome":          "review_passed",
+				"p_failure_class":    "",
+				"p_failure_category": "",
+				"p_failure_detail":   "",
+			})
+			if h.usageTracker != nil {
+				h.usageTracker.RecordCompletion(ctx, modelID, "review", time.Since(reviewStart).Seconds(), true)
+			}
+			h.recordEvent(ctx, "approved", taskID, modelID, "review_passed", map[string]any{
+				"checks": decision.Checks,
+			})
+			log.Printf("[TaskReview] Task %s → testing (supervisor approved)", truncateID(taskID))
 
 		case "fail", "failed":
 			// Failed → back to available with full failure context
