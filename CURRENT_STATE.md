@@ -67,7 +67,29 @@ Hermes (maintenance, audit, contract enforcement)
 
 ### Learning RPCs: ALL wired (zero orphan)
 
-## Routing
+## Courier System — BUILT AND WIRED
+
+### Architecture: GitHub Actions + Supabase Realtime (zero polling)
+
+```
+Governor routes to web platform
+  → CourierRunner.dispatch() triggers GitHub Actions repository_dispatch
+  → GitHub Actions runs browser-use + Playwright (headless Chromium)
+  → Browser interacts with web AI platform (platform-specific selectors)
+  → Result written to Supabase task_runs
+  → Realtime EventCourierResult fires
+  → CourierRunner.NotifyResult() delivers to waiting goroutine
+  → Task continues in pipeline
+```
+
+### Components
+- **governor/internal/connectors/courier.go**: CourierRunner with channel-based waiters, GitHub Actions dispatch, Supabase realtime result delivery
+- **scripts/courier_run.py**: Browser-use agent with platform-specific selectors (ChatGPT, Gemini, DeepSeek, Qwen, generic fallback)
+- **.github/workflows/courier.yml**: GitHub Actions workflow (repository_dispatch trigger, headless Chromium)
+- **handlers_task.go**: Checks `routingFlag == "web"`, dispatches via CourierRunner
+- **Realtime client**: Maps `EventCourierResult` to NotifyResult
+
+### Status: Not yet E2E tested (governor is stopped)
 
 - **SelectRouting ONLY** — all legacy SelectDestination/LegacyRoutingRequest calls removed from handlers
 - Per-member routing through cascade for council (plan + research)
