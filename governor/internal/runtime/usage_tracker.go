@@ -613,7 +613,7 @@ func (t *UsageTracker) LoadFromDatabase(ctx context.Context) error {
 		// Restore cooldown_expires_at (TIMESTAMPTZ)
 		if raw, ok := row["cooldown_expires_at"]; ok && raw != nil {
 			if str, ok := raw.(string); ok && str != "" {
-				cooldownTime, err := time.Parse(time.RFC3339Nano, str)
+				cooldownTime, err := parseTime(str)
 				if err != nil {
 					log.Printf("[UsageTracker] Warning: failed to parse cooldown_expires_at for %s: %v", modelID, err)
 				} else {
@@ -636,7 +636,7 @@ func (t *UsageTracker) LoadFromDatabase(ctx context.Context) error {
 		// Restore last_rate_limit_at (TIMESTAMPTZ)
 		if raw, ok := row["last_rate_limit_at"]; ok && raw != nil {
 			if str, ok := raw.(string); ok && str != "" {
-				lastRL, err := time.Parse(time.RFC3339Nano, str)
+				lastRL, err := parseTime(str)
 				if err != nil {
 					log.Printf("[UsageTracker] Warning: failed to parse last_rate_limit_at for %s: %v", modelID, err)
 				} else {
@@ -783,4 +783,22 @@ func (t *UsageTracker) GetModelCooldownMinutes(modelID string) int {
 		return 0
 	}
 	return usage.Profile.Recovery.CooldownMinutes
+}
+
+// parseTime tries multiple timestamp formats to handle data written by
+// different backends (Supabase returns RFC3339, local PG may return Go format).
+func parseTime(s string) (time.Time, error) {
+	// Try RFC3339Nano first (standard format from Supabase/ISO 8601)
+	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+		return t, nil
+	}
+	// Try Go's default Time.String() format: "2006-01-02 15:04:05.999999999 -0700 MST"
+	if t, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", s); err == nil {
+		return t, nil
+	}
+	// Try without fractional seconds
+	if t, err := time.Parse("2006-01-02 15:04:05 -0700 MST", s); err == nil {
+		return t, nil
+	}
+	return time.Time{}, fmt.Errorf("cannot parse timestamp: %q", s)
 }
