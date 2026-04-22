@@ -1,6 +1,5 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-21 02:45 UTC — VERIFIED AGAINST CODE AND SUPABASE
-# NOTE: CONFIG AND DB ARE NOW IN SYNC VIA DETERMINISTIC RESEARCH PIPELINE
+# AUTO-UPDATED: 2026-04-22 00:35 UTC — VERIFIED AGAINST CODE AND CONFIG FILES
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 
@@ -23,10 +22,15 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 
 ## System Status
 
-- **Governor:** STOPPED + DISABLED (inactive/dead)
-- **Git:** main branch, clean, synced. Last: 576e93f8
+- **Governor:** RUNNING (PID 19288, since Apr 21, process on x220)
+  - NOTE: NOT managed by systemd — started manually
+  - Binary: /home/vibes/vibepilot/governor/governor
+  - Runtime repo: ~/vibepilot (commit 7abaeed4)
+  - Dev repo: ~/VibePilot (synced to origin/main)
+- **Git:** main branch, clean, synced. Last: bd3d479c
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app
 - **Chrome CDP:** 127.0.0.1:9222
+- **Host:** x220, up 11h38m, 15GB RAM, 2.6GB used
 
 ## Human Role (3 things only)
 
@@ -36,54 +40,51 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 
 ## MODELS: CONFIG ↔ DB SYNC VIA RESEARCH PIPELINE
 
-### Current State (Verified)
-- **Config/models.json:** 30 models (source of truth)
-- **Supabase DB models table:** 30 models (in sync)
-- **Total modeled sources:** 30 (config and DB match)
+### Current State (Verified 2026-04-22)
+- **Config/models.json:** 57 models (source of truth)
+- **By status:** 49 active, 6 benched, 2 paused
+- **By access type:** 37 API, 19 web, 1 CLI subscription (GLM-5)
 
-### Composition of 30 Models
-- **API (22):**
-  - Groq: 7
-  - NVIDIA: 3
-  - OpenRouter paid: 4
-  - OpenRouter free: 13
-  - Gemini direct: 1 (experimental: gemini-2.5-flash)
-- **Web/courier (8):**
-  - chatgpt-web
-  - claude-web  
-  - gemini-web
-  - deepseek-web
-  - qwen-web
-  - mistral-web
-  - kimi-ai (new)
-  - perplexity (new)
+### Composition of 57 Models
+- **API (37):**
+  - Gemini direct: 4 (courier, researcher, visual, general)
+  - Groq: 5 (llama-3.3-70b, llama-3.1-8b, qwen3-32b, llama-4-scout, gpt-oss-120b)
+  - NVIDIA NIM: 3 (nemotron-ultra-253b, llama-3.3-70b, kimi-k2-instruct)
+  - OpenRouter free: 18 (gemma variants, llama variants, nemotron, qwen3-coder, hermes-405b, ui-tars, minimax, gpt-oss-20b, deepseek)
+  - DeepSeek API: 2 (paused, out of credits)
+  - OpenAI: 1 (chatgpt-4o-mini, benched)
+- **Web/courier (19):**
+  - chatgpt-web, claude-web, gemini-web, deepseek-web, qwen-web
+  - mistral-web (3 models: large, codestral, pixtral)
+  - notegpt-web (deepseek-v3), kimi-web, huggingchat-web
+  - aistudio-web, poe-web, chatbox-web, aizolo-web
+  - perplexity-web, gemini-2.5-pro-web, gemini-3.1-pro-preview-web
+  - deepseek-r1-web, kimi-k2.6-instant, kimi-k2-instruct-0905-hf
+- **CLI subscription (1):**
+  - GLM-5 via Z.AI Pro (hermes connector, primary model)
 
-### Sync Mechanism (NEW - deterministic, no LLM middleman)
+### Paused/Benched Models
+- **Paused (2):** deepseek-chat, deepseek-reasoner (out of credits)
+- **Benched (6):** chatgpt-4o-mini, claude-sonnet, gemini-web, kimi-k2-instruct (Groq), claude-web, aizolo-mix
+
+### Sync Mechanism (deterministic, no LLM middleman)
 - **Research → Direct Apply:** When supervisor approves research suggestion with type:
   - `new_model`, `pricing_change`, `config_tweak` → writes config/models.json + upserts DB
   - `new_platform` → writes config/connectors.json
 - **ActionApplier:** Runtime package that handles both file writes and DB operations
-- **Fallback:** If direct apply fails, falls back to maintenance command (LLM agent) for compatibility
-- **Status Tracking:** Research suggestions marked `implemented` on success, `approved` on fallback
 - **Thread-Safe:** Mutex-protected config file writes prevent race conditions
 
-### Prior Discrepancy (Fixed)
-Previously: config had 16 models, DB had 58 (42 orphans from research additions never synced back)
-Now: Both have 30 models — sync is bidirectional via research approval pipeline
-
-## CONNECTORS (verified)
-**12 total** in config/connectors.json:
-- CLI: 3 (opencode, claude-code, kimi)
-- API: 5 (gemini-api, deepseek-api, groq-api, nvidia-api, openrouter-api)
-- Web: 4 (chatgpt-web, claude-web, gemini-web, mistral-web) + 4 newly added (deepseek-web, qwen-web, kimi-ai, perplexity)
-
-Note: copilot-web, poe, aizolo were researched but marked unavailable (require accounts/payment) or UX issues (popups, chatbox distractions).
+## CONNECTORS (verified 2026-04-22)
+**26 total** in config/connectors.json:
+- CLI: 4 (hermes active; opencode, claude-code, kimi inactive)
+- API: 7 (gemini-api-courier, gemini-api-researcher, gemini-api-visual, gemini-api-general, groq-api, openrouter-api, nvidia-api active; deepseek-api inactive)
+- Web: 15 (chatgpt-web, claude-web, gemini-web, deepseek-web, qwen-web, mistral-web, notegpt-web, kimi-web, huggingchat-web, aistudio-web, poe-web, chatbox-web, aizolo-web, perplexity-web, openrouter-api all active)
 
 ## SELF-LEARNING SYSTEM — FULLY WIRED
 
 All 6 handlers have learning coverage (verified by grep):
 - plan: 10 calls, 95% coverage
-- council: 6 calls, 95% coverage  
+- council: 6 calls, 95% coverage
 - task: 21 calls, 98% coverage
 - testing: 3 calls, 90% coverage
 - research: 4 calls, 90% coverage
@@ -98,13 +99,28 @@ Architecture: GitHub Actions + Supabase Realtime
 - scripts/courier_run.py: Browser-use with platform selectors
 - .github/workflows/courier.yml: GitHub Actions workflow
 - handlers_task.go: web routing → CourierRunner
-- Status: Not yet E2E tested (governor stopped)
+- Status: Not yet E2E tested
 
-## RECENT COMMITS (this session)
+## CONSULTANT AGENT — BUILT, TESTED ONCE
 
-The commits show:
-1. Wired self-learning feedback loops across all agent processes
-2. Built deterministic research→config+DB sync (no LLM middleman)
-3. Fixed config/DB discrepancy — now both show 30 models
-4. Added 4 missing web platform connectors (kimi-ai, perplexity, poe, aizolo — though poe/aizolo unavailable)
-5. CURRENT_STATE.md updated with verified counts and sync mechanism details
+- Prompt: prompts/consultant.md (539 lines, 20KB)
+- PRD template: prompts/prd_template.md
+- Successfully produced Knowledge Graph PRD (14.5KB, in docs/pending/)
+- Webhook trigger bug: isPRD() matches docs/prd/pending/ — should only match docs/prd/*.md directly
+- Bug needs fix before next PRD is placed in docs/prd/
+
+## PENDING SPECS (not scheduled)
+
+- docs/pending/vibepilot-knowledge-graph-spec.md — Knowledge graph spec (PocketBase, dashboard viz, council review, research agent). NOT ready for planning — need simple pipeline test first.
+
+## KNOWN BUGS
+
+1. **Webhook PRD path matching** — isPRD() in governor/internal/webhooks/github.go matches `docs/prd/pending/` subfolder. Should only match `docs/prd/*.md` directly (not nested paths). Fix: add `/pending/` to exclusion list alongside `/processed/`.
+
+## RECENT COMMITS
+
+1. bd3d479c — docs: add plan (auto-created by webhook from pending PRD, should not have triggered)
+2. 419cc931 — feat: add Knowledge Graph PRD (pending) + update .context
+3. 7abaeed4 — docs: add Hermes subagent delegation config to CURRENT_STATE
+4. b1528a1d — docs: update CURRENT_STATE with consultant agent details
+5. 7fbd059e — feat(consultant): agent prompt and PRD template
