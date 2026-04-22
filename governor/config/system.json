@@ -3,7 +3,8 @@
   "database": {
     "type": "supabase",
     "url_env": "SUPABASE_URL",
-    "key_env": "SUPABASE_SERVICE_KEY"
+    "key_env": "SUPABASE_SERVICE_KEY",
+    "postgres_url_env": "DATABASE_URL"
   },
   "vault": {
     "key_env": "VAULT_KEY",

@@ -124,9 +124,10 @@ type ValidationConfig struct {
 //
 // See governor/internal/vault/vault.go for full architecture docs.
 type DatabaseConfig struct {
-	Type   string `json:"type"`
-	URLEnv string `json:"url_env"`
-	KeyEnv string `json:"key_env"`
+	Type           string `json:"type"`
+	URLEnv         string `json:"url_env"`
+	KeyEnv         string `json:"key_env"`
+	PostgresURLEnv string `json:"postgres_url_env"`
 }
 
 type VaultConfig struct {
@@ -733,6 +734,18 @@ func (c *Config) GetDatabaseURL() string {
 
 func (c *Config) GetDatabaseKey() string {
 	return os.Getenv(c.System.Database.KeyEnv)
+}
+
+func (c *Config) GetDatabaseType() string {
+	return c.System.Database.Type
+}
+
+func (c *Config) GetPostgresURL() string {
+	envKey := c.System.Database.PostgresURLEnv
+	if envKey == "" {
+		envKey = "DATABASE_URL"
+	}
+	return os.Getenv(envKey)
 }
 
 // GetRealtimeURL returns the Supabase Realtime WebSocket URL.

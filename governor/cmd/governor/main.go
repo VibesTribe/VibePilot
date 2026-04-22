@@ -53,15 +53,39 @@ func main() {
 
 	dbURL := cfg.GetDatabaseURL()
 	dbKey := cfg.GetDatabaseKey()
-	if dbURL == "" || dbKey == "" {
-		log.Fatal("Database credentials required: set SUPABASE_URL and SUPABASE_SERVICE_KEY")
+	dbType := cfg.GetDatabaseType()
+
+	var database db.Database
+	var postgrestDB *db.DB // only set for supabase backend (used for PromptLoader)
+	switch dbType {
+	case "postgres":
+		pgURL := cfg.GetPostgresURL()
+		if pgURL == "" {
+			log.Fatal("Postgres backend selected but DATABASE_URL not set")
+		}
+		var err error
+		database, err = db.NewPostgres(context.Background(), pgURL)
+		if err != nil {
+			log.Fatalf("Failed to connect to Postgres: %v", err)
+		}
+		log.Println("Connected to Postgres database")
+	default:
+		// "supabase" or empty = PostgREST
+		if dbURL == "" || dbKey == "" {
+			log.Fatal("Database credentials required: set SUPABASE_URL and SUPABASE_SERVICE_KEY")
+		}
+		postgrestDB = db.New(dbURL, dbKey)
+		database = postgrestDB
+		log.Println("Connected to database (PostgREST)")
 	}
-
-	database := db.New(dbURL, dbKey)
 	defer database.Close()
-	log.Println("Connected to database")
 
-	cfg.SetDatabase(database)
+	// PromptLoader uses PostgREST REST API for prompt upsert.
+	// Only available with supabase backend. Native postgres skips prompt sync
+	// (prompts are loaded from files and synced once during migration).
+	if postgrestDB != nil {
+		cfg.SetDatabase(postgrestDB)
+	}
 
 	// Validate all dependencies before accepting work
 	validateDB := &startupDBAdapter{db: database}
