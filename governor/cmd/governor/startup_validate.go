@@ -491,7 +491,7 @@ func loadJSONFile[T any](path string) (*T, error) {
 	return &result, nil
 }
 
-// startupDBAdapter wraps *db.DB to satisfy the validation interface
+// startupDBAdapter wraps db.Database to satisfy the validation interface
 type startupDBAdapter struct {
 	db interface {
 		RPC(ctx context.Context, name string, params map[string]interface{}) ([]byte, error)

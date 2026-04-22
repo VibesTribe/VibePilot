@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/vibepilot/governor/internal/db"
 )
@@ -27,10 +26,10 @@ func sanitizeColumnName(name string) string {
 }
 
 type DBQueryTool struct {
-	db *db.DB
+	db db.Database
 }
 
-func NewDBQueryTool(database *db.DB) *DBQueryTool {
+func NewDBQueryTool(database db.Database) *DBQueryTool {
 	return &DBQueryTool{db: database}
 }
 
@@ -44,22 +43,8 @@ func (t *DBQueryTool) Execute(ctx context.Context, args map[string]any) (json.Ra
 		return nil, fmt.Errorf("invalid table name")
 	}
 
-	path := table
-
-	if columns, ok := args["columns"].([]any); ok && len(columns) > 0 {
-		var validCols []string
-		for _, c := range columns {
-			col := sanitizeColumnName(fmt.Sprintf("%v", c))
-			if col != "" {
-				validCols = append(validCols, col)
-			}
-		}
-		if len(validCols) > 0 {
-			path = fmt.Sprintf("%s?select=%s", table, strings.Join(validCols, ","))
-		}
-	} else {
-		path = table + "?select=*"
-	}
+	// Build filter map for Query interface
+	filters := map[string]any{}
 
 	if where, ok := args["where"].(map[string]any); ok {
 		for key, val := range where {
@@ -67,16 +52,15 @@ func (t *DBQueryTool) Execute(ctx context.Context, args map[string]any) (json.Ra
 			if col == "" {
 				continue
 			}
-			safeVal := sanitizeFilterValue(val)
-			path = fmt.Sprintf("%s&%s=eq.%s", path, col, safeVal)
+			filters[col] = sanitizeFilterValue(val)
 		}
 	}
 
 	if limit, ok := args["limit"].(float64); ok && limit > 0 && limit <= 1000 {
-		path = fmt.Sprintf("%s&limit=%d", path, int(limit))
+		filters["limit"] = int(limit)
 	}
 
-	data, err := t.db.REST(ctx, "GET", path, nil)
+	data, err := t.db.Query(ctx, table, filters)
 	if err != nil {
 		return json.Marshal(map[string]any{
 			"success": false,
@@ -91,10 +75,10 @@ func (t *DBQueryTool) Execute(ctx context.Context, args map[string]any) (json.Ra
 }
 
 type DBUpdateTool struct {
-	db *db.DB
+	db db.Database
 }
 
-func NewDBUpdateTool(database *db.DB) *DBUpdateTool {
+func NewDBUpdateTool(database db.Database) *DBUpdateTool {
 	return &DBUpdateTool{db: database}
 }
 
@@ -119,8 +103,7 @@ func (t *DBUpdateTool) Execute(ctx context.Context, args map[string]any) (json.R
 		return nil, fmt.Errorf("data parameter required")
 	}
 
-	path := fmt.Sprintf("%s?id=eq.%s", table, id)
-	result, err := t.db.REST(ctx, "PATCH", path, data)
+	result, err := t.db.Update(ctx, table, id, data)
 	if err != nil {
 		return json.Marshal(map[string]any{
 			"success": false,
@@ -136,10 +119,10 @@ func (t *DBUpdateTool) Execute(ctx context.Context, args map[string]any) (json.R
 }
 
 type DBInsertTool struct {
-	db *db.DB
+	db db.Database
 }
 
-func NewDBInsertTool(database *db.DB) *DBInsertTool {
+func NewDBInsertTool(database db.Database) *DBInsertTool {
 	return &DBInsertTool{db: database}
 }
 
@@ -158,7 +141,7 @@ func (t *DBInsertTool) Execute(ctx context.Context, args map[string]any) (json.R
 		return nil, fmt.Errorf("data parameter required")
 	}
 
-	result, err := t.db.REST(ctx, "POST", table, data)
+	result, err := t.db.Insert(ctx, table, data)
 	if err != nil {
 		return json.Marshal(map[string]any{
 			"success": false,
@@ -174,10 +157,10 @@ func (t *DBInsertTool) Execute(ctx context.Context, args map[string]any) (json.R
 }
 
 type DBRPCTool struct {
-	db *db.DB
+	db db.Database
 }
 
-func NewDBRPCTool(database *db.DB) *DBRPCTool {
+func NewDBRPCTool(database db.Database) *DBRPCTool {
 	return &DBRPCTool{db: database}
 }
 
@@ -214,10 +197,10 @@ func (t *DBRPCTool) Execute(ctx context.Context, args map[string]any) (json.RawM
 }
 
 type MaintenanceCommandTool struct {
-	db *db.DB
+	db db.Database
 }
 
-func NewMaintenanceCommandTool(database *db.DB) *MaintenanceCommandTool {
+func NewMaintenanceCommandTool(database db.Database) *MaintenanceCommandTool {
 	return &MaintenanceCommandTool{db: database}
 }
 

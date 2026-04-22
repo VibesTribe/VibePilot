@@ -9,7 +9,7 @@ import (
 )
 
 type dbCheckpointAdapter struct {
-	db *db.DB
+	db db.Database
 }
 
 func (a *dbCheckpointAdapter) RPC(ctx context.Context, fn string, args map[string]any) (json.RawMessage, error) {

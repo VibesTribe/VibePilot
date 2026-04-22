@@ -49,7 +49,7 @@ func getRecoveryConfig(cfg *runtime.Config) RecoveryConfig {
 	return recovery
 }
 
-func runStartupRecovery(ctx context.Context, database *db.DB, cfg RecoveryConfig) {
+func runStartupRecovery(ctx context.Context, database db.Database, cfg RecoveryConfig) {
 	log.Println("Running startup recovery...")
 
 	orphans, err := database.RPC(ctx, "find_orphaned_sessions", map[string]interface{}{
@@ -93,7 +93,7 @@ func runStartupRecovery(ctx context.Context, database *db.DB, cfg RecoveryConfig
 	log.Printf("[Recovery] Recovery complete - %d session(s) recovered", len(orphanList))
 }
 
-func runProcessingRecovery(ctx context.Context, database *db.DB, cfg *runtime.Config) {
+func runProcessingRecovery(ctx context.Context, database db.Database, cfg *runtime.Config) {
 	timeout := cfg.GetProcessingTimeoutSeconds()
 	if timeout == 0 {
 		timeout = 300
@@ -115,7 +115,7 @@ func runProcessingRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 	log.Println("[ProcessingRecovery] Startup recovery complete, switching to realtime-only mode")
 }
 
-func recoverStaleProcessing(ctx context.Context, database *db.DB, table string, timeout int) {
+func recoverStaleProcessing(ctx context.Context, database db.Database, table string, timeout int) {
 	stale, err := database.RPC(ctx, "find_stale_processing", map[string]any{
 		"p_table":           table,
 		"p_timeout_seconds": timeout,
@@ -155,7 +155,7 @@ func recoverStaleProcessing(ctx context.Context, database *db.DB, table string, 
 	log.Printf("[ProcessingRecovery] Recovered %d stale %s", len(staleItems), table)
 }
 
-func runCheckpointRecovery(ctx context.Context, database *db.DB, cfg *runtime.Config, checkpointMgr *core.CheckpointManager) {
+func runCheckpointRecovery(ctx context.Context, database db.Database, cfg *runtime.Config, checkpointMgr *core.CheckpointManager) {
 	coreCfg := cfg.GetCoreConfig()
 	if !coreCfg.IsRecoveryEnabled() {
 		log.Println("[CheckpointRecovery] Recovery disabled, skipping")
@@ -249,7 +249,7 @@ func runCheckpointRecovery(ctx context.Context, database *db.DB, cfg *runtime.Co
 // that have no processing_by lock — meaning the handler bailed and never re-dispatched.
 // It uses a temporary processing lock to trigger a realtime UPDATE event that re-routes
 // to the correct handler, then immediately clears the lock so the handler can claim it.
-func recoverOrphanedPlans(ctx context.Context, database *db.DB) {
+func recoverOrphanedPlans(ctx context.Context, database db.Database) {
 	result, err := database.Query(ctx, "plans", map[string]any{
 		"status":        "in.(review,council_review,revision_needed)",
 		"processing_by": "is.null",
@@ -285,7 +285,7 @@ func recoverOrphanedPlans(ctx context.Context, database *db.DB) {
 // These are stuck because a handler claimed them via claim_for_review but then failed
 // without releasing the lock (e.g., empty API response). It clears processing_by so
 // the task can be re-claimed on the next realtime event.
-func recoverOrphanedTasks(ctx context.Context, database *db.DB) {
+func recoverOrphanedTasks(ctx context.Context, database db.Database) {
 	result, err := database.Query(ctx, "tasks", map[string]any{
 		"status":        "in.(review,testing)",
 		"processing_by": "is.null",
@@ -317,7 +317,7 @@ func recoverOrphanedTasks(ctx context.Context, database *db.DB) {
 
 // recoverPendingResources checks for tasks in pending_resources status and moves them
 // back to available so they can be retried when resources are free.
-func recoverPendingResources(ctx context.Context, database *db.DB) {
+func recoverPendingResources(ctx context.Context, database db.Database) {
 	result, err := database.RPC(ctx, "find_pending_resource_tasks", map[string]any{})
 	if err != nil {
 		log.Printf("[ResourceRecovery] Failed to find pending tasks: %v", err)
@@ -354,7 +354,7 @@ func recoverPendingResources(ctx context.Context, database *db.DB) {
 // runStartupRehydration scans for tasks and plans in active states
 // and fires synthetic events so the governor picks them up on cold start.
 // This ensures the pipeline is autonomous even after restarts.
-func runStartupRehydration(ctx context.Context, database *db.DB, router *runtime.EventRouter) {
+func runStartupRehydration(ctx context.Context, database db.Database, router *runtime.EventRouter) {
 	log.Println("[Rehydration] Scanning for active tasks and plans...")
 
 	// Rehydrate plans in active statuses (including review — they need supervisor approval)

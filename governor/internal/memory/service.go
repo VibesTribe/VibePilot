@@ -78,12 +78,12 @@ type Rule struct {
 
 // MemoryService provides the 3-layer memory operations backed by Supabase.
 type MemoryService struct {
-	db     *db.DB
+	db     db.Database
 	config Config
 }
 
 // New creates a MemoryService using the existing Supabase db client.
-func New(database *db.DB, cfg Config) *MemoryService {
+func New(database db.Database, cfg Config) *MemoryService {
 	return &MemoryService{
 		db:     database,
 		config: cfg,
@@ -157,19 +157,29 @@ func (s *MemoryService) GetShortTerm(ctx context.Context, sessionID string) (map
 
 // StoreProjectState upserts a key/value pair scoped to a project.
 func (s *MemoryService) StoreProjectState(ctx context.Context, projectID, key string, value map[string]any) error {
-	// Attempt update first (match on project_id + key via REST filter path).
-	path := s.config.projectTable() + "?project_id=eq." + projectID + "&key=eq." + key
-	updated, err := s.db.REST(ctx, "PATCH", path, map[string]any{
-		"value":      value,
-		"updated_at": time.Now().UTC().Format(time.RFC3339),
+	// Attempt update first (match on project_id + key via Query to find existing row).
+	existing, err := s.db.Query(ctx, s.config.projectTable(), map[string]any{
+		"project_id": projectID,
+		"key":        key,
+		"limit":      1,
 	})
 	if err != nil {
-		return fmt.Errorf("update project state %s/%s: %w", projectID, key, err)
+		return fmt.Errorf("query project state %s/%s: %w", projectID, key, err)
 	}
 
-	var rows []json.RawMessage
-	if err := json.Unmarshal(updated, &rows); err == nil && len(rows) > 0 {
-		return nil
+	var rows []map[string]any
+	if err := json.Unmarshal(existing, &rows); err == nil && len(rows) > 0 {
+		// Existing row — update by id.
+		if id, ok := rows[0]["id"].(string); ok {
+			_, err = s.db.Update(ctx, s.config.projectTable(), id, map[string]any{
+				"value":      value,
+				"updated_at": time.Now().UTC().Format(time.RFC3339),
+			})
+			if err != nil {
+				return fmt.Errorf("update project state %s/%s: %w", projectID, key, err)
+			}
+			return nil
+		}
 	}
 
 	// No existing row – insert.
@@ -246,8 +256,10 @@ func (s *MemoryService) GetRulesByCategory(ctx context.Context, category string)
 // GetRulesByPriority returns all rules at or above the given priority threshold,
 // ordered by priority descending.
 func (s *MemoryService) GetRulesByPriority(ctx context.Context, minPriority int) ([]Rule, error) {
-	path := s.config.rulesTable() + "?priority=gte." + fmt.Sprintf("%d", minPriority) + "&order=priority.desc"
-	data, err := s.db.REST(ctx, "GET", path, nil)
+	data, err := s.db.Query(ctx, s.config.rulesTable(), map[string]any{
+		"priority": fmt.Sprintf("gte.%d", minPriority),
+		"order":    "priority.desc",
+	})
 	if err != nil {
 		return nil, fmt.Errorf("query rules by priority >= %d: %w", minPriority, err)
 	}
@@ -267,10 +279,24 @@ func (s *MemoryService) GetRulesByPriority(ctx context.Context, minPriority int)
 // Call this periodically (e.g. every 5 minutes) from a background goroutine.
 func (s *MemoryService) CleanExpired(ctx context.Context) error {
 	cutoff := time.Now().UTC().Format(time.RFC3339)
-	path := s.config.sessionsTable() + "?expires_at=lt." + cutoff
-	_, err := s.db.REST(ctx, "DELETE", path, nil)
+	// Find expired sessions, then delete each by ID.
+	data, err := s.db.Query(ctx, s.config.sessionsTable(), map[string]any{
+		"expires_at": "lt." + cutoff,
+		"select":     "id",
+	})
 	if err != nil {
-		return fmt.Errorf("clean expired sessions: %w", err)
+		return fmt.Errorf("clean expired sessions query: %w", err)
+	}
+	var rows []map[string]any
+	if err := json.Unmarshal(data, &rows); err != nil {
+		return fmt.Errorf("clean expired sessions unmarshal: %w", err)
+	}
+	for _, row := range rows {
+		if id, ok := row["id"].(string); ok {
+			if err := s.db.Delete(ctx, s.config.sessionsTable(), id); err != nil {
+				return fmt.Errorf("clean expired session %s: %w", id, err)
+			}
+		}
 	}
 	return nil
 }

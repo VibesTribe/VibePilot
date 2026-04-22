@@ -13,7 +13,7 @@ import (
 )
 
 type MaintenanceHandler struct {
-	database     *db.DB
+	database     db.Database
 	factory      *runtime.SessionFactory
 	pool         *runtime.AgentPool
 	connRouter   *runtime.Router
@@ -23,7 +23,7 @@ type MaintenanceHandler struct {
 }
 
 func NewMaintenanceHandler(
-	database *db.DB,
+	database db.Database,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
 	connRouter *runtime.Router,
@@ -326,7 +326,7 @@ func setupMaintenanceHandler(
 	router *runtime.EventRouter,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
-	database *db.DB,
+	database db.Database,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,

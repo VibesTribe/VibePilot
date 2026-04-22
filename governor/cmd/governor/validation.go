@@ -99,7 +99,7 @@ func validateTasks(tasks []TaskData, cfg *runtime.ValidationConfig) *ValidationF
 	return nil
 }
 
-func createTasksFromApprovedPlan(ctx context.Context, database *db.DB, plan map[string]any, cfg *runtime.ValidationConfig, repoPath string, git *gitree.Gitree) error {
+func createTasksFromApprovedPlan(ctx context.Context, database db.Database, plan map[string]any, cfg *runtime.ValidationConfig, repoPath string, git *gitree.Gitree) error {
 	planID, _ := plan["id"].(string)
 	planPath, _ := plan["plan_path"].(string)
 	if planPath == "" {

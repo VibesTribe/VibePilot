@@ -31,11 +31,11 @@ type SessionSummary struct {
 
 // Compactor compresses session results into summaries and stores them.
 type Compactor struct {
-	db *db.DB
+	db db.Database
 }
 
 // NewCompactor creates a new session compactor.
-func NewCompactor(dbClient *db.DB) *Compactor {
+func NewCompactor(dbClient db.Database) *Compactor {
 	return &Compactor{db: dbClient}
 }
 

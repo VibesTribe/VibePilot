@@ -71,7 +71,7 @@ func extractCouncilReviews(plan map[string]any) []map[string]any {
 	}
 }
 
-func recordModelSuccess(ctx context.Context, database *db.DB, modelID, taskType string, durationSeconds float64) {
+func recordModelSuccess(ctx context.Context, database db.Database, modelID, taskType string, durationSeconds float64) {
 	if modelID == "" {
 		return
 	}
@@ -85,7 +85,7 @@ func recordModelSuccess(ctx context.Context, database *db.DB, modelID, taskType 
 	}
 }
 
-func recordModelFailure(ctx context.Context, database *db.DB, modelID, taskID, failureType string) {
+func recordModelFailure(ctx context.Context, database db.Database, modelID, taskID, failureType string) {
 	if modelID == "" {
 		return
 	}
