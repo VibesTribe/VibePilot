@@ -1,7 +1,7 @@
 package db
-
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -326,10 +327,15 @@ func (p *PostgresDB) GetTaskPacket(ctx context.Context, taskID string) (*TaskPac
 // --- Query builder helpers ---
 
 // buildSelectQuery translates PostgREST-style filter maps to SQL WHERE clauses.
+// NOTE: ORDER BY and LIMIT are collected separately and appended AFTER WHERE
+// to avoid SQL syntax errors from Go's random map iteration order.
 func (p *PostgresDB) buildSelectQuery(table string, filters map[string]any) (string, []any) {
+	// Collect parts separately to ensure correct SQL order:
+	// SELECT ... WHERE ... ORDER BY ... LIMIT
 	query := "SELECT * FROM " + table
-	var clauses []string
+	var whereClauses []string
 	var args []any
+	var orderBy, limitStr string
 	argIdx := 1
 
 	for key, val := range filters {
@@ -337,7 +343,7 @@ func (p *PostgresDB) buildSelectQuery(table string, filters map[string]any) (str
 		switch key {
 		case "limit":
 			if n, ok := toInt(val); ok && n > 0 {
-				query += fmt.Sprintf(" LIMIT %d", n)
+				limitStr = fmt.Sprintf(" LIMIT %d", n)
 			}
 			continue
 		case "order":
@@ -352,7 +358,7 @@ func (p *PostgresDB) buildSelectQuery(table string, filters map[string]any) (str
 			if dir != "ASC" && dir != "DESC" {
 				dir = "ASC"
 			}
-			query += fmt.Sprintf(" ORDER BY %s %s", col, dir)
+			orderBy = fmt.Sprintf(" ORDER BY %s %s", col, dir)
 			continue
 		case "or":
 			// PostgREST: "or=(status.eq.review,status.eq.testing)"
@@ -370,14 +376,21 @@ func (p *PostgresDB) buildSelectQuery(table string, filters map[string]any) (str
 		valStr := fmt.Sprintf("%v", val)
 		clause, nextIdx, newArgs := buildFilterClause(key, valStr, argIdx)
 		if clause != "" {
-			clauses = append(clauses, clause)
+			whereClauses = append(whereClauses, clause)
 			args = append(args, newArgs...)
 			argIdx = nextIdx
 		}
 	}
 
-	if len(clauses) > 0 {
-		query += " WHERE " + strings.Join(clauses, " AND ")
+	// Assemble in correct SQL order: WHERE -> ORDER BY -> LIMIT
+	if len(whereClauses) > 0 {
+		query += " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+	if orderBy != "" {
+		query += orderBy
+	}
+	if limitStr != "" {
+		query += limitStr
 	}
 
 	return query, args
@@ -538,6 +551,48 @@ func convertValue(v any) any {
 			}
 		}
 		return s
+	case [16]byte:
+		// UUID columns come as [16]byte from pgx when not using pgtype codec.
+		// Convert to standard UUID string format.
+		b := val[:]
+		return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+			binary.BigEndian.Uint32(b[0:4]),
+			binary.BigEndian.Uint16(b[4:6]),
+			binary.BigEndian.Uint16(b[6:8]),
+			binary.BigEndian.Uint16(b[8:10]),
+			b[10:])
+	case pgtype.UUID:
+		// pgtype.UUID serializes as [16]byte array by default — must convert to string
+		return val.String()
+	case pgtype.Timestamptz:
+		if !val.Valid {
+			return nil
+		}
+		return val.Time.Format(time.RFC3339Nano)
+	case pgtype.Timestamp:
+		if !val.Valid {
+			return nil
+		}
+		return val.Time.Format(time.RFC3339Nano)
+	case pgtype.Numeric:
+		if !val.Valid {
+			return nil
+		}
+		f64, err := val.Float64Value()
+		if err != nil {
+			return fmt.Sprintf("%v", val)
+		}
+		return f64.Float64
+	case pgtype.Text:
+		if !val.Valid {
+			return nil
+		}
+		return val.String
+	case pgtype.Bool:
+		if !val.Valid {
+			return nil
+		}
+		return val.Bool
 	case fmt.Stringer:
 		return val.String()
 	default:
