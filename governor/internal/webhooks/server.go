@@ -26,6 +26,11 @@ type Server struct {
 	github    *GitHubWebhookHandler
 	server    *http.Server
 	handlers  map[string]EventHandler
+	db        DBQuerier
+}
+
+type DBQuerier interface {
+	RPC(ctx context.Context, name string, params map[string]interface{}) ([]byte, error)
 }
 
 type EventHandler func(ctx context.Context, payload *Payload) error
@@ -70,6 +75,10 @@ func (s *Server) SetGitHubHandler(handler *GitHubWebhookHandler) {
 	s.github = handler
 }
 
+func (s *Server) SetDB(db DBQuerier) {
+	s.db = db
+}
+
 func (s *Server) RegisterHandler(eventType string, handler EventHandler) {
 	s.handlers[eventType] = handler
 	log.Printf("[Webhooks] Registered handler for: %s", eventType)
@@ -79,6 +88,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(s.path, s.handleWebhook)
 	mux.HandleFunc("/status", s.handleStatus)
+	mux.HandleFunc("/api/bookmarks", s.handleBookmark)
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
@@ -291,6 +301,62 @@ func extractID(record map[string]any) string {
 		return id
 	}
 	return ""
+}
+
+func (s *Server) handleBookmark(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		URL    string `json:"url"`
+		Title  string `json:"title"`
+		Note   string `json:"note"`
+		Source string `json:"source"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	if req.URL == "" {
+		http.Error(w, "url is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.Source == "" {
+		req.Source = "bookmarklet"
+	}
+
+	ctx := r.Context()
+	if s.db != nil {
+		result, err := s.db.RPC(ctx, "add_bookmark", map[string]interface{}{
+			"p_url":    req.URL,
+			"p_title":  req.Title,
+			"p_note":   req.Note,
+			"p_source": req.Source,
+		})
+		if err != nil {
+			log.Printf("[Bookmarks] Failed to save: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Write(result)
+		log.Printf("[Bookmarks] Saved: %s", req.URL)
+	} else {
+		http.Error(w, "Database not available", http.StatusServiceUnavailable)
+	}
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
