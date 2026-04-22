@@ -59,7 +59,7 @@ const (
 )
 
 type Vault struct {
-	db       *db.DB
+	db       db.Database
 	cache    map[string]*cachedSecret
 	mu       sync.RWMutex
 	auditLog bool
@@ -88,7 +88,7 @@ type SecretRecord struct {
 	CreatedAt      string `json:"created_at"`
 }
 
-func New(database *db.DB) *Vault {
+func New(database db.Database) *Vault {
 	v := &Vault{
 		db:       database,
 		cache:    make(map[string]*cachedSecret),
@@ -98,7 +98,7 @@ func New(database *db.DB) *Vault {
 	return v
 }
 
-func NewWithoutAudit(database *db.DB) *Vault {
+func NewWithoutAudit(database db.Database) *Vault {
 	v := &Vault{
 		db:       database,
 		cache:    make(map[string]*cachedSecret),
@@ -175,8 +175,10 @@ func (v *Vault) GetSecretNoCache(ctx context.Context, keyName string) (string, e
 }
 
 func (v *Vault) fetchFromDB(ctx context.Context, keyName string) (*SecretRecord, error) {
-	path := fmt.Sprintf("%s?key_name=eq.%s&limit=1", tableName, keyName)
-	data, err := v.db.REST(ctx, "GET", path, nil)
+	data, err := v.db.Query(ctx, tableName, map[string]any{
+		"key_name": keyName,
+		"limit":    1,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("db query: %w", err)
 	}

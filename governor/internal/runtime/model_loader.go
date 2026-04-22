@@ -22,11 +22,11 @@ type ModelsConfigFile struct {
 
 type ModelLoader struct {
 	configPath string
-	db         *db.DB
+	db         db.Database
 	tracker    *UsageTracker
 }
 
-func NewModelLoader(configPath string, database *db.DB, tracker *UsageTracker) *ModelLoader {
+func NewModelLoader(configPath string, database db.Database, tracker *UsageTracker) *ModelLoader {
 	return &ModelLoader{
 		configPath: configPath,
 		db:         database,
@@ -174,7 +174,7 @@ func (l *ModelLoader) Reload(ctx context.Context) error {
 	return l.Load(ctx)
 }
 
-func LoadModelsFromConfig(configDir string, database *db.DB, tracker *UsageTracker) (*ModelLoader, error) {
+func LoadModelsFromConfig(configDir string, database db.Database, tracker *UsageTracker) (*ModelLoader, error) {
 	configPath := filepath.Join(configDir, "models.json")
 
 	loader := NewModelLoader(configPath, database, tracker)

@@ -16,7 +16,7 @@ import (
 )
 
 type CouncilHandler struct {
-	database     *db.DB
+	database     db.Database
 	factory      *runtime.SessionFactory
 	pool         *runtime.AgentPool
 	connRouter   *runtime.Router
@@ -26,7 +26,7 @@ type CouncilHandler struct {
 }
 
 func NewCouncilHandler(
-	database *db.DB,
+	database db.Database,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
 	connRouter *runtime.Router,
@@ -571,7 +571,7 @@ func setupCouncilHandlers(
 	router *runtime.EventRouter,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
-	database *db.DB,
+	database db.Database,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,

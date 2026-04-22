@@ -18,7 +18,7 @@ import (
 )
 
 type TaskHandler struct {
-	database       *db.DB
+	database       db.Database
 	factory        *runtime.SessionFactory
 	pool           *runtime.AgentPool
 	connRouter     *runtime.Router
@@ -39,7 +39,7 @@ type vaultProvider interface {
 }
 
 func NewTaskHandler(
-	database *db.DB,
+	database db.Database,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
 	connRouter *runtime.Router,
@@ -743,7 +743,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 	err = h.pool.SubmitWithDestination(ctx, sliceID, routingResult.ConnectorID, func() error {
 		// Get context for review
 		taskPacket, _ := h.database.GetTaskPacket(ctx, taskID)
-		taskRunData, _ := h.database.REST(ctx, "GET", fmt.Sprintf("task_runs?task_id=eq.%s&order=created_at.desc&limit=1", taskID), nil)
+		taskRunData, _ := h.database.Query(ctx, "task_runs", map[string]any{"task_id": taskID, "order": "created_at.desc", "limit": 1})
 		var taskRuns []map[string]any
 		var latestRun map[string]any
 		if err := json.Unmarshal(taskRunData, &taskRuns); err == nil && len(taskRuns) > 0 {
@@ -783,14 +783,14 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 					"p_failure_reason": "supervisor_review_timeout",
 				})
 				// Release processing_by lock so task can be re-claimed
-				h.database.REST(ctx, "PATCH", fmt.Sprintf("tasks?id=eq.%s", taskID), map[string]any{
+				h.database.Update(ctx, "tasks", taskID, map[string]any{
 					"processing_by": nil,
 				})
 				return nil
 			}
 			log.Printf("[TaskReview] Session failed for %s: %v — releasing lock for re-claim", truncateID(taskID), err)
 			// Release processing_by lock so the task can be re-claimed by recovery or realtime
-			h.database.REST(ctx, "PATCH", fmt.Sprintf("tasks?id=eq.%s", taskID), map[string]any{
+			h.database.Update(ctx, "tasks", taskID, map[string]any{
 				"processing_by": nil,
 			})
 			return nil
@@ -922,7 +922,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 				"p_failure_reason": failureNotes,
 			})
 			// Exclude the executor model from retry so a different model picks it up
-			h.database.REST(ctx, "PATCH", fmt.Sprintf("tasks?id=eq.%s", taskID), map[string]any{
+			h.database.Update(ctx, "tasks", taskID, map[string]any{
 				"routing_flag_reason": fmt.Sprintf("exec_failed_by:%s", modelID),
 			})
 			log.Printf("[TaskReview] Task %s failed: %s (%s) → available (excluding model %s)", truncateID(taskID), failureClass, failureDetail, modelID)
@@ -1190,7 +1190,7 @@ func (h *TaskHandler) recordEvent(ctx context.Context, eventType, taskID, modelI
 	}
 	eventDetails["model_id"] = modelID
 
-	_, err := h.database.REST(ctx, "POST", "orchestrator_events", map[string]any{
+	_, err := h.database.Insert(ctx, "orchestrator_events", map[string]any{
 		"event_type": eventType,
 		"task_id":    taskID,
 		"model_id":   modelID,
@@ -1255,7 +1255,7 @@ func setupTaskHandlers(
 	router *runtime.EventRouter,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
-	database *db.DB,
+	database db.Database,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
@@ -1275,7 +1275,7 @@ func setupTaskHandlers(
 // unlockDependentsByTaskNumber finds tasks in "pending" status whose dependencies
 // contain the given task number (e.g. "T001") and transitions them to "available"
 // once ALL their dependencies are complete.
-func unlockDependentsByTaskNumber(ctx context.Context, database *db.DB, completedTaskNumber string) {
+func unlockDependentsByTaskNumber(ctx context.Context, database db.Database, completedTaskNumber string) {
 	if completedTaskNumber == "" || database == nil {
 		return
 	}

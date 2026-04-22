@@ -21,12 +21,12 @@ const defaultInternalEstimatedTokens = 2000
 
 type Router struct {
 	cfg           *Config
-	database      *db.DB
+	database      db.Database
 	usageTracker  *UsageTracker
 	cascadeOffset uint64 // round-robin counter for model rotation
 }
 
-func NewRouter(cfg *Config, database *db.DB, usageTracker *UsageTracker) *Router {
+func NewRouter(cfg *Config, database db.Database, usageTracker *UsageTracker) *Router {
 	return &Router{
 		cfg:          cfg,
 		database:     database,

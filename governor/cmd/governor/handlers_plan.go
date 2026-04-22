@@ -19,7 +19,7 @@ func setupPlanHandlers(
 	router *runtime.EventRouter,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
-	database *db.DB,
+	database db.Database,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
@@ -37,7 +37,7 @@ func handlePlanCreated(
 	ctx context.Context,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
-	database *db.DB,
+	database db.Database,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
@@ -226,7 +226,7 @@ func runPlanReview(
 	ctx context.Context,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
-	database *db.DB,
+	database db.Database,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
@@ -528,7 +528,7 @@ func handlePlanReview(
 	ctx context.Context,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
-	database *db.DB,
+	database db.Database,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
@@ -572,7 +572,7 @@ func handlePlanReview(
 	runPlanReview(ctx, factory, pool, database, cfg, connRouter, git, usageTracker, plan)
 }
 
-func setPlanError(ctx context.Context, database *db.DB, planID string, reason string) {
+func setPlanError(ctx context.Context, database db.Database, planID string, reason string) {
 	_, err := database.RPC(ctx, "update_plan_status", map[string]any{
 		"p_plan_id": planID,
 		"p_status":  "error",

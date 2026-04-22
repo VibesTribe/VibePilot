@@ -10,7 +10,7 @@ import (
 )
 
 type GitHubWebhookHandler struct {
-	db     *db.DB
+	db     db.Database
 	prdDir string
 }
 
@@ -33,7 +33,7 @@ type GitHubCommit struct {
 	Modified  []string `json:"modified"`
 }
 
-func NewGitHubWebhookHandler(database *db.DB, prdDir string) *GitHubWebhookHandler {
+func NewGitHubWebhookHandler(database db.Database, prdDir string) *GitHubWebhookHandler {
 	return &GitHubWebhookHandler{
 		db:     database,
 		prdDir: prdDir,

@@ -18,7 +18,7 @@ import (
 )
 
 type TestingHandler struct {
-	database     *db.DB
+	database     db.Database
 	factory      *runtime.SessionFactory
 	pool         *runtime.AgentPool
 	connRouter   *runtime.Router
@@ -29,7 +29,7 @@ type TestingHandler struct {
 }
 
 func NewTestingHandler(
-	database *db.DB,
+	database db.Database,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
 	connRouter *runtime.Router,
@@ -205,7 +205,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		// Store the failed executor model ID so the task handler avoids re-routing to it.
 		// This prevents the same model from being assigned a task it just failed on.
 		if executorModelID != "" {
-			h.database.REST(ctx, "PATCH", fmt.Sprintf("tasks?id=eq.%s", taskID), map[string]any{
+			h.database.Update(ctx, "tasks", taskID, map[string]any{
 				"routing_flag_reason": fmt.Sprintf("test_failed_by:%s", executorModelID),
 			})
 		}
@@ -478,7 +478,7 @@ func setupTestingHandlers(
 	router *runtime.EventRouter,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
-	database *db.DB,
+	database db.Database,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,

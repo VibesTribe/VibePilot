@@ -17,7 +17,7 @@ import (
 // No LLM middleman — this is deterministic code execution.
 type ResearchActionApplier struct {
 	configDir string
-	db        *db.DB
+	db        db.Database
 	mu        sync.Mutex
 }
 
@@ -28,7 +28,7 @@ type ModelAction struct {
 	Reason string       `json:"reason,omitempty"`
 }
 
-func NewResearchActionApplier(configDir string, database *db.DB) *ResearchActionApplier {
+func NewResearchActionApplier(configDir string, database db.Database) *ResearchActionApplier {
 	return &ResearchActionApplier{
 		configDir: configDir,
 		db:        database,

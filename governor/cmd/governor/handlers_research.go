@@ -13,7 +13,7 @@ import (
 )
 
 type ResearchHandler struct {
-	database       *db.DB
+	database       db.Database
 	factory        *runtime.SessionFactory
 	pool           *runtime.AgentPool
 	connRouter     *runtime.Router
@@ -23,7 +23,7 @@ type ResearchHandler struct {
 }
 
 func NewResearchHandler(
-	database *db.DB,
+	database db.Database,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
 	connRouter *runtime.Router,
@@ -469,7 +469,7 @@ func setupResearchHandlers(
 	router *runtime.EventRouter,
 	factory *runtime.SessionFactory,
 	pool *runtime.AgentPool,
-	database *db.DB,
+	database db.Database,
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	usageTracker *runtime.UsageTracker,

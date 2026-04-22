@@ -17,7 +17,7 @@ const (
 )
 
 type Dependencies struct {
-	DB       *db.DB
+	DB       db.Database
 	Git      *gitree.Gitree
 	Vault    *vault.Vault
 	RepoPath string

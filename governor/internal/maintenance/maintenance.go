@@ -51,7 +51,7 @@ type ExecutionResult struct {
 }
 
 type Maintenance struct {
-	db         *db.DB
+	db         db.Database
 	gitree     *gitree.Gitree
 	repoPath   string
 	sandboxDir string
@@ -62,7 +62,7 @@ type Config struct {
 	SandboxDir string
 }
 
-func New(cfg *Config, database *db.DB, git *gitree.Gitree) *Maintenance {
+func New(cfg *Config, database db.Database, git *gitree.Gitree) *Maintenance {
 	repoPath := cfg.RepoPath
 	if repoPath == "" {
 		repoPath, _ = os.Getwd()
