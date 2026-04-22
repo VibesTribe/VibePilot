@@ -257,6 +257,7 @@ func main() {
 		Path:   cfg.GetWebhooksConfig().Path,
 		Secret: webhookSecret,
 	}, eventRouter)
+	webhookServer.SetDB(database)
 
 	githubHandler := webhooks.NewGitHubWebhookHandler(database, cfg.GetRepoPath())
 	webhookServer.SetGitHubHandler(githubHandler)
