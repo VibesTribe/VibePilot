@@ -95,39 +95,24 @@ func runStartupRecovery(ctx context.Context, database *db.DB, cfg RecoveryConfig
 
 func runProcessingRecovery(ctx context.Context, database *db.DB, cfg *runtime.Config) {
 	timeout := cfg.GetProcessingTimeoutSeconds()
-	interval := time.Duration(cfg.GetProcessingRecoveryIntervalSeconds()) * time.Second
-
-	if interval == 0 {
-		interval = 60 * time.Second
-	}
 	if timeout == 0 {
 		timeout = 300
 	}
 
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	// Run recovery ONCE at startup only. No continuous polling.
+	// Stale/orphaned items are detected via realtime events going forward.
+	log.Printf("[ProcessingRecovery] Running startup recovery (timeout: %ds)", timeout)
 
-	log.Printf("[ProcessingRecovery] Starting (interval: %v, timeout: %ds)", interval, timeout)
+	recoverStaleProcessing(ctx, database, "plans", timeout)
+	recoverStaleProcessing(ctx, database, "tasks", timeout)
+	recoverStaleProcessing(ctx, database, "test_results", timeout)
+	recoverStaleProcessing(ctx, database, "research_suggestions", timeout)
+	recoverStaleProcessing(ctx, database, "maintenance_commands", timeout)
+	recoverPendingResources(ctx, database)
+	recoverOrphanedPlans(ctx, database)
+	recoverOrphanedTasks(ctx, database)
 
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("[ProcessingRecovery] Stopped")
-			return
-		case <-ticker.C:
-			recoverStaleProcessing(ctx, database, "plans", timeout)
-			recoverStaleProcessing(ctx, database, "tasks", timeout)
-			recoverStaleProcessing(ctx, database, "test_results", timeout)
-			recoverStaleProcessing(ctx, database, "research_suggestions", timeout)
-			recoverStaleProcessing(ctx, database, "maintenance_commands", timeout)
-			// Also check for tasks waiting for resources
-			recoverPendingResources(ctx, database)
-			// Recover plans stuck in active status without processing_by
-			recoverOrphanedPlans(ctx, database)
-			// Recover tasks stuck in review/testing with no processing_by
-			recoverOrphanedTasks(ctx, database)
-		}
-	}
+	log.Println("[ProcessingRecovery] Startup recovery complete, switching to realtime-only mode")
 }
 
 func recoverStaleProcessing(ctx context.Context, database *db.DB, table string, timeout int) {
