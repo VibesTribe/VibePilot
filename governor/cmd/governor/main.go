@@ -266,22 +266,14 @@ func main() {
 
 	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, configDir, contextBuilder)
 
-	// Periodically persist usage tracker state to Supabase for dashboard
+	// Usage state is persisted only on shutdown (no polling).
+	// Dashboard reads model data via realtime subscriptions, not polled tables.
+	// This goroutine waits for shutdown and does one final persist.
 	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				// Final persist before shutdown — use fresh context since the main one is canceled
-				shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				usageTracker.PersistToDatabase(shutdownCtx)
-				cancel()
-				return
-			case <-ticker.C:
-				usageTracker.PersistToDatabase(ctx)
-			}
-		}
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		usageTracker.PersistToDatabase(shutdownCtx)
+		cancel()
 	}()
 
 	// Rehydrate: fire synthetic events for any active tasks/plans so the
