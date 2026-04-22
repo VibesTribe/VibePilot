@@ -1,21 +1,20 @@
-# VibePilot TODO - 2026-04-21 (updated)
+# VibePilot TODO - 2026-04-22 (updated)
 
 ## Critical (do next)
 
-### 1. Consultant agent for PRD quality
-The root cause of the entire cascade of failures: bad PRD → bad plan → bad execution.
-Need a multi-stage consultant process:
-- Raw idea → market research + clarification questions
-- Tech spec design (best options aligned with user intent)
-- Zero-drift, zero-gap PRD output
-- PRD good enough that planner can produce an excellent plan without guessing
-Research existing tech-spec-to-PRD prompts/templates online before designing from scratch.
+### 1. Fix webhook PRD path matching bug
+isPRD() in governor/internal/webhooks/github.go matches `docs/prd/pending/` subfolder.
+Should only match `docs/prd/*.md` directly (not nested paths).
+Add `/pending/` to the exclusion list alongside `/processed/`.
+This caused the knowledge graph spec (intentionally parked in pending) to trigger the planner.
 
-### 2. Test the pipeline end-to-end
-After consultant agent produces a proper PRD, run the full pipeline:
-- PRD → planner (with fresh code map) → supervisor review → task creation → execution (with targeted files) → task review → completion
-- Verify the intelligence overhaul (commit 57654556) actually works
-- This is THE proof point. Nothing else matters until this works.
+### 2. Test the pipeline end-to-end with a SIMPLE task
+NOT a full knowledge graph feature. Pick something small:
+- A single new RPC function
+- A dashboard text fix
+- A config field addition
+Run the full pipeline: PRD → planner → supervisor review → task creation → execution → task review → completion
+This is THE proof point. Nothing else matters until this works once cleanly.
 
 ### 3. Test full fallback chain before May 1
 ZAI/GLM subscription ends May 1. Before then:
@@ -24,12 +23,10 @@ ZAI/GLM subscription ends May 1. Before then:
 - Time each tier's response to confirm latency is acceptable
 - Document any that fail
 
-### 4. Reconcile config/models.json with Supabase DB
-Config has 30 models, DB has 58. The ResearchActionApplier keeps them in sync going forward,
-but existing orphans need cleaning:
-- Verify which DB models are real vs stale
-- Add missing models to config OR remove orphans from DB
-- Then sync should be 1:1
+### 4. Add governor systemd service
+Governor currently running as manual process (PID 19288). If x220 reboots, governor is gone.
+Need a systemd user service that auto-starts it.
+Also: consider syncing runtime repo (~/vibepilot) with dev repo (~/VibePilot) — currently 2 separate clones.
 
 ---
 
@@ -102,6 +99,12 @@ x220 currently tethered via phone WiFi. More stable:
 
 ---
 
+## Pending Specs (parked, not scheduled)
+
+- `docs/pending/vibepilot-knowledge-graph-spec.md` — Full knowledge graph with PocketBase, dashboard viz, council review, research agent, bookmarklet. Complex. Do NOT schedule until simple pipeline test passes.
+
+---
+
 ## Done (April 2026)
 
 - [x] Governor intelligence overhaul (commit 57654556) -- context, routing, verification
@@ -142,23 +145,23 @@ x220 currently tethered via phone WiFi. More stable:
 - [x] Worktrees WIRED into governor (handlers, shutdown cleanup, shadow merge, bootstrap)
 - [x] Worktree strategic patterns (Gemini: shadow merge, env injection, branch naming)
 - [x] Secrets vault fully stocked (10 keys, all encrypted, all fresh Apr 15)
-- [x] Models config updated (16 models, correct rate limits, 3 NVIDIA NIM added)
-- [x] Connectors wired (4 API active: gemini, groq, nvidia, claude-code + 7 web couriers)
+- [x] Models config expanded to 57 models (correct rate limits, full connector coverage)
+- [x] Connectors expanded to 26 (4 CLI, 7 API, 15 web)
 - [x] NVIDIA NIM connector added (integrate.api.nvidia.com, OpenAI-compatible)
-- [x] Groq connector fixed (active, all 4 models, key in vault)
-- [x] Gemini API connector fixed (active, updated models, key in vault)
+- [x] Groq connector fixed (active, all models, key in vault)
+- [x] Gemini API connector fixed (active, 4 specialized keys, all in vault)
 - [x] Deepseek API benched (out of credits, NVIDIA NIM deepseek-r1 as fallback)
 - [x] Chrome CDP working (port 9222, auto-login Gmail/Gemini/Sheets)
 - [x] Gmail app password updated in vault
 - [x] Tier0 rules expanded (migration workflow, no shortcuts, post-task discipline)
-- [x] Self-learning feedback loops wired across all 6 handlers (plan, council, task, testing, research, maint)
+- [x] Self-learning feedback loops wired across all 6 handlers
 - [x] Supervisor model tracking in plan review, task review, research review
 - [x] All legacy SelectDestination calls removed from handlers (SelectRouting only)
 - [x] Courier system fully built (courier.go, courier_run.py, courier.yml, Supabase realtime)
 - [x] Research→config+DB sync (ResearchActionApplier, deterministic, no LLM middleman)
-- [x] 4 new web platforms added (kimi-ai, perplexity, poe, aizolo)
-- [x] WYNTK and TODO updated to match verified system state (Apr 21)
-- [x] CURRENT_STATE updated with intelligence overhaul details (Apr 21)
+- [x] 15 new web platforms added and wired (deepseek, qwen, mistral, notegpt, kimi, huggingchat, aistudio, poe, chatbox, aizolo, perplexity, chatgpt, claude, gemini-2.5-pro, gemini-3.1-pro-preview)
+- [x] Consultant agent prompt and PRD template built (539 lines, tested with Knowledge Graph spec)
+- [x] Config/DB sync verified — research pipeline keeps them in sync going forward
 
 ## Not Viable (abandoned)
 
@@ -168,4 +171,4 @@ x220 currently tethered via phone WiFi. More stable:
 
 ---
 
-**Last Updated:** 2026-04-21
+**Last Updated:** 2026-04-22
