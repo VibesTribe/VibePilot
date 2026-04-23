@@ -94,7 +94,6 @@ func New(database db.Database) *Vault {
 		cache:    make(map[string]*cachedSecret),
 		auditLog: true,
 	}
-	v.vaultKey = v.loadVaultKey()
 	return v
 }
 
@@ -104,17 +103,28 @@ func NewWithoutAudit(database db.Database) *Vault {
 		cache:    make(map[string]*cachedSecret),
 		auditLog: false,
 	}
-	v.vaultKey = v.loadVaultKey()
 	return v
 }
 
-func (v *Vault) loadVaultKey() []byte {
-	key := os.Getenv("VAULT_KEY")
-	if key == "" {
-		log.Printf("Vault: WARNING - VAULT_KEY not set, decryption will fail")
-		return nil
+// InitVaultKey loads the master key from the env var specified in config.
+// Must be called after construction, before any Get/Set operations.
+// Accepts the env var name from config (e.g. "VAULT_KEY") so it's not hardcoded.
+func (v *Vault) InitVaultKey(keyEnv string) {
+	envName := keyEnv
+	if envName == "" {
+		envName = "VAULT_KEY"
 	}
-	return []byte(key)
+	key := os.Getenv(envName)
+	if key == "" {
+		log.Printf("Vault: WARNING - %s not set, vault operations will fail", envName)
+		return
+	}
+	v.vaultKey = []byte(key)
+}
+
+// SetVaultKeyDirect sets the master key directly (used by CLI tools).
+func (v *Vault) SetVaultKeyDirect(key string) {
+	v.vaultKey = []byte(key)
 }
 
 func getMachineSalt() []byte {
@@ -318,6 +328,163 @@ func (v *Vault) CacheStats() map[string]interface{} {
 	}
 
 	return stats
+}
+
+// StoreSecret encrypts a value and upserts it into secrets_vault.
+// If the key already exists, it updates the encrypted value. If not, it inserts.
+func (v *Vault) StoreSecret(ctx context.Context, keyName, plaintext string) error {
+	if v.vaultKey == nil {
+		return fmt.Errorf("VAULT_KEY not configured")
+	}
+
+	encrypted, err := Encrypt(plaintext, string(v.vaultKey))
+	if err != nil {
+		return fmt.Errorf("encrypt: %w", err)
+	}
+
+	// Try upsert: update if exists, insert if not.
+	// We use the db directly since this is a simple table operation.
+	data, err := v.db.Query(ctx, tableName, map[string]any{
+		"key_name": keyName,
+		"limit":    1,
+	})
+	if err != nil {
+		return fmt.Errorf("check existing: %w", err)
+	}
+
+	var existing []SecretRecord
+	if err := json.Unmarshal(data, &existing); err != nil {
+		return fmt.Errorf("unmarshal existing: %w", err)
+	}
+
+	if len(existing) > 0 {
+		// Update existing
+		_, err = v.db.Update(ctx, tableName, existing[0].ID, map[string]any{
+			"encrypted_value": encrypted,
+		})
+		if err != nil {
+			return fmt.Errorf("update: %w", err)
+		}
+	} else {
+		// Insert new
+		_, err = v.db.Insert(ctx, tableName, map[string]any{
+			"key_name":        keyName,
+			"encrypted_value": encrypted,
+		})
+		if err != nil {
+			return fmt.Errorf("insert: %w", err)
+		}
+	}
+
+	// Invalidate cache so next read picks up the new value
+	v.InvalidateCache(keyName)
+
+	log.Printf("Vault: stored %s (len=%d)", keyName, len(plaintext))
+	return nil
+}
+
+// ListSecrets returns all key names in the vault (no decrypted values).
+func (v *Vault) ListSecrets(ctx context.Context) ([]string, error) {
+	data, err := v.db.Query(ctx, tableName, map[string]any{
+		"order": "key_name.asc",
+		"limit": 1000,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
+	}
+
+	var records []SecretRecord
+	if err := json.Unmarshal(data, &records); err != nil {
+		return nil, fmt.Errorf("unmarshal: %w", err)
+	}
+
+	names := make([]string, len(records))
+	for i, r := range records {
+		names[i] = r.KeyName
+	}
+	return names, nil
+}
+
+// RotateKey re-encrypts all secrets with a new master key.
+// Callers must also update the VAULT_KEY env var after this succeeds.
+func (v *Vault) RotateKey(ctx context.Context, newMasterKey string) (int, error) {
+	if v.vaultKey == nil {
+		return 0, fmt.Errorf("current VAULT_KEY not configured")
+	}
+
+	// Fetch all secrets
+	data, err := v.db.Query(ctx, tableName, map[string]any{
+		"limit": 1000,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("query: %w", err)
+	}
+
+	var records []SecretRecord
+	if err := json.Unmarshal(data, &records); err != nil {
+		return 0, fmt.Errorf("unmarshal: %w", err)
+	}
+
+	rotated := 0
+	for _, rec := range records {
+		// Decrypt with old key
+		plaintext, err := v.decrypt(rec.EncryptedValue)
+		if err != nil {
+			log.Printf("Vault: rotate skipped %s (decrypt failed: %v)", rec.KeyName, err)
+			continue
+		}
+
+		// Re-encrypt with new key
+		newEncrypted, err := Encrypt(plaintext, newMasterKey)
+		if err != nil {
+			log.Printf("Vault: rotate failed for %s: %v", rec.KeyName, err)
+			continue
+		}
+
+		// Update in DB
+		_, err = v.db.Update(ctx, tableName, rec.ID, map[string]any{
+			"encrypted_value": newEncrypted,
+		})
+		if err != nil {
+			log.Printf("Vault: rotate update failed for %s: %v", rec.KeyName, err)
+			continue
+		}
+		rotated++
+	}
+
+	// Switch to new key for future operations
+	v.vaultKey = []byte(newMasterKey)
+	v.InvalidateAll()
+
+	return rotated, nil
+}
+
+// DeleteSecret removes a key from the vault.
+func (v *Vault) DeleteSecret(ctx context.Context, keyName string) error {
+	data, err := v.db.Query(ctx, tableName, map[string]any{
+		"key_name": keyName,
+		"limit":    1,
+	})
+	if err != nil {
+		return fmt.Errorf("query: %w", err)
+	}
+
+	var existing []SecretRecord
+	if err := json.Unmarshal(data, &existing); err != nil {
+		return fmt.Errorf("unmarshal: %w", err)
+	}
+
+	if len(existing) == 0 {
+		return fmt.Errorf("secret not found: %s", keyName)
+	}
+
+	if err := v.db.Delete(ctx, tableName, existing[0].ID); err != nil {
+		return fmt.Errorf("delete: %w", err)
+	}
+
+	v.InvalidateCache(keyName)
+	log.Printf("Vault: deleted %s", keyName)
+	return nil
 }
 
 func GetEnvOrVault(ctx context.Context, v *Vault, keyName string) string {

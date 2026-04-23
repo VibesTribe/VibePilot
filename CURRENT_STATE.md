@@ -1,5 +1,5 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-22 00:35 UTC — VERIFIED AGAINST CODE AND CONFIG FILES
+# AUTO-UPDATED: 2026-04-23 13:30 UTC — VERIFIED AGAINST CODE AND CONFIG FILES
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 
@@ -22,12 +22,12 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 
 ## System Status
 
-- **Governor:** RUNNING (PID 19288, since Apr 21, process on x220)
-  - NOTE: NOT managed by systemd — started manually
+- **Governor:** STOPPED (needs restart after vault + SSE merge)
   - Binary: /home/vibes/vibepilot/governor/governor
-  - Runtime repo: ~/vibepilot (commit 7abaeed4)
+  - Runtime repo: ~/vibepilot (rebuilt with vault CLI + API)
   - Dev repo: ~/VibePilot (synced to origin/main)
-- **Git:** main branch, clean, synced. Last: bd3d479c
+  - Start: `source ~/.governor_env && export DATABASE_URL="postgres://vibes@/vibepilot?host=/var/run/postgresql" && export VAULT_KEY="..." && cd ~/vibepilot/governor && ./governor`
+- **Git:** main branch, clean. Last: f2a376d5
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app
 - **Chrome CDP:** 127.0.0.1:9222
 - **Host:** x220, up 11h38m, 15GB RAM, 2.6GB used
@@ -94,11 +94,12 @@ Supervisor tracked in plan review, task review, and research review.
 
 ## COURIER SYSTEM — BUILT AND WIRED
 
-Architecture: GitHub Actions + Supabase Realtime
-- governor/internal/connectors/courier.go: CourierRunner with dispatch + realtime waiters
-- scripts/courier_run.py: Browser-use with platform selectors
+Architecture: GitHub Actions + Governor API + SSE
+- governor/internal/connectors/courier.go: CourierRunner with dispatch + channel-based result waiters
+- scripts/courier_run.py: Browser-use with platform selectors, posts to governor API
 - .github/workflows/courier.yml: GitHub Actions workflow
-- handlers_task.go: web routing → CourierRunner
+- POST /api/courier/result: Governor receives courier results, writes to task_runs, notifies waiter
+- SSE bridge: pg_notify → SSEBroker → dashboard live updates
 - Status: Not yet E2E tested
 
 ## CONSULTANT AGENT — BUILT, TESTED ONCE
@@ -115,7 +116,16 @@ Architecture: GitHub Actions + Supabase Realtime
 
 ## KNOWN BUGS
 
-1. **Webhook PRD path matching** — isPRD() in governor/internal/webhooks/github.go matches `docs/prd/pending/` subfolder. Should only match `docs/prd/*.md` directly (not nested paths). Fix: add `/pending/` to exclusion list alongside `/processed/`.
+1. **Webhook PRD path matching** — FIXED. isPRD() now excludes subfolders.
+
+## VAULT MANAGEMENT — CLI + API
+
+Architecture: AES-GCM encrypted secrets in `secrets_vault` table (local PG).
+- CLI: `./governor vault set KEY "value"` / `get KEY` / `list` / `delete KEY` / `rotate-key NEWKEY`
+- API: `/api/vault/set|get|list|delete|rotate-key` (Bearer token auth via GOVERNOR_ADMIN_TOKEN)
+- API enables future dashboard admin + Telegram chat to manage keys
+- Config-driven: vault.key_env in system.json tells governor which env var holds the master key
+- Bootstrap: only DATABASE_URL + VAULT_KEY needed as env vars. All other secrets in vault.
 
 ## RECENT COMMITS
 

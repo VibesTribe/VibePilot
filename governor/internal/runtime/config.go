@@ -773,6 +773,14 @@ func (c *Config) GetVaultKey() string {
 	return os.Getenv(c.System.Vault.KeyEnv)
 }
 
+// GetVaultKeyEnv returns the env var name for the vault key (e.g. "VAULT_KEY").
+func (c *Config) GetVaultKeyEnv() string {
+	if c.System.Vault.KeyEnv == "" {
+		return "VAULT_KEY"
+	}
+	return c.System.Vault.KeyEnv
+}
+
 func (c *Config) GetProtectedBranches() []string {
 	if c.System == nil || c.System.Git.ProtectedBranches == nil {
 		return []string{"main", "master"}

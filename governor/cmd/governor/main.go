@@ -44,6 +44,12 @@ func main() {
 		return
 	}
 
+	// Vault CLI: ./governor vault <set|get|list|delete|rotate-key> [args...]
+	if len(os.Args) > 1 && os.Args[1] == "vault" {
+		runVaultCLI(os.Args[2:])
+		return
+	}
+
 	log.Printf("VibePilot Governor %s (commit: %s, built: %s)", version, commit, date)
 
 	configDir := getConfigDir()
@@ -124,6 +130,7 @@ func main() {
 	}
 
 	v := vault.New(database)
+	v.InitVaultKey(cfg.GetVaultKeyEnv())
 
 	var courierRunner *connectors.CourierRunner // initialized after ctx is created
 
@@ -285,6 +292,16 @@ func main() {
 	}, eventRouter)
 	webhookServer.SetDB(database)
 	webhookServer.SetSSEBroker(sseBroker)
+	webhookServer.SetVault(v)
+
+	// Admin token for vault API — read from env var (configurable in system.json).
+	// If not set, vault API endpoints are disabled (403).
+	if adminToken := os.Getenv("GOVERNOR_ADMIN_TOKEN"); adminToken != "" {
+		webhookServer.SetAdminToken(adminToken)
+		log.Println("[Admin] Vault API enabled (admin token set)")
+	} else {
+		log.Println("[Admin] Vault API disabled (set GOVERNOR_ADMIN_TOKEN to enable)")
+	}
 
 	// Courier result handler: writes to task_runs and notifies waiting goroutine
 	if courierRunner != nil {
@@ -398,6 +415,120 @@ func getEnvOrDefault(key, defaultVal string) string {
 		return val
 	}
 	return defaultVal
+}
+
+// runVaultCLI handles: ./governor vault <set|get|list|delete|rotate-key> [args...]
+// Connects to the same database, uses the same vault encryption.
+// Requires DATABASE_URL and VAULT_KEY env vars.
+func runVaultCLI(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: governor vault <command> [args...]")
+		fmt.Println("Commands:")
+		fmt.Println("  set <KEY_NAME> <value>    Encrypt and store a secret")
+		fmt.Println("  get <KEY_NAME>            Decrypt and print a secret")
+		fmt.Println("  list                      List all key names in vault")
+		fmt.Println("  delete <KEY_NAME>         Delete a secret from vault")
+		fmt.Println("  rotate-key <NEW_KEY>      Re-encrypt all secrets with new master key")
+		os.Exit(1)
+	}
+
+	ctx := context.Background()
+
+	// Bootstrap: config tells us where to find env vars
+	configDir := getConfigDir()
+	cfg, err := runtime.LoadConfig(configDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Connect to database
+	dbType := cfg.GetDatabaseType()
+	if dbType != "postgres" {
+		fmt.Fprintf(os.Stderr, "Vault CLI requires postgres backend (current: %s)\n", dbType)
+		os.Exit(1)
+	}
+
+	pgURL := cfg.GetPostgresURL()
+	if pgURL == "" {
+		fmt.Fprintln(os.Stderr, "DATABASE_URL not set")
+		os.Exit(1)
+	}
+
+	database, err := db.NewPostgres(ctx, pgURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+	defer database.Close()
+
+	v := vault.NewWithoutAudit(database)
+	v.InitVaultKey(cfg.GetVaultKeyEnv())
+
+	command := args[0]
+	switch command {
+	case "set":
+		if len(args) != 3 {
+			fmt.Fprintln(os.Stderr, "Usage: governor vault set <KEY_NAME> <value>")
+			os.Exit(1)
+		}
+		if err := v.StoreSecret(ctx, args[1], args[2]); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Stored %s\n", args[1])
+
+	case "get":
+		if len(args) != 2 {
+			fmt.Fprintln(os.Stderr, "Usage: governor vault get <KEY_NAME>")
+			os.Exit(1)
+		}
+		val, err := v.GetSecretNoCache(ctx, args[1])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(val)
+
+	case "list":
+		names, err := v.ListSecrets(ctx)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		for _, n := range names {
+			fmt.Println(n)
+		}
+		fmt.Printf("\n%d secret(s)\n", len(names))
+
+	case "delete":
+		if len(args) != 2 {
+			fmt.Fprintln(os.Stderr, "Usage: governor vault delete <KEY_NAME>")
+			os.Exit(1)
+		}
+		if err := v.DeleteSecret(ctx, args[1]); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Deleted %s\n", args[1])
+
+	case "rotate-key":
+		if len(args) != 2 {
+			fmt.Fprintln(os.Stderr, "Usage: governor vault rotate-key <NEW_VAULT_KEY>")
+			os.Exit(1)
+		}
+		count, err := v.RotateKey(ctx, args[1])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Rotated %d secret(s) to new master key\n", count)
+		fmt.Println("IMPORTANT: Update VAULT_KEY env var before next governor start")
+
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown vault command: %s\n", command)
+		os.Exit(1)
+	}
 }
 
 func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault, repoPath string) {
