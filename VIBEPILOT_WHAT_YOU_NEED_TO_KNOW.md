@@ -949,15 +949,12 @@ DATABASE_URL="postgres://vibes@/vibepilot?host=/var/run/postgresql"
 
 ### Vault Master Key
 
-**VAULT_KEY:** `P9jFR25vbjcNxG2S3lx4ZCyspfGLd7wZYliZWLjqKLc=`
-
-This is the ONLY key that decrypts the secrets_vault (15 API keys). Lose it = lose everything permanently.
-Also stored in: `~/.config/systemd/user/vibepilot-governor.service.d/override.conf`
+**VAULT_KEY:** Check `~/.config/systemd/user/vibepilot-governor.service.d/override.conf` or GitHub Secrets. Not stored in public repos.
 
 ```bash
 # Vault CLI
 export DATABASE_URL="postgres://vibes@/vibepilot?host=/var/run/postgresql"
-export VAULT_KEY="P9jFR25vbjcNxG2S3lx4ZCyspfGLd7wZYliZWLjqKLc="
+export VAULT_KEY="$(grep VAULT_KEY ~/.config/systemd/user/vibepilot-governor.service.d/override.conf | cut -d'"' -f2)"
 cd ~/vibepilot/governor
 
 ./governor vault list                    # List all key names
