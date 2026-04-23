@@ -61,7 +61,7 @@ pgnotify/listener.go (status-aware)
        Falls back to 15s polling if SSE connection fails
 ```
 
-### Files Changed (uncommitted on branch `fix/pg-backend-sql-ordering`)
+### Files Changed (committed on branch `fix/pg-backend-sql-ordering`)
 | File | Status | Detail |
 |------|--------|--------|
 | `governor/internal/webhooks/sse.go` | NEW | SSE broker — thread-safe fan-out, SSENotification{Table,Action,ID,Status} |
@@ -71,6 +71,67 @@ pgnotify/listener.go (status-aware)
 | `governor/config/system.json` | MODIFIED | `"type": "postgres"` |
 | PG trigger `vp_notify_change()` | MODIFIED | Now includes `status` and `processing_by` in payload |
 | `~/vibeflow/apps/dashboard/hooks/useMissionData.ts` | MODIFIED | EventSource replaces setInterval, 15s fallback poll |
+
+## Courier Result Endpoint (April 23, 2026)
+
+Courier agents (GitHub Actions) now POST results to governor API instead of Supabase REST.
+
+### Data Flow
+```
+courier_run.py completes task
+  POST /api/courier/result {task_id, status, result, error, tokens_in, tokens_out}
+    |
+    v
+server.go handleCourierResult()
+  validates payload
+  calls CourierResultFunc callback (set from main.go)
+    |
+    v
+  main.go callback:
+    1. Writes to task_runs table via record_courier_result PG RPC
+    2. Calls courierRunner.NotifyResult() to wake waiting goroutine
+    |
+    v
+  pg_notify trigger fires on task_runs INSERT
+    → SSE broadcast → dashboard live update
+    → EventRouter → task transitions to review
+```
+
+### Files Changed
+| File | Status | Detail |
+|------|--------|--------|
+| `governor/internal/webhooks/server.go` | MODIFIED | `/api/courier/result` POST endpoint + `CourierResultFunc` type + `SetCourierResultHandler()` |
+| `governor/internal/connectors/courier.go` | MODIFIED | Added `governorURL` field, sends `governor_api_url` in dispatch payload |
+| `governor/cmd/governor/main.go` | MODIFIED | Wires courier result handler, passes governor URL |
+| `scripts/courier_run.py` | MODIFIED | `update_result()` POSTs to governor API (was `update_supabase()`) |
+| PG function `record_courier_result()` | NEW | RPC that writes to task_runs with proper columns |
+
+## Pipeline Timeline (Dashboard Logs Enhancement, April 23, 2026)
+
+Logs panel now shows full task lifecycle by stitching data from 6 sources into a unified timeline.
+
+### Sources
+| Source | Table | Events Generated |
+|--------|-------|-----------------|
+| Task lifecycle | tasks | prd_committed, task_started, task_completed/failed |
+| Plan lifecycle | plans | plan_created, plan_approved/rejected |
+| Council reviews | council_reviews | council_approved/rejected (per reviewer) |
+| Task runs | task_runs | run_completed/failed |
+| Test results | test_results | test_passed/failed |
+| Orchestrator | orchestrator_events | All original event types preserved |
+
+### Features
+- Filterable by source (task, plan, council, task_run, test, orchestrator)
+- Each event shows: icon, label, timestamp, source badge, detail message, failure reasons
+- 60 events visible (up from 40)
+- Sorted chronologically (newest first)
+
+### Files Changed
+| File | Repo | Detail |
+|------|------|--------|
+| `apps/dashboard/hooks/useMissionData.ts` | vibeflow | Builds unified pipelineEvents array from 6 sources |
+| `apps/dashboard/components/modals/MissionModals.tsx` | vibeflow | LogList with source filters, getEventMeta for 12 new event types, deriveLogCategory updates |
+| `governor/internal/webhooks/server.go` | vibepilot | Dashboard endpoint now queries plans, council_reviews, test_results |
 
 ### Learning System (intact, not affected by migration)
 - `learned_heuristics` — 20 entries (model performance heuristics)
@@ -202,19 +263,21 @@ AES-GCM encrypted, PBKDF2 SHA256 100k iterations. 15 keys stored:
 
 ## Courier Agent Pipeline
 
-### Architecture: GitHub Actions + pg_notify
+### Architecture: GitHub Actions + Governor API
 
 ```
 Governor → router selects routing_flag="web"
         → CourierRunner.dispatch() sends repository_dispatch to GitHub
         → GitHub Actions spins up ubuntu-latest + browser-use + playwright
         → courier_run.py navigates to web platform, pastes prompt, extracts response
-        → courier_run.py writes result to task_runs table via local PG
-        → pg_notify trigger fires on task_runs UPDATE
+        → courier_run.py POSTs result to /api/courier/result (governor API)
+        → Governor writes to task_runs via record_courier_result RPC
+        → pg_notify trigger fires on task_runs INSERT
         → pgnotify listener receives notification
         → EventRouter routes EventCourierResult
         → CourierRunner.NotifyResult() delivers to waiting goroutine via channel
         → Task transitions to "review"
+        → SSE broadcast → dashboard live update
 ```
 
 ### Implementation Status
@@ -228,29 +291,29 @@ Governor → router selects routing_flag="web"
 | Web routing branch in executeTask | Done | e4e807ca | executeCourierTask() method added |
 | GitHub Actions workflow | Done | b0b55235 | .github/workflows/courier_dispatch.yml |
 | courier_run.py script | Done | b0b55235 | scripts/courier_run.py (browser-use) |
-| pg_notify + SSE bridge (zero polling) | Done | uncommitted | pgnotify/listener.go + webhooks/sse.go |
-| EventCourierResult handler | Done | uncommitted | EventRouter receives from pgnotify |
+| pg_notify + SSE bridge (zero polling) | Done | 0c0fae03 | pgnotify/listener.go + webhooks/sse.go |
+| EventCourierResult handler | Done | 0c0fae03 | EventRouter receives from pgnotify |
 | Pipeline gap fixes (5 gaps) | Done | c2e94151 | Vault threading, RPC params, task_runs columns, result format |
 | Vault key derivation (deriveLLMKeyRef) | Done | c2e94151 | Maps connectorID → vault key name |
 | Gemini 4-project connectors | Done | 0897340f, 3a16958c | 4 independent keys, correct models |
 | Local PG backend | Done | ffd29bfa, e3767ba5 | Native pgx, SQL ordering fix, UUID conversion |
-| Dashboard SSE client | Done | uncommitted | EventSource replaces polling in useMissionData.ts |
+| Dashboard SSE client | Done | c5a1923f | EventSource replaces polling in useMissionData.ts |
+| Courier result endpoint | Done | a0b4336f | POST /api/courier/result, no more Supabase writes |
+| Pipeline timeline (dashboard logs) | Done | ec907c43, c5a1923f | Unified 6-source timeline with source filters |
 
 ## Recent Commits (April 22-23, 2026)
 
 | Commit | Description |
 |--------|-------------|
+| ec907c43 | feat: add plans, council_reviews, test_results to dashboard API |
+| a0b4336f | fix: courier writes to governor API instead of Supabase |
+| c5a1923f | feat: unified pipeline timeline in logs panel (vibeflow) |
+| 0c0fae03 | feat: SSE bridge replaces Supabase Realtime for dashboard live updates |
 | e3767ba5 | fix: PG backend SQL ordering, UUID conversion, timestamp parsing, routing ref |
 | ffd29bfa | feat: add native Postgres (pgx) implementation of Database interface |
 | ce433e63 | refactor: swap all handlers from concrete *db.DB to db.Database interface |
 | 4593ff4b | feat: define Database interface (approach 2) |
 | 7a1e02d6 | fix: kill all Supabase polling |
-
-Uncommitted work on branch:
-- SSE bridge (sse.go, listener.go, server.go, main.go)
-- Dashboard EventSource (useMissionData.ts)
-- PG trigger upgrade (vp_notify_change with status)
-- Dead WebSocket code removed
 
 ## Budget
 - **OpenRouter**: $0 credit account. Max spend limit configured. No payment added.
@@ -272,7 +335,7 @@ Uncommitted work on branch:
 2. **Branch not merged** -- `fix/pg-backend-sql-ordering` needs merge to main
 3. **SSE not E2E tested** -- code compiles, wiring verified, but not tested with running governor + dashboard
 4. **jcodemunch CodeMap refresh** -- transport error on startup (pre-existing, graceful fallback to existing map.md)
-5. **Courier pipeline writes to Supabase** -- courier_run.py still uses Supabase REST to write results. Needs update to write to local PG directly (or use governor API).
+5. ~~**Courier pipeline writes to Supabase**~~ -- FIXED. Now writes to governor API.
 
 ## Known Gaps (pre-existing, not yet addressed)
 - Maintenance agent not wired (git write access disconnected)
@@ -286,7 +349,7 @@ Uncommitted work on branch:
 | Doc | Purpose |
 |-----|---------|
 | docs/CURRENT_STATE.md | This file |
-| docs/CURRENT_ISSUES.md | Detailed issue tracker (needs update from March) |
+| docs/CURRENT_ISSUES.md | Detailed issue tracker |
 | docs/designs/governor-intelligence-fix.md | Intelligence overhaul design |
 | governor/config/models.json | 58 models, 49 active |
 | governor/config/connectors.json | 26 destinations, 22 active |
@@ -294,7 +357,7 @@ Uncommitted work on branch:
 | config/prompts/*.md | Agent prompts (planner, supervisor, council, etc.) |
 
 ## Current Task State
-- **Tasks**: 0 active (table empty -- clean slate after migration)
+- **Tasks**: 2 (1 available, 1 in_progress)
 - **Plans**: 1 archived (plan 53db30f3, was in revision_needed loop)
 - **Orchestrator Events**: 5 rows (3 approved, 2 failure)
 - **Pending PRDs**: docs/prd/pending/ (not yet processed through pipeline)
@@ -304,10 +367,10 @@ Uncommitted work on branch:
 |-------|------|
 | models | 58 |
 | platforms | 26 |
+| tasks | 2 |
+| task_runs | 0 |
 | orchestrator_events | 5 |
 | learned_heuristics | 20 |
 | model_scores | 1 |
-| tasks | 0 |
-| task_runs | 0 |
 | lessons_learned | 0 |
 | Total tables | 63 |
