@@ -9,7 +9,7 @@ Flow:
 3. Paste the prompt into the chat interface
 4. Wait for the response
 5. Extract the response text
-6. Write result back to Supabase task_runs table
+6. Write result back to governor API (local PG task_runs)
 """
 
 import os
@@ -75,47 +75,72 @@ def get_platform_config(url: str) -> dict:
     return PLATFORM_SELECTORS["_default"]
 
 
-def update_supabase(task_id: str, status: str, output: str = "",
-                    error: str = "", tokens_in: int = 0, tokens_out: int = 0):
-    """Write result back to Supabase task_runs table."""
-    supabase_url = os.environ["SUPABASE_URL"]
-    supabase_key = os.environ["SUPABASE_KEY"]
+def update_result(task_id: str, status: str, output: str = "",
+                  error: str = "", tokens_in: int = 0, tokens_out: int = 0):
+    """Write result back to governor API (local PG backend).
 
-    # task_runs.result is JSONB — store output and metadata as a JSON object
+    Replaces old Supabase REST write. Governor writes to task_runs table
+    and notifies the waiting courier goroutine via channel.
+    """
+    governor_url = os.environ.get("GOVERNOR_API_URL", "http://localhost:8080")
+
+    payload = json.dumps({
+        "task_id": task_id,
+        "status": status,
+        "output": output,
+        "error": error,
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+    }).encode()
+
+    req = urllib.request.Request(
+        f"{governor_url}/api/courier/result",
+        data=payload,
+        method="POST",
+    )
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        resp = urllib.request.urlopen(req, timeout=15)
+        print(f"[Courier] Result posted to governor: HTTP {resp.status}")
+    except urllib.error.URLError as e:
+        print(f"ERROR: Failed to post result to governor: {e}", file=sys.stderr)
+        # Fallback: try Supabase if governor is unreachable (graceful migration)
+        _fallback_supabase(task_id, status, output, error, tokens_in, tokens_out)
+
+
+def _fallback_supabase(task_id: str, status: str, output: str = "",
+                       error: str = "", tokens_in: int = 0, tokens_out: int = 0):
+    """Legacy fallback: write to Supabase if governor API is unreachable."""
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_KEY")
+    if not supabase_url or not supabase_key:
+        print("ERROR: No governor and no Supabase credentials", file=sys.stderr)
+        sys.exit(1)
+
     result_json = json.dumps({
         "output": output,
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
     })
-
-    data = {
-        "status": status,
-        "completed_at": datetime.now(timezone.utc).isoformat(),
-        "result": result_json,
-    }
+    data = {"status": status, "completed_at": datetime.now(timezone.utc).isoformat(), "result": result_json}
     if error:
         data["error"] = error
-    if tokens_in > 0:
-        data["tokens_in"] = tokens_in
-    if tokens_out > 0:
-        data["tokens_out"] = tokens_out
-
     payload = json.dumps(data).encode()
-    # Match on task_id (UUID from the task), not the auto-generated row id
+
     req = urllib.request.Request(
         f"{supabase_url}/rest/v1/task_runs?task_id=eq.{task_id}&order=created_at.desc&limit=1",
-        data=payload,
-        method="PATCH",
+        data=payload, method="PATCH",
     )
     req.add_header("apikey", supabase_key)
     req.add_header("Authorization", f"Bearer {supabase_key}")
     req.add_header("Content-Type", "application/json")
     req.add_header("Prefer", "return=minimal")
-
     try:
         urllib.request.urlopen(req, timeout=10)
+        print(f"[Courier] Fallback: result written to Supabase")
     except urllib.error.URLError as e:
-        print(f"ERROR: Failed to update Supabase: {e}", file=sys.stderr)
+        print(f"ERROR: Supabase fallback also failed: {e}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -208,18 +233,18 @@ Return the full response text."""
         print(f"[Courier] Success! Output length: {len(output)} chars")
         print(f"[Courier] Estimated tokens: {tokens_in}/{tokens_out}")
 
-        update_supabase(task_id, "completed", output=output,
+        update_result(task_id, "completed", output=output,
                        tokens_in=tokens_in, tokens_out=tokens_out)
 
     except asyncio.TimeoutError:
         print(f"[Courier] Timeout after {timeout_secs}s", file=sys.stderr)
-        update_supabase(task_id, "failed", error=f"Timeout after {timeout_secs}s")
+        update_result(task_id, "failed", error=f"Timeout after {timeout_secs}s")
 
     except Exception as e:
         print(f"[Courier] Error: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
-        update_supabase(task_id, "failed", error=str(e))
+        update_result(task_id, "failed", error=str(e))
 
 
 if __name__ == "__main__":
