@@ -18,6 +18,16 @@ import (
 
 type CourierResultFunc func(taskID string, result json.RawMessage) error
 
+// VaultManager is the interface the server needs for vault API endpoints.
+// Keeps server.go decoupled from the vault package.
+type VaultManager interface {
+	GetSecretNoCache(ctx context.Context, keyName string) (string, error)
+	StoreSecret(ctx context.Context, keyName, plaintext string) error
+	ListSecrets(ctx context.Context) ([]string, error)
+	DeleteSecret(ctx context.Context, keyName string) error
+	RotateKey(ctx context.Context, newMasterKey string) (int, error)
+}
+
 type Server struct {
 	port      int
 	path      string
@@ -33,6 +43,8 @@ type Server struct {
 	wsUpgrader any
 	sseBroker  *SSEBroker
 	courierResultFn CourierResultFunc
+	vault      VaultManager
+	adminToken string
 }
 
 type DBQuerier interface {
@@ -99,6 +111,17 @@ func (s *Server) SetCourierResultFn(fn CourierResultFunc) {
 	s.courierResultFn = fn
 }
 
+// SetVault registers the vault manager for /api/vault/* endpoints.
+func (s *Server) SetVault(v VaultManager) {
+	s.vault = v
+}
+
+// SetAdminToken sets the token required for admin endpoints (vault management).
+// If empty, vault endpoints return 403.
+func (s *Server) SetAdminToken(token string) {
+	s.adminToken = token
+}
+
 func (s *Server) RegisterHandler(eventType string, handler EventHandler) {
 	s.handlers[eventType] = handler
 	log.Printf("[Webhooks] Registered handler for: %s", eventType)
@@ -112,6 +135,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/dashboard", s.handleDashboard)
 	mux.HandleFunc("/api/dashboard/stream", s.handleSSE)
 	mux.HandleFunc("/api/courier/result", s.handleCourierResult)
+	mux.HandleFunc("/api/vault/", s.handleVaultAPI)
 
 
 	s.server = &http.Server{
@@ -630,4 +654,135 @@ func GetWebhookURL(baseURL string, port int, path string) string {
 		path = "/" + path
 	}
 	return fmt.Sprintf("%s:%d%s", baseURL, port, path)
+}
+
+// --- Vault API endpoints ---
+// All require admin token in Authorization: Bearer <token> header.
+// Routes:
+//   GET  /api/vault/list        → list key names
+//   GET  /api/vault/get?key=X   → decrypt and return value
+//   POST /api/vault/set          → {"key":"X","value":"Y"} → encrypt and store
+//   POST /api/vault/delete       → {"key":"X"} → delete
+//   POST /api/vault/rotate-key   → {"new_key":"X"} → re-encrypt all
+
+func (s *Server) checkAdminAuth(r *http.Request) bool {
+	if s.adminToken == "" {
+		return false
+	}
+	auth := r.Header.Get("Authorization")
+	if len(auth) > 7 && auth[:7] == "Bearer " {
+		return auth[7:] == s.adminToken
+	}
+	return false
+}
+
+func (s *Server) handleVaultAPI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if !s.checkAdminAuth(r) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if s.vault == nil {
+		http.Error(w, "Vault not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	ctx := r.Context()
+	sub := strings.TrimPrefix(r.URL.Path, "/api/vault/")
+
+	switch {
+	case sub == "list" && r.Method == http.MethodGet:
+		names, err := s.vault.ListSecrets(ctx)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"keys": names})
+
+	case sub == "get" && r.Method == http.MethodGet:
+		key := r.URL.Query().Get("key")
+		if key == "" {
+			http.Error(w, "Missing key parameter", http.StatusBadRequest)
+			return
+		}
+		val, err := s.vault.GetSecretNoCache(ctx, key)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"key": key, "value": val})
+
+	case sub == "set" && r.Method == http.MethodPost:
+		var req struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if req.Key == "" || req.Value == "" {
+			http.Error(w, "Missing key or value", http.StatusBadRequest)
+			return
+		}
+		if err := s.vault.StoreSecret(ctx, req.Key, req.Value); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "stored", "key": req.Key})
+
+	case sub == "delete" && r.Method == http.MethodPost:
+		var req struct {
+			Key string `json:"key"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if req.Key == "" {
+			http.Error(w, "Missing key", http.StatusBadRequest)
+			return
+		}
+		if err := s.vault.DeleteSecret(ctx, req.Key); err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "deleted", "key": req.Key})
+
+	case sub == "rotate-key" && r.Method == http.MethodPost:
+		var req struct {
+			NewKey string `json:"new_key"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if req.NewKey == "" {
+			http.Error(w, "Missing new_key", http.StatusBadRequest)
+			return
+		}
+		count, err := s.vault.RotateKey(ctx, req.NewKey)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"status": "rotated", "count": count})
+
+	default:
+		http.Error(w, "Not found", http.StatusNotFound)
+	}
 }
