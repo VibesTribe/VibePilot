@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
-	"os"
-	"path/filepath"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -106,10 +106,23 @@ func createTasksFromApprovedPlan(ctx context.Context, database db.Database, plan
 		return fmt.Errorf("plan has no plan_path")
 	}
 
-	fullPath := filepath.Join(repoPath, planPath)
-	planContent, err := os.ReadFile(fullPath)
+	// Fetch plan content from GitHub (source of truth)
+	repoOwner := "VibesTribe"
+	repoName := "VibePilot"
+	branch := "main"
+	rawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", repoOwner, repoName, branch, planPath)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
 	if err != nil {
-		return fmt.Errorf("read plan file %s: %w", fullPath, err)
+		return fmt.Errorf("create plan fetch request: %w", err)
+	}
+	httpResp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("fetch plan from GitHub: %w", err)
+	}
+	planContent, err := io.ReadAll(httpResp.Body)
+	httpResp.Body.Close()
+	if err != nil || httpResp.StatusCode != 200 {
+		return fmt.Errorf("read plan content (status %d): %w", httpResp.StatusCode, err)
 	}
 
 	tasks, err := parseTasksFromPlanMarkdown(string(planContent))
