@@ -187,16 +187,15 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	var routingResult *runtime.RoutingResult
 	var failedModels []string
 
-	// If this task was previously failed by a specific model, exclude that model
-	// to prevent re-assigning to the same one that failed.
+	// If this task was previously failed by specific models, exclude them all
+	// to prevent re-assigning to any model that already failed.
 	if flagReason := getString(task, "routing_flag_reason"); flagReason != "" {
-		if after, ok := strings.CutPrefix(flagReason, "test_failed_by:"); ok && after != "" {
-			failedModels = append(failedModels, after)
-			log.Printf("[TaskAvailable] Task %s: excluding test-failed model %s", taskNumber, after)
+		failedModels = parseFailedModels(flagReason)
+		if len(failedModels) > 0 {
+			log.Printf("[TaskAvailable] Task %s: excluding %d failed model(s): %v", taskNumber, len(failedModels), failedModels)
 		}
-		if after, ok := strings.CutPrefix(flagReason, "exec_failed_by:"); ok && after != "" {
-			failedModels = append(failedModels, after)
-			log.Printf("[TaskAvailable] Task %s: excluding exec-failed model %s", taskNumber, after)
+		if isPromptSuspect(flagReason) {
+			log.Printf("[TaskAvailable] Task %s: PROMPT SUSPECT — %d different models failed, prompt likely needs revision", taskNumber, len(failedModels))
 		}
 	}
 	var modelID, connectorID, routingFlag string
@@ -926,10 +925,9 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 				"p_new_status":     "available",
 				"p_failure_reason": failureNotes,
 			})
-			// Exclude the executor model from retry so a different model picks it up
-			h.database.Update(ctx, "tasks", taskID, map[string]any{
-				"routing_flag_reason": fmt.Sprintf("exec_failed_by:%s", modelID),
-			})
+			// Accumulate the failed executor model — excludes it from retry.
+			// If 2+ different models have failed this task, flags prompt as suspect.
+			accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
 			log.Printf("[TaskReview] Task %s failed: %s (%s) → available (excluding model %s)", truncateID(taskID), failureClass, failureDetail, modelID)
 
 		case "needs_revision":

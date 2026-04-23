@@ -101,6 +101,11 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 
 	if err != nil {
 		log.Printf("[Testing] Test execution error for %s: %v — output: %s", truncateID(taskID), err, truncateOutput(testOutput))
+
+		// Record the test result even on execution error
+		h.recordTestResult(ctx, taskID, taskNumber, sliceID, changedPackages, false,
+			fmt.Sprintf("test_execution_error: %v", err), testOutput, duration)
+
 		h.database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":        taskID,
 			"p_new_status":     "available",
@@ -108,6 +113,9 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		})
 		return
 	}
+
+	// Record test result to DB for dashboard consumption
+	h.recordTestResult(ctx, taskID, taskNumber, sliceID, changedPackages, passed, "", testOutput, duration)
 
 	if passed {
 		log.Printf("[Testing] Task %s tests PASSED in %.1fs", truncateID(taskID), duration)
@@ -203,11 +211,9 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		})
 
 		// Store the failed executor model ID so the task handler avoids re-routing to it.
-		// This prevents the same model from being assigned a task it just failed on.
+		// Accumulates across models — if 2+ different models fail, flags prompt as suspect.
 		if executorModelID != "" {
-			h.database.Update(ctx, "tasks", taskID, map[string]any{
-				"routing_flag_reason": fmt.Sprintf("test_failed_by:%s", executorModelID),
-			})
+			accumulateFailedModel(ctx, h.database, taskID, "test_failed_by", executorModelID)
 		}
 		log.Printf("[Testing] Task %s → available (branch %s preserved for fix)", truncateID(taskID), branchName)
 	}
@@ -578,6 +584,63 @@ func (h *TestingHandler) extractFilesFromTask(task map[string]any) []string {
 		}
 	}
 	return nil
+}
+
+// recordTestResult inserts a row into test_results so the dashboard can display
+// pass/fail status with the error message and raw test output.
+// This is the ONLY place test_results rows are written during pipeline execution.
+func (h *TestingHandler) recordTestResult(
+	ctx context.Context,
+	taskID, taskNumber, sliceID string,
+	testPackages []string,
+	passed bool,
+	errMsg string,
+	testOutput string,
+	durationSecs float64,
+) {
+	testCommand := "go test -v -count=1 ./..."
+	if len(testPackages) > 0 {
+		testCommand = "go test -v -count=1 " + strings.Join(testPackages, " ")
+	}
+
+	// Determine concise outcome string
+	outcome := "pass"
+	errorMsg := ""
+	if !passed {
+		outcome = "fail"
+		if errMsg != "" {
+			errorMsg = errMsg
+		} else {
+			errorMsg = truncateOutput(testOutput)
+		}
+	}
+
+	data := map[string]any{
+		"task_id":      taskID,
+		"task_number":  taskNumber,
+		"slice_id":     sliceID,
+		"test_type":    "unit",
+		"test_command": testCommand,
+		"passed":       passed,
+		"error":        errorMsg,
+		"outcome":      outcome,
+		"output":       testOutput,
+		"duration_ms":  int(durationSecs * 1000),
+		"status":       "complete",
+	}
+
+	result, dbErr := h.database.Insert(ctx, "test_results", data)
+	if dbErr != nil {
+		log.Printf("[Testing] WARNING: Failed to insert test_results for task %s: %v", truncateID(taskID), dbErr)
+		return
+	}
+
+	var inserted []map[string]any
+	if json.Unmarshal(result, &inserted) == nil && len(inserted) > 0 {
+		if id, ok := inserted[0]["id"].(string); ok {
+			log.Printf("[Testing] Recorded test_result %s for task %s (passed=%v)", truncateID(id), truncateID(taskID), passed)
+		}
+	}
 }
 
 // getExecutorModelID looks up the model_id from the latest task_run for a task.
