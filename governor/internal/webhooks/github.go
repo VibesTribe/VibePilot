@@ -95,7 +95,12 @@ func (h *GitHubWebhookHandler) checkAndCreatePRD(ctx context.Context, file, repo
 }
 
 func (h *GitHubWebhookHandler) isPRD(file string) bool {
-	return strings.HasPrefix(file, "docs/prd/") && strings.HasSuffix(file, ".md")
+	if !strings.HasPrefix(file, "docs/prd/") || !strings.HasSuffix(file, ".md") {
+		return false
+	}
+	// Exclude subfolders — only match docs/prd/*.md directly
+	sub := strings.TrimPrefix(file, "docs/prd/")
+	return !strings.Contains(sub, "/")
 }
 
 func (h *GitHubWebhookHandler) createPlanForPRD(ctx context.Context, prdPath string) {
