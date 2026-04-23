@@ -17,7 +17,7 @@ import (
 	"github.com/vibepilot/governor/internal/gitree"
 	govmcp "github.com/vibepilot/governor/internal/mcp"
 	"github.com/vibepilot/governor/internal/memory"
-	"github.com/vibepilot/governor/internal/realtime"
+	"github.com/vibepilot/governor/internal/pgnotify"
 	"github.com/vibepilot/governor/internal/runtime"
 	"github.com/vibepilot/governor/internal/security"
 	"github.com/vibepilot/governor/internal/tools"
@@ -248,19 +248,20 @@ func main() {
 	connRouter := runtime.NewRouter(cfg, database, usageTracker)
 	eventRouter := runtime.NewEventRouter(nil)
 
-	// Initialize Realtime client (replaces broken pg_net webhooks)
-	var realtimeClient *realtime.Client
-	if realtimeURL := cfg.GetRealtimeURL(); realtimeURL != "" {
-		realtimeClient = realtime.NewClient(&realtime.Config{
-			URL:    realtimeURL,
-			APIKey: dbKey, // Use service key for full access
-		}, eventRouter)
-
-		if err := realtimeClient.Connect(); err != nil {
-			log.Printf("Warning: Failed to connect to Realtime: %v (will retry)", err)
-		} else {
-			if err := realtimeClient.SubscribeToAllTables(); err != nil {
-				log.Printf("Warning: Failed to subscribe to tables: %v", err)
+	// Initialize PG Notify listener for local Postgres (replaces Supabase Realtime).
+	// Listens on vp_changes channel, routes domain events internally,
+	// and broadcasts generic notifications to SSE clients for dashboard live updates.
+	var pgListener *pgnotify.Listener
+	sseBroker := webhooks.NewSSEBroker()
+	if dbType == "postgres" {
+		pgURL := cfg.GetPostgresURL()
+		if pgURL != "" {
+			var err error
+			pgListener, err = pgnotify.NewListener(ctx, pgURL, eventRouter, sseBroker)
+			if err != nil {
+				log.Printf("Warning: Failed to start PG Notify listener: %v", err)
+			} else {
+				log.Println("PG Notify listener started on vp_changes")
 			}
 		}
 	}
@@ -282,6 +283,7 @@ func main() {
 		Secret: webhookSecret,
 	}, eventRouter)
 	webhookServer.SetDB(database)
+	webhookServer.SetSSEBroker(sseBroker)
 
 	githubHandler := webhooks.NewGitHubWebhookHandler(database, cfg.GetRepoPath())
 	webhookServer.SetGitHubHandler(githubHandler)
@@ -326,8 +328,8 @@ func main() {
 	if govMCPServer != nil {
 		govMCPServer.Shutdown()
 	}
-	if realtimeClient != nil {
-		realtimeClient.Close()
+	if pgListener != nil {
+		pgListener.Close()
 	}
 	if worktreeMgr != nil {
 		log.Println("[Worktrees] Cleaning up worktrees...")
