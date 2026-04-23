@@ -85,9 +85,9 @@ func (h *TaskHandler) Register(router *runtime.EventRouter) {
 func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	ctx := context.Background()
 
-	var task map[string]any
-	if err := json.Unmarshal(event.Record, &task); err != nil {
-		log.Printf("[TaskAvailable] Parse error: %v", err)
+	task, err := fetchRecord(ctx, h.database, event)
+	if err != nil {
+		log.Printf("[TaskAvailable] Failed to get task record: %v", err)
 		return
 	}
 
@@ -680,7 +680,12 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 	var task map[string]any
 	if err := json.Unmarshal(event.Record, &task); err != nil {
-		return
+		// pgnotify path: Record is nil, fetch from DB
+		var ferr error
+		task, ferr = fetchRecord(ctx, h.database, event)
+		if ferr != nil {
+			return
+		}
 	}
 
 	taskID := getString(task, "id")

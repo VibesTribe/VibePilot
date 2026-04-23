@@ -61,9 +61,9 @@ func (h *TestingHandler) Register(router *runtime.EventRouter) {
 func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 	ctx := context.Background()
 
-	var task map[string]any
-	if err := json.Unmarshal(event.Record, &task); err != nil {
-		log.Printf("[Testing] Parse error: %v", err)
+	task, err := fetchRecord(ctx, h.database, event)
+	if err != nil {
+		log.Printf("[Testing] Failed to get task record: %v", err)
 		return
 	}
 

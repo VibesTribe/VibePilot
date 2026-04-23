@@ -53,9 +53,9 @@ func (h *CouncilHandler) Register(router *runtime.EventRouter) {
 func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 	ctx := context.Background()
 
-	var plan map[string]any
-	if err := json.Unmarshal(event.Record, &plan); err != nil {
-		log.Printf("[CouncilReview] Failed to parse event: %v", err)
+	plan, err := fetchRecord(ctx, h.database, event)
+	if err != nil {
+		log.Printf("[CouncilReview] Failed to get plan record: %v", err)
 		return
 	}
 
@@ -327,9 +327,9 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 func (h *CouncilHandler) handleCouncilDone(event runtime.Event) {
 	ctx := context.Background()
 
-	var plan map[string]any
-	if err := json.Unmarshal(event.Record, &plan); err != nil {
-		log.Printf("[CouncilDone] Failed to parse event: %v", err)
+	plan, err := fetchRecord(ctx, h.database, event)
+	if err != nil {
+		log.Printf("[CouncilDone] Failed to get plan record: %v", err)
 		return
 	}
 

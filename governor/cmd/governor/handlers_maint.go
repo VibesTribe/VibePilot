@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -51,9 +50,9 @@ func (h *MaintenanceHandler) Register(router *runtime.EventRouter) {
 func (h *MaintenanceHandler) handleMaintenanceCommand(event runtime.Event) {
 	ctx := context.Background()
 
-	var cmd map[string]any
-	if err := json.Unmarshal(event.Record, &cmd); err != nil {
-		log.Printf("[MaintenanceCmd] Failed to parse event: %v", err)
+	cmd, err := fetchRecord(ctx, h.database, event)
+	if err != nil {
+		log.Printf("[MaintenanceCmd] Failed to get cmd record: %v", err)
 		return
 	}
 
@@ -183,9 +182,9 @@ func (h *MaintenanceHandler) handleMaintenanceCommand(event runtime.Event) {
 func (h *MaintenanceHandler) handleTaskApproved(event runtime.Event) {
 	ctx := context.Background()
 
-	var task map[string]any
-	if err := json.Unmarshal(event.Record, &task); err != nil {
-		log.Printf("[TaskApproved] Failed to parse event: %v", err)
+	task, err := fetchRecord(ctx, h.database, event)
+	if err != nil {
+		log.Printf("[TaskApproved] Failed to get task record: %v", err)
 		return
 	}
 
@@ -251,9 +250,9 @@ func (h *MaintenanceHandler) handleTaskApproved(event runtime.Event) {
 func (h *MaintenanceHandler) handleTaskMergePending(event runtime.Event) {
 	ctx := context.Background()
 
-	var task map[string]any
-	if err := json.Unmarshal(event.Record, &task); err != nil {
-		log.Printf("[TaskMergePending] Failed to parse event: %v", err)
+	task, err := fetchRecord(ctx, h.database, event)
+	if err != nil {
+		log.Printf("[TaskMergePending] Failed to get task record: %v", err)
 		return
 	}
 
