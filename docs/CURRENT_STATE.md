@@ -2,7 +2,7 @@
 > Last updated: April 23, 2026
 
 ## System Status
-- **Governor**: Running (PID 95117, manual process — NOT systemd, `Restart=always` NOT active)
+- **Governor**: Running (PID 121244, systemd service, `Restart=always` active)
 - **Database**: Local PostgreSQL 16 on x220 (`localhost:5432`, db=vibepilot, user=vibes)
 - **GitHub**: `VibesTribe/VibePilot` (public, branch `fix/pg-backend-sql-ordering`)
 - **Dashboard**: React frontend on Vercel (`vibeflow-dashboard.vercel.app`). Reads from governor `/api/dashboard` (local PG). SSE live updates wired but not yet tested end-to-end.
@@ -331,8 +331,8 @@ Governor → router selects routing_flag="web"
 
 ## Known Issues (non-blocking)
 
-1. **systemd service disabled** -- governor runs as manual process (PID 95117). Won't survive reboot.
-2. **Branch not merged** -- `fix/pg-backend-sql-ordering` needs merge to main
+1. **systemd service active** -- governor runs via systemd user service with Restart=always. Survives crashes.
+2. **Branch merged** -- `fix/pg-backend-sql-ordering` merged to main as `f2a376d5`. Branch can be deleted.
 3. **SSE not E2E tested** -- code compiles, wiring verified, but not tested with running governor + dashboard
 4. **jcodemunch CodeMap refresh** -- transport error on startup (pre-existing, graceful fallback to existing map.md)
 5. ~~**Courier pipeline writes to Supabase**~~ -- FIXED. Now writes to governor API.
