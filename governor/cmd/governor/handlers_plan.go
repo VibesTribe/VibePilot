@@ -45,9 +45,9 @@ func handlePlanCreated(
 	event runtime.Event,
 ) {
 	startTime := time.Now()
-	var plan map[string]any
-	if err := json.Unmarshal(event.Record, &plan); err != nil {
-		log.Printf("[EventPlanCreated] Failed to parse plan: %v", err)
+	plan, err := fetchRecord(ctx, database, event)
+	if err != nil {
+		log.Printf("[EventPlanCreated] Failed to get plan record: %v", err)
 		return
 	}
 
@@ -535,9 +535,9 @@ func handlePlanReview(
 	usageTracker *runtime.UsageTracker,
 	event runtime.Event,
 ) {
-	var plan map[string]any
-	if err := json.Unmarshal(event.Record, &plan); err != nil {
-		log.Printf("[EventPlanReview] Failed to parse plan: %v", err)
+	plan, err := fetchRecord(ctx, database, event)
+	if err != nil {
+		log.Printf("[EventPlanReview] Failed to get plan record: %v", err)
 		return
 	}
 
@@ -545,7 +545,7 @@ func handlePlanReview(
 	planPath, _ := plan["plan_path"].(string)
 	if planPath == "" && planID != "" {
 		// Realtime event may not include plan_path (only changed columns).
-		// Fetch full plan from DB.
+		// fetchRecord already got full row, but check again.
 		raw, err := database.Query(ctx, "plans", map[string]any{"id": planID})
 		if err == nil && raw != nil {
 			var plans []map[string]any

@@ -50,9 +50,9 @@ func (h *ResearchHandler) Register(router *runtime.EventRouter) {
 func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 	ctx := context.Background()
 
-	var suggestion map[string]any
-	if err := json.Unmarshal(event.Record, &suggestion); err != nil {
-		log.Printf("[ResearchReady] Failed to parse event: %v", err)
+	suggestion, err := fetchRecord(ctx, h.database, event)
+	if err != nil {
+		log.Printf("[ResearchReady] Failed to get suggestion record: %v", err)
 		return
 	}
 
@@ -239,9 +239,9 @@ func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 	ctx := context.Background()
 
-	var suggestion map[string]any
-	if err := json.Unmarshal(event.Record, &suggestion); err != nil {
-		log.Printf("[ResearchCouncil] Failed to parse event: %v", err)
+	suggestion, err := fetchRecord(ctx, h.database, event)
+	if err != nil {
+		log.Printf("[ResearchCouncil] Failed to get suggestion record: %v", err)
 		return
 	}
 
