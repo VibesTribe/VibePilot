@@ -16,6 +16,8 @@ import (
 	"github.com/vibepilot/governor/internal/runtime"
 )
 
+type CourierResultFunc func(taskID string, result json.RawMessage) error
+
 type Server struct {
 	port      int
 	path      string
@@ -30,6 +32,7 @@ type Server struct {
 	wsPath    string
 	wsUpgrader any
 	sseBroker  *SSEBroker
+	courierResultFn CourierResultFunc
 }
 
 type DBQuerier interface {
@@ -90,6 +93,12 @@ func (s *Server) SetSSEBroker(broker *SSEBroker) {
 	s.sseBroker = broker
 }
 
+// SetCourierResultFn registers the callback for courier result POSTs.
+// The callback receives (taskID, rawJSON) and returns error.
+func (s *Server) SetCourierResultFn(fn CourierResultFunc) {
+	s.courierResultFn = fn
+}
+
 func (s *Server) RegisterHandler(eventType string, handler EventHandler) {
 	s.handlers[eventType] = handler
 	log.Printf("[Webhooks] Registered handler for: %s", eventType)
@@ -102,6 +111,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/bookmarks", s.handleBookmark)
 	mux.HandleFunc("/api/dashboard", s.handleDashboard)
 	mux.HandleFunc("/api/dashboard/stream", s.handleSSE)
+	mux.HandleFunc("/api/courier/result", s.handleCourierResult)
 
 
 	s.server = &http.Server{
@@ -544,6 +554,54 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		}
 	}
+}
+
+// handleCourierResult accepts POST from courier agents (GitHub Actions) with task results.
+// Replaces the old Supabase REST write + realtime notify pattern.
+// Payload: {"task_id": "...", "status": "completed|failed", "output": "...", "error": "...", "tokens_in": 0, "tokens_out": 0}
+func (s *Server) handleCourierResult(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	var payload struct {
+		TaskID    string `json:"task_id"`
+		Status    string `json:"status"`
+		Output    string `json:"output"`
+		Error     string `json:"error"`
+		TokensIn  int    `json:"tokens_in"`
+		TokensOut int    `json:"tokens_out"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if payload.TaskID == "" {
+		http.Error(w, "Missing task_id", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[CourierResult] Received: task=%s status=%s", payload.TaskID, payload.Status)
+
+	// Notify the courier runner (delivers to waiting goroutine via channel)
+	if s.courierResultFn != nil {
+		if err := s.courierResultFn(payload.TaskID, body); err != nil {
+			log.Printf("[CourierResult] Handler error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // handleWebSocket is deprecated — replaced by SSE (/api/dashboard/stream).
