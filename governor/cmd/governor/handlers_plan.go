@@ -221,8 +221,8 @@ func handlePlanCreated(
 
 	plan["plan_path"] = plannerOutput.PlanPath
 
-	clearProcessingLock()
-
+	// Update plan status BEFORE clearing the processing lock.
+	// This prevents a race where another handler sees draft + no lock and starts a duplicate planner run.
 	_, err = database.RPC(ctx, "update_plan_status", map[string]any{
 		"p_plan_id":   planID,
 		"p_status":    "review",
@@ -230,8 +230,11 @@ func handlePlanCreated(
 	})
 	if err != nil {
 		log.Printf("[EventPlanCreated] Failed to update plan status: %v", err)
+		clearProcessingLock()
 		return
 	}
+
+	clearProcessingLock()
 
 	database.RPC(ctx, "record_performance_metric", map[string]any{
 		"p_metric_type": "prd_to_plan",
@@ -302,6 +305,22 @@ func runPlanReview(
 			"p_id":    planID,
 		})
 	}()
+
+	// Re-fetch plan from DB to confirm it's still in review status.
+	// Prevents re-processing if a previous attempt already moved it to error/approved.
+	currentPlanResult, err := database.Query(ctx, "plans", map[string]any{
+		"id":    planID,
+		"limit": 1,
+	})
+	if err == nil {
+		var currentRows []map[string]any
+		if json.Unmarshal(currentPlanResult, &currentRows) == nil && len(currentRows) > 0 {
+			if currentStatus, ok := currentRows[0]["status"].(string); ok && currentStatus != "review" {
+				log.Printf("[PlanReview] Plan %s no longer review (status=%s), skipping", truncateID(planID), currentStatus)
+				return
+			}
+		}
+	}
 
 	repoPath := cfg.GetRepoPath()
 
