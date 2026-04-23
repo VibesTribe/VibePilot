@@ -28,11 +28,21 @@ func parseBool(data []byte) bool {
 	if data == nil {
 		return false
 	}
+	// Try direct bool first (scalar RPC return)
 	var b bool
-	if err := json.Unmarshal(data, &b); err != nil {
-		return false
+	if err := json.Unmarshal(data, &b); err == nil {
+		return b
 	}
-	return b
+	// Try rowsToJSON format: [{"function_name": true}]
+	var rows []map[string]any
+	if err := json.Unmarshal(data, &rows); err == nil && len(rows) > 0 {
+		for _, v := range rows[0] {
+			if b, ok := v.(bool); ok {
+				return b
+			}
+		}
+	}
+	return false
 }
 
 func truncateID(id string) string {
