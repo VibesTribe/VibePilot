@@ -932,3 +932,64 @@ cd ~/VibePilot && git add docs/prd/test-feature.md && git commit -m "test: add t
 **Need more detail?** See Section 9 for deep dive references.
 
 **Questions?** Ask the human.
+
+---
+
+## Local PostgreSQL + Vault (April 23, 2026)
+
+Supabase replaced with local PostgreSQL 16. Peer auth for user `vibes` (no password).
+
+```bash
+# Connect to database
+psql -d vibepilot
+
+# Connection string for apps
+DATABASE_URL="postgres://vibes@/vibepilot?host=/var/run/postgresql"
+```
+
+### Vault Master Key
+
+**VAULT_KEY:** `P9jFR25vbjcNxG2S3lx4ZCyspfGLd7wZYliZWLjqKLc=`
+
+This is the ONLY key that decrypts the secrets_vault (15 API keys). Lose it = lose everything permanently.
+Also stored in: `~/.config/systemd/user/vibepilot-governor.service.d/override.conf`
+
+```bash
+# Vault CLI
+export DATABASE_URL="postgres://vibes@/vibepilot?host=/var/run/postgresql"
+export VAULT_KEY="P9jFR25vbjcNxG2S3lx4ZCyspfGLd7wZYliZWLjqKLc="
+cd ~/vibepilot/governor
+
+./governor vault list                    # List all key names
+./governor vault set KEY_NAME "value"    # Add or update a key (copy paste done)
+./governor vault get KEY_NAME            # Decrypt and show a key
+./governor vault delete KEY_NAME         # Remove a key
+```
+
+### Governor Startup
+```bash
+# Rebuild after code changes
+cd ~/vibepilot/governor && go build -o governor ./cmd/governor/
+
+# Restart (systemd has all env vars)
+systemctl --user daemon-reload
+systemctl --user restart vibepilot-governor
+
+# Verify
+curl http://localhost:8080/status
+```
+
+### Dashboard API
+```bash
+# Full dashboard data (~185KB JSON)
+curl http://localhost:8080/api/dashboard
+
+# SSE live stream (for browser EventSource)
+curl http://localhost:8080/api/dashboard/stream
+```
+
+### Backup
+```bash
+# PG dump + push to knowledgebase repo (runs daily at 3am via cron)
+~/vibepilot/scripts/pg-dump-and-push.sh
+```
