@@ -120,7 +120,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	log.Printf("[Webhooks] Server starting on port %d at %s", s.port, s.path)
-	log.Printf("[WebSocket] Listening at %s%s", s.port, s.wsPath)
+	log.Printf("[WebSocket] Listening at %d%s", s.port, s.wsPath)
 
 	errChan := make(chan error, 1)
 	go func() {
