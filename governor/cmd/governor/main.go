@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -17,7 +18,7 @@ import (
 	"github.com/vibepilot/governor/internal/gitree"
 	govmcp "github.com/vibepilot/governor/internal/mcp"
 	"github.com/vibepilot/governor/internal/memory"
-	"github.com/vibepilot/governor/internal/realtime"
+	"github.com/vibepilot/governor/internal/pgnotify"
 	"github.com/vibepilot/governor/internal/runtime"
 	"github.com/vibepilot/governor/internal/security"
 	"github.com/vibepilot/governor/internal/tools"
@@ -248,19 +249,20 @@ func main() {
 	connRouter := runtime.NewRouter(cfg, database, usageTracker)
 	eventRouter := runtime.NewEventRouter(nil)
 
-	// Initialize Realtime client (replaces broken pg_net webhooks)
-	var realtimeClient *realtime.Client
-	if realtimeURL := cfg.GetRealtimeURL(); realtimeURL != "" {
-		realtimeClient = realtime.NewClient(&realtime.Config{
-			URL:    realtimeURL,
-			APIKey: dbKey, // Use service key for full access
-		}, eventRouter)
-
-		if err := realtimeClient.Connect(); err != nil {
-			log.Printf("Warning: Failed to connect to Realtime: %v (will retry)", err)
-		} else {
-			if err := realtimeClient.SubscribeToAllTables(); err != nil {
-				log.Printf("Warning: Failed to subscribe to tables: %v", err)
+	// Initialize PG Notify listener for local Postgres (replaces Supabase Realtime).
+	// Listens on vp_changes channel, routes domain events internally,
+	// and broadcasts generic notifications to SSE clients for dashboard live updates.
+	var pgListener *pgnotify.Listener
+	sseBroker := webhooks.NewSSEBroker()
+	if dbType == "postgres" {
+		pgURL := cfg.GetPostgresURL()
+		if pgURL != "" {
+			var err error
+			pgListener, err = pgnotify.NewListener(ctx, pgURL, eventRouter, sseBroker)
+			if err != nil {
+				log.Printf("Warning: Failed to start PG Notify listener: %v", err)
+			} else {
+				log.Println("PG Notify listener started on vp_changes")
 			}
 		}
 	}
@@ -282,6 +284,52 @@ func main() {
 		Secret: webhookSecret,
 	}, eventRouter)
 	webhookServer.SetDB(database)
+	webhookServer.SetSSEBroker(sseBroker)
+
+	// Courier result handler: writes to task_runs and notifies waiting goroutine
+	if courierRunner != nil {
+		webhookServer.SetCourierResultFn(func(taskID string, rawJSON json.RawMessage) error {
+			var record struct {
+				TaskID    string `json:"task_id"`
+				Status    string `json:"status"`
+				Output    string `json:"output"`
+				Error     string `json:"error"`
+				TokensIn  int    `json:"tokens_in"`
+				TokensOut int    `json:"tokens_out"`
+			}
+			if err := json.Unmarshal(rawJSON, &record); err != nil {
+				return fmt.Errorf("parse courier result: %w", err)
+			}
+
+			// Write to task_runs table
+			resultJSON, _ := json.Marshal(map[string]any{
+				"output":     record.Output,
+				"tokens_in":  record.TokensIn,
+				"tokens_out": record.TokensOut,
+			})
+			params := map[string]any{
+				"p_task_id":    taskID,
+				"p_status":     record.Status,
+				"p_result":     string(resultJSON),
+				"p_error":      record.Error,
+				"p_tokens_in":  record.TokensIn,
+				"p_tokens_out": record.TokensOut,
+			}
+			if _, err := database.RPC(ctx, "record_courier_result", params); err != nil {
+				log.Printf("[CourierResult] DB write failed: %v", err)
+				// Don't block the notification — still deliver to waiting goroutine
+			}
+
+			courierRunner.NotifyResult(taskID, &connectors.TaskRunResult{
+				Status:    record.Status,
+				Output:    record.Output,
+				Error:     record.Error,
+				TokensIn:  record.TokensIn,
+				TokensOut: record.TokensOut,
+			})
+			return nil
+		})
+	}
 
 	githubHandler := webhooks.NewGitHubWebhookHandler(database, cfg.GetRepoPath())
 	webhookServer.SetGitHubHandler(githubHandler)
@@ -326,8 +374,8 @@ func main() {
 	if govMCPServer != nil {
 		govMCPServer.Shutdown()
 	}
-	if realtimeClient != nil {
-		realtimeClient.Close()
+	if pgListener != nil {
+		pgListener.Close()
 	}
 	if worktreeMgr != nil {
 		log.Println("[Worktrees] Cleaning up worktrees...")

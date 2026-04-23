@@ -25,11 +25,12 @@ type courierWaiter struct {
 // CourierRunner dispatches tasks to GitHub Actions for browser-based execution
 // and waits for results via Supabase realtime (not polling).
 type CourierRunner struct {
-	githubToken string
-	githubRepo  string
-	db          CourierDB
-	httpClient  *http.Client
-	timeout     time.Duration
+	githubToken  string
+	githubRepo   string
+	governorURL  string
+	db           CourierDB
+	httpClient   *http.Client
+	timeout      time.Duration
 
 	// waiters maps taskID -> channel for realtime result delivery
 	waiters map[string]*courierWaiter
@@ -42,12 +43,13 @@ func NewCourierRunner(githubToken, githubRepo string, db CourierDB, timeoutSecs 
 		timeout = timeoutSecs
 	}
 	return &CourierRunner{
-		githubToken: githubToken,
-		githubRepo:  githubRepo,
-		db:          db,
-		httpClient:  &http.Client{Timeout: 30 * time.Second},
-		timeout:     time.Duration(timeout) * time.Second,
-		waiters:     make(map[string]*courierWaiter),
+		githubToken:  githubToken,
+		githubRepo:   githubRepo,
+		governorURL:  "http://localhost:8080",
+		db:           db,
+		httpClient:   &http.Client{Timeout: 30 * time.Second},
+		timeout:      time.Duration(timeout) * time.Second,
+		waiters:      make(map[string]*courierWaiter),
 	}
 }
 
@@ -200,15 +202,16 @@ func (r *CourierRunner) dispatch(ctx context.Context, taskID, taskPrompt, branch
 	payload := map[string]interface{}{
 		"event_type": "courier_task",
 		"client_payload": map[string]interface{}{
-			"task_id":          taskID,
-			"prompt":           taskPrompt,
-			"branch_name":      branchName,
-			"llm_provider":     llmProvider,
-			"llm_model":        llmModel,
-			"llm_api_key":      llmAPIKey,
-			"web_platform_url": webPlatformURL,
-			"supabase_url":     supabaseURL,
-			"supabase_key":     supabaseKey,
+			"task_id":           taskID,
+			"prompt":            taskPrompt,
+			"branch_name":       branchName,
+			"llm_provider":      llmProvider,
+			"llm_model":         llmModel,
+			"llm_api_key":       llmAPIKey,
+			"web_platform_url":  webPlatformURL,
+			"governor_api_url":  r.governorURL,
+			"supabase_url":      supabaseURL,
+			"supabase_key":      supabaseKey,
 		},
 	}
 

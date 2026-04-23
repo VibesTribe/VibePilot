@@ -16,6 +16,8 @@ import (
 	"github.com/vibepilot/governor/internal/runtime"
 )
 
+type CourierResultFunc func(taskID string, result json.RawMessage) error
+
 type Server struct {
 	port      int
 	path      string
@@ -27,10 +29,15 @@ type Server struct {
 	server    *http.Server
 	handlers  map[string]EventHandler
 	db        DBQuerier
+	wsPath    string
+	wsUpgrader any
+	sseBroker  *SSEBroker
+	courierResultFn CourierResultFunc
 }
 
 type DBQuerier interface {
 	RPC(ctx context.Context, name string, params map[string]interface{}) ([]byte, error)
+	Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error)
 }
 
 type EventHandler func(ctx context.Context, payload *Payload) error
@@ -68,6 +75,7 @@ func NewServer(cfg *Config, router *runtime.EventRouter) *Server {
 		startTime: time.Now(),
 		router:    router,
 		handlers:  make(map[string]EventHandler),
+		sseBroker: NewSSEBroker(),
 	}
 }
 
@@ -77,6 +85,18 @@ func (s *Server) SetGitHubHandler(handler *GitHubWebhookHandler) {
 
 func (s *Server) SetDB(db DBQuerier) {
 	s.db = db
+}
+
+// SetSSEBroker replaces the default SSE broker with a shared instance.
+// Used to share one broker between pgnotify and the webhook server.
+func (s *Server) SetSSEBroker(broker *SSEBroker) {
+	s.sseBroker = broker
+}
+
+// SetCourierResultFn registers the callback for courier result POSTs.
+// The callback receives (taskID, rawJSON) and returns error.
+func (s *Server) SetCourierResultFn(fn CourierResultFunc) {
+	s.courierResultFn = fn
 }
 
 func (s *Server) RegisterHandler(eventType string, handler EventHandler) {
@@ -89,6 +109,10 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc(s.path, s.handleWebhook)
 	mux.HandleFunc("/status", s.handleStatus)
 	mux.HandleFunc("/api/bookmarks", s.handleBookmark)
+	mux.HandleFunc("/api/dashboard", s.handleDashboard)
+	mux.HandleFunc("/api/dashboard/stream", s.handleSSE)
+	mux.HandleFunc("/api/courier/result", s.handleCourierResult)
+
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
@@ -96,6 +120,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	log.Printf("[Webhooks] Server starting on port %d at %s", s.port, s.path)
+	log.Printf("[WebSocket] Listening at %d%s", s.port, s.wsPath)
 
 	errChan := make(chan error, 1)
 	go func() {
@@ -359,6 +384,97 @@ func (s *Server) handleBookmark(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.db == nil {
+		http.Error(w, "Database not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	ctx := r.Context()
+
+	// Query all tables the dashboard needs in parallel
+	type tableResult struct {
+		name string
+		data json.RawMessage
+		err  error
+	}
+
+	tables := []struct {
+		name    string
+		filters map[string]any
+	}{
+		{"tasks", map[string]any{"order": "updated_at.desc", "limit": 100}},
+		{"task_runs", map[string]any{"order": "started_at.desc", "limit": 500}},
+		{"models", nil},
+		{"platforms", nil},
+		{"orchestrator_events", map[string]any{"order": "created_at.desc", "limit": 500}},
+		{"plans", map[string]any{"order": "created_at.desc", "limit": 100}},
+		{"council_reviews", map[string]any{"order": "created_at.desc", "limit": 200}},
+		{"test_results", map[string]any{"order": "created_at.desc", "limit": 200}},
+		{"exchange_rates", nil},
+	}
+
+	results := make(chan tableResult, len(tables))
+	for _, t := range tables {
+		go func(name string, filters map[string]any) {
+			data, err := s.db.Query(ctx, name, filters)
+			results <- tableResult{name: name, data: data, err: err}
+		}(t.name, t.filters)
+	}
+
+	response := make(map[string]json.RawMessage, len(tables))
+	for i := 0; i < len(tables); i++ {
+		res := <-results
+		if res.err != nil {
+			log.Printf("[Dashboard] Error querying %s: %v", res.name, res.err)
+			response[res.name] = json.RawMessage("[]")
+		} else if res.data == nil {
+			response[res.name] = json.RawMessage("[]")
+		} else {
+			response[res.name] = res.data
+		}
+	}
+
+	// ETag: hash only the actual data (no volatile timestamp)
+	responseBytes, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("[Dashboard] Error marshaling response: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	h := sha256.New()
+	h.Write(responseBytes)
+	etag := hex.EncodeToString(h.Sum(nil))[:16]
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("ETag", etag)
+
+	// 304 Not Modified — skip sending 181KB
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	w.Write(responseBytes)
+}
+
+
+
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -379,6 +495,130 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) GetPort() int {
 	return s.port
+}
+
+
+// GetSSEBroker returns the SSE broker so other packages (pgnotify) can broadcast.
+func (s *Server) GetSSEBroker() *SSEBroker {
+	return s.sseBroker
+}
+
+// handleSSE serves Server-Sent Events to dashboard clients.
+// The browser's EventSource API connects here and receives real-time
+// notifications when any monitored table changes.
+// Format: data: {"table":"tasks","action":"UPDATE","id":"abc-123"}\n\n
+func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
+
+	// Subscribe to notifications
+	ch := s.sseBroker.Subscribe()
+	defer s.sseBroker.Unsubscribe(ch)
+
+	// Send initial connection event
+	fmt.Fprintf(w, "event: connected\ndata: {\"status\":\"ok\"}\n\n")
+	flusher.Flush()
+
+	// Keepalive ticker — sends a comment every 30s so connections don't time out
+	keepalive := time.NewTicker(30 * time.Second)
+	defer keepalive.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case notif, ok := <-ch:
+			if !ok {
+				return
+			}
+			data, _ := json.Marshal(notif)
+			fmt.Fprintf(w, "event: change\ndata: %s\n\n", data)
+			flusher.Flush()
+		case <-keepalive.C:
+			fmt.Fprintf(w, ": keepalive\n\n")
+			flusher.Flush()
+		}
+	}
+}
+
+// handleCourierResult accepts POST from courier agents (GitHub Actions) with task results.
+// Replaces the old Supabase REST write + realtime notify pattern.
+// Payload: {"task_id": "...", "status": "completed|failed", "output": "...", "error": "...", "tokens_in": 0, "tokens_out": 0}
+func (s *Server) handleCourierResult(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	var payload struct {
+		TaskID    string `json:"task_id"`
+		Status    string `json:"status"`
+		Output    string `json:"output"`
+		Error     string `json:"error"`
+		TokensIn  int    `json:"tokens_in"`
+		TokensOut int    `json:"tokens_out"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if payload.TaskID == "" {
+		http.Error(w, "Missing task_id", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[CourierResult] Received: task=%s status=%s", payload.TaskID, payload.Status)
+
+	// Notify the courier runner (delivers to waiting goroutine via channel)
+	if s.courierResultFn != nil {
+		if err := s.courierResultFn(payload.TaskID, body); err != nil {
+			log.Printf("[CourierResult] Handler error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// handleWebSocket is deprecated — replaced by SSE (/api/dashboard/stream).
+// Kept as stub so any references don't break at compile time.
+func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Deprecated: use /api/dashboard/stream (SSE) instead", http.StatusGone)
+}
+
+func (s *Server) SetWSUpgrader(upgrader any) {
+	s.wsUpgrader = upgrader
+}
+
+func (s *Server) SetWSPath(path string) {
+	s.wsPath = path
 }
 
 func (s *Server) IsRunning() bool {
