@@ -96,7 +96,7 @@ git checkout go-governor
 ```bash
 # Set env vars first
 export DATABASE_URL="postgres://vibes@/vibepilot?host=/var/run/postgresql"
-export VAULT_KEY="P9jFR25vbjcNxG2S3lx4ZCyspfGLd7wZYliZWLjqKLc="
+export VAULT_KEY="$(grep VAULT_KEY ~/.config/systemd/user/vibepilot-governor.service.d/override.conf | cut -d'"' -f2)"
 cd ~/vibepilot/governor
 
 # List all keys
