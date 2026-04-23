@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -57,6 +59,13 @@ func handlePlanCreated(
 
 	log.Printf("[EventPlanCreated] Processing plan %s, status=%s", truncateID(planID), currentStatus)
 
+	// Only process plans still in draft. Prevents infinite loop:
+	// our status update fires pg_notify which re-triggers this handler.
+	if currentStatus != "draft" {
+		log.Printf("[EventPlanCreated] Plan %s no longer draft (status=%s), skipping", truncateID(planID), currentStatus)
+		return
+	}
+
 	processingBy := fmt.Sprintf("planner:%d", time.Now().UnixNano())
 	claimed, err := database.RPC(ctx, "set_processing", map[string]any{
 		"p_table":         "plans",
@@ -82,14 +91,31 @@ func handlePlanCreated(
 
 	repoPath := cfg.GetRepoPath()
 
-	// Pull latest changes so the PRD file exists on disk
-	if err := git.Pull(ctx); err != nil {
-		log.Printf("[EventPlanCreated] Warning: git pull failed: %v", err)
-	}
+	// Fetch PRD content from GitHub (source of truth), not local filesystem.
+	// Public repo: raw.githubusercontent.com works without auth.
+	repoOwner := "VibesTribe"
+	repoName := "VibePilot"
+	branch := "main"
+	rawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", repoOwner, repoName, branch, prdPath)
 
-	prdContent, err := os.ReadFile(filepath.Join(repoPath, prdPath))
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
 	if err != nil {
-		log.Printf("[EventPlanCreated] Failed to read PRD: %v", err)
+		log.Printf("[EventPlanCreated] Failed to create PRD fetch request: %v", err)
+		setPlanError(ctx, database, planID, "prd_fetch_failed")
+		clearProcessingLock()
+		return
+	}
+	httpResp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		log.Printf("[EventPlanCreated] Failed to fetch PRD from GitHub: %v", err)
+		setPlanError(ctx, database, planID, "prd_fetch_failed")
+		clearProcessingLock()
+		return
+	}
+	defer httpResp.Body.Close()
+	prdContent, err := io.ReadAll(httpResp.Body)
+	if err != nil || httpResp.StatusCode != 200 {
+		log.Printf("[EventPlanCreated] Failed to read PRD content (status %d): %v", httpResp.StatusCode, err)
 		setPlanError(ctx, database, planID, "prd_read_failed")
 		clearProcessingLock()
 		return
@@ -278,16 +304,52 @@ func runPlanReview(
 	}()
 
 	repoPath := cfg.GetRepoPath()
-	prdContent, err := os.ReadFile(filepath.Join(repoPath, prdPath))
+
+	// Fetch PRD and plan content from GitHub (source of truth), not local filesystem.
+	repoOwner := "VibesTribe"
+	repoName := "VibePilot"
+	branch := "main"
+
+	// Fetch PRD content
+	prdRawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", repoOwner, repoName, branch, prdPath)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", prdRawURL, nil)
 	if err != nil {
-		log.Printf("[PlanReview] Failed to read PRD: %v", err)
+		log.Printf("[PlanReview] Failed to create PRD fetch request: %v", err)
+		setPlanError(ctx, database, planID, "prd_fetch_failed")
+		return
+	}
+	httpResp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		log.Printf("[PlanReview] Failed to fetch PRD from GitHub: %v", err)
+		setPlanError(ctx, database, planID, "prd_fetch_failed")
+		return
+	}
+	prdContent, err := io.ReadAll(httpResp.Body)
+	httpResp.Body.Close()
+	if err != nil || httpResp.StatusCode != 200 {
+		log.Printf("[PlanReview] Failed to read PRD content (status %d): %v", httpResp.StatusCode, err)
 		setPlanError(ctx, database, planID, "prd_read_failed")
 		return
 	}
 
-	planContent, err := os.ReadFile(filepath.Join(repoPath, planPath))
+	// Fetch plan content
+	planRawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", repoOwner, repoName, branch, planPath)
+	httpReq2, err := http.NewRequestWithContext(ctx, "GET", planRawURL, nil)
 	if err != nil {
-		log.Printf("[PlanReview] Failed to read plan: %v", err)
+		log.Printf("[PlanReview] Failed to create plan fetch request: %v", err)
+		setPlanError(ctx, database, planID, "plan_fetch_failed")
+		return
+	}
+	httpResp2, err := http.DefaultClient.Do(httpReq2)
+	if err != nil {
+		log.Printf("[PlanReview] Failed to fetch plan from GitHub: %v", err)
+		setPlanError(ctx, database, planID, "plan_fetch_failed")
+		return
+	}
+	planContent, err := io.ReadAll(httpResp2.Body)
+	httpResp2.Body.Close()
+	if err != nil || httpResp2.StatusCode != 200 {
+		log.Printf("[PlanReview] Failed to read plan content (status %d): %v", httpResp2.StatusCode, err)
 		setPlanError(ctx, database, planID, "plan_read_failed")
 		return
 	}

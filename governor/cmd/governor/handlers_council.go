@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
-	"os"
+	"net/http"
 	"sync"
 	"time"
 
@@ -94,9 +95,14 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 	var prdContent string
 	if includePRD {
 		if prdPath := getString(plan, "prd_path"); prdPath != "" {
-			fullPath := fmt.Sprintf("%s/%s", h.cfg.GetRepoPath(), prdPath)
-			if content, err := os.ReadFile(fullPath); err == nil {
-				prdContent = string(content)
+			rawURL := fmt.Sprintf("https://raw.githubusercontent.com/VibesTribe/VibePilot/main/%s", prdPath)
+			if req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil); err == nil {
+				if resp, err := http.DefaultClient.Do(req); err == nil {
+					if body, err := io.ReadAll(resp.Body); err == nil && resp.StatusCode == 200 {
+						prdContent = string(body)
+					}
+					resp.Body.Close()
+				}
 			}
 		}
 	}
