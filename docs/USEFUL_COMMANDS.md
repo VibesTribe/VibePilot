@@ -91,7 +91,55 @@ git checkout go-governor
 
 ---
 
-## Database (Supabase)
+## Vault Management (Encrypted Secrets)
+
+```bash
+# Set env vars first
+export DATABASE_URL="postgres://vibes@/vibepilot?host=/var/run/postgresql"
+export VAULT_KEY="P9jFR25vbjcNxG2S3lx4ZCyspfGLd7wZYliZWLjqKLc="
+cd ~/vibepilot/governor
+
+# List all keys
+./governor vault list
+
+# Add or update a key (copy paste done)
+./governor vault set GROQ_API_KEY "gsk_..."
+
+# Decrypt and view a key
+./governor vault get GITHUB_TOKEN
+
+# Delete a key
+./governor vault delete OLD_KEY
+
+# Rotate master encryption key (re-encrypts all secrets)
+./governor vault rotate-key NEW_BASE64_KEY
+# IMPORTANT: Update VAULT_KEY in systemd override after rotation
+```
+
+---
+
+## Local PostgreSQL (replaces Supabase)
+
+```bash
+# Connect (peer auth, no password)
+psql -d vibepilot
+
+# Quick query - see current tasks
+psql -d vibepilot -c "SELECT id, status, title FROM tasks ORDER BY updated_at DESC LIMIT 5;"
+
+# Check model count
+psql -d vibepilot -c "SELECT count(*) FROM models WHERE status='active';"
+
+# Check vault contents (encrypted)
+psql -d vibepilot -c "SELECT key_name FROM secrets_vault ORDER BY key_name;"
+
+# Backup
+~/vibepilot/scripts/pg-dump-and-push.sh
+```
+
+---
+
+## Database (Supabase) — LEGACY
 
 ```bash
 # Quick query - see current plans
