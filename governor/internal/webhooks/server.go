@@ -421,6 +421,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"models", nil},
 		{"platforms", nil},
 		{"orchestrator_events", map[string]any{"order": "created_at.desc", "limit": 500}},
+		{"plans", map[string]any{"order": "created_at.desc", "limit": 100}},
+		{"council_reviews", map[string]any{"order": "created_at.desc", "limit": 200}},
+		{"test_results", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"exchange_rates", nil},
 	}
 
