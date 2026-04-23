@@ -67,8 +67,8 @@ func handlePlanCreated(
 		log.Printf("[EventPlanCreated] Failed to claim plan %s: %v", truncateID(planID), err)
 		return
 	}
-	var claimSuccess bool
-	if err := json.Unmarshal(claimed, &claimSuccess); err != nil || !claimSuccess {
+	// RPC returns bool via parseBool (handles both scalar and rowsToJSON formats)
+	if err != nil || !parseBool(claimed) {
 		log.Printf("[EventPlanCreated] Plan %s already being processed", truncateID(planID))
 		return
 	}
@@ -254,7 +254,10 @@ func runPlanReview(
 			log.Printf("[PlanReview] Failed to claim plan %s: %v", truncateID(planID), err)
 			return
 		}
-		if err := json.Unmarshal(claimed, &claimSuccess); err == nil && claimSuccess {
+		if parseBool(claimed) {
+			claimSuccess = true
+		}
+		if claimSuccess {
 			break
 		}
 		if claimAttempt < 2 {
