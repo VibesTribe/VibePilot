@@ -540,5 +540,11 @@
         "cost columns"
       ]
     }
+  },
+  "system": {
+    "git": {
+      "repo_path": "/home/vibes/vibepilot",
+      "repo_env": "REPO_PATH"
+    }
   }
 }
