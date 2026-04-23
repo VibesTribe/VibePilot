@@ -1,7 +1,7 @@
 {
   "prompts_dir": "/home/vibes/VibePilot/prompts",
   "database": {
-    "type": "supabase",
+    "type": "postgres",
     "url_env": "SUPABASE_URL",
     "key_env": "SUPABASE_SERVICE_KEY",
     "postgres_url_env": "DATABASE_URL"
