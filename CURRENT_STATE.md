@@ -57,12 +57,18 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 
 ### Config-Driven Timeouts
 - All timeouts read from system.json with sensible fallbacks:
-  - `system.execution.default_timeout_seconds` → GetRunnerTimeoutSecs() (fallback 300)
+  - `system.execution.default_timeout_seconds` → GetRunnerTimeoutSecs() (fallback 300) — global default for CLI runners
   - `system.db.http_timeout_seconds` → GetDBHTTPTimeoutSecs() (fallback 30)
   - `system.db.error_truncate_length` → GetDBErrorTruncateLen() (fallback 200)
   - `system.http.client_timeout_seconds` → GetHTTPClientTimeoutSecs() (fallback 30)
   - `system.http.response_timeout_seconds` → GetHTTPIdleTimeoutSecs() (fallback 30)
-  - `system.courier.timeout_seconds` → GetCourierTimeoutSecs() (fallback 30)
+  - `system.courier.timeout_seconds` → GetCourierTimeoutSecs() (fallback 30) — courier agents (browser-use, slower)
+- Per-connector `timeout_seconds` in connectors.json overrides the global default
+- Tasks are tiny, one-shot, designed for small-context weaker models
+- Fast: task execution, supervisor review, testing, simple research
+- Moderate: PRD processing, plan generation, complex research suggestions
+- Slowest: courier agents (real browser navigation on free web tiers)
+- All adjustable via config, no code changes needed
 
 ## MODELS: CONFIG ↔ DB SYNC VIA RESEARCH PIPELINE
 
