@@ -34,3 +34,4 @@ The file must contain valid JSON with this structure:
 ## Success Criteria
 - `output/hello.json` exists and is valid JSON
 - No other files in the repository are modified
+
