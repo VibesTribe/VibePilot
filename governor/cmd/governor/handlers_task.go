@@ -207,10 +207,11 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 			log.Printf("[TaskAvailable] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
 		}
 		routingResult, routeErr = h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
-			Role:          "task_runner",
-			TaskType:      taskCategory,
-			RoutingFlag:   "", // empty = router decides (web courier if available, internal fallback)
-			ExcludeModels: failedModels,
+			Role:            "task_runner",
+			TaskType:        taskCategory,
+			RoutingFlag:     "", // empty = router decides (web courier if available, internal fallback)
+			ExcludeModels:   failedModels,
+			EstimatedTokens: runtime.EstimateTokens(taskPacket.Prompt, "task_runner"),
 		})
 		if routeErr != nil || routingResult == nil {
 			log.Printf("[TaskAvailable] No routing for task %s (attempt %d)", truncateID(taskID), attempt+1)
@@ -720,10 +721,11 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			log.Printf("[TaskReview] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
 		}
 		routingResult, routeErr = h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
-			Role:          "supervisor",
-			TaskType:      taskType,
-			RoutingFlag:   "internal",
-			ExcludeModels: failedModels,
+			Role:            "supervisor",
+			TaskType:        taskType,
+			RoutingFlag:     "internal",
+			ExcludeModels:   failedModels,
+			EstimatedTokens: runtime.EstimateTokens(getString(task, "instructions"), "supervisor"),
 		})
 		if routeErr != nil || routingResult == nil {
 			log.Printf("[TaskReview] No supervisor for task %s (attempt %d)", truncateID(taskID), attempt+1)
