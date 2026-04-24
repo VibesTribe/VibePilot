@@ -1,11 +1,13 @@
 # VibePilot Current State
-> Last updated: April 23, 2026
+> Last updated: April 24, 2026 — 01:22 UTC
 
 ## System Status
-- **Governor**: Running (PID 121244, systemd service, `Restart=always` active)
+- **Governor**: RUNNING (PID 169717, systemd service, `Restart=always` active)
 - **Database**: Local PostgreSQL 16 on x220 (`localhost:5432`, db=vibepilot, user=vibes)
-- **GitHub**: `VibesTribe/VibePilot` (public, branch `fix/pg-backend-sql-ordering`)
-- **Dashboard**: React frontend on Vercel (`vibeflow-dashboard.vercel.app`). Reads from governor `/api/dashboard` (local PG). SSE live updates wired but not yet tested end-to-end.
+  - system.json correctly set to `"type": "postgres"`
+  - 141 RPC functions
+- **GitHub**: `VibesTribe/VibePilot` (public, branch `main`, last: 2fffb4ad)
+- **Dashboard**: React frontend on Vercel (`vibeflow-dashboard.vercel.app`). Reads from governor `/api/dashboard` (local PG). SSE live updates wired.
 - **Webhooks**: `webhooks.vibestribe.rocks` (Cloudflare Tunnel) → local governor port 8080
 - **Realtime**: Supabase Realtime REMOVED. Replaced by `pg_notify` + SSE bridge.
 - **Backup**: `~/vibepilot/scripts/pg-dump-and-push.sh` exists, cron at 3am → VibesTribe/knowledgebase (private repo)
@@ -38,7 +40,7 @@ Supabase replaced as primary database with local PostgreSQL. Motivations:
 
 ## SSE Bridge: pg_notify → Dashboard (April 23, 2026)
 
-Replaces 5-second polling with event-driven live updates. NOT YET TESTED END-TO-END.
+Replaces 5-second polling with event-driven live updates.
 
 ### Data Flow
 ```
@@ -142,13 +144,13 @@ Logs panel now shows full task lifecycle by stitching data from 6 sources into a
 - RPCs: `update_model_learning`, `record_model_success/failure`, `get_model_score_for_task`
 - Handler: `recordModelLearning()` in `handlers_task.go`
 
-## Governor Boot Sequence (current, after SSE changes)
+## Governor Boot Sequence (current, April 24, 2026)
 ```
 Connected to Postgres database
-Loaded 58 models from database (restored usage state)
+Loaded 57 models from database (restored usage state)
 Loaded 23 prompts
 All connectors registered (hermes, gemini x4, groq, openrouter, nvidia)
-MCP connected (51 tools from jcodemunch)
+MCP connected (jcodemunch)
 DAG pipeline loaded: code-pipeline
 Courier Runner initialized
 Running startup recovery...
@@ -156,8 +158,9 @@ Running startup recovery...
   - No tasks with checkpoints
 PG Notify listener started on vp_changes
 SSE broker ready
+WebSocket listening at 8080
 Webhook server on port 8080
-Governor started
+Governor started (max/module: 2, max total: 4, opencode limit: 2)
 ```
 
 ## Model Fleet (58 models)
@@ -301,19 +304,17 @@ Governor → router selects routing_flag="web"
 | Courier result endpoint | Done | a0b4336f | POST /api/courier/result, no more Supabase writes |
 | Pipeline timeline (dashboard logs) | Done | ec907c43, c5a1923f | Unified 6-source timeline with source filters |
 
-## Recent Commits (April 22-23, 2026)
+## Recent Commits (April 22-24, 2026)
 
 | Commit | Description |
 |--------|-------------|
+| 2fffb4ad | feat: eliminate hardcoded token estimates, make all timeouts config-driven |
+| 3222dac0 | fix: routing cascade puts Gemini first (4 free keys), add plan_id guard, fix race condition |
 | ec907c43 | feat: add plans, council_reviews, test_results to dashboard API |
 | a0b4336f | fix: courier writes to governor API instead of Supabase |
 | c5a1923f | feat: unified pipeline timeline in logs panel (vibeflow) |
 | 0c0fae03 | feat: SSE bridge replaces Supabase Realtime for dashboard live updates |
 | e3767ba5 | fix: PG backend SQL ordering, UUID conversion, timestamp parsing, routing ref |
-| ffd29bfa | feat: add native Postgres (pgx) implementation of Database interface |
-| ce433e63 | refactor: swap all handlers from concrete *db.DB to db.Database interface |
-| 4593ff4b | feat: define Database interface (approach 2) |
-| 7a1e02d6 | fix: kill all Supabase polling |
 
 ## Budget
 - **OpenRouter**: $0 credit account. Max spend limit configured. No payment added.
@@ -332,10 +333,10 @@ Governor → router selects routing_flag="web"
 ## Known Issues (non-blocking)
 
 1. **systemd service active** -- governor runs via systemd user service with Restart=always. Survives crashes.
-2. **Branch merged** -- `fix/pg-backend-sql-ordering` merged to main as `f2a376d5`. Branch can be deleted.
-3. **SSE not E2E tested** -- code compiles, wiring verified, but not tested with running governor + dashboard
-4. **jcodemunch CodeMap refresh** -- transport error on startup (pre-existing, graceful fallback to existing map.md)
-5. ~~**Courier pipeline writes to Supabase**~~ -- FIXED. Now writes to governor API.
+2. **SSE wired but not E2E tested with live dashboard** -- code compiles, wiring verified, but not tested with running governor + live browser
+3. **jcodemunch CodeMap refresh** -- transport error on startup (pre-existing, graceful fallback to existing map.md)
+4. **system.json database type was wrong** -- was `"supabase"` despite using local PG. Fixed to `"postgres"` April 24.
+5. **Go code has hardcoded `"supabase"` case in main.go switch** -- should be purely config-driven. Works because config says `"postgres"` but the supabase path shouldn't be a special case.
 
 ## Known Gaps (pre-existing, not yet addressed)
 - Maintenance agent not wired (git write access disconnected)
@@ -365,7 +366,7 @@ Governor → router selects routing_flag="web"
 ## Database Stats
 | Table | Rows |
 |-------|------|
-| models | 58 |
+| models | 57 |
 | platforms | 26 |
 | tasks | 2 |
 | task_runs | 0 |
@@ -373,4 +374,25 @@ Governor → router selects routing_flag="web"
 | learned_heuristics | 20 |
 | model_scores | 1 |
 | lessons_learned | 0 |
+| RPC functions | 141 |
 | Total tables | 63 |
+
+## Config-Driven Routing (April 24, 2026)
+
+All hardcoded magic numbers eliminated. Token estimation, timeouts, and routing are config-driven.
+
+### Token Estimation
+- `EstimateTokens(content, role)` in router.go computes from actual content
+- Code-aware: structural characters ({, }, etc.) detected for denser token ratio
+- Response budget by role: planner 2x, task_runner 1x, supervisor 0.5x, courier 0.25x
+- Result compared against each model's `context_limit` in `CanMakeRequestVia()`
+- Models that can't fit the task are rejected with "exceeds_context_limit"
+
+### Config-Driven Timeouts
+All timeouts read from system.json (fallbacks only when config is nil):
+- `system.execution.default_timeout_seconds` (fallback 300)
+- `system.db.http_timeout_seconds` (fallback 30)
+- `system.db.error_truncate_length` (fallback 200)
+- `system.http.client_timeout_seconds` (fallback 30)
+- `system.http.response_timeout_seconds` (fallback 30)
+- `system.courier.timeout_seconds` (fallback 30)
