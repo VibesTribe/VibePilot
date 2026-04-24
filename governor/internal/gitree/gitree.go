@@ -458,6 +458,13 @@ func (g *Gitree) CommitAndPush(ctx context.Context, filePath, message string) er
 	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
 
+	// Pull latest before committing to avoid push rejection when remote is ahead
+	// (e.g. dev copy pushed changes, or another pipeline run committed files).
+	if err := g.Pull(ctx); err != nil {
+		log.Printf("[Gitree] CommitAndPush: pull failed (continuing anyway): %v", err)
+		// Non-fatal: we might still be able to push if we're up to date
+	}
+
 	if err := g.gitCommand(ctx, "add", filePath).Run(); err != nil {
 		return fmt.Errorf("git add: %w", err)
 	}
