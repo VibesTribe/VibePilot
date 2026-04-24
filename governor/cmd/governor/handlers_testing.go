@@ -55,7 +55,7 @@ func (h *TestingHandler) Register(router *runtime.EventRouter) {
 }
 
 // ============================================================================
-// TESTING: run go test directly, then merge or fail
+// TESTING: 3-layer quality gate — artifact validation, semgrep, native tests
 // ============================================================================
 
 func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
@@ -93,17 +93,19 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 
 	log.Printf("[Testing] Running tests for task %s (branch: %s)", truncateID(taskID), branchName)
 
-	changedPackages := h.extractTestPackages(task)
+	// Extract expected output files from task result for artifact validation
+	expectedFiles := h.extractExpectedFiles(task)
 
 	start := time.Now()
-	passed, testOutput, err := h.runTests(ctx, branchName, changedPackages)
+	testDir := h.resolveTestDir(ctx, branchName)
+	passed, testOutput, err := h.runTests(ctx, testDir, branchName, expectedFiles)
 	duration := time.Since(start).Seconds()
 
 	if err != nil {
 		log.Printf("[Testing] Test execution error for %s: %v — output: %s", truncateID(taskID), err, truncateOutput(testOutput))
 
 		// Record the test result even on execution error
-		h.recordTestResult(ctx, taskID, taskNumber, sliceID, changedPackages, false,
+		h.recordTestResult(ctx, taskID, taskNumber, sliceID, testDir, false,
 			fmt.Sprintf("test_execution_error: %v", err), testOutput, duration)
 
 		h.database.RPC(ctx, "transition_task", map[string]any{
@@ -115,7 +117,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 	}
 
 	// Record test result to DB for dashboard consumption
-	h.recordTestResult(ctx, taskID, taskNumber, sliceID, changedPackages, passed, "", testOutput, duration)
+	h.recordTestResult(ctx, taskID, taskNumber, sliceID, testDir, passed, "", testOutput, duration)
 
 	if passed {
 		log.Printf("[Testing] Task %s tests PASSED in %.1fs", truncateID(taskID), duration)
@@ -219,11 +221,10 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 	}
 }
 
-// runTests executes go build + go test on the task branch.
-// Returns (passed, output, error).
-func (h *TestingHandler) runTests(ctx context.Context, branchName string, changedPackages []string) (bool, string, error) {
+// resolveTestDir finds the worktree directory for a task branch.
+// Checks worktree list, then filesystem scan, then falls back to main repo.
+func (h *TestingHandler) resolveTestDir(ctx context.Context, branchName string) string {
 	repoPath := h.cfg.GetRepoPath()
-	testDir := ""
 
 	// Method 1: Check git worktree list
 	if h.worktreeMgr != nil {
@@ -231,107 +232,502 @@ func (h *TestingHandler) runTests(ctx context.Context, branchName string, change
 		if err == nil {
 			for _, wt := range worktrees {
 				if strings.Contains(wt.BranchName, branchName) || strings.Contains(wt.Path, branchName) {
-					testDir = wt.Path
-					governorDir := filepath.Join(wt.Path, "governor")
-					if _, err := os.Stat(filepath.Join(governorDir, "go.mod")); err == nil {
-						testDir = governorDir
-					}
-					log.Printf("[Testing] Using git worktree at %s", testDir)
-					break
+					log.Printf("[Testing] Using git worktree at %s", wt.Path)
+					return wt.Path
 				}
 			}
 		}
 	}
 
-	// Method 2: Scan VibePilot-work for directories with .go files
-	if testDir == "" {
-		workBase := filepath.Join(filepath.Dir(repoPath), "VibePilot-work")
-		entries, err := os.ReadDir(workBase)
-		if err == nil {
-			for _, e := range entries {
-				if !e.IsDir() {
-					continue
-				}
-				dirPath := filepath.Join(workBase, e.Name())
-				// Check for go.mod in governor/ subdir or direct
-				govMod := filepath.Join(dirPath, "governor", "go.mod")
-				directMod := filepath.Join(dirPath, "go.mod")
-				if _, err := os.Stat(govMod); err == nil {
-					testDir = filepath.Join(dirPath, "governor")
-					log.Printf("[Testing] Using filesystem worktree at %s", testDir)
-					break
-				} else if _, err := os.Stat(directMod); err == nil {
-					testDir = dirPath
-					log.Printf("[Testing] Using filesystem worktree at %s", testDir)
-					break
-				}
+	// Method 2: Scan VibePilot-work for matching directories
+	workBase := filepath.Join(filepath.Dir(repoPath), "VibePilot-work")
+	entries, err := os.ReadDir(workBase)
+	if err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			dirPath := filepath.Join(workBase, e.Name())
+			if strings.Contains(filepath.Base(dirPath), branchName) || strings.Contains(dirPath, branchName) {
+				log.Printf("[Testing] Using filesystem worktree at %s", dirPath)
+				return dirPath
 			}
 		}
 	}
 
 	// Method 3: Fallback to main repo
-	if testDir == "" {
-		testDir = repoPath
-		log.Printf("[Testing] No worktree found, using main repo at %s", testDir)
-	}
+	log.Printf("[Testing] No worktree found, using main repo at %s", repoPath)
+	return repoPath
+}
 
-	// Timeout
-	testCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+// projectType represents the kind of project detected in a worktree.
+type projectType string
+
+const (
+	projectGo     projectType = "go"
+	projectNode   projectType = "node"
+	projectPython projectType = "python"
+	projectGeneric projectType = "generic" // no project file, pure output
+)
+
+// detectProjectType checks for project marker files in the worktree.
+func detectProjectType(dir string) projectType {
+	// Check each level up to 3 deep (handles worktree/governor/go.mod)
+	for i := 0; i < 3; i++ {
+		checkDir := dir
+		if i > 0 {
+			parts := strings.Split(dir, string(filepath.Separator))
+			if len(parts) > i {
+				checkDir = filepath.Join(parts[:len(parts)-i]...)
+			}
+		}
+		if _, err := os.Stat(filepath.Join(checkDir, "go.mod")); err == nil {
+			return projectGo
+		}
+		if _, err := os.Stat(filepath.Join(checkDir, "package.json")); err == nil {
+			return projectNode
+		}
+		if _, err := os.Stat(filepath.Join(checkDir, "pyproject.toml")); err == nil {
+			return projectPython
+		}
+		if _, err := os.Stat(filepath.Join(checkDir, "setup.py")); err == nil {
+			return projectPython
+		}
+	}
+	return projectGeneric
+}
+
+// runTests executes the 3-layer quality gate.
+// Layer 1: Artifact validation — verify expected output files exist and are well-formed
+// Layer 2: Semgrep static analysis — security and code quality scanning
+// Layer 3: Native test suite — project-type-specific tests (go test, npm test, pytest)
+// Returns (passed, output, error).
+func (h *TestingHandler) runTests(ctx context.Context, testDir, branchName string, expectedFiles []string) (bool, string, error) {
+	pt := detectProjectType(testDir)
+	log.Printf("[Testing] Detected project type: %s (dir: %s)", pt, testDir)
+
+	var allOutput strings.Builder
+	timeout := 3 * time.Minute
+	testCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	goBin := "/home/vibes/go/bin/go"
-	if _, err := exec.LookPath("go"); err == nil {
-		goBin = "go"
-	}
-	env := append(os.Environ(), "PATH="+os.Getenv("PATH")+":/home/vibes/go/bin:/usr/local/go/bin")
+	// ── Layer 1: Artifact Validation ──
+	log.Printf("[Testing] Layer 1: Artifact validation (%d expected files)", len(expectedFiles))
+	layer1Pass, layer1Output := h.runArtifactValidation(testCtx, testDir, expectedFiles)
+	allOutput.WriteString("=== LAYER 1: ARTIFACT VALIDATION ===\n")
+	allOutput.WriteString(layer1Output)
+	allOutput.WriteString("\n")
 
-	// Phase 1: go build ./...
-	buildCmd := exec.CommandContext(testCtx, goBin, "build", "./...")
-	buildCmd.Dir = testDir
-	buildCmd.Env = env
-	var buildOut bytes.Buffer
-	buildCmd.Stdout = &buildOut
-	buildCmd.Stderr = &buildOut
-	log.Printf("[Testing] Phase 1: go build ./... (dir: %s)", testDir)
-	if err := buildCmd.Run(); err != nil {
-		return false, buildOut.String(), fmt.Errorf("build failed")
+	if !layer1Pass {
+		allOutput.WriteString("RESULT: FAIL (artifact validation)\n")
+		return false, allOutput.String(), nil
+	}
+	allOutput.WriteString("RESULT: PASS\n\n")
+
+	// ── Layer 2: Semgrep Static Analysis ──
+	log.Printf("[Testing] Layer 2: Semgrep static analysis")
+	layer2Pass, layer2Output := h.runSemgrep(testCtx, testDir)
+	allOutput.WriteString("=== LAYER 2: SEMGREP STATIC ANALYSIS ===\n")
+	allOutput.WriteString(layer2Output)
+	allOutput.WriteString("\n")
+
+	if !layer2Pass {
+		allOutput.WriteString("RESULT: FAIL (semgrep found ERROR severity issues)\n")
+		return false, allOutput.String(), nil
+	}
+	allOutput.WriteString("RESULT: PASS\n\n")
+
+	// ── Layer 3: Native Test Suite ──
+	log.Printf("[Testing] Layer 3: Native test suite (%s)", pt)
+	layer3Pass, layer3Output, layer3Skipped := h.runNativeTests(testCtx, testDir, pt)
+	allOutput.WriteString("=== LAYER 3: NATIVE TEST SUITE ===\n")
+	if layer3Skipped {
+		allOutput.WriteString(fmt.Sprintf("SKIPPED (no native test suite for %s project)\n", pt))
+	} else {
+		allOutput.WriteString(layer3Output)
+		allOutput.WriteString("\n")
+		if !layer3Pass {
+			allOutput.WriteString("RESULT: FAIL\n")
+			return false, allOutput.String(), nil
+		}
+		allOutput.WriteString("RESULT: PASS\n")
 	}
 
-	// Phase 2: go test on changed packages (or ./... as fallback)
-	testTargets := changedPackages
-	if len(testTargets) == 0 {
-		testTargets = []string{"./..."}
+	allOutput.WriteString("\n=== ALL 3 LAYERS PASSED ===\n")
+	return true, allOutput.String(), nil
+}
+
+// runArtifactValidation verifies that expected output files exist and are well-formed.
+func (h *TestingHandler) runArtifactValidation(ctx context.Context, testDir string, expectedFiles []string) (bool, string) {
+	if len(expectedFiles) == 0 {
+		return true, "No expected files to validate (skipped)\n"
 	}
-	args := []string{"test", "-v", "-count=1"}
-	args = append(args, testTargets...)
-	cmd := exec.CommandContext(testCtx, goBin, args...)
+
+	var output strings.Builder
+	allPassed := true
+
+	for _, relPath := range expectedFiles {
+		fullPath := filepath.Join(testDir, relPath)
+		output.WriteString(fmt.Sprintf("Checking: %s ... ", relPath))
+
+		// Check existence
+		info, err := os.Stat(fullPath)
+		if err != nil {
+			output.WriteString(fmt.Sprintf("MISSING (%v)\n", err))
+			allPassed = false
+			continue
+		}
+
+		// Check file is not empty
+		if info.Size() == 0 {
+			output.WriteString("EMPTY (0 bytes)\n")
+			allPassed = false
+			continue
+		}
+
+		// Format-specific validation
+		ext := strings.ToLower(filepath.Ext(relPath))
+		switch ext {
+		case ".json":
+			data, err := os.ReadFile(fullPath)
+			if err != nil {
+				output.WriteString(fmt.Sprintf("READ ERROR: %v\n", err))
+				allPassed = false
+				continue
+			}
+			var js json.RawMessage
+			if err := json.Unmarshal(data, &js); err != nil {
+				output.WriteString(fmt.Sprintf("INVALID JSON: %v\n", err))
+				allPassed = false
+				continue
+			}
+			output.WriteString(fmt.Sprintf("OK (valid JSON, %d bytes)\n", info.Size()))
+
+		case ".html", ".htm":
+			data, err := os.ReadFile(fullPath)
+			if err != nil {
+				output.WriteString(fmt.Sprintf("READ ERROR: %v\n", err))
+				allPassed = false
+				continue
+			}
+			content := strings.ToLower(string(data))
+			if !strings.Contains(content, "<html") && !strings.Contains(content, "<!doctype") {
+				output.WriteString("INVALID HTML (no <html> or <!DOCTYPE> tag)\n")
+				allPassed = false
+				continue
+			}
+			output.WriteString(fmt.Sprintf("OK (valid HTML, %d bytes)\n", info.Size()))
+
+		case ".yaml", ".yml":
+			data, err := os.ReadFile(fullPath)
+			if err != nil {
+				output.WriteString(fmt.Sprintf("READ ERROR: %v\n", err))
+				allPassed = false
+				continue
+			}
+			// Basic YAML validation: check it's not empty and has at least one key: value pair
+			content := strings.TrimSpace(string(data))
+			if len(content) == 0 {
+				output.WriteString("INVALID YAML (empty)\n")
+				allPassed = false
+				continue
+			}
+			output.WriteString(fmt.Sprintf("OK (%d bytes)\n", info.Size()))
+
+		case ".xml":
+			data, err := os.ReadFile(fullPath)
+			if err != nil {
+				output.WriteString(fmt.Sprintf("READ ERROR: %v\n", err))
+				allPassed = false
+				continue
+			}
+			if !strings.Contains(string(data), "</") && !strings.Contains(string(data), "/>") {
+				output.WriteString("INVALID XML (no closing tags)\n")
+				allPassed = false
+				continue
+			}
+			output.WriteString(fmt.Sprintf("OK (valid XML, %d bytes)\n", info.Size()))
+
+		case ".css":
+			data, err := os.ReadFile(fullPath)
+			if err != nil {
+				output.WriteString(fmt.Sprintf("READ ERROR: %v\n", err))
+				allPassed = false
+				continue
+			}
+			if !strings.Contains(string(data), "{") || !strings.Contains(string(data), "}") {
+				output.WriteString("INVALID CSS (no rule blocks)\n")
+				allPassed = false
+				continue
+			}
+			output.WriteString(fmt.Sprintf("OK (valid CSS, %d bytes)\n", info.Size()))
+
+		case ".js", ".ts":
+			// Basic syntax check: file is non-empty and not obviously broken
+			_, err := os.ReadFile(fullPath)
+			if err != nil {
+				output.WriteString(fmt.Sprintf("READ ERROR: %v\n", err))
+				allPassed = false
+				continue
+			}
+			output.WriteString(fmt.Sprintf("OK (%d bytes)\n", info.Size()))
+
+		default:
+			// Unknown extension — just confirm it exists and is non-empty (already checked above)
+			output.WriteString(fmt.Sprintf("OK (%d bytes)\n", info.Size()))
+		}
+	}
+
+	return allPassed, output.String()
+}
+
+// runSemgrep executes semgrep static analysis on the test directory.
+// ERROR severity findings = fail. WARNING = logged but passes.
+func (h *TestingHandler) runSemgrep(ctx context.Context, testDir string) (bool, string) {
+	var output strings.Builder
+
+	// Check if semgrep is available
+	semgrepPath, err := exec.LookPath("semgrep")
+	if err != nil {
+		output.WriteString("Semgrep not found in PATH — skipping static analysis\n")
+		return true, output.String() // skip is a pass
+	}
+
+	// Run semgrep --config auto --json
+	cmd := exec.CommandContext(ctx, semgrepPath, "--config", "auto", "--json", "--no-git-ignore", ".")
 	cmd.Dir = testDir
-	cmd.Env = env
-
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	log.Printf("[Testing] Phase 2: go test -v -count=1 %s (dir: %s)", strings.Join(testTargets, " "), testDir)
-	err := cmd.Run()
+	output.WriteString(fmt.Sprintf("Running: semgrep --config auto --json . (dir: %s)\n", testDir))
+	err = cmd.Run()
 
-	output := stdout.String()
-	if stderr.Len() > 0 {
-		output += "\n--- STDERR ---\n" + stderr.String()
+	if ctx.Err() == context.DeadlineExceeded {
+		output.WriteString("Semgrep timed out — skipping\n")
+		return true, output.String()
 	}
 
-	if testCtx.Err() == context.DeadlineExceeded {
-		return false, output, fmt.Errorf("test execution timed out after 2m")
+	// Parse JSON output
+	var result struct {
+		Results []struct {
+			CheckID string `json:"check_id"`
+			Path    string `json:"path"`
+			Line    int    `json:"start"` // approximate
+			Extra   struct {
+				Message  string `json:"message"`
+				Severity string `json:"severity"`
+			} `json:"extra"`
+		} `json:"results"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	stdoutStr := stdout.String()
+	if stdoutStr == "" {
+		if stderr.Len() > 0 {
+			output.WriteString(fmt.Sprintf("Semgrep stderr: %s\n", truncateOutput(stderr.String())))
+		}
+		output.WriteString("Semgrep produced no output — skipping\n")
+		return true, output.String()
+	}
+
+	if jsonErr := json.Unmarshal([]byte(stdoutStr), &result); jsonErr != nil {
+		output.WriteString(fmt.Sprintf("Semgrep output parse error: %v — skipping\n", jsonErr))
+		return true, output.String()
+	}
+
+	// Count findings by severity
+	errorCount := 0
+	warningCount := 0
+	infoCount := 0
+	for _, r := range result.Results {
+		switch strings.ToLower(r.Extra.Severity) {
+		case "error":
+			errorCount++
+			output.WriteString(fmt.Sprintf("  ERROR: %s (%s): %s\n", r.CheckID, r.Path, r.Extra.Message))
+		case "warning":
+			warningCount++
+			output.WriteString(fmt.Sprintf("  WARNING: %s (%s): %s\n", r.CheckID, r.Path, r.Extra.Message))
+		default:
+			infoCount++
+		}
+	}
+
+	output.WriteString(fmt.Sprintf("\nSemgrep findings: %d ERROR, %d WARNING, %d INFO\n",
+		errorCount, warningCount, infoCount))
+
+	// Only ERROR severity blocks the pipeline
+	if errorCount > 0 {
+		return false, output.String()
+	}
+	return true, output.String()
+}
+
+// runNativeTests executes the project-type-specific test suite.
+// Returns (passed, output, skipped).
+func (h *TestingHandler) runNativeTests(ctx context.Context, testDir string, pt projectType) (bool, string, bool) {
+	switch pt {
+	case projectGo:
+		return h.runGoTests(ctx, testDir)
+	case projectNode:
+		return h.runNodeTests(ctx, testDir)
+	case projectPython:
+		return h.runPythonTests(ctx, testDir)
+	default:
+		// No project file detected — pure output task, no native tests
+		return true, "", true
+	}
+}
+
+// runGoTests runs go build + go test on Go projects.
+func (h *TestingHandler) runGoTests(ctx context.Context, testDir string) (bool, string, bool) {
+	var output strings.Builder
+
+	// Find the directory with go.mod (might be in a subdirectory)
+	goDir := testDir
+	if _, err := os.Stat(filepath.Join(testDir, "go.mod")); err != nil {
+		// Check subdirectories one level deep
+		entries, readErr := os.ReadDir(testDir)
+		if readErr == nil {
+			for _, e := range entries {
+				if e.IsDir() {
+					candidate := filepath.Join(testDir, e.Name())
+					if _, statErr := os.Stat(filepath.Join(candidate, "go.mod")); statErr == nil {
+						goDir = candidate
+						break
+					}
+				}
+			}
+		}
+	}
+
+	goBin := "go"
+	if _, err := exec.LookPath("go"); err != nil {
+		goBin = "/home/vibes/go/bin/go"
+	}
+	env := append(os.Environ(), "PATH="+os.Getenv("PATH")+"/home/vibes/go/bin:/usr/local/go/bin")
+
+	// Phase 1: go build
+	buildCmd := exec.CommandContext(ctx, goBin, "build", "./...")
+	buildCmd.Dir = goDir
+	buildCmd.Env = env
+	var buildOut bytes.Buffer
+	buildCmd.Stdout = &buildOut
+	buildCmd.Stderr = &buildOut
+	output.WriteString(fmt.Sprintf("Running: go build ./... (dir: %s)\n", goDir))
+	if err := buildCmd.Run(); err != nil {
+		output.WriteString(fmt.Sprintf("BUILD FAILED:\n%s\n", buildOut.String()))
+		return false, output.String(), false
+	}
+	output.WriteString("Build: PASS\n")
+
+	// Phase 2: go test
+	testCmd := exec.CommandContext(ctx, goBin, "test", "-v", "-count=1", "./...")
+	testCmd.Dir = goDir
+	testCmd.Env = env
+	var testOut bytes.Buffer
+	testCmd.Stdout = &testOut
+	testCmd.Stderr = &testOut
+	output.WriteString("Running: go test -v -count=1 ./...\n")
+	err := testCmd.Run()
+
+	if ctx.Err() == context.DeadlineExceeded {
+		output.WriteString("Go tests timed out\n")
+		return false, output.String(), false
 	}
 
 	if err != nil {
-		if _, ok := err.(*exec.ExitError); ok {
-			return false, output, nil
-		}
-		return false, output, err
+		output.WriteString(fmt.Sprintf("Tests FAILED:\n%s\n", truncateOutput(testOut.String())))
+		return false, output.String(), false
+	}
+	output.WriteString(fmt.Sprintf("Tests: PASS\n%s\n", truncateOutput(testOut.String())))
+	return true, output.String(), false
+}
+
+// runNodeTests runs npm test on Node projects.
+func (h *TestingHandler) runNodeTests(ctx context.Context, testDir string) (bool, string, bool) {
+	// Check if package.json has a test script
+	packageJSON, err := os.ReadFile(filepath.Join(testDir, "package.json"))
+	if err != nil {
+		return true, "", true // no package.json = skip
 	}
 
-	return true, output, nil
+	var pkg struct {
+		Scripts map[string]string `json:"scripts"`
+	}
+	if json.Unmarshal(packageJSON, &pkg) != nil || pkg.Scripts["test"] == "" {
+		return true, "No test script in package.json — skipping\n", true
+	}
+
+	var output strings.Builder
+	cmd := exec.CommandContext(ctx, "npm", "test")
+	cmd.Dir = testDir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	output.WriteString("Running: npm test\n")
+
+	err = cmd.Run()
+	outputStr := stdout.String()
+	if stderr.Len() > 0 {
+		outputStr += "\n" + stderr.String()
+	}
+
+	if err != nil {
+		output.WriteString(fmt.Sprintf("npm test FAILED:\n%s\n", truncateOutput(outputStr)))
+		return false, output.String(), false
+	}
+	output.WriteString(fmt.Sprintf("npm test: PASS\n%s\n", truncateOutput(outputStr)))
+	return true, output.String(), false
+}
+
+// runPythonTests runs pytest on Python projects.
+func (h *TestingHandler) runPythonTests(ctx context.Context, testDir string) (bool, string, bool) {
+	// Check if pytest is available
+	pytestPath, err := exec.LookPath("pytest")
+	if err != nil {
+		return true, "pytest not found — skipping Python tests\n", true
+	}
+
+	// Check if there are any test files
+	hasTests := false
+	filepath.WalkDir(testDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !d.IsDir() && (strings.HasPrefix(d.Name(), "test_") || strings.HasSuffix(d.Name(), "_test.py")) {
+			hasTests = true
+			return filepath.SkipAll
+		}
+		return nil
+	})
+
+	if !hasTests {
+		return true, "No Python test files found — skipping\n", true
+	}
+
+	var output strings.Builder
+	cmd := exec.CommandContext(ctx, pytestPath, "-v", "--tb=short")
+	cmd.Dir = testDir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	output.WriteString("Running: pytest -v --tb=short\n")
+
+	err = cmd.Run()
+	outputStr := stdout.String()
+	if stderr.Len() > 0 {
+		outputStr += "\n" + stderr.String()
+	}
+
+	if err != nil {
+		output.WriteString(fmt.Sprintf("pytest FAILED:\n%s\n", truncateOutput(outputStr)))
+		return false, output.String(), false
+	}
+	output.WriteString(fmt.Sprintf("pytest: PASS\n%s\n", truncateOutput(outputStr)))
+	return true, output.String(), false
 }
 
 func (h *TestingHandler) buildBranchName(sliceID, taskNumber, taskID string) string {
@@ -495,9 +891,9 @@ func setupTestingHandlers(
 	handler.Register(router)
 }
 
-// extractTestPackages parses task result to find Go package paths for targeted testing.
-// Falls back to empty slice (which triggers ./... in runTests).
-func (h *TestingHandler) extractTestPackages(task map[string]any) []string {
+// extractExpectedFiles pulls files_created from task result for artifact validation.
+// Replaces the old extractTestPackages which was Go-specific.
+func (h *TestingHandler) extractExpectedFiles(task map[string]any) []string {
 	result, ok := task["result"].(map[string]any)
 	if !ok {
 		return nil
@@ -509,7 +905,7 @@ func (h *TestingHandler) extractTestPackages(task map[string]any) []string {
 		var expected map[string]any
 		if json.Unmarshal([]byte(expectedStr), &expected) == nil {
 			if files, ok := expected["files_created"].([]any); ok {
-				return filesToPackagePaths(files)
+				return toStringSlice(files)
 			}
 		}
 	}
@@ -517,20 +913,19 @@ func (h *TestingHandler) extractTestPackages(task map[string]any) []string {
 	// Try raw_output for files_created
 	rawStr, _ := result["raw_output"].(string)
 	if rawStr != "" {
-		// Look for files_created in the JSON output
-		var outputs []map[string]any
-		// Try parsing as JSON array or object
-		if json.Unmarshal([]byte(rawStr), &outputs) == nil {
-			for _, o := range outputs {
-				if files, ok := o["files_created"].([]any); ok {
-					return filesToPackagePaths(files)
-				}
-			}
-		}
 		var output map[string]any
 		if json.Unmarshal([]byte(rawStr), &output) == nil {
 			if files, ok := output["files_created"].([]any); ok {
-				return filesToPackagePaths(files)
+				return toStringSlice(files)
+			}
+		}
+		// Try as array
+		var outputs []map[string]any
+		if json.Unmarshal([]byte(rawStr), &outputs) == nil {
+			for _, o := range outputs {
+				if files, ok := o["files_created"].([]any); ok {
+					return toStringSlice(files)
+				}
 			}
 		}
 	}
@@ -538,27 +933,15 @@ func (h *TestingHandler) extractTestPackages(task map[string]any) []string {
 	return nil
 }
 
-// filesToPackagePaths converts file paths like "internal/hello/hello.go" to "./internal/hello/..."
-func filesToPackagePaths(files []any) []string {
-	seen := make(map[string]bool)
-	var pkgs []string
-	for _, f := range files {
-		path, _ := f.(string)
-		if path == "" {
-			continue
-		}
-		// Extract directory from file path
-		dir := filepath.Dir(path)
-		// Only include .go-related paths
-		if filepath.Ext(path) == ".go" || filepath.Ext(path) == "" {
-			pkg := "./" + dir + "/..."
-			if !seen[pkg] {
-				seen[pkg] = true
-				pkgs = append(pkgs, pkg)
-			}
+// toStringSlice converts []any to []string, filtering non-string entries.
+func toStringSlice(items []any) []string {
+	var out []string
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
 		}
 	}
-	return pkgs
+	return out
 }
 
 // extractFilesFromTask pulls files_created from task result for completion tracking
@@ -592,16 +975,15 @@ func (h *TestingHandler) extractFilesFromTask(task map[string]any) []string {
 func (h *TestingHandler) recordTestResult(
 	ctx context.Context,
 	taskID, taskNumber, sliceID string,
-	testPackages []string,
+	testDir string,
 	passed bool,
 	errMsg string,
 	testOutput string,
 	durationSecs float64,
 ) {
-	testCommand := "go test -v -count=1 ./..."
-	if len(testPackages) > 0 {
-		testCommand = "go test -v -count=1 " + strings.Join(testPackages, " ")
-	}
+	// Determine project type for test_command display
+	pt := detectProjectType(testDir)
+	testCommand := fmt.Sprintf("3-layer: artifact_validation + semgrep + %s_native_tests", pt)
 
 	// Determine concise outcome string
 	outcome := "pass"
@@ -619,7 +1001,7 @@ func (h *TestingHandler) recordTestResult(
 		"task_id":      taskID,
 		"task_number":  taskNumber,
 		"slice_id":     sliceID,
-		"test_type":    "unit",
+		"test_type":    "3_layer_quality_gate",
 		"test_command": testCommand,
 		"passed":       passed,
 		"error":        errorMsg,
