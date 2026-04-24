@@ -258,50 +258,45 @@ Fix the Go code that writes to Supabase.
 
 ### Complete Flow: PRD → Completion
 
+**This is the canonical pipeline. Every handler, every agent, every test must align with this.**
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. HUMAN PUSHES PRD TO GITHUB                               │
-│    docs/prd/my-feature.md                                   │
+│ 1. PRD PUSHED TO GITHUB                                     │
+│    docs/prd/[feature-name].md                               │
+│    GitHub webhook → governor detects docs/prd/ path         │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. GOVERNOR DETECTS PUSH (Supabase Live)                    │
-│    - Monitors Supabase for new PRD records                  │
-│    - Triggers Planner agent                                 │
+│ 2. PLANNER CREATES PLAN + TASKS                             │
+│    - Reads PRD from GitHub                                  │
+│    - Creates plan record (status: draft)                    │
+│    - Breaks into atomic tasks with prompt packets           │
+│    - Sets dependencies between tasks                        │
+│    - Writes plan to docs/plans/[name]-plan.md               │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. PLANNER CREATES PLAN + TASKS                             │
-│    - Analyzes PRD                                           │
-│    - Creates plan record in Supabase                        │
-│    - Breaks into atomic tasks                               │
-│    - Writes prompt packets                                   │
-│    - Sets dependencies                                      │
+│ 3. SUPERVISOR REVIEWS PLAN                                  │
+│    - Validates: confidence scores, dependencies, prompt     │
+│      packets, internal markers, alignment with PRD          │
+│    - Approve → orchestrator                                 │
+│    - Reject → planner revises                               │
+│                                                              │
+│    For complex plans: Council also reviews                   │
+│    - Council checks architecture and design decisions        │
+│    - Council ONLY reviews PLANS, never outputs               │
+│    - Supervisor triggers council when needed                 │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 4. SUPERVISOR REVIEWS PLAN                                  │
-│    - Validates task breakdown                               │
-│    - Checks dependencies                                    │
-│    - Approves or requests changes                           │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 5. TASKS BECOME AVAILABLE                                   │
-│    - Tasks with met dependencies → status: available        │
-│    - Governor emits EventTaskAvailable                      │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 6. ROUTER SELECTS MODEL AND ROUTING PATH                    │
-│    - Checks task type, category, requirements               │
-│    - Selects from active models/connectors                   │
-│    - Writes to tasks.assigned_to                             │
+│ 4. ORCHESTRATOR ASSIGNS TASKS                               │
+│    - Selects best active model per task                      │
+│    - Assigns no-dependency tasks first                       │
+│    - Dependency tasks locked until deps complete             │
 │    - Sets routing_flag: "internal", "web", or "mcp"         │
 │    - "web" = courier agent (external LLM via free API)       │
 │    - "internal" = local worktree execution                   │
@@ -311,60 +306,135 @@ Fix the Go code that writes to Supabase.
               │ routing_flag?                  │
               ▼                               ▼
 ┌──────────────────────────┐  ┌─────────────────────────────────────────────────┐
-│ 7a. INTERNAL EXECUTION   │  │ 7b. COURIER AGENT (routing_flag = "web")        │
+│ 5a. INTERNAL EXECUTION   │  │ 5b. COURIER AGENT (routing_flag = "web")        │
 │ (isolated worktree)      │  │                                                 │
-│ - git worktree           │  │ Dispatches to GitHub Actions for browser-use:   │
+│ - git worktree per task  │  │ Dispatches to GitHub Actions for browser-use:   │
 │ - prompt packet sent     │  │ - Zero local weight (runs in cloud)             │
-│ - model generates code   │  │ - Zero polling (Supabase Realtime results)      │
+│ - model generates code   │  │ - Zero polling (realtime results)               │
 │ - commit to task branch  │  │                                                 │
-│ - task_runs record       │  │ 1. executeCourierTask() builds packet           │
-│                          │  │ 2. Vault decrypts key via deriveLLMKeyRef       │
-│                          │  │ 3. CourierRunner.dispatch() → GitHub Actions    │
-│                          │  │ 4. courier_run.py: browser-use + playwright     │
-│                          │  │ 5. Result → task_runs via Supabase REST         │
-│                          │  │ 6. Realtime fires EventCourierResult            │
-│                          │  │ 7. NotifyResult() → waiting goroutine           │
-│                          │  │ 8. Task → "review"                              │
+│ - task_runs record       │  │ CourierRunner.dispatch() → GitHub Actions       │
+│                          │  │ courier_run.py: browser-use + playwright        │
+│                          │  │ Result → task_runs → realtime → review          │
 └──────────────────────────┘  └─────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 8. SUPERVISOR REVIEWS OUTPUT                                │
-│    - Supervisor reviews ALL outputs                         │
-│    - Check against task prompt + expected output            │
+│ 6. SUPERVISOR REVIEWS OUTPUT                                │
+│    - Checks output against task prompt + expected output    │
 │    - Approve → testing                                      │
-│    - Reject → back to task runner                           │
-│    (Council reviews PLANS, not outputs. Supervisor owns all │
-│     output review. Council is only for plan/architecture.)  │
+│    - Reject → back to task runner with feedback             │
+│    - Supervisor owns ALL output review                      │
+│    - Council NEVER reviews outputs                          │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 9. TESTER VALIDATES                                         │
-│    - Runs tests                                             │
-│    - Runs lint/typecheck                                    │
-│    - Pass → ready for merge                                 │
-│    - Fail → back to task runner                             │
+│ 7. TESTING HANDLER (three layers)                           │
+│                                                              │
+│    Layer 1: Output Artifact Validation                      │
+│    - Verify files in expected_output exist                  │
+│    - Validate format (JSON parses, HTML has structure)      │
+│                                                              │
+│    Layer 2: Semgrep Static Analysis                         │
+│    - semgrep --config auto on worktree                      │
+│    - ERROR severity findings = test failure                 │
+│    - WARNING severity = logged but passes                   │
+│                                                              │
+│    Layer 3: Native Test Suite (if project has one)          │
+│    - go.mod → go build + go test                            │
+│    - package.json with test script → npm test               │
+│    - pyproject.toml → pytest                                │
+│    - No project file → skip (pure output task)              │
+│                                                              │
+│    Pass → merge to module branch                            │
+│    Fail → back to task runner                               │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 10. SYSTEM AUTO-MERGES (with shadow merge safety)           │
-│     - Shadow merge: test for conflicts before real merge    │
-│     - If conflicts: merge_pending, agents resolve           │
-│     - If clean: task branch → Module branch (auto-merge)    │
-│     - Worktree removed, task branch deleted                 │
+│ 8. TASK MERGE TO MODULE BRANCH                              │
+│    - Shadow merge: test for conflicts before real merge     │
+│    - Clean merge: task branch → module branch               │
+│    - Delete task branch, remove worktree                    │
+│    - Unlock dependent tasks                                 │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 9. MODULE INTEGRATION TEST (when all module tasks merged)   │
+│    - Full module tested as integrated unit                  │
+│    - Semgrep on complete module                             │
+│    - Native test suite on module branch                     │
+│    - Pass → merge module to project main                    │
+│    - Fail → identify failing task, back to runner           │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 10. MODULE MERGE TO PROJECT MAIN                            │
+│     - Module branch → project's main branch                │
+│     - Delete module branch                                 │
+│     - Dashboard shows completed module                      │
 │     - No human involvement for code                         │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 11. DASHBOARD SHOWS PROGRESS                                │
-│     - Task status: complete                                 │
-│     - Model assignment: which model did the work            │
-│     - Token counts: how many tokens used                    │
-│     - ROI: cost savings                                     │
+│     https://vibeflow-dashboard.vercel.app/                  │
+│     - Task status, model assignment, token counts, ROI     │
+│     - Real-time via SSE from governor /api/dashboard/stream │
 └─────────────────────────────────────────────────────────────┘
+
+KEY DISTINCTIONS:
+- SUPERVISOR reviews: plan quality (step 3) + output alignment (step 6)
+- COUNCIL reviews: complex plan architecture (step 3 only, supervisor triggers)
+- TESTING HANDLER: code correctness (step 7, never reviews alignment)
+- HUMAN reviews: visual UI/UX only, never code/merge/debug
+```
+
+---
+
+## Multi-Project Architecture
+
+**VibePilot is an orchestrator. It can build ANY project, not just itself.**
+
+### Three Tiers of Usage
+
+| Tier | Example | Task Scope | Target Repo |
+|------|---------|-----------|-------------|
+| Focused change | "Fix the docs button on dashboard" | 1-3 tasks, existing files | vibeflow (or any repo) |
+| Cross-repo project | "Build knowledgebase with graph view" | 10+ tasks, multiple repos | knowledgebase + vibeflow + vibepilot |
+| Full greenfield | "Build Extra Yum recipe app" | Entire project, new repo | brand new repo |
+
+### How It Works
+
+```
+VibePilot (orchestrator repo)         Target Project (any repo)
+┌──────────────────────┐              ┌──────────────────────┐
+│ docs/prd/            │              │ src/                 │
+│ docs/plans/          │              │ tests/               │
+│ governor/            │              │ package.json         │
+│ config/              │              │ ...                  │
+└──────────────────────┘              └──────────────────────┘
+         │                                     │
+         │ PRDs live here                       │ Worktrees clone this
+         │ Plans live here                      │ Code changes go here
+         │ Pipeline runs here                   │ Tests run here
+```
+
+### What's Needed (not yet implemented)
+
+- `projects` table needs: `repo_owner`, `repo_name`, `base_branch`
+- `create_plan` RPC takes `project_id` which determines target repo
+- Handlers read project config instead of hardcoded repo references
+- Worktrees clone the TARGET project repo, not always vibepilot
+- Testing handler detects project type from the TARGET repo
+
+### Current State
+
+Right now all tasks target vibepilot itself (hardcoded VibesTribe/VibePilot in 4 handler locations).
+This is acceptable for initial E2E testing. Multi-project routing is the next architectural milestone.
 
 ---
 
@@ -891,28 +961,32 @@ journalctl --user -u vibepilot-governor --since "5 minutes ago" | tail -50
 ### Create a Test PRD
 ```bash
 cat > ~/VibePilot/docs/prd/test-feature.md << 'EOF'
-# PRD: Test Feature
+# PRD: [Feature Name]
 
-Priority: Low
-Complexity: Simple
-Category: coding
+Priority: Low|Medium|High
+Complexity: Simple|Moderate|Complex
+Category: coding|configuration|documentation
 
 ## Context
-Test description.
+Why this feature exists. What problem it solves.
 
 ## What to Build
-- Item 1
-- Item 2
+- Specific deliverable 1
+- Specific deliverable 2
 
 ## Files
-- file1.go
-- file2.go
+- path/to/file1.ext - purpose of this file
+- path/to/file2.ext - purpose of this file
 
 ## Expected Output
-- Expected result
+- What success looks like (specific, measurable)
+
+## Constraints
+- Do NOT modify [specific files or systems]
+- Must work with [specific technology or framework]
 EOF
 
-cd ~/VibePilot && git add docs/prd/test-feature.md && git commit -m "test: add test PRD" && git push origin main
+cd ~/VibePilot && git add docs/prd/test-feature.md && git commit -m "prd: [feature name]" && git push origin main
 ```
 
 ---
