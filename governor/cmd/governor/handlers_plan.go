@@ -133,10 +133,11 @@ func handlePlanCreated(
 			log.Printf("[EventPlanCreated] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
 		}
 		routingResult, routeErr = connRouter.SelectRouting(ctx, runtime.RoutingRequest{
-			Role:           "planner",
-			TaskType:       "planning",
-			RoutingFlag:    "internal",
-			ExcludeModels:  failedModels,
+			Role:            "planner",
+			TaskType:        "planning",
+			RoutingFlag:     "internal",
+			ExcludeModels:   failedModels,
+			EstimatedTokens: runtime.EstimateTokens(string(prdContent), "planner"),
 		})
 		if routeErr != nil || routingResult == nil {
 			log.Printf("[EventPlanCreated] No routing available for planner (attempt %d)", attempt+1)
@@ -385,10 +386,11 @@ func runPlanReview(
 		}
 		var routeErr error
 		routingResult, routeErr = connRouter.SelectRouting(ctx, runtime.RoutingRequest{
-			Role:           "supervisor",
-			TaskType:       "review",
-			RoutingFlag:    "internal",
-			ExcludeModels:  failedModels,
+			Role:            "supervisor",
+			TaskType:        "review",
+			RoutingFlag:     "internal",
+			ExcludeModels:   failedModels,
+			EstimatedTokens: runtime.EstimateTokens(string(prdContent)+string(planContent), "supervisor"),
 		})
 		if routeErr != nil || routingResult == nil {
 			log.Printf("[PlanReview] No routing available for supervisor (attempt %d)", attempt+1)

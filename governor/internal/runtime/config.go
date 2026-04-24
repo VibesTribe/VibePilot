@@ -13,6 +13,11 @@ type SystemConfig struct {
 	Database    DatabaseConfig         `json:"database"`
 	Vault       VaultConfig            `json:"vault"`
 	Git         GitConfig              `json:"git"`
+	DB          *DBConfig              `json:"db,omitempty"`
+	HTTP        *HTTPConfig            `json:"http,omitempty"`
+	Execution   *ExecutionConfig       `json:"execution,omitempty"`
+	Session     *SessionConfig         `json:"session,omitempty"`
+	Courier     *CourierConfig         `json:"courier,omitempty"`
 	Runtime     RuntimeConfig          `json:"runtime"`
 	Concurrency ConcurrencyConfig      `json:"concurrency"`
 	Security    SecurityConfig         `json:"security"`
@@ -134,6 +139,34 @@ type VaultConfig struct {
 	KeyEnv          string `json:"key_env"`
 	Table           string `json:"table"`
 	CacheTTLSeconds int    `json:"cache_ttl_seconds"`
+}
+
+// DBConfig configures database HTTP timeouts and error truncation.
+type DBConfig struct {
+	HTTPTimeoutSeconds int `json:"http_timeout_seconds"`
+	ErrorTruncateLength int `json:"error_truncate_length"`
+}
+
+// HTTPConfig configures HTTP client timeouts.
+type HTTPConfig struct {
+	ClientTimeoutSeconds   int `json:"client_timeout_seconds"`
+	RequestTimeoutSeconds  int `json:"request_timeout_seconds"`
+	ResponseTimeoutSeconds int `json:"response_timeout_seconds"`
+}
+
+// ExecutionConfig configures default execution timeouts.
+type ExecutionConfig struct {
+	DefaultTimeoutSeconds int `json:"default_timeout_seconds"`
+}
+
+// SessionConfig configures session-level timeouts.
+type SessionConfig struct {
+	DefaultTimeoutSeconds int `json:"default_timeout_seconds"`
+}
+
+// CourierConfig configures courier agent timeouts.
+type CourierConfig struct {
+	TimeoutSeconds int `json:"timeout_seconds"`
 }
 
 type GitConfig struct {
@@ -1155,6 +1188,12 @@ func loadJSON[T any](path string) (*T, error) {
 }
 
 func (c *Config) GetRunnerTimeoutSecs() int {
+	if c.System == nil {
+		return 300
+	}
+	if v := c.System.Execution; v != nil && v.DefaultTimeoutSeconds > 0 {
+		return v.DefaultTimeoutSeconds
+	}
 	return 300
 }
 
@@ -1169,10 +1208,22 @@ func (c *Config) GetSessionTimeoutSecs() int {
 }
 
 func (c *Config) GetDBHTTPTimeoutSecs() int {
+	if c.System == nil || c.System.DB == nil {
+		return 30
+	}
+	if c.System.DB.HTTPTimeoutSeconds > 0 {
+		return c.System.DB.HTTPTimeoutSeconds
+	}
 	return 30
 }
 
 func (c *Config) GetDBErrorTruncateLen() int {
+	if c.System == nil || c.System.DB == nil {
+		return 200
+	}
+	if c.System.DB.ErrorTruncateLength > 0 {
+		return c.System.DB.ErrorTruncateLength
+	}
 	return 200
 }
 
@@ -1198,14 +1249,32 @@ func (c *Config) GetTypecheckTimeoutSecs() int {
 }
 
 func (c *Config) GetHTTPClientTimeoutSecs() int {
+	if c.System == nil || c.System.HTTP == nil {
+		return 30
+	}
+	if c.System.HTTP.ClientTimeoutSeconds > 0 {
+		return c.System.HTTP.ClientTimeoutSeconds
+	}
 	return 30
 }
 
 func (c *Config) GetHTTPIdleTimeoutSecs() int {
+	if c.System == nil || c.System.HTTP == nil {
+		return 30
+	}
+	if c.System.HTTP.ResponseTimeoutSeconds > 0 {
+		return c.System.HTTP.ResponseTimeoutSeconds
+	}
 	return 30
 }
 
 func (c *Config) GetCourierTimeoutSecs() int {
+	if c.System == nil || c.System.Courier == nil {
+		return 30
+	}
+	if c.System.Courier.TimeoutSeconds > 0 {
+		return c.System.Courier.TimeoutSeconds
+	}
 	return 30
 }
 
