@@ -458,11 +458,18 @@ func (g *Gitree) CommitAndPush(ctx context.Context, filePath, message string) er
 	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
 
-	// Pull latest before committing to avoid push rejection when remote is ahead
-	// (e.g. dev copy pushed changes, or another pipeline run committed files).
+	// Stash any dirty working tree changes, pull latest, then pop stash.
+	// This prevents "unstaged changes" errors during rebase.
+	// Stash is best-effort; if nothing to stash, git returns error (which we ignore).
+	g.gitCommand(ctx, "stash", "--include-untracked").Run()
+
 	if err := g.Pull(ctx); err != nil {
 		log.Printf("[Gitree] CommitAndPush: pull failed (continuing anyway): %v", err)
-		// Non-fatal: we might still be able to push if we're up to date
+		// Try to pop stash anyway so we don't lose changes
+		g.gitCommand(ctx, "stash", "pop").Run()
+	} else {
+		// Pop stash after successful pull
+		g.gitCommand(ctx, "stash", "pop").Run()
 	}
 
 	if err := g.gitCommand(ctx, "add", filePath).Run(); err != nil {
