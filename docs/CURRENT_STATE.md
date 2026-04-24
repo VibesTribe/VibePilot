@@ -390,9 +390,17 @@ All hardcoded magic numbers eliminated. Token estimation, timeouts, and routing 
 
 ### Config-Driven Timeouts
 All timeouts read from system.json (fallbacks only when config is nil):
-- `system.execution.default_timeout_seconds` (fallback 300)
+- `system.execution.default_timeout_seconds` (fallback 300) — global default for CLI runners
 - `system.db.http_timeout_seconds` (fallback 30)
 - `system.db.error_truncate_length` (fallback 200)
 - `system.http.client_timeout_seconds` (fallback 30)
 - `system.http.response_timeout_seconds` (fallback 30)
-- `system.courier.timeout_seconds` (fallback 30)
+- `system.courier.timeout_seconds` (fallback 30) — courier agents (browser-use, slower)
+- Per-connector `timeout_seconds` in connectors.json overrides the global default
+
+### Timeout Philosophy
+Tasks are tiny and designed for one-shot completion even on small-context weaker models.
+- Fast: task execution, supervisor review, testing, research model/platform additions
+- Moderate: PRD processing, plan generation, complex research suggestions
+- Slowest: courier agents (real browser navigation + extraction on free web tiers)
+All adjustable via config, no code changes needed.
