@@ -218,6 +218,15 @@ func (t *UsageTracker) CanMakeRequestVia(ctx context.Context, modelID string, co
 	now := time.Now()
 	profile := usage.Profile
 
+	// Context window check: if estimatedTokens exceeds the model's context_limit,
+	// this model cannot handle the task regardless of rate limit availability.
+	if estimatedTokens > 0 && profile.ContextLimit > 0 && estimatedTokens > profile.ContextLimit {
+		return RequestDecision{
+			CanProceed: false,
+			Reason:     "exceeds_context_limit",
+		}
+	}
+
 	if profile.BufferPct == 0 {
 		profile.BufferPct = t.defaults.BufferPct
 	}

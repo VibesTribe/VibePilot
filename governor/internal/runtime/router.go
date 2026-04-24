@@ -14,17 +14,43 @@ import (
 // Uses ~4 chars per token (OpenAI-style). Adds a response budget based on task type:
 //   - planner: 2x input (plans are often larger than the PRD)
 //   - supervisor/review: 0.5x input (reviews are summaries)
-//   - task_runner: 1x input (code changes comparable to instructions)
-//   - everything else: 1x input
-// Falls back to 0 if no content provided (caller should provide content).
+// EstimateTokens computes a token estimate from actual content length.
+// Uses ~4 chars/token for prose, ~3 chars/token for code/structured content.
+// Adds a response budget multiplier by task role:
+//   - planner: 2x input (plans are typically much longer than the PRD)
+//   - supervisor/reviewer: 0.5x input (reviews are concise)
+//   - task_runner: 1x input (implementation ~= spec size)
+//   - courier: 0.25x input (short status updates)
+//
+// The result is compared against each model's context_limit in CanMakeRequestVia,
+// so models that can't fit the task are automatically skipped by the cascade.
 func EstimateTokens(content string, role string) int {
 	if len(content) == 0 {
 		return 0
 	}
-	inputTokens := len(content) / 4
+
+	// Count structural markers to detect code-heavy content.
+	// Code tokens are denser (fewer chars per token on average).
+	structural := 0
+	for i := 0; i < len(content); i++ {
+		switch content[i] {
+		case '{', '}', '[', ']', '(', ')', '=', '<', '>', ';', '|', '&':
+			structural++
+		}
+	}
+	structuralRatio := float64(structural) / float64(len(content))
+
+	// Prose-heavy: ~4 chars/token. Code-heavy: ~3 chars/token.
+	charsPerToken := 4.0 - structuralRatio // ranges from 3.0 to 4.0
+	if charsPerToken < 3.0 {
+		charsPerToken = 3.0
+	}
+
+	inputTokens := int(float64(len(content)) / charsPerToken)
 	if inputTokens == 0 {
 		inputTokens = 1
 	}
+
 	var responseMultiplier float64
 	switch role {
 	case "planner":
@@ -33,9 +59,12 @@ func EstimateTokens(content string, role string) int {
 		responseMultiplier = 0.5
 	case "task_runner":
 		responseMultiplier = 1.0
+	case "courier":
+		responseMultiplier = 0.25
 	default:
 		responseMultiplier = 1.0
 	}
+
 	return int(float64(inputTokens) * (1.0 + responseMultiplier))
 }
 
