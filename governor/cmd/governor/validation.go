@@ -121,6 +121,20 @@ func createTasksFromApprovedPlan(ctx context.Context, database db.Database, plan
 
 	log.Printf("[createTasksFromApprovedPlan] Found %d tasks in plan %s", len(tasks), truncateID(planID))
 
+	// Deduplication guard: if tasks already exist for this plan, skip creation.
+	// This prevents duplicate tasks when pgnotify fires the review handler twice.
+	existingRaw, _ := database.Query(ctx, "tasks", map[string]any{
+		"plan_id": planID,
+		"select":  "id",
+	})
+	if len(existingRaw) > 4 { // Query returns at least "[]" (2 chars)
+		var existing []map[string]any
+		if json.Unmarshal(existingRaw, &existing) == nil && len(existing) > 0 {
+			log.Printf("[createTasksFromApprovedPlan] Skipping: %d tasks already exist for plan %s", len(existing), truncateID(planID))
+			return nil
+		}
+	}
+
 	if validationErr := validateTasks(tasks, cfg); validationErr != nil {
 		log.Printf("[createTasksFromApprovedPlan] Validation failed: %v", validationErr)
 		return validationErr
