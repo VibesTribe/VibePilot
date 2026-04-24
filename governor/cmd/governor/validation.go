@@ -4,11 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -108,35 +104,10 @@ func createTasksFromApprovedPlan(ctx context.Context, database db.Database, plan
 		return fmt.Errorf("plan has no plan_path")
 	}
 
-	// Fetch plan content — try GitHub first, fall back to local filesystem
-	repoOwner := "VibesTribe"
-	repoName := "VibePilot"
-	branch := "main"
-	rawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", repoOwner, repoName, branch, planPath)
-	httpReq, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
+	// Fetch plan content
+	planContent, err := fetchContent(ctx, repoPath, planPath)
 	if err != nil {
-		return fmt.Errorf("create plan fetch request: %w", err)
-	}
-	httpResp, err := http.DefaultClient.Do(httpReq)
-	var planContent []byte
-	if err != nil || httpResp.StatusCode != 200 {
-		if httpResp != nil {
-			httpResp.Body.Close()
-		}
-		// Fallback: read from local filesystem
-		localPath := filepath.Join(os.Getenv("REPO_PATH"), planPath)
-		localContent, readErr := os.ReadFile(localPath)
-		if readErr != nil {
-			return fmt.Errorf("plan not on GitHub (status %d) and not local (%v)", httpResp.StatusCode, readErr)
-		}
-		planContent = localContent
-		log.Printf("[createTasksFromApprovedPlan] Using local plan file: %s", localPath)
-	} else {
-		planContent, err = io.ReadAll(httpResp.Body)
-		httpResp.Body.Close()
-		if err != nil {
-			return fmt.Errorf("read plan content: %w", err)
-		}
+		return fmt.Errorf("fetch plan: %w", err)
 	}
 
 	tasks, err := parseTasksFromPlanMarkdown(string(planContent))
