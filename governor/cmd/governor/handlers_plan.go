@@ -352,7 +352,7 @@ func runPlanReview(
 		return
 	}
 
-	// Fetch plan content
+	// Fetch plan content — try GitHub first, fall back to local filesystem
 	planRawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", repoOwner, repoName, branch, planPath)
 	httpReq2, err := http.NewRequestWithContext(ctx, "GET", planRawURL, nil)
 	if err != nil {
@@ -361,17 +361,29 @@ func runPlanReview(
 		return
 	}
 	httpResp2, err := http.DefaultClient.Do(httpReq2)
-	if err != nil {
-		log.Printf("[PlanReview] Failed to fetch plan from GitHub: %v", err)
-		setPlanError(ctx, database, planID, "plan_fetch_failed")
-		return
-	}
-	planContent, err := io.ReadAll(httpResp2.Body)
-	httpResp2.Body.Close()
+	var planContent []byte
 	if err != nil || httpResp2.StatusCode != 200 {
-		log.Printf("[PlanReview] Failed to read plan content (status %d): %v", httpResp2.StatusCode, err)
-		setPlanError(ctx, database, planID, "plan_read_failed")
-		return
+		if httpResp2 != nil {
+			httpResp2.Body.Close()
+		}
+		// Fallback: read from local filesystem (plan may not be pushed yet)
+		localPlanPath := filepath.Join(repoPath, planPath)
+		localContent, readErr := os.ReadFile(localPlanPath)
+		if readErr != nil {
+			log.Printf("[PlanReview] Plan not on GitHub (status %d) and not local (%v): %s", httpResp2.StatusCode, readErr, localPlanPath)
+			setPlanError(ctx, database, planID, "plan_read_failed")
+			return
+		}
+		planContent = localContent
+		log.Printf("[PlanReview] Using local plan file (GitHub not available): %s", localPlanPath)
+	} else {
+		planContent, err = io.ReadAll(httpResp2.Body)
+		httpResp2.Body.Close()
+		if err != nil {
+			log.Printf("[PlanReview] Failed to read plan content: %v", err)
+			setPlanError(ctx, database, planID, "plan_read_failed")
+			return
+		}
 	}
 
 	// Try running supervisor with cascade retry on transient failures (429, 503, timeout)
