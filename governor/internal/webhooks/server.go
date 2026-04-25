@@ -213,16 +213,16 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var supabasePayload Payload
-	if err := json.Unmarshal(body, &supabasePayload); err != nil {
+	var payload Payload
+	if err := json.Unmarshal(body, &payload); err != nil {
 		log.Printf("[Webhooks] Failed to parse payload: %v", err)
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
 
-	eventType := s.mapToEventType(&supabasePayload)
+	eventType := s.mapToEventType(&payload)
 	if eventType == "" {
-		log.Printf("[Webhooks] Unknown event for table %s, type %s", supabasePayload.Table, supabasePayload.Type)
+		log.Printf("[Webhooks] Unknown event for table %s, type %s", payload.Table, payload.Type)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -230,18 +230,18 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if handler, ok := s.handlers[eventType]; ok {
-		if err := handler(ctx, &supabasePayload); err != nil {
+		if err := handler(ctx, &payload); err != nil {
 			log.Printf("[Webhooks] Handler error for %s: %v", eventType, err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 	}
 
-	recordJSON, _ := json.Marshal(supabasePayload.Record)
+	recordJSON, _ := json.Marshal(payload.Record)
 	event := runtime.Event{
 		Type:      runtime.EventType(eventType),
-		ID:        extractID(supabasePayload.Record),
-		Table:     supabasePayload.Table,
+		ID:        extractID(payload.Record),
+		Table:     payload.Table,
 		Record:    recordJSON,
 		Timestamp: time.Now(),
 	}
@@ -250,7 +250,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		s.router.Route(event)
 	}
 
-	log.Printf("[Webhooks] Processed %s from %s", eventType, supabasePayload.Table)
+	log.Printf("[Webhooks] Processed %s from %s", eventType, payload.Table)
 	w.WriteHeader(http.StatusOK)
 }
 

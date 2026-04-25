@@ -1,3 +1,6 @@
+// migrate_vault is a one-time migration tool for re-encrypting vault secrets.
+// DEPRECATED: This tool was used during migration from Supabase to local Postgres.
+// Use "governor vault" CLI for vault operations instead.
 package main
 
 import (

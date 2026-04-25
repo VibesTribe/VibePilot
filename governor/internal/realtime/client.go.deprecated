@@ -55,9 +55,10 @@ type Subscription struct {
 }
 
 // Config for the Realtime client.
+// DEPRECATED: Supabase Realtime WebSocket client. pgnotify is used instead.
 type Config struct {
-	URL    string // e.g., "wss://xyz.supabase.co/realtime/v1/websocket"
-	APIKey string // anon key or service key
+	URL    string // WebSocket URL (unused with pgnotify)
+	APIKey string // API key (unused with pgnotify)
 }
 
 // Phoenix channel message types
