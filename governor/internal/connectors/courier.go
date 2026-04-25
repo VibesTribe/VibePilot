@@ -23,16 +23,18 @@ type courierWaiter struct {
 }
 
 // CourierRunner dispatches tasks to GitHub Actions for browser-based execution
-// and waits for results via Supabase realtime (not polling).
+// and waits for results via the governor /api/courier/result callback (zero polling).
+// When the GitHub Actions workflow completes, it POSTs the result back to the
+// governor's public webhook URL, which delivers it to the waiting goroutine via channel.
 type CourierRunner struct {
 	githubToken  string
 	githubRepo   string
-	governorURL  string
+	governorURL  string // external URL for GitHub Actions to callback (e.g. https://webhooks.vibestribe.rocks)
 	db           CourierDB
 	httpClient   *http.Client
 	timeout      time.Duration
 
-	// waiters maps taskID -> channel for realtime result delivery
+	// waiters maps taskID -> channel for result delivery
 	waiters map[string]*courierWaiter
 	mu      sync.RWMutex
 }
@@ -53,8 +55,17 @@ func NewCourierRunner(githubToken, githubRepo string, db CourierDB, timeoutSecs 
 	}
 }
 
+// SetGovernorURL sets the external callback URL for courier result delivery.
+// Must be called before Run() if using GitHub Actions dispatch (needs public URL).
+func (r *CourierRunner) SetGovernorURL(url string) {
+	if url != "" {
+		r.governorURL = url
+	}
+}
+
 // Run dispatches a courier task to GitHub Actions and waits for the result.
-// Results are delivered via Supabase realtime (zero polling).
+// Results are delivered via POST to the governor /api/courier/result endpoint
+// from the GitHub Actions workflow, then forwarded to the waiting goroutine via channel.
 func (r *CourierRunner) Run(ctx context.Context, prompt string, timeout int) (string, int, int, error) {
 	if r.githubToken == "" {
 		return "", 0, 0, fmt.Errorf("GITHUB_TOKEN not configured")
@@ -103,9 +114,6 @@ func (r *CourierRunner) Run(ctx context.Context, prompt string, timeout int) (st
 		webPlatformURL, _ = task["web_platform"].(string)
 	}
 
-	supabaseURL, _ := task["supabase_url"].(string)
-	supabaseKey, _ := task["supabase_key"].(string)
-
 	if webPlatformURL == "" {
 		return "", 0, 0, fmt.Errorf("orchestrator must provide web_platform_url")
 	}
@@ -134,12 +142,12 @@ func (r *CourierRunner) Run(ctx context.Context, prompt string, timeout int) (st
 	}
 
 	// Dispatch to GitHub Actions
-	if err := r.dispatch(ctx, taskID, taskPrompt, branchName, llmProvider, llmModel, llmAPIKey, webPlatformURL, supabaseURL, supabaseKey); err != nil {
+	if err := r.dispatch(ctx, taskID, taskPrompt, branchName, llmProvider, llmModel, llmAPIKey, webPlatformURL); err != nil {
 		r.failTaskRun(ctx, taskID, err.Error())
 		return "", 0, 0, err
 	}
 
-	// Wait for result via channel (fed by Supabase realtime, zero polling)
+	// Wait for result via channel (fed by /api/courier/result POST callback, zero polling)
 	result, err := r.waitForCompletion(ctx, w)
 	if err != nil {
 		return "", 0, 0, err
@@ -198,20 +206,18 @@ func (r *CourierRunner) failTaskRun(ctx context.Context, id, errMsg string) {
 	})
 }
 
-func (r *CourierRunner) dispatch(ctx context.Context, taskID, taskPrompt, branchName, llmProvider, llmModel, llmAPIKey, webPlatformURL, supabaseURL, supabaseKey string) error {
+func (r *CourierRunner) dispatch(ctx context.Context, taskID, taskPrompt, branchName, llmProvider, llmModel, llmAPIKey, webPlatformURL string) error {
 	payload := map[string]interface{}{
 		"event_type": "courier_task",
 		"client_payload": map[string]interface{}{
-			"task_id":           taskID,
-			"prompt":            taskPrompt,
-			"branch_name":       branchName,
-			"llm_provider":      llmProvider,
-			"llm_model":         llmModel,
-			"llm_api_key":       llmAPIKey,
-			"web_platform_url":  webPlatformURL,
-			"governor_api_url":  r.governorURL,
-			"supabase_url":      supabaseURL,
-			"supabase_key":      supabaseKey,
+			"task_id":          taskID,
+			"prompt":           taskPrompt,
+			"branch_name":      branchName,
+			"llm_provider":     llmProvider,
+			"llm_model":        llmModel,
+			"llm_api_key":      llmAPIKey,
+			"web_platform_url": webPlatformURL,
+			"governor_api_url": r.governorURL,
 		},
 	}
 

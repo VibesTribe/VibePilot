@@ -570,7 +570,7 @@ func (r *Router) selectDestination(ctx context.Context, taskType string, taskCat
 			}
 		}
 
-		// Secondary validation: Supabase RPC check for platform availability.
+		// Secondary validation: local PG RPC check for platform availability.
 		// Kept as a backup / external source of truth.
 		if !r.isDestinationAvailable(ctx, conn.ID) {
 			continue
