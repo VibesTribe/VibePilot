@@ -312,6 +312,16 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	h.saveCheckpoint(ctx, taskID, "execution_start", 0, "", nil)
 	runStart := time.Now()
 
+	// Transition to in_progress so dashboard shows execution state
+	// and recovery can find stuck tasks
+	h.database.RPC(ctx, "transition_task", map[string]any{
+		"p_task_id":    taskID,
+		"p_new_status": "in_progress",
+	})
+	h.database.Update(ctx, "tasks", taskID, map[string]any{
+		"assigned_to": modelID,
+	})
+
 	// Web courier dispatch: if router selected a web platform, use CourierRunner
 	if routingFlag == "web" && h.courierRunner != nil {
 		platformURL := routingResult.PlatformURL
@@ -886,7 +896,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		log.Printf("[TaskReview] Task %s → testing (supervisor=%s approved)", truncateID(taskID), supervisorModelID)
 
 		case "fail", "failed":
-			// Failed → back to available with full failure context
+			// Failed → back to pending with full failure context
 			failureClass := decision.FailureClass
 			if failureClass == "" {
 				failureClass = "unknown"
@@ -924,16 +934,16 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			h.git.DeleteBranch(ctx, branchName)
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":        taskID,
-				"p_new_status":     "available",
+				"p_new_status":     "pending",
 				"p_failure_reason": failureNotes,
 			})
 			// Accumulate the failed executor model — excludes it from retry.
 			// If 2+ different models have failed this task, flags prompt as suspect.
 			accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
-			log.Printf("[TaskReview] Task %s failed: %s (%s) → available (excluding model %s)", truncateID(taskID), failureClass, failureDetail, modelID)
+			log.Printf("[TaskReview] Task %s failed: %s (%s) → pending (excluding model %s)", truncateID(taskID), failureClass, failureDetail, modelID)
 
 		case "needs_revision":
-			// Needs revision → back to available with FULL feedback for retry
+			// Needs revision → back to pending with FULL feedback for retry
 			failureClass := decision.FailureClass
 			if failureClass == "" {
 				failureClass = "needs_revision"
@@ -976,16 +986,22 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			h.git.DeleteBranch(ctx, branchName)
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":        taskID,
-				"p_new_status":     "available",
+				"p_new_status":     "pending",
 				"p_failure_reason": revisionNotes,
 			})
-			log.Printf("[TaskReview] Task %s needs revision: %s (%s) → available", truncateID(taskID), failureClass, failureDetail)
+			log.Printf("[TaskReview] Task %s needs revision: %s (%s) → pending", truncateID(taskID), failureClass, failureDetail)
 
 	case "council_review":
-		// Complex → escalate to council
+		// Complex → fail with notes for intelligent reassignment
+		// Note: Council reviews PLANS only, not tasks. Complex tasks fail with notes.
+		escReason := "complex task needs reassignment"
+		if decision.FailureClass != "" {
+			escReason = fmt.Sprintf("%s: %s", decision.FailureClass, decision.FailureDetail)
+		}
 		h.database.RPC(ctx, "transition_task", map[string]any{
-			"p_task_id":    taskID,
-			"p_new_status": "council_review",
+			"p_task_id":        taskID,
+			"p_new_status":     "failed",
+			"p_failure_reason": fmt.Sprintf("Supervisor escalation: %s", escReason),
 		})
 		// Record supervisor success (correctly identified complexity)
 		if h.usageTracker != nil {
@@ -994,7 +1010,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		log.Printf("[TaskReview] Task %s → council_review (supervisor=%s escalated)", truncateID(taskID), supervisorModelID)
 
 		case "reroute":
-			// Reroute → back to available for different assignment
+			// Reroute → back to pending for different assignment
 			failureClass := decision.FailureClass
 			if failureClass == "" {
 				failureClass = "model_limitation"
@@ -1018,17 +1034,17 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			h.git.DeleteBranch(ctx, branchName)
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":        taskID,
-				"p_new_status":     "available",
+				"p_new_status":     "pending",
 				"p_failure_reason": fmt.Sprintf("[%s] %s", failureClass, failureDetail),
 			})
-			log.Printf("[TaskReview] Task %s reroute → available", truncateID(taskID))
+			log.Printf("[TaskReview] Task %s reroute → pending", truncateID(taskID))
 
 		default:
 			// Unknown decision → human review
 			log.Printf("[TaskReview] Unknown decision '%s' for %s → awaiting_human", decision.Decision, truncateID(taskID))
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":    taskID,
-				"p_new_status": "awaiting_human",
+				"p_new_status": "failed",
 			})
 		}
 
@@ -1052,10 +1068,10 @@ func (h *TaskHandler) failTask(ctx context.Context, taskID, modelID, branchName,
 	h.git.DeleteBranch(ctx, branchName)
 	h.database.RPC(ctx, "transition_task", map[string]any{
 		"p_task_id":        taskID,
-		"p_new_status":     "available",
+		"p_new_status":     "pending",
 		"p_failure_reason": reason,
 	})
-	log.Printf("[TaskHandler] Task %s failed: %s → available", truncateID(taskID), reason)
+	log.Printf("[TaskHandler] Task %s failed: %s → pending", truncateID(taskID), reason)
 }
 
 func (h *TaskHandler) buildBranchName(sliceID, taskNumber, taskID string) string {
@@ -1278,7 +1294,7 @@ func setupTaskHandlers(
 }
 
 // unlockDependentsByTaskNumber finds tasks in "pending" status whose dependencies
-// contain the given task number (e.g. "T001") and transitions them to "available"
+// contain the given task number (e.g. "T001") and transitions them to "pending"
 // once ALL their dependencies are complete.
 func unlockDependentsByTaskNumber(ctx context.Context, database db.Database, completedTaskNumber string) {
 	if completedTaskNumber == "" || database == nil {
@@ -1348,10 +1364,10 @@ func unlockDependentsByTaskNumber(ctx context.Context, database db.Database, com
 		}
 
 		if allComplete {
-			log.Printf("[DependencyUnlock] Task %s: all dependencies complete, transitioning to available", pendingNum)
+			log.Printf("[DependencyUnlock] Task %s: all dependencies complete, transitioning to pending", pendingNum)
 			database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":    pendingID,
-				"p_new_status": "available",
+				"p_new_status": "pending",
 			})
 		} else {
 			log.Printf("[DependencyUnlock] Task %s: still has unmet dependencies", pendingNum)

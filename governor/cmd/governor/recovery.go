@@ -199,12 +199,12 @@ func runCheckpointRecovery(ctx context.Context, database db.Database, cfg *runti
 		case "execution":
 			_, err := database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":    taskID,
-				"p_new_status": "available",
+				"p_new_status": "pending",
 			})
 			if err != nil {
 				log.Printf("[CheckpointRecovery] Failed to reset task %s: %v", taskNumber, err)
 			} else {
-				log.Printf("[CheckpointRecovery] Reset task %s to available for re-execution", taskNumber)
+				log.Printf("[CheckpointRecovery] Reset task %s to pending for re-execution", taskNumber)
 				database.RPC(ctx, "delete_checkpoint", map[string]any{"p_task_id": taskID})
 			}
 
@@ -231,10 +231,10 @@ func runCheckpointRecovery(ctx context.Context, database db.Database, cfg *runti
 			}
 
 		default:
-			log.Printf("[CheckpointRecovery] Unknown step '%s' for task %s, resetting to available", step, taskNumber)
+			log.Printf("[CheckpointRecovery] Unknown step '%s' for task %s, resetting to pending", step, taskNumber)
 			_, err := database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":    taskID,
-				"p_new_status": "available",
+				"p_new_status": "pending",
 			})
 			if err == nil {
 				database.RPC(ctx, "delete_checkpoint", map[string]any{"p_task_id": taskID})
@@ -316,7 +316,7 @@ func recoverOrphanedTasks(ctx context.Context, database db.Database) {
 }
 
 // recoverPendingResources checks for tasks in pending_resources status and moves them
-// back to available so they can be retried when resources are free.
+// back to pending so they can be retried when resources are free.
 func recoverPendingResources(ctx context.Context, database db.Database) {
 	result, err := database.RPC(ctx, "find_pending_resource_tasks", map[string]any{})
 	if err != nil {
@@ -337,11 +337,11 @@ func recoverPendingResources(ctx context.Context, database db.Database) {
 		taskID, _ := task["id"].(string)
 		taskNumber, _ := task["task_number"].(string)
 
-		log.Printf("[ResourceRecovery] Task %s pending resources → available", taskNumber)
+		log.Printf("[ResourceRecovery] Task %s pending resources → pending", taskNumber)
 
 		_, err := database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":    taskID,
-			"p_new_status": "available",
+			"p_new_status": "pending",
 		})
 		if err != nil {
 			log.Printf("[ResourceRecovery] Failed to transition task %s: %v", taskNumber, err)
@@ -395,7 +395,7 @@ func runStartupRehydration(ctx context.Context, database db.Database, router *ru
 		}
 	}
 
-	// Rehydrate tasks in active states (available, review, testing)
+	// Rehydrate tasks in active states (pending, review, testing)
 	// Skip in_progress — those have processing_by set and will be caught by stale recovery
 	tasksRaw, err := database.Query(ctx, "tasks", map[string]any{
 		"status": "in.(available,review,testing)",
@@ -420,8 +420,8 @@ func runStartupRehydration(ctx context.Context, database db.Database, router *ru
 				record, _ := json.Marshal(task)
 				var eventType runtime.EventType
 				switch status {
-				case "available":
-					eventType = runtime.EventTaskAvailable
+			case "pending":
+				eventType = runtime.EventTaskAvailable
 				case "review":
 					eventType = runtime.EventTaskReview
 				case "testing":
