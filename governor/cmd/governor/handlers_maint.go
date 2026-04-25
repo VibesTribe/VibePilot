@@ -216,7 +216,7 @@ func (h *MaintenanceHandler) handleTaskApproved(event runtime.Event) {
 		log.Printf("[TaskApproved] Merge failed for %s: %v", truncateID(taskID), err)
 		h.database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":        taskID,
-			"p_new_status":     "approval",
+			"p_new_status":     "complete",
 			"p_failure_reason": "merge_failed",
 		})
 		// Record the merge failure for analytics

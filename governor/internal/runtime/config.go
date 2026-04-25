@@ -613,7 +613,7 @@ func (c *Config) Reload() error {
 				MaxToolTurns:           10,
 			},
 			Events: EventsConfig{
-				TaskStatusesAvailable: []string{"available"},
+				TaskStatusesAvailable: []string{"pending"},
 				TaskStatusesReview:    []string{"review"},
 				TaskStatusesCompleted: []string{"testing", "merged"},
 				PlanStatusesCouncil:   []string{"council_review"},
@@ -964,7 +964,7 @@ func (c *Config) GetHTTPAllowlist() []string {
 func (c *Config) GetEventsConfig() *EventsConfig {
 	if c.System == nil {
 		return &EventsConfig{
-			TaskStatusesAvailable:    []string{"available"},
+			TaskStatusesAvailable:    []string{"pending"},
 			TaskStatusesReview:       []string{"review"},
 			TaskStatusesCompleted:    []string{"testing", "merged"},
 			PlanStatusesDraft:        []string{"draft"},

@@ -171,10 +171,7 @@ func createTasksFromApprovedPlan(ctx context.Context, database db.Database, plan
 			}
 		}
 
-		status := "available"
-		if len(task.Dependencies) > 0 {
-			status = "pending"
-		}
+		status := "pending"
 
 		maxAttempts := 3
 		if cfg != nil && cfg.DefaultMaxAttempts > 0 {

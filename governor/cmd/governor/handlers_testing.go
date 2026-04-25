@@ -110,7 +110,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 
 		h.database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":        taskID,
-			"p_new_status":     "available",
+			"p_new_status":     "pending",
 			"p_failure_reason": fmt.Sprintf("test_execution_error: %v\n%s", err, truncateOutput(testOutput)),
 		})
 		return
@@ -208,7 +208,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 
 		h.database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":        taskID,
-			"p_new_status":     "available",
+			"p_new_status":     "pending",
 			"p_failure_reason": "test_failed:\n" + testOutput,
 		})
 
@@ -217,7 +217,7 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		if executorModelID != "" {
 			accumulateFailedModel(ctx, h.database, taskID, "test_failed_by", executorModelID)
 		}
-		log.Printf("[Testing] Task %s → available (branch %s preserved for fix)", truncateID(taskID), branchName)
+		log.Printf("[Testing] Task %s → pending (branch %s preserved for fix)", truncateID(taskID), branchName)
 	}
 }
 
@@ -1021,6 +1021,7 @@ func (h *TestingHandler) recordTestResult(
 		"output":       testOutput,
 		"duration_ms":  int(durationSecs * 1000),
 		"status":       "complete",
+		"created_at":   time.Now(),
 	}
 
 	result, dbErr := h.database.Insert(ctx, "test_results", data)

@@ -461,17 +461,17 @@ func (c *Client) mapToEventType(change *ChangeEvent) string {
 			log.Printf("[Realtime] Converted status to string: %q", status)
 		}
 		switch {
-		case status == "available" && action == "INSERT":
+		case status == "pending" && action == "INSERT":
 			return string(runtime.EventTaskAvailable)
-		case status == "available" && action == "UPDATE":
-			if oldStatus, _ := change.Old["status"].(string); oldStatus != "available" {
+		case status == "pending" && action == "UPDATE":
+			if oldStatus, _ := change.Old["status"].(string); oldStatus != "pending" {
 				return string(runtime.EventTaskAvailable)
 			}
 		case status == "review":
 			return string(runtime.EventTaskReview)
 		case status == "testing":
 			return string(runtime.EventTaskTesting)
-		case status == "approval":
+		case status == "complete":
 			return string(runtime.EventTaskApproval)
 		case status == "merge_pending":
 			return string(runtime.EventTaskMergePending)
@@ -496,7 +496,7 @@ func (c *Client) mapToEventType(change *ChangeEvent) string {
 			return string(runtime.EventCouncilDone)
 		case status == "approved":
 			return string(runtime.EventPlanApproved)
-		case status == "blocked":
+		case status == "failed":
 			return string(runtime.EventPlanBlocked)
 		case status == "revision_needed":
 			return string(runtime.EventRevisionNeeded)

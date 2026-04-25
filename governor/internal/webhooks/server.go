@@ -292,15 +292,15 @@ func (s *Server) mapToEventType(payload *Payload) string {
 	case table == "tasks":
 		status, _ := payload.Record["status"].(string)
 		switch {
-		case status == "available" && action == "INSERT":
+		case status == "pending" && action == "INSERT":
 			return string(runtime.EventTaskAvailable)
-		case status == "available" && action == "UPDATE":
-			if oldStatus, _ := payload.OldRecord["status"].(string); oldStatus != "available" {
+		case status == "pending" && action == "UPDATE":
+			if oldStatus, _ := payload.OldRecord["status"].(string); oldStatus != "pending" {
 				return string(runtime.EventTaskAvailable)
 			}
 		case status == "review":
 			return string(runtime.EventTaskReview)
-		case status == "testing" || status == "approval":
+		case status == "testing" || status == "complete":
 			return string(runtime.EventTaskCompleted)
 		}
 
