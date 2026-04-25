@@ -152,6 +152,15 @@ func main() {
 	}
 	log.Printf("[Startup] Managed repo clean, on %s", git.MainBranch())
 
+	// Point prompts to the managed repo's prompts directory.
+	// Prompts are project-specific and live in the repo, not hardcoded.
+	repoPromptsDir := filepath.Join(repoPath, "prompts")
+	if _, err := os.Stat(repoPromptsDir); err != nil {
+		repoPromptsDir = filepath.Join(repoPath, "config", "prompts")
+	}
+	cfg.SetPromptsDir(repoPromptsDir)
+	log.Printf("[Prompts] Using: %s", repoPromptsDir)
+
 	// Set up worktree manager for parallel agent execution
 	var worktreeMgr *gitree.WorktreeManager
 	worktreeBasePath := cfg.GetWorktreeBasePath()

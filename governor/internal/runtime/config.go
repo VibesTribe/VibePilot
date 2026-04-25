@@ -769,6 +769,18 @@ func (c *Config) GetDatabaseURL() string {
 	return os.Getenv(c.System.Database.URLEnv)
 }
 
+// SetPromptsDir overrides the prompts directory. Used by main.go to point
+// to the managed repo's prompts after bootstrapping.
+func (c *Config) SetPromptsDir(dir string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.System == nil {
+		c.System = &SystemConfig{}
+	}
+	c.System.PromptsDir = dir
+	c.promptsDir = dir
+}
+
 func (c *Config) GetDatabaseKey() string {
 	return os.Getenv(c.System.Database.KeyEnv)
 }
