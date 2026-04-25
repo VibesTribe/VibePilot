@@ -2,6 +2,8 @@
   "prompts_dir": "config/prompts",
   "database": {
     "type": "postgres",
+    "url_env": "DATABASE_URL",
+    "key_env": "VAULT_KEY",
     "postgres_url_env": "DATABASE_URL"
   },
   "vault": {
