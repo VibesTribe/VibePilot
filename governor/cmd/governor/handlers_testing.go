@@ -155,50 +155,13 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		})
 		log.Printf("[Testing] Task %s → COMPLETE (testing passed)", truncateID(taskID))
 
-		// Unlock dependents now — task is done regardless of merge
+		// Unlock dependents now — task is done.
 		// The DB unlock_dependent_tasks RPC searches by UUID, but our deps store
 		// task numbers (e.g. "T001"). Use Go-native unlock that matches by number.
 		unlockDependentsByTaskNumber(ctx, h.database, taskNumber)
 
-		// Auto-merge to module branch (best effort, does not affect completion)
-		targetBranch := h.getTargetBranch(sliceID)
-
-		// Shadow merge check
-		if h.worktreeMgr != nil {
-			shadowResult, shadowErr := h.worktreeMgr.ShadowMerge(ctx, branchName, targetBranch)
-			if shadowErr != nil {
-				log.Printf("[Testing] Shadow merge check failed for %s: %v (proceeding anyway)", branchName, shadowErr)
-			} else if shadowResult != nil && shadowResult.HasConflicts {
-				log.Printf("[Testing] Shadow merge found conflicts for %s: %v (task stays complete, merge_pending)", branchName, shadowResult.ConflictFiles)
-				// Task stays complete but merge is blocked. Record merge_pending for resolution.
-				h.database.RPC(ctx, "transition_task", map[string]any{
-					"p_task_id":    taskID,
-					"p_new_status": "merge_pending",
-					"p_result":     string(completionJSON),
-				})
-				return
-			}
-		}
-
-		if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
-			// Merge failed but TASK IS STILL COMPLETE. Log and move on.
-			log.Printf("[Testing] Merge to %s failed for task %s (task still complete): %v", targetBranch, truncateID(taskID), err)
-		} else {
-			// Merge success — transition to merged and cleanup
-			log.Printf("[Testing] Task %s code merged to %s", truncateID(taskID), targetBranch)
-			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":    taskID,
-				"p_new_status": "merged",
-				"p_result":     string(completionJSON),
-			})
-			if h.worktreeMgr != nil {
-				h.worktreeMgr.RemoveWorktree(ctx, taskID)
-			}
-			h.git.DeleteBranch(ctx, branchName)
-
-			// Check if all tasks for this slice are now merged → merge module to testing
-			h.tryMergeModuleToTesting(ctx, taskID, sliceID, targetBranch)
-		}
+		// Merge is handled by handleTaskApproved (MaintenanceHandler) on "complete" status.
+		// Tester does ONE thing: test. Merge is a separate downstream concern.
 	} else {
 		// Tests failed → keep branch and worktree for iterative fixing
 		// The executor will resume on this same branch to fix the specific failures
