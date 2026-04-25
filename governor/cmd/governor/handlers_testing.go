@@ -136,32 +136,38 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			log.Printf("[Testing] Recorded test PASS for executor model %s", executorModelID)
 		}
 
-		// TASK IS COMPLETE. Period. Testing passed = success.
-		// Record completion with model tracking data. This is the source of truth
-		// for model success/failure stats. Merge is a separate concern below.
+		// Determine final status based on task type.
+		// Visual/UI/UX tasks MUST go to human_review before merge.
+		// Human has final say on all visual changes — this is non-negotiable.
+		taskType := getString(task, "type")
+		nextStatus := "complete"
+		if taskType == "ui_ux" {
+			nextStatus = "human_review"
+		}
+
 		completionResult := map[string]any{
-			"status":         "complete",
+			"status":         nextStatus,
 			"test_passed":    true,
 			"test_duration":  duration,
 			"files_created":  h.extractFilesFromTask(task),
 		}
 		completionJSON, _ := json.Marshal(completionResult)
-		// Task is COMPLETE — testing passed. This is the model success signal.
-		// Merge is a separate downstream concern and does not affect completion.
 		h.database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":    taskID,
-			"p_new_status": "complete",
+			"p_new_status": nextStatus,
 			"p_result":     string(completionJSON),
 		})
-		log.Printf("[Testing] Task %s → COMPLETE (testing passed)", truncateID(taskID))
+		if nextStatus == "human_review" {
+			log.Printf("[Testing] Task %s → HUMAN_REVIEW (ui_ux task, awaiting human approval)", truncateID(taskID))
+		} else {
+			log.Printf("[Testing] Task %s → COMPLETE (testing passed)", truncateID(taskID))
+		}
 
-		// Unlock dependents now — task is done.
-		// The DB unlock_dependent_tasks RPC searches by UUID, but our deps store
-		// task numbers (e.g. "T001"). Use Go-native unlock that matches by number.
+		// Unlock dependents now — task is done (human_review is still "done" from dependency perspective).
 		unlockDependentsByTaskNumber(ctx, h.database, taskNumber)
 
 		// Merge is handled by handleTaskApproved (MaintenanceHandler) on "complete" status.
-		// Tester does ONE thing: test. Merge is a separate downstream concern.
+		// For human_review tasks, merge happens AFTER human approves (see handleTaskHumanReviewApproval).
 	} else {
 		// Tests failed → keep branch and worktree for iterative fixing
 		// The executor will resume on this same branch to fix the specific failures

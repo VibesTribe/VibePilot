@@ -136,6 +136,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/dashboard/stream", s.handleSSE)
 	mux.HandleFunc("/api/courier/result", s.handleCourierResult)
 	mux.HandleFunc("/api/vault/", s.handleVaultAPI)
+	mux.HandleFunc("/api/task/review", s.handleTaskReview)
 
 
 	s.server = &http.Server{
@@ -789,5 +790,88 @@ func (s *Server) handleVaultAPI(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		http.Error(w, "Not found", http.StatusNotFound)
+	}
+}
+
+// handleTaskReview accepts POST from dashboard when human reviews a task in human_review status.
+// Payload: {"task_id": "...", "action": "approve"|"reject", "notes": "..."}
+// On approve: transitions to "complete" → merge pipeline picks it up.
+// On reject: transitions to "pending" with rejection notes for re-execution.
+func (s *Server) handleTaskReview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+
+	var req struct {
+		TaskID string `json:"task_id"`
+		Action string `json:"action"` // "approve" or "reject"
+		Notes  string `json:"notes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.TaskID == "" || req.Action == "" {
+		http.Error(w, "Missing task_id or action", http.StatusBadRequest)
+		return
+	}
+
+	// Verify task is actually in human_review status
+	data, err := s.db.Query(ctx, "tasks", map[string]any{
+		"id":     "eq." + req.TaskID,
+		"select": "id,status,type,title",
+	})
+	if err != nil {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+	var tasks []map[string]any
+	if err := json.Unmarshal(data, &tasks); err != nil || len(tasks) == 0 {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+	if tasks[0]["status"] != "human_review" {
+		http.Error(w, "Task is not in human_review status", http.StatusConflict)
+		return
+	}
+
+	switch req.Action {
+	case "approve":
+		// Transition to complete — the maintenance handler's handleTaskApproved
+		// will pick this up via pgnotify and proceed with merge.
+		_, err := s.db.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":    req.TaskID,
+			"p_new_status": "complete",
+			"p_result":     fmt.Sprintf(`{"human_approved":true,"notes":%q}`, req.Notes),
+		})
+		if err != nil {
+			http.Error(w, "Failed to approve task", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[TaskReview] Task %s APPROVED by human → complete", req.TaskID[:8])
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "approved"})
+
+	case "reject":
+		// Transition back to pending with rejection notes.
+		// The task will be re-routed to a different model for re-execution.
+		_, err := s.db.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        req.TaskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": fmt.Sprintf("human_rejected: %s", req.Notes),
+		})
+		if err != nil {
+			http.Error(w, "Failed to reject task", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[TaskReview] Task %s REJECTED by human → pending", req.TaskID[:8])
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "rejected"})
+
+	default:
+		http.Error(w, "Invalid action: must be approve or reject", http.StatusBadRequest)
 	}
 }
