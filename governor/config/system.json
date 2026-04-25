@@ -1,5 +1,5 @@
 {
-  "prompts_dir": "/home/vibes/VibePilot/prompts",
+  "prompts_dir": "config/prompts",
   "database": {
     "type": "postgres",
     "url_env": "SUPABASE_URL",
@@ -14,8 +14,10 @@
   "git": {
     "host": "github",
     "repo_env": "GITHUB_REPO",
-    "repo_path": "/home/vibes/VibePilot",
+    "github_owner": "VibesTribe",
+    "github_repo": "VibePilot",
     "token_env": "GITHUB_TOKEN",
+    "data_dir": "/home/vibes/.governor",
     "protected_branches": [
       "main",
       "master",
@@ -165,7 +167,7 @@
   },
   "worktrees": {
     "enabled": true,
-    "base_path": "/home/vibes/VibePilot-work"
+    "base_path": "/home/vibes/.governor/worktrees/VibesTribe-VibePilot"
   },
   "code_map": {
     "path": ".context/map.md",

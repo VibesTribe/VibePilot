@@ -239,8 +239,14 @@ func (h *TestingHandler) resolveTestDir(ctx context.Context, branchName string) 
 		}
 	}
 
-	// Method 2: Scan VibePilot-work for matching directories
-	workBase := filepath.Join(filepath.Dir(repoPath), "VibePilot-work")
+	// Method 2: Scan worktree base dir for matching directories
+	workBase := ""
+	if h.worktreeMgr != nil {
+		workBase = h.worktreeMgr.BasePath()
+	}
+	if workBase == "" {
+		workBase = filepath.Join(filepath.Dir(repoPath), "worktrees")
+	}
 	entries, err := os.ReadDir(workBase)
 	if err == nil {
 		for _, e := range entries {
@@ -605,9 +611,15 @@ func (h *TestingHandler) runGoTests(ctx context.Context, testDir string) (bool, 
 
 	goBin := "go"
 	if _, err := exec.LookPath("go"); err != nil {
-		goBin = "/home/vibes/go/bin/go"
+		// Fallback: try common Go install locations
+		for _, candidate := range []string{"/usr/local/go/bin/go", os.ExpandEnv("$HOME/go/bin/go")} {
+			if _, statErr := os.Stat(candidate); statErr == nil {
+				goBin = candidate
+				break
+			}
+		}
 	}
-	env := append(os.Environ(), "PATH="+os.Getenv("PATH")+"/home/vibes/go/bin:/usr/local/go/bin")
+	env := append(os.Environ(), "PATH="+os.Getenv("PATH")+":"+filepath.Dir(goBin))
 
 	// Phase 1: go build
 	buildCmd := exec.CommandContext(ctx, goBin, "build", "./...")
