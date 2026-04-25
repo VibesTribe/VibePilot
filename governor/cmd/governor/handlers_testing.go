@@ -140,9 +140,11 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			"files_created":  h.extractFilesFromTask(task),
 		}
 		completionJSON, _ := json.Marshal(completionResult)
+		// Task is COMPLETE — testing passed. This is the model success signal.
+		// Merge is a separate downstream concern and does not affect completion.
 		h.database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":    taskID,
-			"p_new_status": "merged",
+			"p_new_status": "complete",
 			"p_result":     string(completionJSON),
 		})
 		log.Printf("[Testing] Task %s → COMPLETE (testing passed)", truncateID(taskID))
@@ -161,9 +163,13 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			if shadowErr != nil {
 				log.Printf("[Testing] Shadow merge check failed for %s: %v (proceeding anyway)", branchName, shadowErr)
 			} else if shadowResult != nil && shadowResult.HasConflicts {
-				log.Printf("[Testing] Shadow merge found conflicts for %s: %v (task still complete)", branchName, shadowResult.ConflictFiles)
-				// Task stays merged. Merge conflicts handled separately.
-				// Do NOT change task status — completion is already recorded.
+				log.Printf("[Testing] Shadow merge found conflicts for %s: %v (task stays complete, merge_pending)", branchName, shadowResult.ConflictFiles)
+				// Task stays complete but merge is blocked. Record merge_pending for resolution.
+				h.database.RPC(ctx, "transition_task", map[string]any{
+					"p_task_id":    taskID,
+					"p_new_status": "merge_pending",
+					"p_result":     string(completionJSON),
+				})
 				return
 			}
 		}
@@ -172,8 +178,13 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			// Merge failed but TASK IS STILL COMPLETE. Log and move on.
 			log.Printf("[Testing] Merge to %s failed for task %s (task still complete): %v", targetBranch, truncateID(taskID), err)
 		} else {
-			// Merge success — cleanup
+			// Merge success — transition to merged and cleanup
 			log.Printf("[Testing] Task %s code merged to %s", truncateID(taskID), targetBranch)
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "merged",
+				"p_result":     string(completionJSON),
+			})
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}

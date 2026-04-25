@@ -547,15 +547,23 @@ func (g *Gitree) CommitAndPush(ctx context.Context, filePath, message string) er
 	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
 
-	// GUARANTEE: start from clean main (plan files go on main)
-	if err := g.ResetToMain(ctx); err != nil {
-		return fmt.Errorf("CommitAndPush: reset to main failed: %w", err)
+	// Ensure we're on main (plan files go on main), but do NOT clean/reset
+	// because the caller just wrote the file to disk and ResetToMain would
+	// destroy it with checkout -f + clean -fd.
+	currentBranch, _ := g.currentBranch(ctx)
+	if currentBranch != g.mainBranch {
+		if err := g.gitCommand(ctx, "checkout", g.mainBranch).Run(); err != nil {
+			return fmt.Errorf("CommitAndPush: checkout %s failed: %w", g.mainBranch, err)
+		}
 	}
 
-	// Pull latest to avoid conflicts
+	// Pull latest to avoid conflicts (stash any untracked files first)
+	g.gitCommand(ctx, "stash", "--include-untracked").Run()
 	if err := g.Pull(ctx); err != nil {
+		g.gitCommand(ctx, "stash", "pop").Run()
 		return fmt.Errorf("CommitAndPush: pull failed: %w", err)
 	}
+	g.gitCommand(ctx, "stash", "pop").Run()
 
 	if err := g.gitCommand(ctx, "add", filePath).Run(); err != nil {
 		return fmt.Errorf("git add: %w", err)
@@ -579,6 +587,16 @@ func (g *Gitree) CommitAndPush(ctx context.Context, filePath, message string) er
 	}
 
 	return nil
+}
+
+func (g *Gitree) currentBranch(ctx context.Context) (string, error) {
+	var out bytes.Buffer
+	cmd := g.gitCommand(ctx, "branch", "--show-current")
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out.String()), nil
 }
 
 func (g *Gitree) gitCommand(ctx context.Context, args ...string) *exec.Cmd {
