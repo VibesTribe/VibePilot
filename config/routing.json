@@ -1,137 +1,93 @@
 {
-  "version": "2.0",
-  "description": "Routing strategy. How VibePilot decides WHERE to send tasks. The free_cascade strategy uses UsageTracker to pick only currently-active providers.",
-  "last_updated": "2026-04-15",
-  "current_strategy": "free_cascade",
+  "$schema": "./schemas/routing.schema.json",
+  "version": "1.0",
+  "description": "Routing configuration. All priority and restrictions are configurable. Nothing hardcoded in code.",
+  "default_strategy": "default",
   "strategies": {
-    "free_cascade": {
-      "id": "free_cascade",
-      "name": "Free Cascade (Rate-Limit Aware)",
-      "description": "Uses UsageTracker to pick first provider that is NOT in cooldown and under 80% limits. Never tries dead options. Shows countdown to next available.",
-      "mode": "rate_limit_aware",
+    "default": {
+      "description": "External first if task allows, then internal",
       "priority": [
+        "external",
+        "internal"
+      ]
+    },
+    "internal_only": {
+      "description": "Never use external platforms",
+      "priority": [
+        "internal"
+      ]
+    },
+    "external_only": {
+      "description": "Only use external platforms",
+      "priority": [
+        "external"
+      ]
+    },
+    "free_cascade": {
+      "description": "Cascade through free API models in priority order. Used when agent has no model pin.",
+      "priority": [
+        "gemini-2.5-flash-lite",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3-flash-preview",
         "gemini-2.5-flash",
-        "gemini-2.0-flash",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "llama-3.3-70b-versatile",
+        "groq/compound",
+        "openai/gpt-oss-120b",
+        "groq/compound-mini",
         "llama-3.1-8b-instant",
-        "compound",
-        "google/gemma-3-4b-it",
+        "nvidia/llama-3.1-nemotron-ultra-253b-v1",
         "meta/llama-3.3-70b-instruct",
-        "deepseek-ai/deepseek-v3.2",
-        "google/gemma-4-31b-it:free",
-        "nvidia/nemotron-3-super-120b-a12b:free",
-        "qwen/qwen3-coder-480b-a35b:free"
-      ],
-      "rate_limit_policy": {
-        "buffer_pct": 80,
-        "on_limit_hit": "skip_to_next",
-        "on_all_limited": "wait_for_shortest_cooldown",
-        "min_spacing_seconds": 2
-      },
-      "agent_restrictions": {
-        "internal_only": ["planner", "supervisor", "council", "orchestrator", "maintenance", "watcher", "tester"],
-        "default": ["consultant", "researcher", "courier", "task_runner"]
-      },
-      "fallback": {
-        "on_all_unavailable": "pause_and_alert",
-        "alert_target": "supervisor"
-      },
-      "rationale": [
-        "All providers are free, zero cost",
-        "UsageTracker knows real-time status of each model",
-        "Never wastes time trying models in cooldown",
-        "80% buffer prevents hitting hard limits mid-task",
-        "Cascade order prioritizes best model for task",
-        "Countdown timer shows when next provider becomes available"
-      ]
-    },
-    "web_first": {
-      "id": "web_first",
-      "name": "Web First (Courier Intelligence)",
-      "description": "Use web platforms for free access + model intelligence gathering. API as fallback.",
-      "priority_order": ["web", "api_free", "cli"],
-      "within_type_priority": {
-        "web": ["gemini-web", "huggingchat-web", "deepseek-web", "qwen-web", "mistral-web"],
-        "api_free": ["gemini-api", "groq-api", "nvidia-api", "openrouter-api"],
-        "cli": ["claude-code"]
-      },
-      "rationale": [
-        "Web platforms = free access to best models",
-        "Courier agents gather real-world performance data",
-        "API as reliable fallback"
-      ]
-    },
-    "api_first": {
-      "id": "api_first",
-      "name": "API First (Speed Priority)",
-      "description": "Direct API for speed and reliability. No browser overhead.",
-      "priority_order": ["api_free", "cli", "web"],
-      "within_type_priority": {
-        "api_free": ["gemini-api", "groq-api", "nvidia-api", "openrouter-api"],
-        "cli": ["claude-code"],
-        "web": ["gemini-web", "huggingchat-web", "deepseek-web"]
-      },
-      "rationale": [
-        "Direct API = faster, more reliable",
-        "Full control over parameters",
-        "No browser automation complexity"
+        "moonshotai/kimi-k2-instruct",
+        "google/gemma-4-26b-a4b-it:free",
+        "nvidia/nemotron-nano-12b-v2-vl:free",
+        "google/gemma-3-27b-it:free",
+        "deepseek-chat",
+        "glm-5"
       ]
     }
   },
-  "destination_type_definitions": {
-    "web": {
-      "description": "Web platforms via courier. Free access to best models.",
-      "cost": "free",
-      "requires": "courier role + browser_control model"
-    },
-    "cli": {
-      "description": "CLI tools. Agent-driven code editing.",
-      "cost": "subscription_sunk"
-    },
-    "api_free": {
-      "description": "Free API tiers. Direct access, no browser overhead.",
-      "cost": "free"
-    }
-  },
-  "throttle_defaults": {
-    "strategy": "pace",
-    "at_percent": 80,
-    "description": "Never exceed 80% of any rate limit. UsageTracker enforces per model.",
-    "per_limit_type": {
-      "per_minute": {
-        "action": "delay",
-        "delay_calculation": "60 / limit * 1.1"
-      },
-      "per_hour": {
-        "action": "delay",
-        "delay_calculation": "3600 / limit * 1.1"
-      },
-      "per_day": {
-        "action": "pause",
-        "until": "next_day"
-      }
-    }
-  },
-  "intelligence_gathering": {
-    "enabled": true,
-    "track_per_model": [
-      "success_rate",
-      "failure_reasons",
-      "avg_duration",
-      "task_types_succeeded",
-      "task_types_failed"
+  "agent_restrictions": {
+    "internal_only": [
+      "planner",
+      "supervisor",
+      "council",
+      "orchestrator",
+      "maintenance",
+      "watcher",
+      "tester"
     ],
-    "report_frequency": "weekly"
-  },
-  "fallback_chain": {
-    "api_unavailable": ["web", "cli"],
-    "web_unavailable": ["api_free", "cli"],
-    "cli_unavailable": ["api_free", "web"],
-    "all_unavailable": "pause_and_alert"
+    "default": [
+      "consultant",
+      "researcher",
+      "courier",
+      "task_runner"
+    ]
   },
   "destination_categories": {
-    "internal": {
+    "external": {
+      "description": "Web platforms accessed by couriers",
       "check_field": "type",
-      "check_values": ["cli", "api"]
+      "check_values": [
+        "web"
+      ]
+    },
+    "internal": {
+      "description": "CLI and API destinations",
+      "check_field": "type",
+      "check_values": [
+        "cli",
+        "api"
+      ]
     }
+  },
+  "selection_criteria": {
+    "status": "active",
+    "not_at_limit": true,
+    "prefer_learned_best": true
+  },
+  "fallback": {
+    "on_category_unavailable": "try_next_priority",
+    "on_all_unavailable": "pause_and_alert"
   }
 }

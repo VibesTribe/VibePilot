@@ -18,6 +18,11 @@
       "transitions": ["review", "pending_human"],
       "on_enter_event": "revision_needed"
     },
+    "prd_incomplete": {
+      "description": "PRD lacks required information",
+      "transitions": ["pending_human"],
+      "on_enter_event": "prd_incomplete"
+    },
     "council_review": {
       "description": "Complex plan, council reviewing",
       "transitions": ["approved", "revision_needed", "blocked", "pending_human"],
@@ -53,7 +58,7 @@
   },
   
   "revision_rules": {
-    "max_rounds": 6,
+    "max_rounds": 3,
     "on_max_rounds": "pending_human",
     "description": "After max_rounds revisions, escalate to human. Change max_rounds to adjust tolerance for revision loops."
   },

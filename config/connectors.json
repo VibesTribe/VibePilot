@@ -30,7 +30,7 @@
       "id": "claude-code",
       "name": "Claude Code CLI",
       "type": "cli",
-      "status": "active",
+      "status": "inactive",
       "command": "claude",
       "cli_args": [
         "-p",
@@ -47,7 +47,40 @@
         "glob",
         "grep"
       ],
-      "notes": "Claude Code CLI with GLM-5 model"
+      "notes": "Claude Code CLI. Inactive - auth broken after key rotation."
+    },
+    {
+      "id": "hermes",
+      "name": "Hermes Agent",
+      "type": "cli",
+      "status": "active",
+      "command": "hermes",
+      "cli_args": [
+        "chat",
+        "-q",
+        "{PROMPT}",
+        "-Q",
+        "-t",
+        "terminal,file",
+        "--yolo",
+        "--max-turns",
+        "50"
+      ],
+      "timeout_seconds": 300,
+      "provides_tools": [
+        "read",
+        "write",
+        "bash",
+        "webfetch",
+        "edit",
+        "glob",
+        "grep",
+        "search",
+        "browser",
+        "terminal",
+        "file"
+      ],
+      "notes": "Hermes Agent CLI. For executor tasks that need tools. GLM-5 via Z.AI."
     },
     {
       "id": "kimi",
@@ -71,19 +104,76 @@
       "notes": "Web search enabled"
     },
     {
-      "id": "gemini-api",
-      "name": "Gemini API",
+      "id": "gemini-api-courier",
+      "name": "Gemini API (Courier Project)",
       "type": "api",
       "status": "active",
       "provider": "google",
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
-      "api_key_ref": "GEMINI_API_KEY",
+      "api_key_ref": "GEMINI_COURIER_KEY",
       "models_available": [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash"
+        "gemini-2.5-flash-lite"
       ],
       "provides_tools": [],
-      "notes": "Google AI Studio free tier. 15 RPM, 150 RPD."
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500
+      },
+      "notes": "Stable workhorse for high-throughput courier tasks. 1000 RPD free-tier limit. Safest choice."
+    },
+    {
+      "id": "gemini-api-researcher",
+      "name": "Gemini API (Researcher Project)",
+      "type": "api",
+      "status": "active",
+      "provider": "google",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+      "api_key_ref": "GEMINI_RESEARCHER_KEY",
+      "models_available": [
+        "gemini-3.1-flash-lite-preview"
+      ],
+      "provides_tools": [],
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500
+      },
+      "notes": "Best intelligence for daily system researcher. Smarter than 2.5 but in preview mode."
+    },
+    {
+      "id": "gemini-api-visual",
+      "name": "Gemini API (Visual Tester / Brain)",
+      "type": "api",
+      "status": "active",
+      "provider": "google",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+      "api_key_ref": "GEMINI_VISUAL_TESTER_KEY",
+      "models_available": [
+        "gemini-3-flash-preview"
+      ],
+      "provides_tools": [],
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500
+      },
+      "notes": "Best available on free tier for code/visual QA. 3.1-pro-preview requires billing. 3-flash-preview is free and capable."
+    },
+    {
+      "id": "gemini-api-general",
+      "name": "Gemini API (General / Legacy Fallback)",
+      "type": "api",
+      "status": "active",
+      "provider": "google",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+      "api_key_ref": "GEMINI_GENERAL_KEY",
+      "models_available": [
+        "gemini-2.5-flash-lite"
+      ],
+      "provides_tools": [],
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500
+      },
+      "notes": "The Tank. gemini-1.5-flash removed from API. 2.5-flash-lite is the new stable fallback."
     },
     {
       "id": "deepseek-api",
@@ -97,8 +187,7 @@
         "deepseek-chat",
         "deepseek-reasoner"
       ],
-      "provides_tools": [],
-      "notes": "Out of credits. Use deepseek-web courier or NVIDIA NIM deepseek-r1 instead."
+      "provides_tools": []
     },
     {
       "id": "groq-api",
@@ -112,10 +201,47 @@
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
         "qwen3-32b",
-        "kimi-k2-instruct"
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "openai/gpt-oss-120b",
+        "groq/compound",
+        "groq/compound-mini"
       ],
       "provides_tools": [],
-      "notes": "OpenAI-compatible endpoint. Key in vault."
+      "shared_limits": {
+        "tokens_per_day": 100000,
+        "requests_per_day": 14400
+      },
+      "notes": "Re-enabled after vault fix. Org-level shared limits: 100K TPD and 14.4K RPD across ALL models."
+    },
+    {
+      "id": "openrouter-api",
+      "name": "OpenRouter API",
+      "type": "api",
+      "status": "active",
+      "provider": "openrouter",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "models_available": [
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "google/gemma-4-31b-it:free",
+        "openai/gpt-oss-120b:free",
+        "z-ai/glm-4.5-air:free",
+        "minimax/minimax-m2.5:free",
+        "openrouter/free",
+        "openrouter/elephant-alpha:free",
+        "google/gemma-4-26b-a4b-it:free",
+        "nvidia/nemotron-nano-12b-v2-vl:free",
+        "google/gemma-3-27b-it:free",
+        "bytedance/ui-tars-1.5-7b"
+      ],
+      "provides_tools": [],
+      "notes": "Free tier: 200 RPD unfunded, 1000 RPD with $10+ deposit. 20 RPM per model. Always use :free suffix. openrouter/free auto-routes to best available. Credit: -$0.57 (was $18, burned by Anthropic default). Use free models ONLY.",
+      "rate_limits": {
+        "rpm_per_model": 20,
+        "rpd_unfunded": 200,
+        "rpd_funded": 1000
+      },
+      "credit_remaining_usd": -0.57
     },
     {
       "id": "nvidia-api",
@@ -126,27 +252,12 @@
       "endpoint": "https://integrate.api.nvidia.com/v1",
       "api_key_ref": "NVIDIA_API_KEY",
       "models_available": [
-        "meta/llama-4-maverick-17b-128e-instruct",
-        "deepseek-ai/deepseek-r1",
-        "qwen/qwen3-235b-a22b"
+        "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+        "meta/llama-3.3-70b-instruct",
+        "moonshotai/kimi-k2-instruct"
       ],
       "provides_tools": [],
-      "notes": "NVIDIA NIM free tier. OpenAI-compatible endpoint. 1000 RPD per model. Bearer token auth."
-    },
-    {
-      "id": "openrouter-api",
-      "name": "OpenRouter API",
-      "type": "api",
-      "status": "emergency_fallback",
-      "provider": "openrouter",
-      "endpoint": "https://openrouter.ai/api/v1",
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "models_available": [
-        "deepseek/deepseek-r1:free",
-        "google/gemini-2.5-flash-preview:free"
-      ],
-      "provides_tools": [],
-      "notes": "EMERGENCY ONLY. Always use :free suffix. Set $0 spend limit in dashboard. Free models can fall back to paid without warning."
+      "notes": "Free tier with rate limits. Nemotron Ultra for complex tasks."
     },
     {
       "id": "chatgpt-web",
@@ -160,7 +271,13 @@
         "chatgpt-4o-mini"
       ],
       "provides_tools": [],
-      "notes": "Courier destination. Free tier: ~10 messages/3hrs. Manual or browser automation."
+      "limit_schema": {
+        "messages_per_3h": 40,
+        "model": "GPT-4o limited, GPT-4o mini unlimited fallback"
+      },
+      "notes": "Courier destination. Free tier: ~10 messages/3hrs. Manual or browser automation.",
+      "limit_source": "OpenAI docs: dynamic ~10-40 per 3hr window. No fixed published number. GPT-4o mini has no effective limit.",
+      "popup_handling": null
     },
     {
       "id": "claude-web",
@@ -174,7 +291,13 @@
         "claude-sonnet"
       ],
       "provides_tools": [],
-      "notes": "Courier destination. Variable daily limits. Good for PRD review."
+      "limit_schema": {
+        "messages_per_day": 20,
+        "limit_type": "dynamic_context_dependent"
+      },
+      "notes": "Courier destination. Variable daily limits. Good for PRD review.",
+      "limit_source": "Anthropic docs: ~10-20/day rolling window. Varies by conversation length. Shorter = more messages.",
+      "popup_handling": null
     },
     {
       "id": "gemini-web",
@@ -189,21 +312,13 @@
         "gemini-2.5-pro"
       ],
       "provides_tools": [],
-      "notes": "Courier destination. 1M tokens/day free tier."
-    },
-    {
-      "id": "copilot-web",
-      "name": "Copilot Web",
-      "type": "web",
-      "status": "unavailable",
-      "url": "https://copilot.microsoft.com",
-      "provider": "microsoft",
-      "requires_auth": "microsoft_account",
-      "models_available": [
-        "copilot"
-      ],
-      "provides_tools": [],
-      "notes": "Requires Microsoft account. Not usable."
+      "limit_schema": {
+        "messages_per_day": null,
+        "limit_type": "undocumented_chat_interface"
+      },
+      "notes": "Courier destination. 1M tokens/day free tier.",
+      "limit_source": "Google: chat interface limits unpublished. API well-documented (15 RPM/1500 RPD for Flash).",
+      "popup_handling": null
     },
     {
       "id": "deepseek-web",
@@ -218,22 +333,34 @@
         "deepseek-r1"
       ],
       "provides_tools": [],
-      "notes": "Courier destination. Generous free tier. Works without login."
+      "limit_schema": {
+        "messages_per_day": null,
+        "limit_type": "server_capacity_only"
+      },
+      "notes": "Courier destination. Generous free tier. Works without login.",
+      "limit_source": "DeepSeek: no published limit. Server busy errors during peak times only limitation.",
+      "popup_handling": null
     },
     {
       "id": "qwen-web",
       "name": "Qwen Web",
       "type": "web",
       "status": "active",
-      "url": "https://qwen.ai",
+      "url": "https://chat.qwen.ai",
       "provider": "alibaba",
       "requires_auth": "none",
       "models_available": [
-        "qwen-3",
+        "qwen-3.6-plus",
         "qwen-2.5"
       ],
       "provides_tools": [],
-      "notes": "Courier destination. Works without login."
+      "limit_schema": {
+        "messages_per_day": null,
+        "limit_type": "undocumented_varies_by_model"
+      },
+      "notes": "Courier destination. Works without login.",
+      "limit_source": "Alibaba: limits not published in English. Varies by model (Turbo > Plus > Max).",
+      "popup_handling": null
     },
     {
       "id": "mistral-web",
@@ -249,7 +376,13 @@
         "pixtral"
       ],
       "provides_tools": [],
-      "notes": "Courier destination. Free tier available. Good for code."
+      "limit_schema": {
+        "messages_per_day": null,
+        "limit_type": "no_documented_limit"
+      },
+      "notes": "Courier destination. Free tier available. Good for code.",
+      "limit_source": "Mistral: free Le Chat has no published message caps. Very generous.",
+      "popup_handling": null
     },
     {
       "id": "notegpt-web",
@@ -264,55 +397,179 @@
         "deepseek-v3"
       ],
       "provides_tools": [],
-      "notes": "Courier destination. Free DeepSeek R1 & V3. No login required. Good backup."
+      "limit_schema": {
+        "messages_per_day": 3,
+        "limit_type": "hard_cutoff"
+      },
+      "notes": "Courier destination. Free DeepSeek R1 & V3. No login required. Good backup.",
+      "limit_source": "User reported: 3 free messages per day.",
+      "popup_handling": null
     },
     {
-      "id": "kimi-ai",
+      "id": "kimi-web",
+      "name": "Kimi AI",
       "type": "web",
+      "status": "active",
+      "url": "https://www.kimi.com",
       "provider": "moonshot",
-      "url": "https://kimi.ai",
-      "auth": {
-        "method": "google_sso"
-      },
+      "requires_auth": "browser_login",
+      "models_available": [
+        "kimi-k2.6-instant"
+      ],
+      "provides_tools": [],
       "limit_schema": {
-        "messages_per_3h": 15,
-        "messages_per_session": null
-      }
+        "messages_per_day": 50,
+        "limit_type": "estimated"
+      },
+      "notes": "Courier destination. Google SSO. K2.6 Instant model. Agent swarm feature available.",
+      "limit_source": "Estimated from Moonshot docs. Not precisely published.",
+      "popup_handling": null
     },
     {
-      "id": "perplexity",
+      "id": "huggingchat-web",
+      "name": "HuggingChat",
       "type": "web",
-      "provider": "perplexity",
-      "url": "https://perplexity.ai",
-      "auth": {
-        "method": "google_sso"
-      },
+      "status": "active",
+      "url": "https://huggingface.co/chat/",
+      "provider": "huggingface",
+      "requires_auth": "none",
+      "models_available": [
+        "kimi-k2-instruct-0905-hf"
+      ],
+      "provides_tools": [
+        "mcp"
+      ],
       "limit_schema": {
-        "messages_per_3h": 5,
-        "messages_per_day": 10
-      }
+        "messages_per_day": null,
+        "limit_type": "unlimited_mostly"
+      },
+      "notes": "Courier destination. Unlimited free. Multi-model switcher. MCP servers. Currently defaulting to Kimi-K2-Instruct-0905 via novita.",
+      "limit_source": "HuggingFace: community-driven, mostly unlimited. Shared infrastructure may throttle.",
+      "popup_handling": null
     },
     {
-      "id": "poe",
+      "id": "aistudio-web",
+      "name": "Google AI Studio",
       "type": "web",
+      "status": "active",
+      "url": "https://aistudio.google.com/prompts/new_chat",
+      "provider": "google",
+      "requires_auth": "browser_login",
+      "models_available": [
+        "gemini-3.1-pro-preview-web"
+      ],
+      "provides_tools": [
+        "function_calling",
+        "grounding_search",
+        "grounding_maps",
+        "url_context",
+        "code_execution"
+      ],
+      "limit_schema": {
+        "requests_per_day": 1500,
+        "requests_per_minute": 15,
+        "tokens_per_minute": 1000000,
+        "limit_type": "verified_api_docs"
+      },
+      "notes": "Courier destination. Best for apps/design. Has native tools: function calling, Google Search grounding, Maps, URL context. Google SSO. Free.",
+      "limit_source": "Google AI docs VERIFIED: Gemini Flash 15 RPM/1M TPM/1500 RPD. Pro: 2 RPM/32K TPM/50 RPD.",
+      "popup_handling": null
+    },
+    {
+      "id": "poe-web",
+      "name": "Poe",
+      "type": "web",
+      "status": "active",
+      "url": "https://poe.com/",
       "provider": "poe",
-      "url": "https://poe.com",
-      "auth": {
-        "method": "google_sso"
-      },
+      "requires_auth": "browser_login",
+      "models_available": [
+        "poe-mix"
+      ],
+      "provides_tools": [],
       "limit_schema": {
-        "messages_per_day": null
-      }
+        "compute_points_per_day": 3000,
+        "limit_type": "verified"
+      },
+      "notes": "Courier destination. Multi-model aggregator. 3000 compute points/day free. Models: DeepSeek-R1, Gemma-4-31B, Gemini-3.1-Flash-Lite and more. Google SSO.",
+      "limit_source": "Poe official: 3000 compute points/day. Different models cost different points.",
+      "popup_handling": null
     },
     {
-      "id": "aizolo",
+      "id": "chatbox-web",
+      "name": "Chatbox AI",
       "type": "web",
-      "provider": "aizolo",
-      "url": "https://aizolo.com",
-      "auth": {
-        "method": "google_sso"
+      "status": "active",
+      "url": "https://app.chatbox.ai/",
+      "provider": "chatbox",
+      "requires_auth": "none",
+      "models_available": [
+        "gpt-4o-mini-chatbox"
+      ],
+      "provides_tools": [],
+      "limit_schema": {
+        "messages_per_day": null,
+        "limit_type": "unknown"
       },
-      "limit_schema": {}
+      "notes": "Courier destination. Provides GPT-4o mini for free. No auth needed. URL redirects from chatboxapp.ai to app.chatbox.ai.",
+      "limit_source": "No published limits found. Wrapper service for GPT-4o mini.",
+      "popup_handling": null
+    },
+    {
+      "id": "aizolo-web",
+      "name": "AiZolo",
+      "type": "web",
+      "status": "active",
+      "url": "https://chat.aizolo.com/new",
+      "provider": "aizolo",
+      "requires_auth": "none",
+      "models_available": [
+        "aizolo-mix"
+      ],
+      "provides_tools": [],
+      "limit_schema": {
+        "messages_per_day_free": 5,
+        "tokens_per_year": 255000000,
+        "limit_type": "verified"
+      },
+      "best_for": [
+        "research",
+        "coding",
+        "multi_model_comparison"
+      ],
+      "notes": "Multi-AI aggregator. Free tier: limited messages then paywall. Has Claude, Gemini, DeepSeek, GPT. Premium $9.90/mo for 3M tokens across all premium models. Good for when free credits run dry on primary platforms.",
+      "limit_source": "AiZolo site: 255M tokens/year free. Very limited messages before paywall popup.",
+      "popup_handling": "DISMISS_POPUP: close subscribe/purchase popup via X button before interaction"
+    },
+    {
+      "id": "perplexity-web",
+      "name": "Perplexity",
+      "type": "web",
+      "status": "active",
+      "url": "https://www.perplexity.ai/",
+      "provider": "perplexity",
+      "requires_auth": "none",
+      "models_available": [
+        "perplexity-free"
+      ],
+      "provides_tools": [
+        "web_search",
+        "citations"
+      ],
+      "limit_schema": {
+        "pro_searches_per_day": 5,
+        "basic_searches": "unlimited",
+        "limit_type": "verified"
+      },
+      "best_for": [
+        "search",
+        "research",
+        "citations",
+        "live_data"
+      ],
+      "notes": "System Researcher primary. Best citation accuracy. Live web search with sources. 5 Pro searches/day free. Google SSO.",
+      "limit_source": "Perplexity official: 5 Pro searches/day free. Basic/unlimited for standard.",
+      "popup_handling": null
     }
   ]
 }

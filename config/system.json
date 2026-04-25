@@ -1,58 +1,182 @@
 {
-  "version": "1.0",
-  "description": "System configuration - database, vault, git, runtime settings. All swappable.",
-  
+  "prompts_dir": "config/prompts",
   "database": {
-    "type": "supabase",
+    "type": "postgres",
     "url_env": "SUPABASE_URL",
     "key_env": "SUPABASE_SERVICE_KEY",
-    "notes": "Swap type and env vars to change database. Add new driver to db/ package."
+    "postgres_url_env": "DATABASE_URL"
   },
-  
   "vault": {
     "key_env": "VAULT_KEY",
     "table": "secrets_vault",
-    "notes": "Vault stores encrypted secrets. Key is bootstrap credential, never in DB."
+    "cache_ttl_seconds": 300
   },
-  
   "git": {
     "host": "github",
     "repo_env": "GITHUB_REPO",
+    "github_owner": "VibesTribe",
+    "github_repo": "VibePilot",
     "token_env": "GITHUB_TOKEN",
-    "protected_branches": ["main", "master"],
-    "notes": "Swap host to gitlab/bitbucket. Add driver to gitree/ package."
+    "data_dir": "/home/vibes/.governor",
+    "protected_branches": [
+      "main",
+      "master",
+      "research-considerations"
+    ],
+    "default_timeout_seconds": 60,
+    "default_merge_target": "main",
+    "branch_name_pattern": "^[a-zA-Z0-9_/.-]+$",
+    "remote_name": "origin",
+    "branch_prefixes": {
+      "task": "task/",
+      "module": "module/"
+    },
+    "id_truncate_length": 8
   },
-  
-  "runtime": {
-    "max_concurrent_per_module": 8,
-    "max_concurrent_total": 160,
-    "event_poll_interval_ms": 5000,
-    "agent_timeout_seconds": 300,
-    "max_tool_turns": 10,
-    "notes": "Polling 5s to reduce Supabase egress. 1s was causing 8GB+ bandwidth."
+  "db": {
+    "http_timeout_seconds": 30,
+    "error_truncate_length": 200
   },
-  
+  "http": {
+    "client_timeout_seconds": 30,
+    "request_timeout_seconds": 10,
+    "response_timeout_seconds": 30
+  },
+  "execution": {
+    "default_timeout_seconds": 300
+  },
+  "session": {
+    "default_timeout_seconds": 300
+  },
+  "tools": {
+    "web_max_topics": 5,
+    "web_max_related_topics": 5,
+    "web_timeout_seconds": 30,
+    "web_max_response_length": 10000,
+    "sandbox_timeout_seconds": 120
+  },
   "courier": {
-    "driver": "github_actions",
-    "max_concurrent": 3,
-    "timeout_seconds": 300,
-    "github_actions": {
-      "workflow": "browser-use.yml",
-      "notes": "Uses GitHub's free 7GB runners. Swap driver for local/external."
-    }
+    "timeout_seconds": 30,
+    "governor_external_url": "https://webhooks.vibestribe.rocks"
   },
-  
+  "runtime": {
+    "max_concurrent_per_module": 2,
+    "max_concurrent_total": 4,
+    "agent_timeout_seconds": 300,
+    "max_tool_turns": 10
+  },
+  "concurrency": {
+    "limits": {
+      "claude-code": 2,
+      "general": 2
+    },
+    "default_limit": 2
+  },
+  "security": {
+    "leak_detection_enabled": true,
+    "http_allowlist": [
+      "api.github.com",
+      "github.com",
+      "generativelanguage.googleapis.com",
+      "api.groq.com",
+      "openrouter.ai",
+      "integrate.api.nvidia.com",
+      "api.deepseek.com"
+    ]
+  },
+  "events": {
+    "task_statuses_available": [
+      "available"
+    ],
+    "task_statuses_review": [
+      "review"
+    ],
+    "task_statuses_completed": [
+      "testing",
+      "approved",
+      "merged",
+      "merge_pending"
+    ],
+    "plan_statuses_draft": [
+      "draft"
+    ],
+    "plan_statuses_review": [
+      "review"
+    ],
+    "plan_statuses_council": [
+      "council_review"
+    ],
+    "plan_statuses_pending_human": [
+      "pending_human"
+    ],
+    "plan_statuses_approved": [
+      "approved"
+    ],
+    "maintenance_status": "pending",
+    "test_results_status": "pending_review"
+  },
+  "sandbox": {
+    "default_test_command": "npm test",
+    "timeout_seconds": 60
+  },
+  "web_tools": {
+    "search_url": "https://api.duckduckgo.com/",
+    "user_agent": "Mozilla/5.0 (compatible; VibePilot/2.0)",
+    "max_fetch_length": 10000,
+    "max_related_topics": 5,
+    "timeout_seconds": 30
+  },
+  "recovery": {
+    "processing_timeout_seconds": 360,
+    "processing_recovery_interval_seconds": 10,
+    "orphan_threshold_seconds": 60
+  },
+  "validation": {
+    "min_task_confidence": 0.95,
+    "require_prompt_packet": true,
+    "require_category": true,
+    "require_expected_output": true,
+    "default_max_attempts": 3
+  },
   "logging": {
-    "level": "info",
-    "format": "json",
-    "audit_table": "orchestrator_events"
+    "max_output_length": 5000,
+    "max_id_display": 8
   },
-  
+  "webhooks": {
+    "enabled": false,
+    "port": 8080,
+    "path": "/webhooks",
+    "secret_vault_key": "webhook_secret"
+  },
+  "core": {
+    "checkpoint_enabled": true,
+    "checkpoint_interval_percent": 25,
+    "state_sync_interval_seconds": 60,
+    "recovery_enabled": true
+  },
+  "mcp_servers": [
+    {
+      "name": "jcodemunch",
+      "transport": "stdio",
+      "command": "/home/vibes/.local/bin/jcodemunch-mcp",
+      "args": [
+        "serve"
+      ],
+      "enabled": true
+    }
+  ],
+  "governor_mcp": {
+    "enabled": false,
+    "transport": "sse",
+    "port": 8081
+  },
   "worktrees": {
     "enabled": true,
-    "base_path": "/home/vibes/VibePilot-work",
-    "max_active": 5,
-    "auto_cleanup": true,
-    "notes": "One worktree per parallel agent task. Auto-cleanup on shutdown. Shadow merge before real merge."
+    "base_path": "/home/vibes/.governor/worktrees/VibesTribe-VibePilot"
+  },
+  "code_map": {
+    "path": ".context/map.md",
+    "cache_ttl_mins": 60,
+    "refresh_on_startup": true
   }
 }
