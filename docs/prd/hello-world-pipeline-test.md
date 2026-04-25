@@ -25,5 +25,3 @@ A valid JSON file at `output/hello.json` that parses correctly and contains all 
 - Do NOT touch any Go code, vibepilot internals, or configuration files
 - Only create the single file specified above
 - The file must be valid JSON
-
-
