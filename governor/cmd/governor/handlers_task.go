@@ -198,6 +198,14 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 			log.Printf("[TaskAvailable] Task %s: PROMPT SUSPECT — %d different models failed, prompt likely needs revision", taskNumber, len(failedModels))
 		}
 	}
+
+	// Read planner's routing flag from DB. "internal" = task needs codebase access,
+	// must use internal agent. "" = router decides (try courier, fallback to internal).
+	taskRoutingFlag := getString(task, "routing_flag")
+	if taskRoutingFlag != "" {
+		log.Printf("[TaskAvailable] Task %s: planner routing_flag=%q", taskNumber, taskRoutingFlag)
+	}
+
 	var modelID, connectorID, routingFlag string
 	var connConfig *runtime.ConnectorConfig
 	maxRetries := 5
@@ -209,7 +217,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		routingResult, routeErr = h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
 			Role:            "task_runner",
 			TaskType:        taskCategory,
-			RoutingFlag:     "", // empty = router decides (web courier if available, internal fallback)
+			RoutingFlag:     taskRoutingFlag,
 			ExcludeModels:   failedModels,
 			EstimatedTokens: runtime.EstimateTokens(taskPacket.Prompt, "task_runner"),
 		})
