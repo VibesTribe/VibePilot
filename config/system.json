@@ -2,8 +2,6 @@
   "prompts_dir": "config/prompts",
   "database": {
     "type": "postgres",
-    "url_env": "SUPABASE_URL",
-    "key_env": "SUPABASE_SERVICE_KEY",
     "postgres_url_env": "DATABASE_URL"
   },
   "vault": {
@@ -67,7 +65,7 @@
   },
   "concurrency": {
     "limits": {
-      "claude-code": 2,
+      "hermes": 2,
       "general": 2
     },
     "default_limit": 2
@@ -143,7 +141,7 @@
     "max_id_display": 8
   },
   "webhooks": {
-    "enabled": false,
+    "enabled": true,
     "port": 8080,
     "path": "/webhooks",
     "secret_vault_key": "webhook_secret"

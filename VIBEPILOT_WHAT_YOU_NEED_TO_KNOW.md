@@ -580,10 +580,11 @@ GitHub Actions: ubuntu-latest + browser-use + playwright
 courier_run.py: navigate platform URL → paste prompt → extract response
         │
         ▼
-courier_run.py writes to task_runs via Supabase REST
+courier_run.py POSTs result to governor /api/courier/result
+(via cloudflare tunnel: https://webhooks.vibestribe.rocks)
         │
         ▼
-Supabase Realtime fires UPDATE → EventCourierResult
+Governor handleCourierResult → record_courier_result RPC → local PG task_runs
         │
         ▼
 CourierRunner.NotifyResult() → channel delivery to waiting goroutine
@@ -610,7 +611,7 @@ Tokens counted client-side → Cost calculated → transition_task → review
 | `GEMINI_GENERAL_KEY` | Google AI | General/fallback (gemini-2.5-flash-lite) |
 | `NVIDIA_API_KEY` | NVIDIA NIM | 3 free models |
 
-**Implementation status:** Fully built and wired. All components exist: CourierRunner (courier.go), browser-use script (courier_run.py), GitHub Actions workflow (courier.yml), Supabase realtime result delivery. Not yet E2E tested (governor stopped).
+**Implementation status:** Fully built and wired. All components exist: CourierRunner (courier.go), browser-use script (courier_run.py), GitHub Actions workflow (courier_dispatch.yml), governor callback endpoint (/api/courier/result via cloudflare tunnel). Result delivery: local PG task_runs + channel notification. Not yet E2E tested.
 
 ---
 
