@@ -932,14 +932,14 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
 			h.git.DeleteBranch(ctx, branchName)
+			// Accumulate the failed executor model BEFORE transitioning.
+			// transition_task fires pgnotify → handler reads routing_flag_reason.
+			accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":        taskID,
 				"p_new_status":     "pending",
 				"p_failure_reason": failureNotes,
 			})
-			// Accumulate the failed executor model — excludes it from retry.
-			// If 2+ different models have failed this task, flags prompt as suspect.
-			accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
 			log.Printf("[TaskReview] Task %s failed: %s (%s) → pending (excluding model %s)", truncateID(taskID), failureClass, failureDetail, modelID)
 
 		case "needs_revision":
@@ -1066,14 +1066,16 @@ func (h *TaskHandler) failTask(ctx context.Context, taskID, modelID, branchName,
 		h.worktreeMgr.RemoveWorktree(ctx, taskID)
 	}
 	h.git.DeleteBranch(ctx, branchName)
+	// Exclude this model BEFORE transitioning to pending.
+	// The transition fires pgnotify → EventTaskAvailable reads routing_flag_reason.
+	// If we write exclusion after transition, the handler reads stale (empty) data
+	// and routes to the same failed model.
+	accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
 	h.database.RPC(ctx, "transition_task", map[string]any{
 		"p_task_id":        taskID,
 		"p_new_status":     "pending",
 		"p_failure_reason": reason,
 	})
-	// Exclude this model from future routing attempts for this task.
-	// Without this, the same broken model gets reassigned on every retry.
-	accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
 	log.Printf("[TaskHandler] Task %s failed: %s → pending (excluding model %s)", truncateID(taskID), reason, modelID)
 }
 
