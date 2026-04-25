@@ -518,9 +518,9 @@ func (c *Client) mapToEventType(change *ChangeEvent) string {
 		return string(runtime.EventTestResults)
 
 	case table == "task_runs":
-		// Only emit when status transitions away from "running" (completed or failed)
+		// Only emit when status transitions away from "running" (success or failed)
 		status, _ := change.New["status"].(string)
-		if status == "completed" || status == "failed" {
+		if status == "success" || status == "failed" {
 			return string(runtime.EventCourierResult)
 		}
 	}

@@ -35,7 +35,7 @@ const (
 	EventTaskMerged       EventType = "task_merged"
 	EventTaskMergePending EventType = "task_merge_pending"
 	EventTaskHumanReview  EventType = "task_human_review"
-	EventCourierResult    EventType = "courier_result" // task_runs UPDATE with completed/failed status
+	EventCourierResult    EventType = "courier_result" // task_runs UPDATE with success/failed status
 )
 
 type Event struct {
