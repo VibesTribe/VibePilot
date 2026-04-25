@@ -571,6 +571,16 @@ func handlePlanReview(
 	}
 
 	planID, _ := plan["id"].(string)
+
+	// Status guard: only process plans still in "review" status.
+	// Prevents duplicate execution when pgnotify fires twice for the same
+	// status transition (the first handler already moved the plan forward).
+	currentStatus, _ := plan["status"].(string)
+	if currentStatus != "review" {
+		log.Printf("[EventPlanReview] Plan %s no longer in review (status=%s), skipping", truncateID(planID), currentStatus)
+		return
+	}
+
 	planPath, _ := plan["plan_path"].(string)
 	if planPath == "" && planID != "" {
 		// Realtime event may not include plan_path (only changed columns).
