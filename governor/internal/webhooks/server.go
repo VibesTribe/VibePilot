@@ -591,7 +591,7 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 // handleCourierResult accepts POST from courier agents (GitHub Actions) with task results.
 // Replaces the old Supabase REST write + realtime notify pattern.
-// Payload: {"task_id": "...", "status": "completed|failed", "output": "...", "error": "...", "tokens_in": 0, "tokens_out": 0}
+// Payload: {"task_id": "...", "status": "success|failed", "output": "...", "error": "...", "tokens_in": 0, "tokens_out": 0}
 func (s *Server) handleCourierResult(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
