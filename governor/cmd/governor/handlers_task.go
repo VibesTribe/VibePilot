@@ -1071,7 +1071,10 @@ func (h *TaskHandler) failTask(ctx context.Context, taskID, modelID, branchName,
 		"p_new_status":     "pending",
 		"p_failure_reason": reason,
 	})
-	log.Printf("[TaskHandler] Task %s failed: %s → pending", truncateID(taskID), reason)
+	// Exclude this model from future routing attempts for this task.
+	// Without this, the same broken model gets reassigned on every retry.
+	accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
+	log.Printf("[TaskHandler] Task %s failed: %s → pending (excluding model %s)", truncateID(taskID), reason, modelID)
 }
 
 func (h *TaskHandler) buildBranchName(sliceID, taskNumber, taskID string) string {

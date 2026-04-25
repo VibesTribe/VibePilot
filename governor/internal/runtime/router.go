@@ -576,7 +576,7 @@ func (r *Router) selectDestination(ctx context.Context, taskType string, taskCat
 			continue
 		}
 
-		url, _ := conn.Extra["url"].(string)
+		url := conn.URL
 		if url == "" {
 			continue
 		}

@@ -332,15 +332,40 @@ func (p *PostgresDB) GetTaskPacket(ctx context.Context, taskID string) (*TaskPac
 func (p *PostgresDB) buildSelectQuery(table string, filters map[string]any) (string, []any) {
 	// Collect parts separately to ensure correct SQL order:
 	// SELECT ... WHERE ... ORDER BY ... LIMIT
-	query := "SELECT * FROM " + table
+
+	// "select" overrides the default "SELECT *" — PostgREST compatibility.
+	// Supports comma-separated column lists: "select": "id,status,routing_flag_reason"
+	colsClause := "*"
+	if cols, ok := filters["select"]; ok {
+		if s, ok := cols.(string); ok && s != "" {
+			// Validate each column name to prevent injection
+			parts := strings.Split(s, ",")
+			valid := true
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				if !isValidTableName(part) {
+					valid = false
+					break
+				}
+			}
+			if valid {
+				colsClause = s
+			}
+		}
+	}
+
+	query := "SELECT " + colsClause + " FROM " + table
 	var whereClauses []string
 	var args []any
 	var orderBy, limitStr string
 	argIdx := 1
 
 	for key, val := range filters {
-		// Special keys: limit, order, or
+		// Special keys: select, limit, order, or
 		switch key {
+		case "select":
+			// Already handled above
+			continue
 		case "limit":
 			if n, ok := toInt(val); ok && n > 0 {
 				limitStr = fmt.Sprintf(" LIMIT %d", n)
