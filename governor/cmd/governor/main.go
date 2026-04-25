@@ -110,27 +110,56 @@ func main() {
 	checkpointMgr := core.NewCheckpointManager(stateMachine, checkpointStorage)
 	log.Println("Core state machine initialized")
 
-	repoPath := getEnvOrDefault("REPO_PATH", ".")
-	protectedBranches := cfg.GetProtectedBranches()
+	// Initialize vault early -- needed for GITHUB_TOKEN to bootstrap managed repo
+	v := vault.New(database)
+	v.InitVaultKey(cfg.GetVaultKeyEnv())
 
-	git := gitree.New(&gitree.Config{
-		RepoPath:          repoPath,
-		ProtectedBranches: protectedBranches,
+	// ==========================================================================
+	// MANAGED REPO: The governor owns its own git clone, separate from any
+	// editing clone or external directory. It bootstraps from GitHub on first
+	// run and always resets to a clean state on startup. No shared state.
+	// ==========================================================================
+	repoOwner := cfg.GetGitHubOwner()
+	repoName := cfg.GetGitHubRepoName()
+	githubToken := ""
+	if t, err := v.GetSecret(context.Background(), "GITHUB_TOKEN"); err == nil && t != "" {
+		githubToken = t
+	}
+
+	managedRepo, err := gitree.NewManagedRepo(context.Background(), gitree.ManagedRepoConfig{
+		GitHubOwner:       repoOwner,
+		GitHubRepo:        repoName,
+		GitHubToken:       githubToken,
+		DataDir:           cfg.GetDataDir(),
+		MainBranch:        cfg.GetDefaultMergeTarget(),
+		ProtectedBranches: cfg.GetProtectedBranches(),
 		Timeout:           time.Duration(cfg.GetGitTimeoutSeconds()) * time.Second,
-		RemoteName:        cfg.GetRemoteName(),
 	})
+	if err != nil {
+		log.Fatalf("Failed to bootstrap managed repo for %s/%s: %v", repoOwner, repoName, err)
+	}
+	git := managedRepo.Gitree()
+	repoPath := managedRepo.LocalPath()
+	log.Printf("[ManagedRepo] Ready: %s/%s at %s", repoOwner, repoName, repoPath)
+
+	// CRITICAL: Clean git state on startup. Remove stale branches and worktrees
+	// from previous runs. This is safe because the managed repo is ours alone.
+	log.Printf("[Startup] Cleaning managed repo state...")
+	managedRepo.CleanStaleBranches(context.Background())
+	managedRepo.CleanStaleWorktrees(context.Background())
+	if err := managedRepo.Reset(context.Background()); err != nil {
+		log.Printf("[Startup] WARNING: managed repo reset failed: %v", err)
+	}
+	log.Printf("[Startup] Managed repo clean, on %s", git.MainBranch())
 
 	// Set up worktree manager for parallel agent execution
 	var worktreeMgr *gitree.WorktreeManager
-	if cfg.System.Worktrees != nil && cfg.System.Worktrees.Enabled {
-		worktreeMgr = gitree.NewWorktreeManager(git, cfg.System.Worktrees.BasePath)
-		log.Printf("[Worktrees] Enabled, base path: %s", cfg.System.Worktrees.BasePath)
-	} else {
-		log.Printf("[Worktrees] Disabled (no worktrees config or enabled=false)")
+	worktreeBasePath := cfg.GetWorktreeBasePath()
+	if worktreeBasePath == "" {
+		worktreeBasePath = managedRepo.WorktreeBasePath()
 	}
-
-	v := vault.New(database)
-	v.InitVaultKey(cfg.GetVaultKeyEnv())
+	worktreeMgr = gitree.NewWorktreeManager(git, worktreeBasePath)
+	log.Printf("[Worktrees] Enabled, base path: %s", worktreeBasePath)
 
 	var courierRunner *connectors.CourierRunner // initialized after ctx is created
 
@@ -184,10 +213,10 @@ func main() {
 	defer cancel()
 
 	// Initialize CourierRunner for web platform dispatch (courier agent system)
-	// Nil if GITHUB_TOKEN is not available — web routing falls back to internal gracefully
+	repoSlug := repoOwner + "/" + repoName // from ManagedRepo config above
 	if githubToken, err := v.GetSecret(ctx, "GITHUB_TOKEN"); err == nil && githubToken != "" {
-		courierRunner = connectors.NewCourierRunner(githubToken, "VibesTribe/VibePilot", database, 0)
-		log.Println("[Courier] Runner initialized (GitHub Actions dispatch enabled)")
+		courierRunner = connectors.NewCourierRunner(githubToken, repoSlug, database, 0)
+		log.Printf("[Courier] Runner initialized for %s (GitHub Actions dispatch enabled)", repoSlug)
 	} else {
 		log.Printf("[Courier] Runner disabled (GITHUB_TOKEN unavailable: %v)", err)
 	}

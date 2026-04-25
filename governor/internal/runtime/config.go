@@ -63,7 +63,7 @@ type GovernorMCPConfig struct {
 // WorktreeConfig configures git worktrees for parallel agent execution.
 type WorktreeConfig struct {
 	Enabled  bool   `json:"enabled"`
-	BasePath string `json:"base_path"` // e.g. /home/vibes/VibePilot-work
+	BasePath string `json:"base_path"` // e.g. /home/vibes/.governor/worktrees/VibesTribe-VibePilot
 }
 
 // MCPServerConfig defines an approved MCP server connection.
@@ -173,12 +173,16 @@ type GitConfig struct {
 	Host               string              `json:"host"`
 	RepoEnv            string              `json:"repo_env"`
 	RepoPath           string              `json:"repo_path"`
+	GitHubOwner        string              `json:"github_owner"`
+	GitHubRepo         string              `json:"github_repo"`
 	TokenEnv           string              `json:"token_env"`
 	ProtectedBranches  []string            `json:"protected_branches"`
 	DefaultTimeoutSecs int                 `json:"default_timeout_seconds"`
 	DefaultMergeTarget string              `json:"default_merge_target"`
 	BranchNamePattern  string              `json:"branch_name_pattern"`
 	RemoteName         string              `json:"remote_name"`
+	DataDir            string              `json:"data_dir"`
+	WorktreeBasePath   string              `json:"worktree_base_path"`
 	BranchPrefixes     *BranchPrefixConfig `json:"branch_prefixes"`
 }
 
@@ -861,6 +865,35 @@ func (c *Config) GetRemoteName() string {
 		return "origin"
 	}
 	return c.System.Git.RemoteName
+}
+
+func (c *Config) GetGitHubOwner() string {
+	if c.System == nil || c.System.Git.GitHubOwner == "" {
+		return "VibesTribe"
+	}
+	return c.System.Git.GitHubOwner
+}
+
+func (c *Config) GetGitHubRepoName() string {
+	if c.System == nil || c.System.Git.GitHubRepo == "" {
+		return "VibePilot"
+	}
+	return c.System.Git.GitHubRepo
+}
+
+func (c *Config) GetDataDir() string {
+	if c.System == nil || c.System.Git.DataDir == "" {
+		home, _ := os.UserHomeDir()
+		return filepath.Join(home, ".governor")
+	}
+	return c.System.Git.DataDir
+}
+
+func (c *Config) GetWorktreeBasePath() string {
+	if c.System == nil || c.System.Git.WorktreeBasePath == "" {
+		return ""
+	}
+	return c.System.Git.WorktreeBasePath
 }
 
 func (c *Config) GetTaskBranchPrefix() string {

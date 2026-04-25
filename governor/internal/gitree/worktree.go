@@ -409,3 +409,8 @@ func (wm *WorktreeManager) BootstrapWorktree(ctx context.Context, worktreePath s
 
 	return nil
 }
+
+// BasePath returns the configured base directory for all worktrees.
+func (wm *WorktreeManager) BasePath() string {
+	return wm.basePath
+}
