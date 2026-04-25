@@ -68,9 +68,11 @@ func NewManagedRepo(ctx context.Context, cfg ManagedRepoConfig) (*ManagedRepo, e
 	localPath := filepath.Join(cfg.DataDir, "repos", repoSlug)
 
 	// Build authenticated clone URL
+	// GitHub PAT format: https://USERNAME:TOKEN@github.com/owner/repo.git
+	// Using just https://TOKEN@ treats it as a username and prompts for password
 	var repoURL string
 	if cfg.GitHubToken != "" {
-		repoURL = fmt.Sprintf("https://%s@github.com/%s/%s.git", cfg.GitHubToken, cfg.GitHubOwner, cfg.GitHubRepo)
+		repoURL = fmt.Sprintf("https://%s:%s@github.com/%s/%s.git", cfg.GitHubOwner, cfg.GitHubToken, cfg.GitHubOwner, cfg.GitHubRepo)
 	} else {
 		repoURL = fmt.Sprintf("https://github.com/%s/%s.git", cfg.GitHubOwner, cfg.GitHubRepo)
 	}
