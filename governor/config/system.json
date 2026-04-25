@@ -56,7 +56,8 @@
     "sandbox_timeout_seconds": 120
   },
   "courier": {
-    "timeout_seconds": 30
+    "timeout_seconds": 30,
+    "governor_external_url": "https://webhooks.vibestribe.rocks"
   },
   "runtime": {
     "max_concurrent_per_module": 2,
@@ -74,9 +75,13 @@
   "security": {
     "leak_detection_enabled": true,
     "http_allowlist": [
-      "api.supabase.co",
       "api.github.com",
-      "github.com"
+      "github.com",
+      "generativelanguage.googleapis.com",
+      "api.groq.com",
+      "openrouter.ai",
+      "integrate.api.nvidia.com",
+      "api.deepseek.com"
     ]
   },
   "events": {

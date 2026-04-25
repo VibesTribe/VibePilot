@@ -230,7 +230,13 @@ func main() {
 	repoSlug := repoOwner + "/" + repoName // from ManagedRepo config above
 	if githubToken, err := v.GetSecret(ctx, "GITHUB_TOKEN"); err == nil && githubToken != "" {
 		courierRunner = connectors.NewCourierRunner(githubToken, repoSlug, database, 0)
-		log.Printf("[Courier] Runner initialized for %s (GitHub Actions dispatch enabled)", repoSlug)
+		// Set external URL so GitHub Actions can POST results back via cloudflare tunnel
+		if cfg.System.Courier != nil && cfg.System.Courier.GovernorExternalURL != "" {
+			courierRunner.SetGovernorURL(cfg.System.Courier.GovernorExternalURL)
+			log.Printf("[Courier] Runner initialized for %s (callback via %s)", repoSlug, cfg.System.Courier.GovernorExternalURL)
+		} else {
+			log.Printf("[Courier] Runner initialized for %s (callback via localhost -- GitHub Actions dispatch will fail without external URL)", repoSlug)
+		}
 	} else {
 		log.Printf("[Courier] Runner disabled (GITHUB_TOKEN unavailable: %v)", err)
 	}
@@ -627,7 +633,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 	actionApplier := runtime.NewResearchActionApplier(configDir, database)
 	setupResearchHandlers(ctx, router, factory, pool, database, cfg, connRouter, usageTracker, actionApplier)
 
-	// Courier result handler: delivers Supabase realtime notifications to waiting courier goroutines
+	// Courier result handler: delivers courier result notifications to waiting goroutines via channel
 	if courierRunner != nil {
 		router.On(runtime.EventCourierResult, func(event runtime.Event) {
 			var record struct {

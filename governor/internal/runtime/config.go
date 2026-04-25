@@ -164,9 +164,10 @@ type SessionConfig struct {
 	DefaultTimeoutSeconds int `json:"default_timeout_seconds"`
 }
 
-// CourierConfig configures courier agent timeouts.
+// CourierConfig configures courier agent dispatch and connectivity.
 type CourierConfig struct {
-	TimeoutSeconds int `json:"timeout_seconds"`
+	TimeoutSeconds     int    `json:"timeout_seconds"`
+	GovernorExternalURL string `json:"governor_external_url,omitempty"` // e.g. https://webhooks.vibestribe.rocks
 }
 
 type GitConfig struct {
