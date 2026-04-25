@@ -1084,15 +1084,19 @@ complete       Passed all gates, ready for merge
 merge_pending  Shadow merge detected conflicts, awaiting resolution
 merged         Merged to module/project branch
 failed         Failed at some stage, has notes, awaiting intelligent reassignment
+human_review   Awaiting human decision (visual UI/UX, researcher suggestions after council, API credit exhaustion)
 ```
 
-**NO OTHER STATUSES ARE VALID FOR TASKS.** No `assigned`, no `human_review`, no `blocked`, no `council_review` for tasks. Council reviews PLANS only. Tasks never go to human.
+**NO OTHER STATUSES ARE VALID FOR TASKS.** No `assigned`, no `blocked`, no `council_review` for tasks. Council reviews PLANS only. Tasks only go to `human_review` for the three mandatory human triggers: visual UI/UX review, researcher suggestions after council, and API credit exhaustion.
 
 ### Task Status Flow
 
 ```
 pending → in_progress → received → review → testing → complete → merge_pending → merged
                ↘ failed (with notes → back to pending for intelligent reassignment)
+
+Visual/UI/UX tasks take a different path after testing:
+testing → human_review (human must approve before merge) → complete → merge_pending → merged
 ```
 
 - `canTransition()`: forward-only, any status can transition to `failed`

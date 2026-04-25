@@ -174,6 +174,8 @@ func (l *Listener) mapEvent(p notifyPayload) *runtime.Event {
 			eventType = runtime.EventTaskApproval
 		case p.Status == "merge_pending":
 			eventType = runtime.EventTaskMergePending
+		case p.Status == "human_review":
+			eventType = runtime.EventTaskHumanReview
 		}
 
 	case p.Table == "plans":

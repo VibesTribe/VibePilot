@@ -172,6 +172,7 @@ const (
 	EventTaskMerged          EventType = "task_merged"
 	EventTaskError           EventType = "task_error"
 	EventTaskEscalated       EventType = "task_escalated"
+	EventTaskHumanReview     EventType = "task_human_review"
 
 	EventCouncilStarted   EventType = "council_started"
 	EventCouncilVote      EventType = "council_vote"
