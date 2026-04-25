@@ -202,7 +202,7 @@ func (l *Listener) mapEvent(p notifyPayload) *runtime.Event {
 		}
 
 	case p.Table == "task_runs":
-		if p.Status == "completed" || p.Status == "failed" {
+		if p.Status == "success" || p.Status == "failed" {
 			eventType = runtime.EventCourierResult
 		}
 
