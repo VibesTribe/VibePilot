@@ -161,6 +161,11 @@ func main() {
 	cfg.SetPromptsDir(repoPromptsDir)
 	log.Printf("[Prompts] Using: %s", repoPromptsDir)
 
+	// Point all repo-path references to the managed repo.
+	// Handlers use cfg.GetRepoPath() for file reads/writes.
+	cfg.SetRepoPath(repoPath)
+	log.Printf("[RepoPath] Using managed repo: %s", repoPath)
+
 	// Set up worktree manager for parallel agent execution
 	var worktreeMgr *gitree.WorktreeManager
 	worktreeBasePath := cfg.GetWorktreeBasePath()
