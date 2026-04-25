@@ -217,17 +217,16 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			log.Printf("[Testing] Recorded test FAIL for executor model %s", executorModelID)
 		}
 
+		// Store the failed executor model ID BEFORE transitioning.
+		// transition_task fires pgnotify → handler reads routing_flag_reason.
+		if executorModelID != "" {
+			accumulateFailedModel(ctx, h.database, taskID, "test_failed_by", executorModelID)
+		}
 		h.database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":        taskID,
 			"p_new_status":     "pending",
 			"p_failure_reason": "test_failed:\n" + testOutput,
 		})
-
-		// Store the failed executor model ID so the task handler avoids re-routing to it.
-		// Accumulates across models — if 2+ different models fail, flags prompt as suspect.
-		if executorModelID != "" {
-			accumulateFailedModel(ctx, h.database, taskID, "test_failed_by", executorModelID)
-		}
 		log.Printf("[Testing] Task %s → pending (branch %s preserved for fix)", truncateID(taskID), branchName)
 	}
 }
