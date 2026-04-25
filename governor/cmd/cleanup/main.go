@@ -1,3 +1,6 @@
+// cleanup is a maintenance tool for cleaning up stale pipeline data.
+// DEPRECATED: References Supabase env vars. Needs rewriting for local Postgres.
+// Use psql TRUNCATE ... CASCADE directly instead.
 package main
 
 import (

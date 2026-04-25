@@ -35,10 +35,10 @@ var (
 func main() {
 	// Check for smoke test flag
 	if len(os.Args) > 1 && os.Args[1] == "-smoke-test" {
-		dbURL := os.Getenv("SUPABASE_URL")
-		dbKey := os.Getenv("SUPABASE_SERVICE_KEY")
-		if dbURL == "" || dbKey == "" {
-			log.Fatal("SUPABASE_URL and SUPABASE_SERVICE_KEY required for smoke test")
+		dbURL := os.Getenv("DATABASE_URL")
+		dbKey := os.Getenv("VAULT_KEY")
+		if dbURL == "" {
+			log.Fatal("DATABASE_URL required for smoke test")
 		}
 		runSmokeTest(dbURL, dbKey)
 		return
@@ -63,7 +63,7 @@ func main() {
 	dbType := cfg.GetDatabaseType()
 
 	var database db.Database
-	var postgrestDB *db.DB // only set for supabase backend (used for PromptLoader)
+	var postgrestDB *db.DB // only set for PostgREST/Supabase backend (used for PromptLoader)
 	switch dbType {
 	case "postgres":
 		pgURL := cfg.GetPostgresURL()
@@ -77,9 +77,9 @@ func main() {
 		}
 		log.Println("Connected to Postgres database")
 	default:
-		// "supabase" or empty = PostgREST
+		// Legacy: PostgREST/Supabase backend (deprecated, use type "postgres")
 		if dbURL == "" || dbKey == "" {
-			log.Fatal("Database credentials required: set SUPABASE_URL and SUPABASE_SERVICE_KEY")
+			log.Fatal("Database credentials required: set DATABASE_URL or legacy SUPABASE_URL/SUPABASE_SERVICE_KEY")
 		}
 		postgrestDB = db.New(dbURL, dbKey)
 		database = postgrestDB
@@ -87,8 +87,8 @@ func main() {
 	}
 	defer database.Close()
 
-	// PromptLoader uses PostgREST REST API for prompt upsert.
-	// Only available with supabase backend. Native postgres skips prompt sync
+	// PromptLoader uses REST API for prompt upsert.
+	// Only available with PostgREST/Supabase backend. Native postgres skips prompt sync
 	// (prompts are loaded from files and synced once during migration).
 	if postgrestDB != nil {
 		cfg.SetDatabase(postgrestDB)

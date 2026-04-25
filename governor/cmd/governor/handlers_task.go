@@ -558,8 +558,7 @@ func (h *TaskHandler) executeCourierTask(
 		"llm_model":        modelID,
 		"llm_api_key":      llmAPIKey,
 		"web_platform_url": platformURL,
-		"supabase_url":     h.cfg.GetDatabaseURL(),
-		"supabase_key":     h.cfg.GetDatabaseKey(),
+		"callback_url":     h.cfg.GetCourierExternalURL(),
 	}
 
 	packetJSON, err := json.Marshal(packet)

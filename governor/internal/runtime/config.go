@@ -594,9 +594,10 @@ func (c *Config) Reload() error {
 	if c.System == nil {
 		c.System = &SystemConfig{
 			Database: DatabaseConfig{
-				Type:   "supabase",
-				URLEnv: "SUPABASE_URL",
-				KeyEnv: "SUPABASE_SERVICE_KEY",
+				Type:           "postgres",
+				URLEnv:         "DATABASE_URL",
+				KeyEnv:         "VAULT_KEY",
+				PostgresURLEnv: "DATABASE_URL",
 			},
 			Vault: VaultConfig{
 				KeyEnv:          "VAULT_KEY",
@@ -800,25 +801,10 @@ func (c *Config) GetPostgresURL() string {
 	return os.Getenv(envKey)
 }
 
-// GetRealtimeURL returns the Supabase Realtime WebSocket URL.
-// It constructs this from the database URL by replacing the protocol.
-// Example: https://xyz.supabase.co -> wss://xyz.supabase.co/realtime/v1/websocket
+// GetRealtimeURL returns the realtime notification URL.
+// Deprecated: Supabase Realtime removed. pgnotify is used instead.
 func (c *Config) GetRealtimeURL() string {
-	dbURL := c.GetDatabaseURL()
-	if dbURL == "" {
-		return ""
-	}
-
-	// Replace https:// with wss:// and add realtime path
-	// https://qtpdzsinvifkgpxyxlaz.supabase.co -> wss://qtpdzsinvifkgpxyxlaz.supabase.co/realtime/v1/websocket
-	realtimeURL := dbURL
-	if len(dbURL) > 8 && dbURL[:8] == "https://" {
-		realtimeURL = "wss://" + dbURL[8:] + "/realtime/v1/websocket"
-	} else if len(dbURL) > 7 && dbURL[:7] == "http://" {
-		realtimeURL = "ws://" + dbURL[7:] + "/realtime/v1/websocket"
-	}
-
-	return realtimeURL
+	return ""
 }
 
 func (c *Config) GetVaultKey() string {
@@ -955,7 +941,6 @@ func (c *Config) GetLoggingConfig() *LoggingConfig {
 func (c *Config) GetHTTPAllowlist() []string {
 	if c.System == nil || c.System.Security.HTTPAllowlist == nil {
 		return []string{
-			"api.supabase.co",
 			"api.github.com",
 			"github.com",
 		}
@@ -1337,6 +1322,15 @@ func (c *Config) GetCourierTimeoutSecs() int {
 		return c.System.Courier.TimeoutSeconds
 	}
 	return 30
+}
+
+// GetCourierExternalURL returns the governor's external URL for courier callbacks.
+// Includes the /api/courier/result path.
+func (c *Config) GetCourierExternalURL() string {
+	if c.System == nil || c.System.Courier == nil || c.System.Courier.GovernorExternalURL == "" {
+		return ""
+	}
+	return c.System.Courier.GovernorExternalURL + "/api/courier/result"
 }
 
 func (c *Config) GetDefaultCLIArgs() []string {
