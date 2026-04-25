@@ -1,40 +1,30 @@
 {
-  "version": "2.0",
-  "description": "Tool definitions for VibePilot runtime. Parameters + security + implementation.",
-  "last_updated": "2026-02-25",
-  
   "tools": {
     "git_create_branch": {
       "description": "Create a new git branch",
       "parameters": {
-        "name": {"type": "string", "required": true, "description": "Branch name (e.g., task/T001-profile)"}
+        "name": {"type": "string", "required": true}
       },
       "security_level": "write",
-      "implementation": "gitree.CreateBranch",
-      "allowed_agents": ["maintenance"]
+      "implementation": "gitree"
     },
-    
     "git_read_branch": {
-      "description": "Read files from a git branch",
+      "description": "Read files from a branch",
       "parameters": {
-        "branch": {"type": "string", "required": true},
-        "path": {"type": "string", "required": false}
+        "branch": {"type": "string", "required": true}
       },
       "security_level": "read",
-      "implementation": "gitree.ReadBranch",
-      "allowed_agents": ["supervisor", "planner", "council"]
+      "implementation": "gitree"
     },
-    
     "git_commit": {
-      "description": "Commit changes to current branch",
+      "description": "Commit output to a branch",
       "parameters": {
-        "message": {"type": "string", "required": true}
+        "branch": {"type": "string", "required": true},
+        "output": {"type": "object", "required": true}
       },
       "security_level": "write",
-      "implementation": "gitree.Commit",
-      "allowed_agents": ["maintenance"]
+      "implementation": "gitree"
     },
-    
     "git_merge": {
       "description": "Merge source branch into target branch",
       "parameters": {
@@ -42,33 +32,35 @@
         "target": {"type": "string", "required": true}
       },
       "security_level": "write",
-      "implementation": "gitree.MergeBranch",
-      "allowed_agents": ["maintenance"]
+      "implementation": "gitree"
     },
-    
     "git_delete_branch": {
-      "description": "Delete a branch after merge",
+      "description": "Delete a git branch",
       "parameters": {
         "name": {"type": "string", "required": true}
       },
       "security_level": "write",
-      "implementation": "gitree.DeleteBranch",
-      "allowed_agents": ["maintenance"]
+      "implementation": "gitree"
     },
-    
+    "git_clear_branch": {
+      "description": "Clear all files from a branch for retry",
+      "parameters": {
+        "name": {"type": "string", "required": true}
+      },
+      "security_level": "write",
+      "implementation": "gitree"
+    },
     "db_query": {
       "description": "Query database table",
       "parameters": {
         "table": {"type": "string", "required": true},
-        "columns": {"type": "array", "required": false, "items": "string"},
+        "columns": {"type": "array", "required": false},
         "where": {"type": "object", "required": false},
         "limit": {"type": "integer", "required": false}
       },
       "security_level": "read",
-      "implementation": "db.Query",
-      "allowed_agents": ["supervisor", "orchestrator", "council", "planner", "vibes"]
+      "implementation": "db"
     },
-    
     "db_update": {
       "description": "Update database record",
       "parameters": {
@@ -77,100 +69,108 @@
         "data": {"type": "object", "required": true}
       },
       "security_level": "write",
-      "implementation": "db.Update",
-      "allowed_agents": ["supervisor", "orchestrator"]
+      "implementation": "db"
     },
-    
+    "db_insert": {
+      "description": "Insert new record into database table",
+      "parameters": {
+        "table": {"type": "string", "required": true},
+        "data": {"type": "object", "required": true}
+      },
+      "security_level": "write",
+      "implementation": "db"
+    },
     "db_rpc": {
       "description": "Call database RPC function",
       "parameters": {
-        "name": {"type": "string", "required": true, "description": "RPC function name"},
-        "params": {"type": "object", "required": false, "description": "RPC parameters"}
+        "name": {"type": "string", "required": true},
+        "params": {"type": "object", "required": false}
       },
       "security_level": "write",
-      "implementation": "db.CallRPC",
-      "allowed_agents": ["supervisor", "orchestrator", "maintenance"],
-      "notes": "RPC name validated against allowlist in db/rpc.go"
+      "implementation": "db"
     },
-    
+    "command_maintenance": {
+      "description": "Queue a maintenance command",
+      "parameters": {
+        "command": {"type": "string", "required": true},
+        "params": {"type": "object", "required": false}
+      },
+      "security_level": "write",
+      "implementation": "db"
+    },
     "file_read": {
       "description": "Read file from repository",
       "parameters": {
         "path": {"type": "string", "required": true}
       },
       "security_level": "read",
-      "implementation": "maintenance.ReadFile",
-      "allowed_agents": ["planner", "internal_cli", "tester_code", "vibes"]
+      "implementation": "file"
     },
-    
     "file_write": {
-      "description": "Write file to repository (sandboxed)",
+      "description": "Write file to repository",
       "parameters": {
         "path": {"type": "string", "required": true},
         "content": {"type": "string", "required": true}
       },
       "security_level": "write",
-      "implementation": "maintenance.WriteFile",
-      "allowed_agents": ["maintenance"]
+      "implementation": "file"
     },
-    
-    "sandbox_test": {
-      "description": "Run code in sandbox for testing",
+    "file_delete": {
+      "description": "Delete file from repository",
       "parameters": {
-        "files": {"type": "array", "required": true, "description": "Array of {path, content}"},
-        "test_command": {"type": "string", "required": false}
+        "path": {"type": "string", "required": true}
       },
-      "security_level": "execute",
-      "implementation": "maintenance.SandboxTest",
-      "allowed_agents": ["maintenance", "tester_code"]
+      "security_level": "write",
+      "implementation": "file"
     },
-    
     "vault_get": {
-      "description": "Get secret from vault",
+      "description": "Get secret from vault (returns existence only, not value)",
       "parameters": {
-        "key": {"type": "string", "required": true, "description": "Secret key name"}
+        "key": {"type": "string", "required": true}
       },
       "security_level": "secret",
-      "implementation": "vault.GetSecret",
-      "allowed_agents": ["orchestrator"],
-      "notes": "Only orchestrator can fetch secrets to pass to runners"
+      "implementation": "vault"
     },
-    
     "web_search": {
-      "description": "Search the web",
+      "description": "Search the web using DuckDuckGo",
       "parameters": {
         "query": {"type": "string", "required": true}
       },
       "security_level": "read",
-      "implementation": "web.Search",
-      "allowed_agents": ["consultant", "researcher", "council", "vibes"]
+      "implementation": "web"
     },
-    
-    "command_maintenance": {
-      "description": "Queue a command for maintenance agent",
+    "web_fetch": {
+      "description": "Fetch content from a URL",
       "parameters": {
-        "command": {"type": "string", "required": true, "enum": ["merge", "create_branch", "delete_branch", "apply_change"]},
-        "params": {"type": "object", "required": false}
+        "url": {"type": "string", "required": true}
       },
-      "security_level": "write",
-      "implementation": "db.QueueMaintenanceCommand",
-      "allowed_agents": ["supervisor"],
-      "notes": "Supervisor commands maintenance via queue, never direct execution"
+      "security_level": "read",
+      "implementation": "web"
+    },
+    "sandbox_test": {
+      "description": "Run code in sandbox for testing",
+      "parameters": {
+        "files": {"type": "array", "required": true},
+        "test_command": {"type": "string", "required": false}
+      },
+      "security_level": "execute",
+      "implementation": "sandbox"
+    },
+    "run_lint": {
+      "description": "Run linter on codebase",
+      "parameters": {
+        "path": {"type": "string", "required": false}
+      },
+      "security_level": "execute",
+      "implementation": "sandbox"
+    },
+    "run_typecheck": {
+      "description": "Run type checker on codebase",
+      "parameters": {
+        "path": {"type": "string", "required": false}
+      },
+      "security_level": "execute",
+      "implementation": "sandbox"
     }
-  },
-  
-  "security_levels": {
-    "read": "Can read data, no modifications",
-    "write": "Can modify data/files",
-    "execute": "Can run code in sandbox",
-    "secret": "Can access encrypted secrets"
-  },
-  
-  "notes": [
-    "Tools are primitives that agents use",
-    "Each agent gets 2-3 tools maximum to prevent drift",
-    "Tool permissions enforced at runtime",
-    "Implementation maps to Go function in internal/ package",
-    "Add new tools: add definition here, implement in Go, register in runtime"
-  ]
+  }
 }
