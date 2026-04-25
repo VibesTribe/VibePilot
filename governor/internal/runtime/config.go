@@ -453,6 +453,7 @@ type Config struct {
 	routingPath       string
 	planLifecyclePath string
 	promptsDir        string
+	repoPathOverride  string
 	db                PromptLoader
 
 	mu sync.RWMutex
@@ -838,10 +839,23 @@ func (c *Config) GetProtectedBranches() []string {
 }
 
 func (c *Config) GetRepoPath() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.repoPathOverride != "" {
+		return c.repoPathOverride
+	}
 	if c.System == nil || c.System.Git.RepoPath == "" {
 		return "."
 	}
 	return c.System.Git.RepoPath
+}
+
+// SetRepoPath overrides the repo path. Used by main.go to point to the
+// managed repo after bootstrapping.
+func (c *Config) SetRepoPath(path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.repoPathOverride = path
 }
 
 func (c *Config) GetGitTimeout() int {
