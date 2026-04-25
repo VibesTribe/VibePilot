@@ -300,7 +300,9 @@ func (s *Server) mapToEventType(payload *Payload) string {
 			}
 		case status == "review":
 			return string(runtime.EventTaskReview)
-		case status == "testing" || status == "complete":
+		case status == "testing":
+			return string(runtime.EventTaskTesting)
+		case status == "complete":
 			return string(runtime.EventTaskCompleted)
 		}
 
@@ -451,6 +453,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"exchange_rates", nil},
 		{"failure_records", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"maintenance_commands", map[string]any{"order": "created_at.desc", "limit": 200}},
+		{"system_counters", nil},
 	}
 
 	results := make(chan tableResult, len(tables))
