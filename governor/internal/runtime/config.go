@@ -322,6 +322,7 @@ type ConnectorConfig struct {
 	Type           string                 `json:"type"`
 	Status         string                 `json:"status"`
 	Provider       string                 `json:"provider,omitempty"`
+	URL            string                 `json:"url,omitempty"`
 	Command        string                 `json:"command,omitempty"`
 	CLIArgs        []string               `json:"cli_args,omitempty"`
 	Endpoint       string                 `json:"endpoint,omitempty"`
