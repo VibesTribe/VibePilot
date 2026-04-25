@@ -1009,35 +1009,39 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		}
 		log.Printf("[TaskReview] Task %s → council_review (supervisor=%s escalated)", truncateID(taskID), supervisorModelID)
 
-		case "reroute":
-			// Reroute → back to pending for different assignment
-			failureClass := decision.FailureClass
-			if failureClass == "" {
-				failureClass = "model_limitation"
-			}
-			failureDetail := decision.FailureDetail
-			if failureDetail == "" {
-				failureDetail = "Supervisor recommends different model"
-			}
-		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
-		// Record supervisor model success (correctly identified model limitation)
-		if h.usageTracker != nil {
-			h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
+	case "reroute":
+		// Reroute → back to pending for different assignment
+		// Supervisor explicitly rejected this model — exclude it from retry.
+		failureClass := decision.FailureClass
+		if failureClass == "" {
+			failureClass = "model_limitation"
 		}
-		h.recordEvent(ctx, "reroute", taskID, modelID, failureClass, map[string]any{
-			"class": failureClass, "detail": failureDetail,
-			"supervisor_model": supervisorModelID,
-		})
+		failureDetail := decision.FailureDetail
+		if failureDetail == "" {
+			failureDetail = "Supervisor recommends different model"
+		}
+	h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
+	// Record supervisor model success (correctly identified model limitation)
+	if h.usageTracker != nil {
+		h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
+	}
+	h.recordEvent(ctx, "reroute", taskID, modelID, failureClass, map[string]any{
+		"class": failureClass, "detail": failureDetail,
+		"supervisor_model": supervisorModelID,
+	})
 			if h.worktreeMgr != nil {
 				h.worktreeMgr.RemoveWorktree(ctx, taskID)
 			}
 			h.git.DeleteBranch(ctx, branchName)
+			// Exclude the rejected model BEFORE transitioning to pending.
+			// transition_task fires pgnotify → handler reads routing_flag_reason.
+			accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":        taskID,
 				"p_new_status":     "pending",
 				"p_failure_reason": fmt.Sprintf("[%s] %s", failureClass, failureDetail),
 			})
-			log.Printf("[TaskReview] Task %s reroute → pending", truncateID(taskID))
+			log.Printf("[TaskReview] Task %s reroute → pending (excluding model %s)", truncateID(taskID), modelID)
 
 		default:
 			// Unknown decision → human review

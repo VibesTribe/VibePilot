@@ -108,6 +108,12 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		h.recordTestResult(ctx, taskID, taskNumber, sliceID, testDir, false,
 			fmt.Sprintf("test_execution_error: %v", err), testOutput, duration)
 
+		// The test runner crashed — could be due to broken code from the executor model.
+		// Exclude the executor model so a different model gets a fresh attempt.
+		executorModelID := h.getExecutorModelID(ctx, taskID)
+		if executorModelID != "" {
+			accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", executorModelID)
+		}
 		h.database.RPC(ctx, "transition_task", map[string]any{
 			"p_task_id":        taskID,
 			"p_new_status":     "pending",
