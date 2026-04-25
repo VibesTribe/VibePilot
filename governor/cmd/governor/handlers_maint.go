@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -18,6 +19,7 @@ type MaintenanceHandler struct {
 	connRouter   *runtime.Router
 	cfg          *runtime.Config
 	git          *gitree.Gitree
+	worktreeMgr  *gitree.WorktreeManager
 	usageTracker *runtime.UsageTracker
 }
 
@@ -28,6 +30,7 @@ func NewMaintenanceHandler(
 	connRouter *runtime.Router,
 	cfg *runtime.Config,
 	git *gitree.Gitree,
+	worktreeMgr *gitree.WorktreeManager,
 	usageTracker *runtime.UsageTracker,
 ) *MaintenanceHandler {
 	return &MaintenanceHandler{
@@ -37,6 +40,7 @@ func NewMaintenanceHandler(
 		connRouter:   connRouter,
 		cfg:          cfg,
 		git:          git,
+		worktreeMgr:  worktreeMgr,
 		usageTracker: usageTracker,
 	}
 }
@@ -196,49 +200,77 @@ func (h *MaintenanceHandler) handleTaskApproved(event runtime.Event) {
 		return
 	}
 
-	// Claim for merge
-	mergeID := fmt.Sprintf("merge:%d", time.Now().UnixNano())
-	claimed, err := h.database.RPC(ctx, "claim_for_review", map[string]any{
-		"p_task_id":     taskID,
-		"p_reviewer_id": mergeID,
+	// Claim using set_processing — works on any status (claim_for_review only
+	// works for 'review'/'testing' which is why this handler was dead code).
+	processingBy := fmt.Sprintf("merge:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
+		"p_table":         "tasks",
+		"p_id":            taskID,
+		"p_processing_by": processingBy,
 	})
 	if err != nil || !parseBool(claimed) {
 		log.Printf("[TaskApproved] Task %s already being processed", truncateID(taskID))
 		return
 	}
 
+	defer h.database.RPC(ctx, "clear_processing", map[string]any{
+		"p_table": "tasks",
+		"p_id":    taskID,
+	})
+
 	branchName := h.buildBranchName(sliceID, taskNumber, taskID)
 	targetBranch := h.getTargetBranch(sliceID)
 
 	log.Printf("[TaskApproved] Merging %s -> %s for task %s", branchName, targetBranch, truncateID(taskID))
 
+	// Shadow merge check — detect conflicts before attempting real merge
+	if h.worktreeMgr != nil {
+		shadowResult, shadowErr := h.worktreeMgr.ShadowMerge(ctx, branchName, targetBranch)
+		if shadowErr != nil {
+			log.Printf("[TaskApproved] Shadow merge check failed for %s: %v (proceeding anyway)", branchName, shadowErr)
+		} else if shadowResult != nil && shadowResult.HasConflicts {
+			log.Printf("[TaskApproved] Shadow merge found conflicts for %s: %v → merge_pending", branchName, shadowResult.ConflictFiles)
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "merge_pending",
+			})
+			h.database.RPC(ctx, "record_failure", map[string]any{
+				"p_agent_id":       "maintenance",
+				"p_failure_class":  "merge_conflict",
+				"p_failure_detail": fmt.Sprintf("branch=%s target=%s conflicts=%v", branchName, targetBranch, shadowResult.ConflictFiles),
+				"p_task_id":        taskID,
+			})
+			return
+		}
+	}
+
 	if err := h.git.MergeBranch(ctx, branchName, targetBranch); err != nil {
-		log.Printf("[TaskApproved] Merge failed for %s: %v", truncateID(taskID), err)
-		h.database.RPC(ctx, "transition_task", map[string]any{
-			"p_task_id":        taskID,
-			"p_new_status":     "complete",
-			"p_failure_reason": "merge_failed",
-		})
-		// Record the merge failure for analytics
+		log.Printf("[TaskApproved] Merge failed for %s: %v — task stays complete", truncateID(taskID), err)
 		h.database.RPC(ctx, "record_failure", map[string]any{
 			"p_agent_id":       "maintenance",
 			"p_failure_class":  "merge_failed",
 			"p_failure_detail": fmt.Sprintf("branch=%s target=%s: %v", branchName, targetBranch, err),
 			"p_task_id":        taskID,
 		})
+		// Task stays "complete" — merge is best effort
 		return
 	}
 
-	h.git.DeleteBranch(ctx, branchName)
-
+	// Merge succeeded
 	h.database.RPC(ctx, "transition_task", map[string]any{
 		"p_task_id":    taskID,
 		"p_new_status": "merged",
 	})
-	h.database.RPC(ctx, "unlock_dependent_tasks", map[string]any{
-		"p_completed_task_id": taskID,
-	})
-	// Record successful merge for analytics
+
+	// Cleanup worktree and branch
+	if h.worktreeMgr != nil {
+		h.worktreeMgr.RemoveWorktree(ctx, taskID)
+	}
+	h.git.DeleteBranch(ctx, branchName)
+
+	// Check if all tasks for this slice are now merged → merge module to testing
+	h.tryMergeModuleToTesting(ctx, taskID, sliceID, targetBranch)
+
 	h.database.RPC(ctx, "record_performance_metric", map[string]any{
 		"p_agent_id":    "maintenance",
 		"p_metric_type": "merge",
@@ -264,16 +296,22 @@ func (h *MaintenanceHandler) handleTaskMergePending(event runtime.Event) {
 		return
 	}
 
-	// Claim for merge retry
-	mergeID := fmt.Sprintf("merge_retry:%d", time.Now().UnixNano())
-	claimed, err := h.database.RPC(ctx, "claim_for_review", map[string]any{
-		"p_task_id":     taskID,
-		"p_reviewer_id": mergeID,
+	// Claim using set_processing — works on any status.
+	processingBy := fmt.Sprintf("merge_retry:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
+		"p_table":         "tasks",
+		"p_id":            taskID,
+		"p_processing_by": processingBy,
 	})
 	if err != nil || !parseBool(claimed) {
 		log.Printf("[TaskMergePending] Task %s already being processed", truncateID(taskID))
 		return
 	}
+
+	defer h.database.RPC(ctx, "clear_processing", map[string]any{
+		"p_table": "tasks",
+		"p_id":    taskID,
+	})
 
 	log.Printf("[TaskMergePending] Creating maintenance command for task %s", truncateID(taskID))
 
@@ -320,6 +358,119 @@ func (h *MaintenanceHandler) getTargetBranch(sliceID string) string {
 	return "TEST_MODULES/" + sliceID
 }
 
+// tryMergeModuleToTesting checks if all tasks for the same slice and plan are merged.
+// If so, merges TEST_MODULES/<slice> into the "testing" branch.
+func (h *MaintenanceHandler) tryMergeModuleToTesting(ctx context.Context, taskID, sliceID, moduleBranch string) {
+	planID := ""
+	taskData, err := h.database.Query(ctx, "tasks", map[string]any{"id": "eq." + taskID, "select": "plan_id"})
+	if err != nil {
+		log.Printf("[TaskApproved] Module merge check: failed to query task plan_id: %v", err)
+		return
+	}
+	var tasks []map[string]any
+	if err := json.Unmarshal(taskData, &tasks); err == nil && len(tasks) > 0 {
+		if pid, ok := tasks[0]["plan_id"].(string); ok {
+			planID = pid
+		}
+	}
+	if planID == "" {
+		log.Printf("[TaskApproved] Module merge check: no plan_id for task %s, skipping", truncateID(taskID))
+		return
+	}
+
+	filters := map[string]any{
+		"plan_id":  "eq." + planID,
+		"slice_id": "eq." + sliceID,
+		"select":   "id,status",
+	}
+	siblingData, err := h.database.Query(ctx, "tasks", filters)
+	if err != nil {
+		log.Printf("[TaskApproved] Module merge check: failed to query siblings: %v", err)
+		return
+	}
+	var siblings []map[string]any
+	if err := json.Unmarshal(siblingData, &siblings); err != nil {
+		log.Printf("[TaskApproved] Module merge check: failed to parse siblings: %v", err)
+		return
+	}
+
+	allDone := true
+	remaining := 0
+	for _, s := range siblings {
+		status, _ := s["status"].(string)
+		switch status {
+		case "merged", "complete", "escalated", "cancelled":
+			// terminal states
+		default:
+			allDone = false
+			remaining++
+		}
+	}
+
+	if !allDone {
+		log.Printf("[TaskApproved] Module %s has %d tasks remaining (plan %s), skipping module merge", sliceID, remaining, truncateID(planID))
+		return
+	}
+
+	log.Printf("[TaskApproved] All tasks complete for module %s (plan %s) → merging %s to testing", sliceID, truncateID(planID), moduleBranch)
+	if err := h.git.MergeBranch(ctx, moduleBranch, "testing"); err != nil {
+		log.Printf("[TaskApproved] Module-to-testing merge FAILED for %s: %v", moduleBranch, err)
+	} else {
+		log.Printf("[TaskApproved] Module %s successfully merged to testing branch", sliceID)
+		h.tryMergeTestingToMain(ctx, planID)
+	}
+}
+
+// tryMergeTestingToMain checks if all modules for a plan are merged into testing.
+// If so, merges the testing branch into main (final integration step).
+func (h *MaintenanceHandler) tryMergeTestingToMain(ctx context.Context, planID string) {
+	taskData, err := h.database.Query(ctx, "tasks", map[string]any{
+		"plan_id": "eq." + planID,
+		"select":  "id,status,slice_id",
+	})
+	if err != nil {
+		log.Printf("[TaskApproved] Testing-to-main check: failed to query plan tasks: %v", err)
+		return
+	}
+	var tasks []map[string]any
+	if err := json.Unmarshal(taskData, &tasks); err != nil {
+		log.Printf("[TaskApproved] Testing-to-main check: failed to parse tasks: %v", err)
+		return
+	}
+
+	moduleStatus := map[string]bool{}
+	for _, t := range tasks {
+		sliceID, _ := t["slice_id"].(string)
+		status, _ := t["status"].(string)
+		if sliceID == "" {
+			continue
+		}
+		switch status {
+		case "merged", "complete", "escalated", "cancelled":
+			// terminal — ok
+		default:
+			moduleStatus[sliceID] = false
+		}
+		if _, exists := moduleStatus[sliceID]; !exists {
+			moduleStatus[sliceID] = true
+		}
+	}
+
+	for slice, done := range moduleStatus {
+		if !done {
+			log.Printf("[TaskApproved] Testing-to-main: module %s still has pending tasks (plan %s)", slice, truncateID(planID))
+			return
+		}
+	}
+
+	log.Printf("[TaskApproved] All modules complete for plan %s → merging testing to main", truncateID(planID))
+	if err := h.git.MergeBranch(ctx, "testing", "main"); err != nil {
+		log.Printf("[TaskApproved] Testing-to-main merge FAILED: %v", err)
+	} else {
+		log.Printf("[TaskApproved] Plan %s fully integrated: testing → main merge complete", truncateID(planID))
+	}
+}
+
 func setupMaintenanceHandler(
 	ctx context.Context,
 	router *runtime.EventRouter,
@@ -329,8 +480,9 @@ func setupMaintenanceHandler(
 	cfg *runtime.Config,
 	connRouter *runtime.Router,
 	git *gitree.Gitree,
+	worktreeMgr *gitree.WorktreeManager,
 	usageTracker *runtime.UsageTracker,
 ) {
-	handler := NewMaintenanceHandler(database, factory, pool, connRouter, cfg, git, usageTracker)
+	handler := NewMaintenanceHandler(database, factory, pool, connRouter, cfg, git, worktreeMgr, usageTracker)
 	handler.Register(router)
 }

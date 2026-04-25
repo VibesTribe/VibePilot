@@ -622,7 +622,7 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, contextBuilder)
 	setupPlanHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)
 	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)
-	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)
+	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter, git, worktreeMgr, usageTracker)
 	setupTestingHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, worktreeMgr, usageTracker)
 	actionApplier := runtime.NewResearchActionApplier(configDir, database)
 	setupResearchHandlers(ctx, router, factory, pool, database, cfg, connRouter, usageTracker, actionApplier)
