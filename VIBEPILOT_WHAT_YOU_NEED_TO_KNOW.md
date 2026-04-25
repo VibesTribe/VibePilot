@@ -1012,6 +1012,7 @@ cd ~/VibePilot && git add docs/prd/test-feature.md && git commit -m "prd: [featu
 ## Local PostgreSQL + Vault (April 23, 2026)
 
 Supabase replaced with local PostgreSQL 16. Peer auth for user `vibes` (no password).
+Supabase project cut off April 24 due to excessive egress from redundant polling (never poll again).
 
 ```bash
 # Connect to database
@@ -1064,3 +1065,149 @@ curl http://localhost:8080/api/dashboard/stream
 # PG dump + push to knowledgebase repo (runs daily at 3am via cron)
 ~/vibepilot/scripts/pg-dump-and-push.sh
 ```
+
+---
+
+## DASHBOARD REFERENCE AUDIT (Validated April 25, 2026)
+
+**Read this instead of re-reading dashboard source code. Every field, status, and data flow traced from actual code.**
+
+### Task Statuses (THESE ARE THE ONLY VALID TASK STATUSES)
+
+```
+pending        Task created, in orchestrator queue
+in_progress    Orchestrator assigned to model, executing
+received       Courier/web agent returned results
+review         Supervisor reviewing output quality
+testing        Testing handler running (3 layers)
+complete       Passed all gates, ready for merge
+merge_pending  Shadow merge detected conflicts, awaiting resolution
+merged         Merged to module/project branch
+failed         Failed at some stage, has notes, awaiting intelligent reassignment
+```
+
+**NO OTHER STATUSES ARE VALID FOR TASKS.** No `assigned`, no `human_review`, no `blocked`, no `council_review` for tasks. Council reviews PLANS only. Tasks never go to human.
+
+### Task Status Flow
+
+```
+pending → in_progress → received → review → testing → complete → merge_pending → merged
+               ↘ failed (with notes → back to pending for intelligent reassignment)
+```
+
+- `canTransition()`: forward-only, any status can transition to `failed`
+- `failed` tasks get notes, go back to `pending` for intelligent reassignment
+- System learns from every failure at every stage
+
+### What Dashboard Displays (per component)
+
+**TaskSnapshot (core/types.ts):**
+- `id` - Task ID
+- `title` - Task title
+- `status` - One of the 9 valid TaskStatus values
+- `confidence` - Confidence score (0-1)
+- `updatedAt` - ISO timestamp
+- `owner` - Model/provider assigned (e.g. "groq:gemma-2-9b-it")
+- `lessons` - Array of {title, summary} from learning
+- `sliceId` - Slice grouping
+- `taskNumber` - Task number within slice
+- `location` - TaskLocation object: {kind: "platform"|"mcp"|"internal", label, link?/endpoint?}
+- `dependencies` - Array of task IDs this depends on
+- `packet` - {prompt: string, attachments?: {label, href}[]}
+- `summary` - Task summary
+- `mergePending` - Boolean
+- `metrics` - {tokensUsed?, runtimeSeconds?, costUsd?}
+
+**AgentSnapshot (core/types.ts):**
+- `id`, `name`, `status`, `summary`, `updatedAt`
+- `logo?`, `tier?`, `cooldownReason?`, `costPerRunUsd?`
+- `vendor?`, `capability?`, `contextWindowTokens?`, `effectiveContextWindowTokens?`
+- `cooldownExpiresAt?`, `creditStatus?` ("available"|"low"|"depleted"|"unknown")
+- `rateLimitWindowSeconds?`, `costPer1kTokensUsd?`, `warnings?`
+
+**FailureSnapshot:** `id`, `title`, `summary`, `reasonCode`
+
+**MergeCandidate:** `branch`, `title`, `summary`, `checklist` (boolean[])
+
+**ModelAnalyticsView:** `id`, `started_at`, `status` (completed|failed|pending), `notes`
+
+### How Dashboard Gets Data
+
+1. **Governor SSE stream** at `http://localhost:8080/api/dashboard/stream`
+2. **Governor REST API** at `http://localhost:8080/api/dashboard` (~185KB JSON)
+3. Dashboard does NOT connect to PostgreSQL directly
+4. Dashboard does NOT connect to Supabase (was cut off April 24)
+5. Governor reads PostgreSQL, serves to dashboard
+
+### Dashboard Internal Architecture
+
+**Orchestrator (core/orchestrator.ts):**
+- `plan(objectives)` → builds TaskPacket[] via Planner
+- `dispatch(packet)` → Router selects provider, emits "in_progress" event, saves task state
+- Creates snapshots with status "in_progress" and owner = provider
+
+**Router (core/router.ts):**
+- Scores providers by: priority(0.28), confidence(0.26), successRate(0.24), latency(0.14), penalty(0.08)
+- Returns `{skillId, provider, confidence}`
+
+**Planner (core/planner.ts):**
+- Maps objectives → TaskPacket[] with auto-generated IDs
+- Each has taskId, title, objectives, deliverables, confidence, editScope
+
+**MCP Server (mcp/server.ts):**
+- Tools: runSkill, getTaskState, emitNote, queryEvents
+- `/run-task` endpoint: validates TaskPacket, dispatches via orchestrator, queues to disk
+- Port 3030 by default
+
+**Agents (all in src/agents/):**
+- All take TaskPacket, return {summary, confidence, deliverables}
+- PrdAgent, PlannerAgent, DevAgent, DesignAgent, SupervisorAgent, TesterAgent, WatcherAgent, AnalystAgent, ResearchAgent, MaintenanceAgent
+- SupervisorAgent: validates task state against JSON schema, runs TesterAgent
+- TesterAgent: spawns skill runners (validate_output, run_visual_tests), returns passed/failed/error
+- WatcherAgent: drift detection stub
+
+**TaskState (core/taskState.ts):**
+- Persisted to `data/state/task.state.json`
+- Shape: {tasks: TaskSnapshot[], agents: AgentSnapshot[], failures: FailureSnapshot[], merge_candidates: MergeCandidate[], metrics: Record<string,unknown>, updated_at: string}
+
+**Events (utils/events.ts):**
+- Stored in `data/state/events.log.jsonl` (JSONL)
+- Quality derived from events: "pass" if positive status/event, "fail" if negative or error
+- POSITIVE_STATUSES: complete, merged, merge_pending
+- NEGATIVE_STATUSES: failed
+
+### What Dashboard Needs from Go Governor API
+
+The `/api/dashboard` endpoint must return JSON containing:
+1. `tasks` - Array matching TaskSnapshot shape (with all fields above)
+2. `agents` - Array matching AgentSnapshot shape
+3. `failures` - Array matching FailureSnapshot shape
+4. `merge_candidates` - Array matching MergeCandidate shape
+5. `metrics` - Key-value metrics
+6. `updated_at` - ISO timestamp
+
+Each task must have:
+- `status` as one of the 9 valid TaskStatus values (no others)
+- `owner` showing which model it was assigned to
+- `location` with kind (platform/mcp/internal), label, and link/endpoint
+- `packet` with the prompt and any attachments
+- `metrics` with token usage, runtime, cost
+
+### Plan Statuses (separate from task statuses)
+
+Plans have their own lifecycle (see `plan_lifecycle.json`). Council reviews PLANS only, never tasks.
+
+### Council Triggers
+
+Council can be called for:
+1. Complex plan architecture review (supervisor triggers)
+2. System researcher suggested updates
+3. Architecture improvements
+
+### Human Role (VERY LIMITED)
+
+1. Visual UI/UX review only
+2. Paid API benched decisions (credit depleted)
+3. Research suggestions after council review
+
+Human NEVER: reviews code, merges code, debugs, writes code, does anything technical.
