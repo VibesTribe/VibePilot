@@ -1,5 +1,5 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-24 01:22 UTC — VERIFIED AGAINST CODE AND CONFIG FILES
+# AUTO-UPDATED: 2026-04-25 16:55 UTC — VERIFIED AGAINST CODE AND CONFIG FILES
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 
@@ -22,18 +22,19 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 
 ## System Status
 
-- **Governor:** RUNNING (PID 169300, systemd service, Restart=always)
+- **Governor:** RUNNING (PID 327784, systemd service, Restart=always)
   - Binary: /home/vibes/vibepilot/governor/governor
   - Runtime repo: ~/vibepilot (config, binary, prompts)
-  - Dev repo: ~/VibePilot (source, synced to origin/main)
   - Database: Local PostgreSQL 16 (system.json type=postgres)
-  - Startup: `Connected to Postgres database`, 57/57 models restored
   - Webhook: port 8080/webhooks
   - SSE: pg_notify on vp_changes → SSE broker → dashboard
-- **Git:** main branch. Last: 2fffb4ad
+  - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
+- **Git:** main branch. Last: cf96ebbd
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app
 - **Chrome CDP:** 127.0.0.1:9222
-- **Host:** x220, up 2d12h, 15GB RAM, 3.5GB used
+- **Host:** x220, up 4d4h, 15GB RAM, 4.6GB used
+- **Pipeline tables:** EMPTY (truncated, ready for E2E test)
+- **System counters:** 487,793 tokens / 48 runs lifetime
 
 ## Human Role (3 things only)
 
@@ -57,7 +58,7 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 
 ### Config-Driven Timeouts
 - All timeouts read from system.json with sensible fallbacks:
-  - `system.execution.default_timeout_seconds` → GetRunnerTimeoutSecs() (fallback 300) — global default for CLI runners
+  - `system.execution.default_timeout_seconds` → GetRunnerTimeoutSecs() (fallback 300)
   - `system.db.http_timeout_seconds` → GetDBHTTPTimeoutSecs() (fallback 30)
   - `system.db.error_truncate_length` → GetDBErrorTruncateLen() (fallback 200)
   - `system.http.client_timeout_seconds` → GetHTTPClientTimeoutSecs() (fallback 30)
@@ -72,12 +73,10 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 
 ## MODELS: CONFIG ↔ DB SYNC VIA RESEARCH PIPELINE
 
-### Current State (Verified 2026-04-24)
+### Current State (Verified 2026-04-25)
 - **Config/models.json:** 16 model entries
-- **DB:** 57 models registered (from historical research pipeline)
-- **By status:** 49 active, 6 benched, 2 paused
-- **By access type:** 37 API, 19 web, 1 CLI subscription (GLM-5)
-- **UsageTracker:** Restores 57/57 models from DB on startup
+- **DB:** models loaded at startup from config (no hot reload, restart required)
+- **UsageTracker:** Restores all models from DB on startup
 
 ### Sync Mechanism (deterministic, no LLM middleman)
 - **Research → Direct Apply:** When supervisor approves research suggestion with type:
@@ -102,14 +101,20 @@ All 6 handlers have learning coverage (verified by grep):
 - research: 4 calls, 90% coverage
 - maint: 7 calls, 95% coverage
 
-## COURIER SYSTEM — BUILT AND WIRED
+## COURIER SYSTEM — BUILT, BUGS FIXED, READY FOR E2E TEST
 
 Architecture: GitHub Actions + Governor API + SSE
 - governor/internal/connectors/courier.go: CourierRunner with dispatch + channel-based result waiters
 - scripts/courier_run.py: Browser-use with platform selectors, posts to governor API
 - POST /api/courier/result: Governor receives courier results, writes to task_runs, notifies waiter
 - SSE bridge: pg_notify → SSEBroker → dashboard live updates
-- Status: Not yet E2E tested
+- governor_external_url: https://webhooks.vibestribe.rocks (in system.json)
+
+### Bugs Fixed (2026-04-25, commit dd7fba1c)
+1. **courier_run.py status**: "completed" → "success" to match task_runs CHECK constraint
+2. **record_courier_result RPC**: Consolidated from 2 overloads (text/jsonb) to single text overload that always calls increment_lifetime_counters
+3. **Duplicate task_runs**: executeCourierTask now calls update_courier_task_run (updates existing row) instead of create_task_run (which created duplicates)
+4. **pgnotify EventCourierResult handler**: Now queries DB for task_run data instead of unmarshaling nil event.Record
 
 ## CONSULTANT AGENT — BUILT, TESTED ONCE
 
@@ -125,12 +130,12 @@ Architecture: AES-GCM encrypted secrets in `secrets_vault` table (local PG).
 - Config-driven: vault.key_env in system.json tells governor which env var holds the master key
 - Bootstrap: only DATABASE_URL + VAULT_KEY needed as env vars. All other secrets in vault.
 
-## LOCAL PG RPCs: 141 total (verified 2026-04-24)
+## LOCAL PG RPCs: 146 total (verified 2026-04-25)
 
 ## RECENT COMMITS
 
-1. 2fffb4ad — feat: eliminate hardcoded token estimates, make all timeouts config-driven
-2. 3730bf46 — docs: add plan 79f28776
-3. 3f5a4b82 — prd: hello pipeline v2 smoke test
-4. 3222dac0 — fix: routing cascade puts Gemini first (4 free keys), add plan_id guard, fix race condition
-5. 95a9b244 — docs: add plan for hello-pipeline test PRD
+1. cf96ebbd — chore: add migration 128 for courier RPC fixes
+2. dd7fba1c — fix: 4 courier pipeline bugs (status mismatch, duplicate RPC, nil Record, counter)
+3. 9c580e6d — Remove all Supabase from courier pipeline, add external callback URL
+4. e0ebb144 — fix: task handler respects planner routing_flag from DB
+5. 5d5f43fb — feat: add human_review status — three mandatory human triggers
