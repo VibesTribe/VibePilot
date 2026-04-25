@@ -600,19 +600,15 @@ func (h *TaskHandler) executeCourierTask(
 	}
 	h.commitOutput(ctx, branchName, nil, output, summary, modelID, taskID, duration.Seconds())
 
-	// Record task run via RPC (params match create_task_run signature exactly)
+	// Update the existing task_run row (created by CourierRunner.Run, updated by webhook callback)
+	// with full execution metadata. Avoids duplicate rows.
 	totalTokens := tokensIn + tokensOut
-	h.database.RPC(ctx, "create_task_run", map[string]any{
-		"p_task_id":      taskID,
-		"p_model_id":     modelID,
-		"p_status":       "success",
-		"p_tokens_in":    tokensIn,
-		"p_tokens_out":   tokensOut,
-		"p_tokens_used":  totalTokens,
-		"p_courier":      "github-actions",
-		"p_platform":     platformID,
-		"p_started_at":   runStart.UTC().Format(time.RFC3339),
-		"p_completed_at": time.Now().UTC().Format(time.RFC3339),
+	h.database.RPC(ctx, "update_courier_task_run", map[string]any{
+		"p_task_id":     taskID,
+		"p_model_id":    modelID,
+		"p_courier":     "github-actions",
+		"p_platform":    platformID,
+		"p_tokens_used": totalTokens,
 	})
 
 	// Transition task to review (params match transition_task signature)

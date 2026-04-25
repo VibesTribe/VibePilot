@@ -197,7 +197,7 @@ Return the full response text."""
         print(f"[Courier] Success! Output length: {len(output)} chars")
         print(f"[Courier] Estimated tokens: {tokens_in}/{tokens_out}")
 
-        update_result(task_id, "completed", output=output,
+        update_result(task_id, "success", output=output,
                        tokens_in=tokens_in, tokens_out=tokens_out)
 
     except asyncio.TimeoutError:

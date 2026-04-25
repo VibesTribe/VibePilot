@@ -135,6 +135,10 @@ var defaultRPCAllowlist = map[string]bool{
 	// Usage persistence (migration 126)
 	"upsert_connector_usage": true,
 	"update_platform_usage":  true,
+
+	// Courier result handling
+	"record_courier_result":     true,
+	"update_courier_task_run":   true,
 }
 
 type RPCAllowlist struct {

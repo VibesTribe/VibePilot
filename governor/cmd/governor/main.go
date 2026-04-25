@@ -633,27 +633,53 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 	actionApplier := runtime.NewResearchActionApplier(configDir, database)
 	setupResearchHandlers(ctx, router, factory, pool, database, cfg, connRouter, usageTracker, actionApplier)
 
-	// Courier result handler: delivers courier result notifications to waiting goroutines via channel
+	// Courier result handler (pgnotify path): backup delivery channel for waiting goroutines.
+	// The primary path is the webhook callback in SetCourierResultFn. This pgnotify handler
+	// fires after the webhook writes to task_runs, which triggers the notify trigger.
+	// pgnotify sets Record to nil, so we must query the DB to get the result data.
 	if courierRunner != nil {
 		router.On(runtime.EventCourierResult, func(event runtime.Event) {
-			var record struct {
-				ID        string `json:"id"`
-				Status    string `json:"status"`
-				Output    string `json:"output"`
-				Error     string `json:"error"`
-				TokensIn  int    `json:"tokens_in"`
-				TokensOut int    `json:"tokens_out"`
-			}
-			if err := json.Unmarshal(event.Record, &record); err != nil {
-				log.Printf("[CourierResult] Failed to parse record: %v", err)
+			// pgnotify always sets Record to nil — query DB for the latest task_run result
+			if event.ID == "" {
 				return
 			}
-			courierRunner.NotifyResult(record.ID, &connectors.TaskRunResult{
-				Status:    record.Status,
-				Output:    record.Output,
-				Error:     record.Error,
-				TokensIn:  record.TokensIn,
-				TokensOut: record.TokensOut,
+			rows, err := database.Query(context.Background(), "task_runs", map[string]any{
+				"task_id": event.ID,
+				"order":   "completed_at.desc",
+				"limit":   1,
+				"select":  "status,result,error,tokens_in,tokens_out",
+			})
+			if err != nil || len(rows) == 0 {
+				log.Printf("[CourierResult-pgnotify] No task_run found for task %s", event.ID)
+				return
+			}
+			var runs []struct {
+				Status    string          `json:"status"`
+				Result    json.RawMessage `json:"result"`
+				Error     string          `json:"error"`
+				TokensIn  int             `json:"tokens_in"`
+				TokensOut int             `json:"tokens_out"`
+			}
+			if err := json.Unmarshal(rows, &runs); err != nil || len(runs) == 0 {
+				log.Printf("[CourierResult-pgnotify] Parse error for task %s: %v", event.ID, err)
+				return
+			}
+			run := runs[0]
+			output := ""
+			if len(run.Result) > 0 {
+				var r struct {
+					Output string `json:"output"`
+				}
+				if json.Unmarshal(run.Result, &r) == nil {
+					output = r.Output
+				}
+			}
+			courierRunner.NotifyResult(event.ID, &connectors.TaskRunResult{
+				Status:    run.Status,
+				Output:    output,
+				Error:     run.Error,
+				TokensIn:  run.TokensIn,
+				TokensOut: run.TokensOut,
 			})
 		})
 	}
