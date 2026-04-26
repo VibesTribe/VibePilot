@@ -448,11 +448,22 @@ func (h *TaskHandler) executeTask(
 	taskOutput, parseErr := runtime.ParseTaskRunnerOutput(result.Output)
 	var files []runtime.File
 	var summary string
+	outputFormatIssue := false
 	if parseErr != nil {
 		summary = cleanOutput
 	} else {
 		files = taskOutput.Files
 		summary = taskOutput.Summary
+		// Detect format issue: models returning string paths instead of {path,content} objects
+		for _, f := range files {
+			if f.Path != "" && f.Content == "" {
+				outputFormatIssue = true
+				break
+			}
+		}
+		if outputFormatIssue {
+			log.Printf("[TaskHandler] WARNING: Model returned files_created as string paths without content for %s — format violation", truncateID(taskID))
+		}
 	}
 
 	// Build execution result for supervisor review
@@ -467,9 +478,10 @@ func (h *TaskHandler) executeTask(
 			}
 			return result
 		}(),
-		"summary":    summary,
-		"raw_output": cleanOutput,
-		"status":     "complete",
+		"summary":             summary,
+		"raw_output":          cleanOutput,
+		"status":              "complete",
+		"output_format_issue": outputFormatIssue,
 	}
 
 	// Commit output to branch
@@ -596,6 +608,7 @@ func (h *TaskHandler) executeCourierTask(
 	taskOutput, parseErr := runtime.ParseTaskRunnerOutput(output)
 	var files []runtime.File
 	var summary string
+	outputFormatIssue := false
 	if parseErr != nil {
 		log.Printf("[CourierTask] Output parse failed for %s: %v (using raw output)", truncateID(taskID), parseErr)
 		summary = output
@@ -606,6 +619,16 @@ func (h *TaskHandler) executeCourierTask(
 		files = taskOutput.Files
 		summary = taskOutput.Summary
 		log.Printf("[CourierTask] Parsed %d files from courier output for %s", len(files), truncateID(taskID))
+		// Detect format issue: models returning string paths instead of {path,content} objects
+		for _, f := range files {
+			if f.Path != "" && f.Content == "" {
+				outputFormatIssue = true
+				break
+			}
+		}
+		if outputFormatIssue {
+			log.Printf("[CourierTask] WARNING: Courier model returned files_created as string paths without content for %s — format violation", truncateID(taskID))
+		}
 	}
 
 	// Commit output to branch with parsed files
@@ -1114,11 +1137,26 @@ func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files
 			}
 		}
 		outputMap["files"] = fileMaps
-		// If all files have empty content, fall back to raw output as a file
+		// If all files have empty content, the model returned paths but no content.
+		// Save both: raw_output as task_output.txt AND a manifest showing what was expected.
 		if !hasContent && rawOutput != "" {
 			log.Printf("[commitOutput] Warning: all files have empty content for %s, saving raw_output as task_output.txt", truncateID(taskID))
+			// Build manifest showing the file paths that were expected but have no content
+			paths := make([]string, len(files))
+			for i, f := range files {
+				paths[i] = f.Path
+			}
+			manifest, _ := json.MarshalIndent(map[string]any{
+				"warning":           "Model returned file paths but no file content (output format violation)",
+				"expected_files":    paths,
+				"task_id":           taskID,
+				"model_id":          modelID,
+				"has_raw_output":    rawOutput != "",
+				"supervisor_action": "Review raw_output. If file content should be present, fail with failure_class=borken_output.",
+			}, "", "  ")
 			outputMap["files"] = []any{
 				map[string]any{"path": "task_output.txt", "content": rawOutput},
+				map[string]any{"path": "output_manifest.json", "content": string(manifest)},
 			}
 		}
 	}
