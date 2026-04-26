@@ -6,3 +6,4 @@ Create a single JSON file at output/hello.json containing: {"message": "hello wo
 ## Requirements
 - Create output/hello.json with the exact content above
 - Nothing else
+
