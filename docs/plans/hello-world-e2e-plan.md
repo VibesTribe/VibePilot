@@ -1,7 +1,7 @@
-# PLAN: Hello World E2E (Internal)
+# PLAN: Hello World E2E
 
 ## Overview
-Create a simple JSON artifact at a specific path to validate pipeline execution and codebase access.
+Create a simple JSON file at a specific path to validate end-to-end pipeline execution and codebase interaction.
 
 ## Tasks
 
@@ -15,21 +15,21 @@ Create a simple JSON artifact at a specific path to validate pipeline execution 
 # TASK: T001 - Create Hello World JSON
 
 ## Context
-This is an end-to-end internal test. The goal is to verify that the agent can navigate the project structure and create a specific file with valid JSON content.
+This task is part of an internal E2E test to verify that agents can successfully create files within the project structure. 
 
 ## What to Build
-1. Ensure the directory `output/` exists in the project root.
-2. Create a file named `output/hello.json`.
-3. The file must contain exactly the following JSON content:
+Create a new file at `output/hello.json`. If the `output/` directory does not exist, create it first. 
+
+The file must contain the following JSON object:
 {
   "message": "hello world",
   "status": "ok"
 }
 
-Do not include any other fields. Ensure the file is correctly formatted and valid JSON.
+Ensure the JSON is valid and correctly formatted.
 
 ## Files
-- `output/hello.json` - The target JSON file
+- `output/hello.json` - The generated test artifact
 ```
 
 #### Expected Output
@@ -39,7 +39,8 @@ Do not include any other fields. Ensure the file is correctly formatted and vali
   "files_created": ["output/hello.json"],
   "tests_written": []
 }
-```",
+```
+",
   "tasks": [
     {
       "task_number": "T001",
@@ -50,22 +51,23 @@ Do not include any other fields. Ensure the file is correctly formatted and vali
       "prompt_packet": "# TASK: T001 - Create Hello World JSON
 
 ## Context
-This is an end-to-end internal test. The goal is to verify that the agent can navigate the project structure and create a specific file with valid JSON content.
+This task is part of an internal E2E test to verify that agents can successfully create files within the project structure. 
 
 ## What to Build
-1. Ensure the directory `output/` exists in the project root.
-2. Create a file named `output/hello.json`.
-3. The file must contain exactly the following JSON content:
+Create a new file at `output/hello.json`. If the `output/` directory does not exist, create it first. 
+
+The file must contain the following JSON object:
 {
   "message": "hello world",
   "status": "ok"
 }
 
-Do not include any other fields. Ensure the file is correctly formatted and valid JSON.
+Ensure the JSON is valid and correctly formatted.
 
 ## Files
-- `output/hello.json` - The target JSON file",
+- `output/hello.json` - The generated test artifact",
       "expected_output": {
+        "task_id": "T001",
         "files_created": [
           "output/hello.json"
         ],
@@ -74,5 +76,4 @@ Do not include any other fields. Ensure the file is correctly formatted and vali
     }
   ],
   "total_tasks": 1,
-  "status": "review",
-  "slice_id": "hello-world-e2e
+  "status": "review
