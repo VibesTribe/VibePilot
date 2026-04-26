@@ -141,6 +141,11 @@ func handlePlanCreated(
 			if usageTracker != nil {
 				if isRateLimitError(err) {
 					usageTracker.RecordRateLimit(ctx, routingResult.ModelID)
+					// Shared rate limits (e.g. Groq TPD) block ALL models on the same connector.
+					// Cooldown the connector so the cascade skips it immediately.
+					if routingResult.ConnectorID != "" {
+						usageTracker.RecordConnectorCooldown(ctx, routingResult.ConnectorID, 5)
+					}
 				}
 				usageTracker.RecordCompletion(ctx, routingResult.ModelID, "", time.Since(startTime).Seconds(), false)
 			}
@@ -361,6 +366,16 @@ func runPlanReview(
 				"p_failure_type":     "execution_error",
 				"p_failure_category": "model_issue",
 			})
+			// Rate limit tracking: cooldown connector so cascade skips dead endpoints
+			if usageTracker != nil {
+				if isRateLimitError(err) {
+					usageTracker.RecordRateLimit(ctx, routingResult.ModelID)
+					if routingResult.ConnectorID != "" {
+						usageTracker.RecordConnectorCooldown(ctx, routingResult.ConnectorID, 5)
+					}
+				}
+				usageTracker.RecordCompletion(ctx, routingResult.ModelID, "", time.Since(startTime).Seconds(), false)
+			}
 			if attempt < maxRetries-1 {
 				continue // try next model
 			}
