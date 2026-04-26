@@ -664,17 +664,24 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 				log.Printf("[CourierResult-pgnotify] Parse error for task %s: %v", event.ID, err)
 				return
 			}
-			run := runs[0]
-			output := ""
-			if len(run.Result) > 0 {
-				var r struct {
-					Output string `json:"output"`
-				}
-				if json.Unmarshal(run.Result, &r) == nil {
-					output = r.Output
-				}
+		run := runs[0]
+		// Ignore non-terminal statuses — the initial INSERT (status="running")
+		// triggers this same handler via pg_notify, which would prematurely
+		// deliver an empty result to the waiting goroutine before the
+		// GitHub Actions workflow even starts.
+		if run.Status != "success" && run.Status != "failed" {
+			return
+		}
+		output := ""
+		if len(run.Result) > 0 {
+			var r struct {
+				Output string `json:"output"`
 			}
-			courierRunner.NotifyResult(event.ID, &connectors.TaskRunResult{
+			if json.Unmarshal(run.Result, &r) == nil {
+				output = r.Output
+			}
+		}
+		courierRunner.NotifyResult(event.ID, &connectors.TaskRunResult{
 				Status:    run.Status,
 				Output:    output,
 				Error:     run.Error,
