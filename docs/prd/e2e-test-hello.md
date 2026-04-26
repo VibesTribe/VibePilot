@@ -8,3 +8,6 @@ Create a single JSON file at output/hello.json. This task requires access to the
 - File must be valid JSON
 - Requires codebase access to navigate project structure
 - Must be executed internally (not on external web platforms)
+
+## Notes
+E2E pipeline test - v2. Triggered via webhook push.
