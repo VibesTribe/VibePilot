@@ -1,7 +1,7 @@
 # PLAN: Hello World Pipeline Test
 
 ## Overview
-This plan creates a single JSON file as a pipeline validation artifact to test the end-to-end VibePilot pipeline.
+This plan creates a single JSON file to validate the end-to-end pipeline execution from PRD to completion.
 
 ## Tasks
 
@@ -15,19 +15,17 @@ This plan creates a single JSON file as a pipeline validation artifact to test t
 # TASK: T001 - Create Hello World JSON Output File
 
 ## Context
-This task is part of a pipeline validation test to ensure the end-to-end VibePilot pipeline functions correctly. The goal is to create a single output file without modifying any existing project files.
+This task is part of a pipeline validation test to ensure the full VibePilot pipeline functions correctly from PRD to completion. The objective is to produce a single output file without modifying any existing project files.
 
 ## What to Build
-Create a single file named `output/hello.json`. This file should contain a valid JSON object with the following fields:
-- `greeting`: "Hello from VibePilot!"
-- `status`: "success"
+Create a single file named `output/hello.json`. This file must contain a valid JSON object with the following fields:
+- `greeting`: A string with the value "Hello from VibePilot!"
+- `status`: A string with the value "success"
 - `generated_at`: The current timestamp in ISO 8601 format.
-- `pipeline`: "e2e-test-passed"
-
-Ensure that no other files are created or modified. The generated JSON must be syntactically correct.
+- `pipeline`: A string with the value "e2e-test-passed"
 
 ## Files
-- `output/hello.json` - The output JSON artifact.
+- `output/hello.json`: The generated JSON output artifact.
 ```
 
 #### Expected Output
@@ -38,3 +36,37 @@ Ensure that no other files are created or modified. The generated JSON must be s
   "tests_written": []
 }
 ```
+",
+  "tasks": [
+    {
+      "task_id": "T001",
+      "title": "Create Hello World JSON Output File",
+      "category": "coding",
+      "confidence": 0.99,
+      "dependencies": [],
+      "prompt_packet": "# TASK: T001 - Create Hello World JSON Output File
+
+## Context
+This task is part of a pipeline validation test to ensure the full VibePilot pipeline functions correctly from PRD to completion. The objective is to produce a single output file without modifying any existing project files.
+
+## What to Build
+Create a single file named `output/hello.json`. This file must contain a valid JSON object with the following fields:
+- `greeting`: A string with the value "Hello from VibePilot!"
+- `status`: A string with the value "success"
+- `generated_at`: The current timestamp in ISO 8601 format.
+- `pipeline`: A string with the value "e2e-test-passed"
+
+## Files
+- `output/hello.json`: The generated JSON output artifact.
+",
+      "expected_output": {
+        "task_id": "T001",
+        "files_created": [
+          "output/hello.json"
+        ],
+        "tests_written": []
+      }
+    }
+  ],
+  "total_tasks": 1,
+  "status": "review
