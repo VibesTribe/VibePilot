@@ -592,12 +592,24 @@ func (h *TaskHandler) executeCourierTask(
 	duration := time.Since(runStart)
 	log.Printf("[CourierTask] Courier completed for %s in %.1fs (tokens: %d/%d)", truncateID(taskID), duration.Seconds(), tokensIn, tokensOut)
 
-	// Commit output and transition to review, same as internal execution
-	summary := output
-	if len(output) > 500 {
-		summary = output[:500] + "..."
+	// Parse courier output for files, same as internal execution path
+	taskOutput, parseErr := runtime.ParseTaskRunnerOutput(output)
+	var files []runtime.File
+	var summary string
+	if parseErr != nil {
+		log.Printf("[CourierTask] Output parse failed for %s: %v (using raw output)", truncateID(taskID), parseErr)
+		summary = output
+		if len(output) > 500 {
+			summary = output[:500] + "..."
+		}
+	} else {
+		files = taskOutput.Files
+		summary = taskOutput.Summary
+		log.Printf("[CourierTask] Parsed %d files from courier output for %s", len(files), truncateID(taskID))
 	}
-	h.commitOutput(ctx, branchName, nil, output, summary, modelID, taskID, duration.Seconds())
+
+	// Commit output to branch with parsed files
+	h.commitOutput(ctx, branchName, files, output, summary, modelID, taskID, duration.Seconds())
 
 	// Update the existing task_run row (created by CourierRunner.Run, updated by webhook callback)
 	// with full execution metadata. Avoids duplicate rows.
