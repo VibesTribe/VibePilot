@@ -247,7 +247,7 @@
       "id": "nvidia-api",
       "name": "NVIDIA NIM API",
       "type": "api",
-      "status": "disabled",
+      "status": "active",
       "provider": "nvidia",
       "endpoint": "https://integrate.api.nvidia.com/v1",
       "api_key_ref": "NVIDIA_API_KEY",

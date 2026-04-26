@@ -192,7 +192,13 @@ func (g *Gitree) CreateBranchFrom(ctx context.Context, branchName, sourceBranch 
 
 		if err := checkoutCmd.Run(); err != nil {
 			if strings.Contains(out.String(), "already exists") {
-				return g.gitCommand(ctx, "push", "-u", g.remoteName, branchName).Run()
+				// Branch exists locally — just check it out and ensure it tracks remote
+				if checkoutErr := g.gitCommand(ctx, "checkout", branchName).Run(); checkoutErr != nil {
+					return fmt.Errorf("checkout existing branch %s: %w", branchName, checkoutErr)
+				}
+				// Ensure remote tracking (ignore error if already tracking)
+				g.gitCommand(ctx, "push", "-u", g.remoteName, branchName).Run()
+				return nil
 			}
 			return fmt.Errorf("create branch from %s: %w - %s", sourceBranch, err, out.String())
 		}
