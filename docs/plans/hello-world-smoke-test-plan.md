@@ -1,7 +1,7 @@
 # PLAN: Hello World Smoke Test
 
 ## Overview
-This plan generates a simple JSON file as a smoke test for the VibePilot pipeline. It ensures basic file creation and JSON formatting capabilities are functional.
+This plan outlines the steps to create a simple `output/hello.json` file for smoke testing purposes.
 
 ## Tasks
 
@@ -11,29 +11,32 @@ This plan generates a simple JSON file as a smoke test for the VibePilot pipelin
 **Dependencies:** none
 
 #### Prompt Packet
-```markdown
+```
 # TASK: T001 - Generate greeting JSON file
 
 ## Context
-This task is part of a smoke test to verify basic VibePilot functionality, specifically the ability to create a JSON file with dynamic content.
+This task is part of a smoke test to verify basic file generation capabilities. The goal is to create a single JSON output file that includes a predefined message and a dynamic timestamp.
 
 ## What to Build
-Create a file named `output/hello.json`. The file should contain a JSON object with the following structure:
+Create a file named `output/hello.json`. The directory `output` should be created if it doesn't exist. The content of `output/hello.json` must be a valid JSON object with the following structure:
 
 - `message`: A string with the value "Hello from VibePilot!"
-- `timestamp`: An ISO 8601 formatted string representing the current time.
+- `timestamp`: An ISO 8601 formatted string representing the current date and time.
 
-Ensure the `output` directory is created if it does not already exist.
+**Constraints:**
+- Only create the `output/hello.json` file. Do not modify or delete any other files.
+- Do not introduce any external dependencies or make network calls.
 
 ## Files
-- `output/hello.json` - The generated greeting JSON file.
+- `output/hello.json` - The generated JSON file.
 ```
 
 #### Expected Output
 ```json
 {
+  "task_id": "T001",
   "files_created": ["output/hello.json"],
-  "tests_required": []
+  "tests_written": []
 }
 ```
 ",
@@ -47,24 +50,27 @@ Ensure the `output` directory is created if it does not already exist.
       "prompt_packet": "# TASK: T001 - Generate greeting JSON file
 
 ## Context
-This task is part of a smoke test to verify basic VibePilot functionality, specifically the ability to create a JSON file with dynamic content.
+This task is part of a smoke test to verify basic file generation capabilities. The goal is to create a single JSON output file that includes a predefined message and a dynamic timestamp.
 
 ## What to Build
-Create a file named `output/hello.json`. The file should contain a JSON object with the following structure:
+Create a file named `output/hello.json`. The directory `output` should be created if it doesn't exist. The content of `output/hello.json` must be a valid JSON object with the following structure:
 
 - `message`: A string with the value "Hello from VibePilot!"
-- `timestamp`: An ISO 8601 formatted string representing the current time.
+- `timestamp`: An ISO 8601 formatted string representing the current date and time.
 
-Ensure the `output` directory is created if it does not already exist.
+**Constraints:**
+- Only create the `output/hello.json` file. Do not modify or delete any other files.
+- Do not introduce any external dependencies or make network calls.
 
 ## Files
-- `output/hello.json` - The generated greeting JSON file.
+- `output/hello.json` - The generated JSON file.
 ",
       "expected_output": {
+        "task_id": "T001",
         "files_created": [
           "output/hello.json"
         ],
-        "tests_required": []
+        "tests_written": []
       }
     }
   ],
