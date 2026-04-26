@@ -73,7 +73,10 @@
         "tool_calling"
       ],
       "access_via": [
-        "gemini-api-courier"
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general"
       ],
       "api_key_ref": "GEMINI_COURIER_KEY",
       "status": "active",
@@ -126,7 +129,10 @@
         "tool_calling"
       ],
       "access_via": [
-        "gemini-api-researcher"
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general"
       ],
       "api_key_ref": "GEMINI_RESEARCHER_KEY",
       "status": "active",
@@ -179,7 +185,10 @@
         "tool_calling"
       ],
       "access_via": [
-        "gemini-api-visual"
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general"
       ],
       "api_key_ref": "GEMINI_VISUAL_TESTER_KEY",
       "status": "active",
@@ -217,57 +226,6 @@
         "may_change"
       ],
       "notes": "Best available on free tier for code/visual QA. 3.1-pro-preview requires billing. 3-flash is free and capable."
-    },
-    {
-      "id": "gemini-2.5-flash-lite",
-      "name": "Gemini 2.5 Flash Lite (General / Legacy Fallback)",
-      "provider": "google",
-      "access_type": "api",
-      "context_limit": 1000000,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal"
-      ],
-      "access_via": [
-        "gemini-api-general"
-      ],
-      "api_key_ref": "GEMINI_GENERAL_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 5,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "wait_and_retry",
-        "cooldown_minutes": 2,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "ultra_stable",
-        "fast",
-        "long_context",
-        "never_overloaded"
-      ],
-      "weaknesses": [
-        "lite_model"
-      ],
-      "notes": "The Tank. gemini-1.5-flash removed from API. 2.5-flash-lite is the new stable fallback."
     },
     {
       "id": "deepseek-chat",
@@ -2786,6 +2744,9 @@
         "instruction"
       ],
       "access_via": [
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
         "gemini-api-general"
       ],
       "status": "active"
