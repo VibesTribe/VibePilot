@@ -1159,6 +1159,22 @@ func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files
 				map[string]any{"path": "output_manifest.json", "content": string(manifest)},
 			}
 		}
+	} else if rawOutput != "" {
+		// No files parsed at all — model returned prose/code blocks, not structured JSON.
+		// Write raw_output as task_output.txt so supervisor and testers have something to review.
+		log.Printf("[commitOutput] No files parsed for %s, saving raw_output as task_output.txt (%d bytes)", truncateID(taskID), len(rawOutput))
+		manifest, _ := json.MarshalIndent(map[string]any{
+			"warning":           "Model output could not be parsed into structured files (no files_created in response)",
+			"task_id":           taskID,
+			"model_id":          modelID,
+			"has_raw_output":    true,
+			"raw_output_length": len(rawOutput),
+			"supervisor_action": "Review raw_output for usable content. If model produced code in markdown blocks, extract and retry with failure_class=broken_output.",
+		}, "", "  ")
+		outputMap["files"] = []any{
+			map[string]any{"path": "task_output.txt", "content": rawOutput},
+			map[string]any{"path": "output_manifest.json", "content": string(manifest)},
+		}
 	}
 	// Use worktree-aware commit when available (task branch is checked out in worktree,
 	// so CommitOutput's checkout step would fail). Both internal and courier tasks use this.
