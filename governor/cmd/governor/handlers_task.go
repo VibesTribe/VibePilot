@@ -736,15 +736,26 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		return
 	}
 
-	// Route to supervisor with cascade retry — same pattern as planner/executor
+	// Route to supervisor with cascade retry — covers BOTH routing AND execution
+	// Get context for review (needed regardless of which model runs it)
+	taskPacket, _ := h.database.GetTaskPacket(ctx, taskID)
+	taskRunData, _ := h.database.Query(ctx, "task_runs", map[string]any{"task_id": taskID, "order": "created_at.desc", "limit": 1})
+	var taskRuns []map[string]any
+	var latestRun map[string]any
+	if err := json.Unmarshal(taskRunData, &taskRuns); err == nil && len(taskRuns) > 0 {
+		latestRun = taskRuns[0]
+	}
+
+	var result *runtime.SessionResult
 	var routingResult *runtime.RoutingResult
 	var failedModels []string
+	var supervisorModelID string
 	maxRetries := 5
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		var routeErr error
 		if attempt > 0 {
 			log.Printf("[TaskReview] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
 		}
+		var routeErr error
 		routingResult, routeErr = h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
 			Role:            "supervisor",
 			TaskType:        taskType,
@@ -754,124 +765,102 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		})
 		if routeErr != nil || routingResult == nil {
 			log.Printf("[TaskReview] No supervisor for task %s (attempt %d)", truncateID(taskID), attempt+1)
-			// All models in cooldown — stop, don't retry
-			return
-		}
-		break // routing found
-	}
-
-	if routingResult == nil {
-		log.Printf("[TaskReview] No routing available for task %s after %d attempts", truncateID(taskID), maxRetries)
-		return
-	}
-
-	session, err := h.factory.CreateWithConnector(ctx, "supervisor", taskType, routingResult.ConnectorID)
-	if err != nil {
-		log.Printf("[TaskReview] Session error for %s: %v", truncateID(taskID), err)
-		return
-	}
-
-	err = h.pool.SubmitWithDestination(ctx, sliceID, routingResult.ConnectorID, func() error {
-		// Get context for review
-		taskPacket, _ := h.database.GetTaskPacket(ctx, taskID)
-		taskRunData, _ := h.database.Query(ctx, "task_runs", map[string]any{"task_id": taskID, "order": "created_at.desc", "limit": 1})
-		var taskRuns []map[string]any
-		var latestRun map[string]any
-		if err := json.Unmarshal(taskRunData, &taskRuns); err == nil && len(taskRuns) > 0 {
-			latestRun = taskRuns[0]
+			break
 		}
 
-		// Supervisor with timeout — prevent hung reviews from locking tasks
-		reviewCtx, reviewCancel := context.WithTimeout(ctx, 2*time.Minute)
-		defer reviewCancel()
+		session, sessErr := h.factory.CreateWithConnector(ctx, "supervisor", taskType, routingResult.ConnectorID)
+		if sessErr != nil {
+			log.Printf("[TaskReview] Session error for %s: %v", truncateID(taskID), sessErr)
+			failedModels = append(failedModels, routingResult.ModelID)
+			continue
+		}
 
+		supervisorModelID = routingResult.ModelID
 		reviewStart := time.Now()
-		result, err := session.Run(reviewCtx, map[string]any{
+
+		// Run synchronously — supervisor review is fast, no need for pool submission
+		reviewCtx, reviewCancel := context.WithTimeout(ctx, 2*time.Minute)
+		runResult, runErr := session.Run(reviewCtx, map[string]any{
 			"task":        task,
 			"event":       "task_review",
 			"task_packet": taskPacket,
 			"task_run":    latestRun,
 		})
+		reviewCancel()
 		reviewDuration := time.Since(reviewStart).Seconds()
-		supervisorModelID := routingResult.ModelID
-		if err != nil {
-			// Record supervisor model failure
+
+		if runErr != nil {
+			// Record failure and cooldown connector if rate limited
 			if h.usageTracker != nil {
+				if isRateLimitError(runErr) {
+					h.usageTracker.RecordRateLimit(ctx, supervisorModelID)
+					if routingResult.ConnectorID != "" {
+						h.usageTracker.RecordConnectorCooldown(ctx, routingResult.ConnectorID, 5)
+					}
+				}
 				h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, false)
 			}
 			h.database.RPC(ctx, "record_model_failure", map[string]any{
 				"p_model_id":         supervisorModelID,
 				"p_task_type":        "supervisor_review",
 				"p_failure_class":    "session_error",
-				"p_failure_detail":   err.Error(),
+				"p_failure_detail":   runErr.Error(),
 				"p_duration_seconds": reviewDuration,
 			})
-			if reviewCtx.Err() == context.DeadlineExceeded {
-				log.Printf("[TaskReview] TIMEOUT reviewing task %s after 2m (supervisor=%s)", truncateID(taskID), supervisorModelID)
-				h.database.RPC(ctx, "transition_task", map[string]any{
-					"p_task_id":        taskID,
-					"p_new_status":     "review",
-					"p_failure_reason": "supervisor_review_timeout",
-				})
-				// Release processing_by lock so task can be re-claimed
-				h.database.Update(ctx, "tasks", taskID, map[string]any{
-					"processing_by": nil,
-				})
-				return nil
+			failedModels = append(failedModels, routingResult.ModelID)
+			log.Printf("[TaskReview] Supervisor attempt %d failed for %s (model=%s, connector=%s): %v", attempt+1, truncateID(taskID), supervisorModelID, routingResult.ConnectorID, runErr)
+			continue // try next model
+		}
+
+		// Success
+		result = runResult
+		break
+	}
+
+	if result == nil {
+		log.Printf("[TaskReview] No supervisor available for task %s after %d attempts — releasing lock", truncateID(taskID), maxRetries)
+		h.database.Update(ctx, "tasks", taskID, map[string]any{
+			"processing_by": nil,
+		})
+		return
+	}
+
+	// Compact session for context history
+	h.factory.Compact(ctx, result, taskID)
+
+	decision, parseErr := runtime.ParseSupervisorDecision(result.Output)
+	if parseErr != nil {
+		log.Printf("[TaskReview] Parse error for %s: %v, retrying...", truncateID(taskID), parseErr)
+
+		// Retry with explicit JSON enforcement
+		retrySession, retryErr := h.factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.ConnectorID)
+		if retryErr == nil {
+			retryResult, retryRunErr := retrySession.Run(ctx, map[string]any{
+				"previous_output": result.Output,
+				"parse_error":     parseErr.Error(),
+				"instruction":     "Your previous response was not valid JSON. Parse the previous output and respond with ONLY the JSON object. No markdown. No explanations.",
+			})
+			if retryRunErr == nil {
+				decision, parseErr = runtime.ParseSupervisorDecision(retryResult.Output)
 			}
-			log.Printf("[TaskReview] Session failed for %s: %v — releasing lock for re-claim", truncateID(taskID), err)
-			// Release processing_by lock so the task can be re-claimed by recovery or realtime
+		}
+
+		if parseErr != nil {
+			log.Printf("[TaskReview] Retry also failed to parse for %s: %v", truncateID(taskID), parseErr)
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":        taskID,
+				"p_new_status":     "failed",
+				"p_failure_reason": fmt.Sprintf("JSON parse failed after retry: %v", parseErr),
+			})
 			h.database.Update(ctx, "tasks", taskID, map[string]any{
 				"processing_by": nil,
 			})
-			return nil
+			return
 		}
+		log.Printf("[TaskReview] Retry succeeded for %s", truncateID(taskID))
+	}
 
-		// Compact session for context history
-		h.factory.Compact(ctx, result, taskID)
-
-		decision, parseErr := runtime.ParseSupervisorDecision(result.Output)
-		if parseErr != nil {
-			log.Printf("[TaskReview] Parse error for %s: %v, retrying...", truncateID(taskID), parseErr)
-
-			// Retry with explicit JSON enforcement
-			retrySession, retryErr := h.factory.CreateWithConnector(ctx, "supervisor", "review", routingResult.ConnectorID)
-			if retryErr == nil {
-				retryResult, retryRunErr := retrySession.Run(ctx, map[string]any{
-					"previous_output": result.Output,
-					"parse_error":     parseErr.Error(),
-					"instruction":     "Your previous response was not valid JSON. Parse the previous output and respond with ONLY the JSON object. No markdown. No explanations.",
-				})
-				if retryRunErr == nil {
-					decision, parseErr = runtime.ParseSupervisorDecision(retryResult.Output)
-				}
-			}
-
-			if parseErr != nil {
-				log.Printf("[TaskReview] Retry also failed to parse for %s: %v", truncateID(taskID), parseErr)
-				// Record supervisor model failure for bad output format
-				if h.usageTracker != nil {
-					h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, false)
-				}
-				h.database.RPC(ctx, "record_model_failure", map[string]any{
-					"p_model_id":         supervisorModelID,
-					"p_task_type":        "supervisor_review",
-					"p_failure_class":    "json_parse_error",
-					"p_failure_detail":   fmt.Sprintf("Failed to produce valid JSON after retry: %v", parseErr),
-					"p_duration_seconds": reviewDuration,
-				})
-				// Set to failed status instead of leaving in limbo
-				h.database.RPC(ctx, "transition_task", map[string]any{
-					"p_task_id":        taskID,
-					"p_new_status":     "failed",
-					"p_failure_reason": fmt.Sprintf("JSON parse failed after retry: %v", parseErr),
-				})
-				return nil
-			}
-			log.Printf("[TaskReview] Retry succeeded for %s", truncateID(taskID))
-		}
-
-		log.Printf("[TaskReview] Task %s decision: %s", truncateID(taskID), decision.Decision)
+	log.Printf("[TaskReview] Task %s decision: %s", truncateID(taskID), decision.Decision)
 
 	switch decision.Decision {
 	case "approved", "pass":
@@ -880,18 +869,12 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			"p_task_id":    taskID,
 			"p_new_status": "testing",
 		})
-
-		// Record supervisor approval as success for the supervisor model.
-		if h.usageTracker != nil {
-			h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
-		}
 		h.database.RPC(ctx, "record_model_success", map[string]any{
 			"p_model_id":         supervisorModelID,
 			"p_task_type":        "supervisor_review",
-			"p_duration_seconds": reviewDuration,
+			"p_duration_seconds": 0,
 			"p_tokens_used":      result.TokensIn + result.TokensOut,
 		})
-
 		// Also record a success signal for the executor model (passed review).
 		h.database.RPC(ctx, "update_model_learning", map[string]any{
 			"p_model_id":         modelID,
@@ -901,114 +884,101 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			"p_failure_category": "",
 			"p_failure_detail":   "",
 		})
-		if h.usageTracker != nil {
-			h.usageTracker.RecordCompletion(ctx, modelID, "review", time.Since(reviewStart).Seconds(), true)
-		}
 		h.recordEvent(ctx, "approved", taskID, modelID, "review_passed", map[string]any{
 			"checks":          decision.Checks,
 			"supervisor_model": supervisorModelID,
 		})
 		log.Printf("[TaskReview] Task %s → testing (supervisor=%s approved)", truncateID(taskID), supervisorModelID)
 
-		case "fail", "failed":
-			// Failed → back to pending with full failure context
-			failureClass := decision.FailureClass
-			if failureClass == "" {
-				failureClass = "unknown"
-			}
-			failureDetail := decision.FailureDetail
-			if failureDetail == "" && len(decision.Issues) > 0 {
-				failureDetail = decision.Issues[0].Description
-			}
+	case "fail", "failed":
+		// Failed → back to pending with full failure context
+		failureClass := decision.FailureClass
+		if failureClass == "" {
+			failureClass = "unknown"
+		}
+		failureDetail := decision.FailureDetail
+		if failureDetail == "" && len(decision.Issues) > 0 {
+			failureDetail = decision.Issues[0].Description
+		}
 
-			// Build full failure notes including ReturnFeedback
-			failureNotes := fmt.Sprintf("[%s] %s", failureClass, failureDetail)
-			if decision.ReturnFeedback.Summary != "" {
-				failureNotes += "\n\n" + decision.ReturnFeedback.Summary
+		// Build full failure notes including ReturnFeedback
+		failureNotes := fmt.Sprintf("[%s] %s", failureClass, failureDetail)
+		if decision.ReturnFeedback.Summary != "" {
+			failureNotes += "\n\n" + decision.ReturnFeedback.Summary
+		}
+		if len(decision.ReturnFeedback.SpecificIssues) > 0 {
+			failureNotes += "\n\nIssues:"
+			for _, issue := range decision.ReturnFeedback.SpecificIssues {
+				failureNotes += "\n- " + issue
 			}
-			if len(decision.ReturnFeedback.SpecificIssues) > 0 {
-				failureNotes += "\n\nIssues:"
-				for _, issue := range decision.ReturnFeedback.SpecificIssues {
-					failureNotes += "\n- " + issue
-				}
-			}
+		}
 
 		h.recordFailure(ctx, modelID, taskID, failureClass)
 		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
-		// Record supervisor model success (it correctly identified the failure)
-		if h.usageTracker != nil {
-			h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
-		}
 		h.recordEvent(ctx, "failure", taskID, modelID, failureClass, map[string]any{
 			"class": failureClass, "detail": failureDetail,
 			"supervisor_model": supervisorModelID,
 		})
-			if h.worktreeMgr != nil {
-				h.worktreeMgr.RemoveWorktree(ctx, taskID)
-			}
-			h.git.DeleteBranch(ctx, branchName)
-			// Accumulate the failed executor model BEFORE transitioning.
-			// transition_task fires pgnotify → handler reads routing_flag_reason.
-			accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
-			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":        taskID,
-				"p_new_status":     "pending",
-				"p_failure_reason": failureNotes,
-			})
-			log.Printf("[TaskReview] Task %s failed: %s (%s) → pending (excluding model %s)", truncateID(taskID), failureClass, failureDetail, modelID)
+		if h.worktreeMgr != nil {
+			h.worktreeMgr.RemoveWorktree(ctx, taskID)
+		}
+		h.git.DeleteBranch(ctx, branchName)
+		// Accumulate the failed executor model BEFORE transitioning.
+		accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": failureNotes,
+		})
+		log.Printf("[TaskReview] Task %s failed: %s (%s) → pending (excluding model %s)", truncateID(taskID), failureClass, failureDetail, modelID)
 
-		case "needs_revision":
-			// Needs revision → back to pending with FULL feedback for retry
-			failureClass := decision.FailureClass
-			if failureClass == "" {
-				failureClass = "needs_revision"
-			}
-			failureDetail := decision.FailureDetail
-			if failureDetail == "" && len(decision.Issues) > 0 {
-				failureDetail = decision.Issues[0].Description
-			}
+	case "needs_revision":
+		// Needs revision → back to pending with FULL feedback for retry
+		failureClass := decision.FailureClass
+		if failureClass == "" {
+			failureClass = "needs_revision"
+		}
+		failureDetail := decision.FailureDetail
+		if failureDetail == "" && len(decision.Issues) > 0 {
+			failureDetail = decision.Issues[0].Description
+		}
 
-			// Build structured revision feedback from supervisor's ReturnFeedback
-			revisionNotes := fmt.Sprintf("[%s] %s", failureClass, failureDetail)
-			if decision.ReturnFeedback.Summary != "" {
-				revisionNotes += "\n\n" + decision.ReturnFeedback.Summary
+		// Build structured revision feedback from supervisor's ReturnFeedback
+		revisionNotes := fmt.Sprintf("[%s] %s", failureClass, failureDetail)
+		if decision.ReturnFeedback.Summary != "" {
+			revisionNotes += "\n\n" + decision.ReturnFeedback.Summary
+		}
+		if len(decision.ReturnFeedback.SpecificIssues) > 0 {
+			revisionNotes += "\n\nIssues to fix:"
+			for _, issue := range decision.ReturnFeedback.SpecificIssues {
+				revisionNotes += "\n- " + issue
 			}
-			if len(decision.ReturnFeedback.SpecificIssues) > 0 {
-				revisionNotes += "\n\nIssues to fix:"
-				for _, issue := range decision.ReturnFeedback.SpecificIssues {
-					revisionNotes += "\n- " + issue
-				}
+		}
+		if len(decision.ReturnFeedback.Suggestions) > 0 {
+			revisionNotes += "\n\nSuggestions:"
+			for _, s := range decision.ReturnFeedback.Suggestions {
+				revisionNotes += "\n- " + s
 			}
-			if len(decision.ReturnFeedback.Suggestions) > 0 {
-				revisionNotes += "\n\nSuggestions:"
-				for _, s := range decision.ReturnFeedback.Suggestions {
-					revisionNotes += "\n- " + s
-				}
-			}
+		}
 
 		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
-		// Record supervisor model success (it correctly identified revision needed)
-		if h.usageTracker != nil {
-			h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
-		}
 		h.recordEvent(ctx, "revision_needed", taskID, modelID, failureClass, map[string]any{
 			"class": failureClass, "detail": failureDetail, "revision_notes": revisionNotes,
 			"supervisor_model": supervisorModelID,
 		})
-			if h.worktreeMgr != nil {
-				h.worktreeMgr.RemoveWorktree(ctx, taskID)
-			}
-			h.git.DeleteBranch(ctx, branchName)
-			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":        taskID,
-				"p_new_status":     "pending",
-				"p_failure_reason": revisionNotes,
-			})
-			log.Printf("[TaskReview] Task %s needs revision: %s (%s) → pending", truncateID(taskID), failureClass, failureDetail)
+		if h.worktreeMgr != nil {
+			h.worktreeMgr.RemoveWorktree(ctx, taskID)
+		}
+		h.git.DeleteBranch(ctx, branchName)
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": revisionNotes,
+		})
+		log.Printf("[TaskReview] Task %s needs revision: %s (%s) → pending", truncateID(taskID), failureClass, failureDetail)
 
 	case "council_review":
 		// Complex → fail with notes for intelligent reassignment
-		// Note: Council reviews PLANS only, not tasks. Complex tasks fail with notes.
 		escReason := "complex task needs reassignment"
 		if decision.FailureClass != "" {
 			escReason = fmt.Sprintf("%s: %s", decision.FailureClass, decision.FailureDetail)
@@ -1018,15 +988,10 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			"p_new_status":     "failed",
 			"p_failure_reason": fmt.Sprintf("Supervisor escalation: %s", escReason),
 		})
-		// Record supervisor success (correctly identified complexity)
-		if h.usageTracker != nil {
-			h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
-		}
 		log.Printf("[TaskReview] Task %s → council_review (supervisor=%s escalated)", truncateID(taskID), supervisorModelID)
 
 	case "reroute":
 		// Reroute → back to pending for different assignment
-		// Supervisor explicitly rejected this model — exclude it from retry.
 		failureClass := decision.FailureClass
 		if failureClass == "" {
 			failureClass = "model_limitation"
@@ -1035,42 +1000,34 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		if failureDetail == "" {
 			failureDetail = "Supervisor recommends different model"
 		}
-	h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
-	// Record supervisor model success (correctly identified model limitation)
-	if h.usageTracker != nil {
-		h.usageTracker.RecordCompletion(ctx, supervisorModelID, "supervisor_review", reviewDuration, true)
-	}
-	h.recordEvent(ctx, "reroute", taskID, modelID, failureClass, map[string]any{
-		"class": failureClass, "detail": failureDetail,
-		"supervisor_model": supervisorModelID,
-	})
-			if h.worktreeMgr != nil {
-				h.worktreeMgr.RemoveWorktree(ctx, taskID)
-			}
-			h.git.DeleteBranch(ctx, branchName)
-			// Exclude the rejected model BEFORE transitioning to pending.
-			// transition_task fires pgnotify → handler reads routing_flag_reason.
-			accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
-			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":        taskID,
-				"p_new_status":     "pending",
-				"p_failure_reason": fmt.Sprintf("[%s] %s", failureClass, failureDetail),
-			})
-			log.Printf("[TaskReview] Task %s reroute → pending (excluding model %s)", truncateID(taskID), modelID)
-
-		default:
-			// Unknown decision → human review
-			log.Printf("[TaskReview] Unknown decision '%s' for %s → awaiting_human", decision.Decision, truncateID(taskID))
-			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":    taskID,
-				"p_new_status": "failed",
-			})
+		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
+		h.recordEvent(ctx, "reroute", taskID, modelID, failureClass, map[string]any{
+			"class": failureClass, "detail": failureDetail,
+			"supervisor_model": supervisorModelID,
+		})
+		if h.worktreeMgr != nil {
+			h.worktreeMgr.RemoveWorktree(ctx, taskID)
 		}
+		h.git.DeleteBranch(ctx, branchName)
+		// Exclude the rejected model BEFORE transitioning to pending.
+		accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": fmt.Sprintf("[%s] %s", failureClass, failureDetail),
+		})
+		log.Printf("[TaskReview] Task %s reroute → pending (excluding model %s)", truncateID(taskID), modelID)
 
-		return nil
-	})
-	if err != nil {
-		log.Printf("[TaskReview] Submit error: %v", err)
+	default:
+		// Unknown decision → fail
+		log.Printf("[TaskReview] Unknown decision '%s' for %s → failed", decision.Decision, truncateID(taskID))
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":    taskID,
+			"p_new_status": "failed",
+		})
+		h.database.Update(ctx, "tasks", taskID, map[string]any{
+			"processing_by": nil,
+		})
 	}
 }
 
