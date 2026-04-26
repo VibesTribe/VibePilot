@@ -303,6 +303,7 @@ func (p *PostgresDB) GetRunners(ctx context.Context) ([]Runner, error) {
 }
 
 func (p *PostgresDB) GetTaskPacket(ctx context.Context, taskID string) (*TaskPacket, error) {
+	// Try task_packets table first (populated by Supabase RPC in cloud mode)
 	rows, err := p.pool.Query(ctx,
 		"SELECT task_id, prompt, tech_spec, expected_output, context, version FROM task_packets WHERE task_id = $1 LIMIT 1",
 		taskID,
@@ -312,16 +313,60 @@ func (p *PostgresDB) GetTaskPacket(ctx context.Context, taskID string) (*TaskPac
 	}
 	defer rows.Close()
 
-	if !rows.Next() {
-		return nil, fmt.Errorf("task packet not found for task %s", taskID)
+	if rows.Next() {
+		var tp TaskPacket
+		if err := rows.Scan(&tp.TaskID, &tp.Prompt, &tp.TechSpec, &tp.ExpectedOutput, &tp.Context, &tp.Version); err != nil {
+			return nil, fmt.Errorf("scan task packet: %w", err)
+		}
+		return &tp, nil
 	}
 
-	var tp TaskPacket
-	if err := rows.Scan(&tp.TaskID, &tp.Prompt, &tp.TechSpec, &tp.ExpectedOutput, &tp.Context, &tp.Version); err != nil {
-		return nil, fmt.Errorf("scan task packet: %w", err)
+	// Fallback: extract from tasks.result JSONB column (local Postgres mode).
+	// Tasks are created with prompt_packet and expected_output in result JSONB.
+	var resultJSON []byte
+	err = p.pool.QueryRow(ctx,
+		"SELECT result FROM tasks WHERE id = $1 LIMIT 1",
+		taskID,
+	).Scan(&resultJSON)
+	if err != nil {
+		return nil, fmt.Errorf("task packet not found for task %s (checked task_packets and tasks)", taskID)
 	}
 
-	return &tp, nil
+	var resultMap map[string]json.RawMessage
+	if err := json.Unmarshal(resultJSON, &resultMap); err != nil {
+		return nil, fmt.Errorf("parse task result JSONB: %w", err)
+	}
+
+	tp := &TaskPacket{TaskID: taskID}
+	if raw, ok := resultMap["prompt_packet"]; ok {
+		// prompt_packet may be a JSON string or plain text
+		var s string
+		if json.Unmarshal(raw, &s) == nil {
+			tp.Prompt = s
+		} else {
+			tp.Prompt = string(raw)
+		}
+	}
+	if raw, ok := resultMap["expected_output"]; ok {
+		var s string
+		if json.Unmarshal(raw, &s) == nil {
+			tp.ExpectedOutput = s
+		} else {
+			tp.ExpectedOutput = string(raw)
+		}
+	}
+	if raw, ok := resultMap["tech_spec"]; ok {
+		tp.TechSpec = raw
+	}
+	if raw, ok := resultMap["context"]; ok {
+		tp.Context = raw
+	}
+
+	if tp.Prompt == "" {
+		return nil, fmt.Errorf("task packet has empty prompt_packet for task %s", taskID)
+	}
+
+	return tp, nil
 }
 
 // --- Query builder helpers ---

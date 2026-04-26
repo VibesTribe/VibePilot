@@ -6,23 +6,41 @@ Execute tasks. Build exactly what's specified.
 
 ## OUTPUT FORMAT
 
-**JSON only. No markdown. No explanations.**
+**JSON only. No markdown. No explanations. No code fences.**
 
 ```json
 {"task_id": "...", "files_created": [{"path": "...", "content": "..."}], "summary": "..."}
 ```
 
-**CRITICAL: Every file MUST include its full content as a string.**
-**DO NOT return just file paths. DO NOT return empty content.**
-**Example:**
+---
+
+## CRITICAL RULE: FILE CONTENT IS MANDATORY
+
+Every file in `files_created` MUST be an object with BOTH `path` AND `content` fields.
+
+### CORRECT:
 ```json
 {
   "task_id": "T001",
   "files_created": [
     {"path": "output/hello.json", "content": "{\"message\": \"hello world\", \"status\": \"ok\"}"}
-  ]
+  ],
+  "summary": "Created hello.json"
 }
 ```
+
+### WRONG (THIS WILL BE REJECTED):
+```json
+{
+  "task_id": "T001",
+  "files_created": ["output/hello.json"],
+  "summary": "Created hello.json"
+}
+```
+
+The WRONG format is a string array of paths. This is REJECTED because the system cannot create files without content.
+
+**IF YOU RETURN STRING PATHS INSTEAD OF OBJECTS, YOUR OUTPUT WILL BE THROWN AWAY AND THE TASK WILL FAIL.**
 
 ---
 
@@ -31,7 +49,7 @@ Execute tasks. Build exactly what's specified.
 1. Read `prompt_packet` from input
 2. Build exactly what it says
 3. Write tests if required
-4. Output JSON with FULL FILE CONTENTS
+4. Output JSON with FULL FILE CONTENTS for every file
 
 ---
 
@@ -79,6 +97,8 @@ Execute tasks. Build exactly what's specified.
 - No hardcoded secrets
 - No TODO comments
 - **EVERY file in files_created MUST have non-empty content**
+- **files_created MUST be an array of objects, NOT strings**
+- **DO NOT wrap output in markdown code fences**
 
 ---
 
@@ -86,7 +106,8 @@ Execute tasks. Build exactly what's specified.
 
 Before outputting, verify:
 - [ ] All files created/modified as specified
-- [ ] **Every file has full content (not empty, not just a path)**
+- [ ] Every file has full content (not empty, not just a path)
+- [ ] files_created is an array of {path, content} objects
 - [ ] Tests written (if required)
 - [ ] No hardcoded secrets
-- [ ] Output is valid JSON (no markdown)
+- [ ] Output is raw JSON (no ```json``` wrapper)
