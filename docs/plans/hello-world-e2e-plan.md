@@ -1,12 +1,12 @@
-# PLAN: Hello World E2E (Internal)
+# PLAN: Hello World E2E
 
 ## Overview
-This plan implements a simple end-to-end pipeline test by creating a specific JSON artifact in the repository to verify file system access and pipeline execution.
+Create a simple JSON file at a specific location to verify E2E pipeline functionality and codebase navigation.
 
 ## Tasks
 
 ### T001: Create Hello World JSON
-**Confidence:** 1.0
+**Confidence:** 0.99
 **Category:** coding
 **Dependencies:** none
 
@@ -15,22 +15,17 @@ This plan implements a simple end-to-end pipeline test by creating a specific JS
 # TASK: T001 - Create Hello World JSON
 
 ## Context
-This is a pipeline validation task. The goal is to produce a single JSON output file to verify the pipeline works end-to-end and has correct file system permissions.
+This is an end-to-end pipeline test. The goal is to verify that the system can correctly navigate the codebase and create a file in the expected location.
 
 ## What to Build
-Create the file `output/hello.json` with the following valid JSON content:
+Create the file `output/hello.json` with valid JSON containing:
+- A "message" field set to "hello world"
+- A "status" field set to "ok"
 
-```json
-{
-  "message": "hello world",
-  "status": "ok"
-}
-```
-
-If the `output/` directory does not exist, create it first.
+Do NOT modify any existing files. Ensure the `output/` directory exists if needed, though usually, the task runner handles directory creation upon file write.
 
 ## Files
-- `output/hello.json` - The output artifact
+- `output/hello.json` - The output test artifact
 ```
 
 #### Expected Output
@@ -40,34 +35,28 @@ If the `output/` directory does not exist, create it first.
   "files_created": ["output/hello.json"],
   "tests_written": []
 }
-```
-",
+```",
   "tasks": [
     {
       "task_number": "T001",
       "title": "Create Hello World JSON",
       "category": "coding",
-      "confidence": 1.0,
+      "confidence": 0.99,
       "dependencies": [],
       "prompt_packet": "# TASK: T001 - Create Hello World JSON
 
 ## Context
-This is a pipeline validation task. The goal is to produce a single JSON output file to verify the pipeline works end-to-end and has correct file system permissions.
+This is an end-to-end pipeline test. The goal is to verify that the system can correctly navigate the codebase and create a file in the expected location.
 
 ## What to Build
-Create the file `output/hello.json` with the following valid JSON content:
+Create the file `output/hello.json` with valid JSON containing:
+- A "message" field set to "hello world"
+- A "status" field set to "ok"
 
-```json
-{
-  "message": "hello world",
-  "status": "ok"
-}
-```
-
-If the `output/` directory does not exist, create it first.
+Do NOT modify any existing files. Ensure the `output/` directory exists if needed, though usually, the task runner handles directory creation upon file write.
 
 ## Files
-- `output/hello.json` - The output artifact",
+- `output/hello.json` - The output test artifact",
       "expected_output": {
         "files_created": [
           "output/hello.json"
