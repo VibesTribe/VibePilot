@@ -337,7 +337,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		log.Printf("[TaskAvailable] Courier dispatch for %s → %s (%s)", truncateID(taskID), platformID, platformURL)
 
 		err = h.pool.SubmitWithDestination(ctx, sliceID, connectorID, func() error {
-			return h.executeCourierTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, platformID, platformURL, runStart)
+			return h.executeCourierTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, platformID, platformURL, worktreePath, runStart)
 		})
 		if err != nil {
 			log.Printf("[TaskAvailable] Courier pool error for %s: %v", truncateID(taskID), err)
@@ -473,7 +473,7 @@ func (h *TaskHandler) executeTask(
 	}
 
 	// Commit output to branch
-	h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds())
+	h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds(), worktreePath)
 
 	// Record task run with execution result
 	costs := h.calculateCosts(ctx, modelID, tokensIn, tokensOut)
@@ -534,7 +534,7 @@ func (h *TaskHandler) executeCourierTask(
 	ctx context.Context,
 	task map[string]any,
 	taskPacket *db.TaskPacket,
-	taskID, taskNumber, modelID, connectorID, branchName, taskCategory, platformID, platformURL string,
+	taskID, taskNumber, modelID, connectorID, branchName, taskCategory, platformID, platformURL, worktreePath string,
 	runStart time.Time,
 ) error {
 	// Resolve the LLM API key for browser-use from the vault
@@ -609,7 +609,7 @@ func (h *TaskHandler) executeCourierTask(
 	}
 
 	// Commit output to branch with parsed files
-	h.commitOutput(ctx, branchName, files, output, summary, modelID, taskID, duration.Seconds())
+	h.commitOutput(ctx, branchName, files, output, summary, modelID, taskID, duration.Seconds(), worktreePath)
 
 	// Update the existing task_run row (created by CourierRunner.Run, updated by webhook callback)
 	// with full execution metadata. Avoids duplicate rows.
@@ -1139,7 +1139,7 @@ func (h *TaskHandler) deriveRoutingFlag(conn *runtime.ConnectorConfig) string {
 	}
 }
 
-func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files []runtime.File, rawOutput, summary, modelID, taskID string, duration float64) error {
+func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files []runtime.File, rawOutput, summary, modelID, taskID string, duration float64, worktreePath string) error {
 	outputMap := map[string]any{
 		"raw_output": rawOutput,
 		"model_id":   modelID,
@@ -1153,6 +1153,11 @@ func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files
 			fileMaps[i] = map[string]any{"path": f.Path, "content": f.Content}
 		}
 		outputMap["files"] = fileMaps
+	}
+	// Use worktree-aware commit when available (task branch is checked out in worktree,
+	// so CommitOutput's checkout step would fail). Both internal and courier tasks use this.
+	if worktreePath != "" {
+		return h.git.CommitOutputToWorktree(ctx, worktreePath, branchName, outputMap)
 	}
 	return h.git.CommitOutput(ctx, branchName, outputMap)
 }

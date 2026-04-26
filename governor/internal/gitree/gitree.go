@@ -614,3 +614,107 @@ func (g *Gitree) Pull(ctx context.Context) error {
 	}
 	return nil
 }
+
+// CommitOutputToWorktree writes task output files directly to the worktree directory.
+// The worktree is already on the correct branch, so we skip the checkout step that
+// CommitOutput does (which fails when the branch is locked by the worktree).
+// This is used by both internal task runners and courier agents.
+func (g *Gitree) CommitOutputToWorktree(ctx context.Context, worktreePath string, branchName string, output interface{}) error {
+	if worktreePath == "" {
+		return fmt.Errorf("CommitOutputToWorktree: worktreePath is required")
+	}
+	if !isValidBranchName(branchName) {
+		return fmt.Errorf("invalid branch name: %s", branchName)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
+
+	outputMap, ok := output.(map[string]interface{})
+	if !ok {
+		outputMap = make(map[string]interface{})
+	}
+
+	// Write files directly to the worktree (already on the right branch)
+	if files, ok := outputMap["files"]; ok {
+		filesList, ok := files.([]interface{})
+		if !ok {
+			return fmt.Errorf("files must be an array")
+		}
+		for _, f := range filesList {
+			file, ok := f.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			path, ok := file["path"].(string)
+			if !ok {
+				continue
+			}
+			content, ok := file["content"].(string)
+			if !ok {
+				continue
+			}
+			fullPath := filepath.Join(worktreePath, path)
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+				return fmt.Errorf("create dir: %w", err)
+			}
+			if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+				return fmt.Errorf("write file: %w", err)
+			}
+		}
+	}
+
+	// Write raw output if no files
+	if output, ok := outputMap["output"]; ok && outputMap["files"] == nil {
+		resultPath := filepath.Join(worktreePath, "task_output.txt")
+		content, _ := json.MarshalIndent(output, "", "  ")
+		if err := os.WriteFile(resultPath, content, 0644); err != nil {
+			return fmt.Errorf("write result: %w", err)
+		}
+	}
+
+	// Write response if present
+	if response, ok := outputMap["response"]; ok {
+		resultPath := filepath.Join(worktreePath, "task_result.json")
+		content, _ := json.MarshalIndent(response, "", "  ")
+		if err := os.WriteFile(resultPath, content, 0644); err != nil {
+			return fmt.Errorf("write result: %w", err)
+		}
+	}
+
+	// Stage, commit, and push from the worktree
+	addCmd := g.gitCommandIn(ctx, worktreePath, "add", ".")
+	if err := addCmd.Run(); err != nil {
+		return fmt.Errorf("git add in worktree: %w", err)
+	}
+
+	var commitOut bytes.Buffer
+	commitCmd := g.gitCommandIn(ctx, worktreePath, "commit", "-m", "task output")
+	commitCmd.Stdout = &commitOut
+	commitCmd.Stderr = &commitOut
+
+	if err := commitCmd.Run(); err != nil {
+		outStr := commitOut.String()
+		if strings.Contains(outStr, "nothing to commit") || strings.Contains(outStr, "no changes added") {
+			log.Printf("[Gitree] No changes to commit in worktree for %s", branchName)
+			return nil
+		}
+		return fmt.Errorf("git commit in worktree: %w - %s", err, outStr)
+	}
+
+	pushCmd := g.gitCommandIn(ctx, worktreePath, "push")
+	if err := pushCmd.Run(); err != nil {
+		return fmt.Errorf("git push from worktree: %w", err)
+	}
+
+	log.Printf("[Gitree] Committed output to worktree branch %s at %s", branchName, worktreePath)
+	return nil
+}
+
+// gitCommandIn creates an exec.Cmd for git with the specified working directory.
+// Used for operations in worktrees where commands must run inside the worktree, not the main repo.
+func (g *Gitree) gitCommandIn(ctx context.Context, dir string, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = dir
+	return cmd
+}

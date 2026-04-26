@@ -236,6 +236,21 @@ func (mr *ManagedRepo) bootstrap(ctx context.Context, cfg ManagedRepoConfig) err
 			log.Printf("[ManagedRepo] Fetch warning: %s", string(out))
 		}
 
+		// Hard reset to origin/main so the working tree reflects the latest commit.
+		// Without this, fetch updates refs but the working tree stays stale —
+		// symlinks, config, and prompts can be out of date.
+		mainBranch := cfg.MainBranch
+		if mainBranch == "" {
+			mainBranch = "main"
+		}
+		resetCmd := exec.CommandContext(ctx, "git", "reset", "--hard", "origin/"+mainBranch)
+		resetCmd.Dir = mr.localPath
+		if out, err := resetCmd.CombinedOutput(); err != nil {
+			log.Printf("[ManagedRepo] Reset warning: %s", string(out))
+		} else {
+			log.Printf("[ManagedRepo] Reset to origin/%s", mainBranch)
+		}
+
 		return nil
 	}
 
