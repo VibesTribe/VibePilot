@@ -670,8 +670,16 @@ func (g *Gitree) CommitOutputToWorktree(ctx context.Context, worktreePath string
 		}
 	}
 
-	// Write raw output if no files
-	if output, ok := outputMap["output"]; ok && outputMap["files"] == nil {
+	// Write raw output if no files (check both "output" and "raw_output" keys)
+	if rawOut, ok := outputMap["raw_output"]; ok && rawOut != "" {
+		if outputMap["files"] == nil {
+			resultPath := filepath.Join(worktreePath, "task_output.txt")
+			content, _ := json.MarshalIndent(rawOut, "", "  ")
+			if err := os.WriteFile(resultPath, content, 0644); err != nil {
+				return fmt.Errorf("write result: %w", err)
+			}
+		}
+	} else if output, ok := outputMap["output"]; ok && outputMap["files"] == nil {
 		resultPath := filepath.Join(worktreePath, "task_output.txt")
 		content, _ := json.MarshalIndent(output, "", "  ")
 		if err := os.WriteFile(resultPath, content, 0644); err != nil {
