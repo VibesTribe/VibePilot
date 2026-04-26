@@ -1106,10 +1106,21 @@ func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files
 	}
 	if len(files) > 0 {
 		fileMaps := make([]any, len(files))
+		hasContent := false
 		for i, f := range files {
 			fileMaps[i] = map[string]any{"path": f.Path, "content": f.Content}
+			if f.Content != "" {
+				hasContent = true
+			}
 		}
 		outputMap["files"] = fileMaps
+		// If all files have empty content, fall back to raw output as a file
+		if !hasContent && rawOutput != "" {
+			log.Printf("[commitOutput] Warning: all files have empty content for %s, saving raw_output as task_output.txt", truncateID(taskID))
+			outputMap["files"] = []any{
+				map[string]any{"path": "task_output.txt", "content": rawOutput},
+			}
+		}
 	}
 	// Use worktree-aware commit when available (task branch is checked out in worktree,
 	// so CommitOutput's checkout step would fail). Both internal and courier tasks use this.

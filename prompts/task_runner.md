@@ -9,7 +9,19 @@ Execute tasks. Build exactly what's specified.
 **JSON only. No markdown. No explanations.**
 
 ```json
-{"task_id": "...", "files_created": [...], "summary": "..."}
+{"task_id": "...", "files_created": [{"path": "...", "content": "..."}], "summary": "..."}
+```
+
+**CRITICAL: Every file MUST include its full content as a string.**
+**DO NOT return just file paths. DO NOT return empty content.**
+**Example:**
+```json
+{
+  "task_id": "T001",
+  "files_created": [
+    {"path": "output/hello.json", "content": "{\"message\": \"hello world\", \"status\": \"ok\"}"}
+  ]
+}
 ```
 
 ---
@@ -19,7 +31,7 @@ Execute tasks. Build exactly what's specified.
 1. Read `prompt_packet` from input
 2. Build exactly what it says
 3. Write tests if required
-4. Output JSON
+4. Output JSON with FULL FILE CONTENTS
 
 ---
 
@@ -46,7 +58,7 @@ Execute tasks. Build exactly what's specified.
   "files_created": [
     {
       "path": "path/to/file.py",
-      "content": "# Full file content here\n..."
+      "content": "# Full file content here\nprint('hello')\n"
     }
   ],
   "files_modified": [],
@@ -66,6 +78,7 @@ Execute tasks. Build exactly what's specified.
 - Write tests if required
 - No hardcoded secrets
 - No TODO comments
+- **EVERY file in files_created MUST have non-empty content**
 
 ---
 
@@ -73,6 +86,7 @@ Execute tasks. Build exactly what's specified.
 
 Before outputting, verify:
 - [ ] All files created/modified as specified
+- [ ] **Every file has full content (not empty, not just a path)**
 - [ ] Tests written (if required)
 - [ ] No hardcoded secrets
 - [ ] Output is valid JSON (no markdown)
