@@ -725,6 +725,106 @@ func (g *Gitree) CommitOutputToWorktree(ctx context.Context, worktreePath string
 	return nil
 }
 
+// DiskFile represents a file with its path and content read from disk.
+type DiskFile struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
+// ScanWorktreeFiles reads ALL files currently in a worktree directory and returns
+// them as DiskFile slices with full content. This is the source of truth for what
+// the agent actually produced -- regardless of connector type (API, CLI, courier).
+//
+// After commitOutput writes parsed/raw output to the worktree and git-adds everything,
+// this function scans the result. It captures:
+//   - Files parsed from structured JSON output
+//   - Files written by CLI agents directly to disk
+//   - The task_output.txt raw fallback
+//
+// excludePaths filters out known metadata files that aren't agent output.
+func (g *Gitree) ScanWorktreeFiles(ctx context.Context, worktreePath string, excludePaths []string) ([]DiskFile, error) {
+	if worktreePath == "" {
+		return nil, fmt.Errorf("ScanWorktreeFiles: worktreePath is required")
+	}
+
+	exclude := make(map[string]bool)
+	for _, p := range excludePaths {
+		exclude[p] = true
+	}
+
+	var files []DiskFile
+	err := filepath.Walk(worktreePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // skip unreadable files
+		}
+		if info.IsDir() {
+			// Skip .git directories
+			if strings.Contains(path, "/.git") || strings.HasSuffix(path, "/.git") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Get relative path from worktree root
+		relPath, err := filepath.Rel(worktreePath, path)
+		if err != nil {
+			return nil
+		}
+		// Normalize to forward slashes
+		relPath = filepath.ToSlash(relPath)
+
+		if exclude[relPath] {
+			return nil
+		}
+
+		// Read file content (limit to 2MB per file to avoid memory issues)
+		if info.Size() > 2*1024*1024 {
+			log.Printf("[ScanWorktreeFiles] Skipping large file: %s (%d bytes)", relPath, info.Size())
+			return nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			log.Printf("[ScanWorktreeFiles] Warning: could not read %s: %v", relPath, err)
+			return nil
+		}
+
+		files = append(files, DiskFile{
+			Path:    relPath,
+			Content: string(content),
+		})
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("scan worktree: %w", err)
+	}
+
+	log.Printf("[ScanWorktreeFiles] Found %d files in %s", len(files), worktreePath)
+	return files, nil
+}
+
+// ScanBranchFiles lists files on a branch (non-worktree path) by checking out
+// the branch, walking the directory, and reading file contents. Returns to main after.
+func (g *Gitree) ScanBranchFiles(ctx context.Context, branchName string, excludePaths []string) ([]DiskFile, error) {
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
+
+	if err := g.ResetToMain(ctx); err != nil {
+		return nil, fmt.Errorf("ScanBranchFiles: reset to main failed: %w", err)
+	}
+
+	if err := g.gitCommand(ctx, "checkout", "-f", branchName).Run(); err != nil {
+		return nil, fmt.Errorf("ScanBranchFiles: checkout %s failed: %w", branchName, err)
+	}
+
+	files, err := g.ScanWorktreeFiles(ctx, g.repoPath, excludePaths)
+
+	// Always return to main
+	g.ResetToMain(ctx)
+
+	return files, err
+}
+
 // gitCommandIn creates an exec.Cmd for git with the specified working directory.
 // Used for operations in worktrees where commands must run inside the worktree, not the main repo.
 func (g *Gitree) gitCommandIn(ctx context.Context, dir string, args ...string) *exec.Cmd {
