@@ -1,36 +1,35 @@
 # PLAN: Hello World E2E (Internal)
 
 ## Overview
-This plan outlines the steps to create a single JSON file at `output/hello.json` within the project codebase, confirming basic file manipulation capabilities and internal execution flow.
+Create a simple JSON artifact at a specific path to validate pipeline execution and codebase access.
 
 ## Tasks
 
-### T001: Create output/hello.json
-**Confidence:** 0.98
+### T001: Create Hello World JSON
+**Confidence:** 0.99
 **Category:** coding
 **Dependencies:** none
 
 #### Prompt Packet
 ```
-# TASK: T001 - Create output/hello.json
+# TASK: T001 - Create Hello World JSON
 
 ## Context
-This task is to create a simple JSON file as a confirmation of internal file writing capabilities. The file will be placed at `output/hello.json` within the project's repository.
+This is an end-to-end internal test. The goal is to verify that the agent can navigate the project structure and create a specific file with valid JSON content.
 
 ## What to Build
-Create the file `output/hello.json` with the following valid JSON content:
-
-```json
+1. Ensure the directory `output/` exists in the project root.
+2. Create a file named `output/hello.json`.
+3. The file must contain exactly the following JSON content:
 {
   "message": "hello world",
   "status": "ok"
 }
-```
 
-Ensure the file is created within the project's root directory structure. Do NOT modify any existing files. Only create `output/hello.json`.
+Do not include any other fields. Ensure the file is correctly formatted and valid JSON.
 
 ## Files
-- `output/hello.json` - The output artifact
+- `output/hello.json` - The target JSON file
 ```
 
 #### Expected Output
@@ -40,34 +39,32 @@ Ensure the file is created within the project's root directory structure. Do NOT
   "files_created": ["output/hello.json"],
   "tests_written": []
 }
-```
-",
+```",
   "tasks": [
     {
-      "task_id": "T001",
-      "title": "Create output/hello.json",
+      "task_number": "T001",
+      "title": "Create Hello World JSON",
       "category": "coding",
-      "confidence": 0.98,
+      "confidence": 0.99,
       "dependencies": [],
-      "prompt_packet": "# TASK: T001 - Create output/hello.json
+      "prompt_packet": "# TASK: T001 - Create Hello World JSON
 
 ## Context
-This task is to create a simple JSON file as a confirmation of internal file writing capabilities. The file will be placed at `output/hello.json` within the project's repository.
+This is an end-to-end internal test. The goal is to verify that the agent can navigate the project structure and create a specific file with valid JSON content.
 
 ## What to Build
-Create the file `output/hello.json` with the following valid JSON content:
-
-```json
+1. Ensure the directory `output/` exists in the project root.
+2. Create a file named `output/hello.json`.
+3. The file must contain exactly the following JSON content:
 {
   "message": "hello world",
   "status": "ok"
 }
-```
 
-Ensure the file is created within the project's root directory structure. Do NOT modify any existing files. Only create `output/hello.json`.
+Do not include any other fields. Ensure the file is correctly formatted and valid JSON.
 
 ## Files
-- `output/hello.json` - The output artifact",
+- `output/hello.json` - The target JSON file",
       "expected_output": {
         "files_created": [
           "output/hello.json"
@@ -77,4 +74,5 @@ Ensure the file is created within the project's root directory structure. Do NOT
     }
   ],
   "total_tasks": 1,
-  "status": "review
+  "status": "review",
+  "slice_id": "hello-world-e2e
