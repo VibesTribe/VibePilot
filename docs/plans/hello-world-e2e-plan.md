@@ -1,7 +1,7 @@
 # PLAN: Hello World E2E
 
 ## Overview
-Create a simple JSON file at a specific path to validate end-to-end pipeline execution and codebase interaction.
+Create a simple JSON file as a pipeline test artifact to verify internal execution, codebase access, and file writing capabilities.
 
 ## Tasks
 
@@ -15,21 +15,19 @@ Create a simple JSON file at a specific path to validate end-to-end pipeline exe
 # TASK: T001 - Create Hello World JSON
 
 ## Context
-This task is part of an internal E2E test to verify that agents can successfully create files within the project structure. 
+This is a pipeline validation task (v2). The goal is to produce a single JSON output file to verify the pipeline works end-to-end, has correct file system permissions, and can navigate the project structure.
 
 ## What to Build
-Create a new file at `output/hello.json`. If the `output/` directory does not exist, create it first. 
-
-The file must contain the following JSON object:
+Create the file `output/hello.json` with exactly the following JSON content:
 {
   "message": "hello world",
   "status": "ok"
 }
 
-Ensure the JSON is valid and correctly formatted.
+Ensure the `output/` directory exists. If it does not exist, create it. Do NOT modify any existing project files.
 
 ## Files
-- `output/hello.json` - The generated test artifact
+- `output/hello.json` - The output artifact
 ```
 
 #### Expected Output
@@ -51,23 +49,20 @@ Ensure the JSON is valid and correctly formatted.
       "prompt_packet": "# TASK: T001 - Create Hello World JSON
 
 ## Context
-This task is part of an internal E2E test to verify that agents can successfully create files within the project structure. 
+This is a pipeline validation task (v2). The goal is to produce a single JSON output file to verify the pipeline works end-to-end, has correct file system permissions, and can navigate the project structure.
 
 ## What to Build
-Create a new file at `output/hello.json`. If the `output/` directory does not exist, create it first. 
-
-The file must contain the following JSON object:
+Create the file `output/hello.json` with exactly the following JSON content:
 {
   "message": "hello world",
   "status": "ok"
 }
 
-Ensure the JSON is valid and correctly formatted.
+Ensure the `output/` directory exists. If it does not exist, create it. Do NOT modify any existing project files.
 
 ## Files
-- `output/hello.json` - The generated test artifact",
+- `output/hello.json` - The output artifact",
       "expected_output": {
-        "task_id": "T001",
         "files_created": [
           "output/hello.json"
         ],
