@@ -10,4 +10,4 @@ Create a single JSON file at output/hello.json. This task requires access to the
 - Must be executed internally (not on external web platforms)
 
 ## Notes
-E2E pipeline test - v3. Triggered via webhook push.
+E2E pipeline test - v4. Triggered via webhook push.
