@@ -217,7 +217,10 @@ func handlePlanCreated(
 		return
 	}
 
-	clearProcessingLock()
+	// Note: clearProcessingLock() is NOT needed here because update_plan_status
+	// already sets processing_by = NULL in the same UPDATE. Calling it again
+	// would fire a second pg_notify (no-op UPDATE still triggers vp_notify_change),
+	// causing a duplicate PlanReview event.
 
 	database.RPC(ctx, "record_performance_metric", map[string]any{
 		"p_metric_type": "prd_to_plan",
@@ -302,6 +305,20 @@ func runPlanReview(
 				log.Printf("[PlanReview] Plan %s no longer review (status=%s), skipping", truncateID(planID), currentStatus)
 				return
 			}
+		}
+	}
+
+	// Guard against duplicate review: if tasks already exist for this plan,
+	// a previous handler already approved it (createTasks runs before status update).
+	existingTasks, taskErr := database.Query(ctx, "tasks", map[string]any{
+		"plan_id": planID,
+		"limit":   1,
+	})
+	if taskErr == nil {
+		var taskRows []map[string]any
+		if json.Unmarshal(existingTasks, &taskRows) == nil && len(taskRows) > 0 {
+			log.Printf("[PlanReview] Plan %s already has tasks — previously approved, skipping duplicate review", truncateID(planID))
+			return
 		}
 	}
 
