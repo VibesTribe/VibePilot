@@ -467,8 +467,24 @@ func (h *TaskHandler) executeTask(
 	}
 
 	// Build execution result for supervisor review
+	// Commit output to branch and get ACTUAL files from disk
+	actualFiles, _ := h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds(), worktreePath)
+
+	// Build executionResult from actual disk files, not parsed stdout.
+	// This is the truth that supervisor and testers will review.
 	executionResult := map[string]any{
 		"files": func() []map[string]any {
+			if len(actualFiles) > 0 {
+				result := make([]map[string]any, len(actualFiles))
+				for i, f := range actualFiles {
+					result[i] = map[string]any{
+						"path":    f.Path,
+						"content": f.Content,
+					}
+				}
+				return result
+			}
+			// Fallback: use parsed files if disk scan returned nothing
 			result := make([]map[string]any, len(files))
 			for i, f := range files {
 				result[i] = map[string]any{
@@ -483,9 +499,6 @@ func (h *TaskHandler) executeTask(
 		"status":              "complete",
 		"output_format_issue": outputFormatIssue,
 	}
-
-	// Commit output to branch
-	h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds(), worktreePath)
 
 	// Record task run with execution result
 	costs := h.calculateCosts(ctx, modelID, tokensIn, tokensOut)
@@ -631,11 +644,33 @@ func (h *TaskHandler) executeCourierTask(
 		}
 	}
 
-	// Commit output to branch with parsed files
-	h.commitOutput(ctx, branchName, files, output, summary, modelID, taskID, duration.Seconds(), worktreePath)
+	// Commit output to branch and get ACTUAL files from disk
+	actualFiles, _ := h.commitOutput(ctx, branchName, files, output, summary, modelID, taskID, duration.Seconds(), worktreePath)
+
+	// Build the file list from disk scan (truth), falling back to parsed files
+	diskFileList := func() []map[string]any {
+		if len(actualFiles) > 0 {
+			result := make([]map[string]any, len(actualFiles))
+			for i, f := range actualFiles {
+				result[i] = map[string]any{
+					"path":    f.Path,
+					"content": f.Content,
+				}
+			}
+			return result
+		}
+		result := make([]map[string]any, len(files))
+		for i, f := range files {
+			result[i] = map[string]any{
+				"path":    f.Path,
+				"content": f.Content,
+			}
+		}
+		return result
+	}()
 
 	// Update the existing task_run row (created by CourierRunner.Run, updated by webhook callback)
-	// with full execution metadata. Avoids duplicate rows.
+	// with full execution metadata and ACTUAL files from disk.
 	totalTokens := tokensIn + tokensOut
 	h.database.RPC(ctx, "update_courier_task_run", map[string]any{
 		"p_task_id":     taskID,
@@ -643,20 +678,27 @@ func (h *TaskHandler) executeCourierTask(
 		"p_courier":     "github-actions",
 		"p_platform":    platformID,
 		"p_tokens_used": totalTokens,
+		"p_result": map[string]any{
+			"files":               diskFileList,
+			"summary":             summary,
+			"raw_output":          output,
+			"status":              "complete",
+			"output_format_issue": outputFormatIssue,
+			"model_id":            modelID,
+			"routing_flag":        "web",
+			"platform_id":         platformID,
+			"tokens_used":         totalTokens,
+			"duration_seconds":    duration.Seconds(),
+		},
 	})
 
-	// Transition task to review (params match transition_task signature)
+	// Transition task to review. Do NOT pass p_result here --
+	// tasks.result already has prompt_packet/expected_output from creation,
+	// and COALESCE(p_result, result) would overwrite them.
+	// File content lives in task_runs.result (set above via update_courier_task_run).
 	h.database.RPC(ctx, "transition_task", map[string]any{
 		"p_task_id":    taskID,
 		"p_new_status": "review",
-		"p_result": map[string]any{
-			"output":           output,
-			"model_id":         modelID,
-			"routing_flag":     "web",
-			"platform_id":      platformID,
-			"tokens_used":      totalTokens,
-			"duration_seconds": duration.Seconds(),
-		},
 	})
 
 	h.recordSuccess(ctx, taskID, modelID, taskCategory, duration.Seconds(), totalTokens)
@@ -1119,7 +1161,13 @@ func (h *TaskHandler) deriveRoutingFlag(conn *runtime.ConnectorConfig) string {
 	}
 }
 
-func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files []runtime.File, rawOutput, summary, modelID, taskID string, duration float64, worktreePath string) error {
+// commitOutput writes task output to the branch/worktree and returns the ACTUAL files
+// found on disk after writing. This is the source of truth -- regardless of whether the
+// model returned structured JSON, prose, markdown, or anything else.
+//
+// The returned []gitree.DiskFile contains real file contents from the filesystem,
+// not parsed-from-stdout approximations. Supervisor and testers use these.
+func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files []runtime.File, rawOutput, summary, modelID, taskID string, duration float64, worktreePath string) ([]gitree.DiskFile, error) {
 	outputMap := map[string]any{
 		"raw_output": rawOutput,
 		"model_id":   modelID,
@@ -1127,61 +1175,59 @@ func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files
 		"duration":   duration,
 		"summary":    summary,
 	}
+
+	// Write whatever we parsed from stdout to the worktree.
+	// Even if parsing failed, raw_output goes as task_output.txt.
+	// The actual files list comes from scanning disk AFTER this write.
 	if len(files) > 0 {
 		fileMaps := make([]any, len(files))
-		hasContent := false
 		for i, f := range files {
 			fileMaps[i] = map[string]any{"path": f.Path, "content": f.Content}
-			if f.Content != "" {
-				hasContent = true
-			}
 		}
 		outputMap["files"] = fileMaps
-		// If all files have empty content, the model returned paths but no content.
-		// Save both: raw_output as task_output.txt AND a manifest showing what was expected.
-		if !hasContent && rawOutput != "" {
-			log.Printf("[commitOutput] Warning: all files have empty content for %s, saving raw_output as task_output.txt", truncateID(taskID))
-			// Build manifest showing the file paths that were expected but have no content
-			paths := make([]string, len(files))
-			for i, f := range files {
-				paths[i] = f.Path
-			}
-			manifest, _ := json.MarshalIndent(map[string]any{
-				"warning":           "Model returned file paths but no file content (output format violation)",
-				"expected_files":    paths,
-				"task_id":           taskID,
-				"model_id":          modelID,
-				"has_raw_output":    rawOutput != "",
-				"supervisor_action": "Review raw_output. If file content should be present, fail with failure_class=borken_output.",
-			}, "", "  ")
-			outputMap["files"] = []any{
-				map[string]any{"path": "task_output.txt", "content": rawOutput},
-				map[string]any{"path": "output_manifest.json", "content": string(manifest)},
-			}
-		}
 	} else if rawOutput != "" {
-		// No files parsed at all — model returned prose/code blocks, not structured JSON.
-		// Write raw_output as task_output.txt so supervisor and testers have something to review.
+		// No files parsed — write raw output so it's on the branch
 		log.Printf("[commitOutput] No files parsed for %s, saving raw_output as task_output.txt (%d bytes)", truncateID(taskID), len(rawOutput))
-		manifest, _ := json.MarshalIndent(map[string]any{
-			"warning":           "Model output could not be parsed into structured files (no files_created in response)",
-			"task_id":           taskID,
-			"model_id":          modelID,
-			"has_raw_output":    true,
-			"raw_output_length": len(rawOutput),
-			"supervisor_action": "Review raw_output for usable content. If model produced code in markdown blocks, extract and retry with failure_class=broken_output.",
-		}, "", "  ")
 		outputMap["files"] = []any{
 			map[string]any{"path": "task_output.txt", "content": rawOutput},
-			map[string]any{"path": "output_manifest.json", "content": string(manifest)},
 		}
 	}
-	// Use worktree-aware commit when available (task branch is checked out in worktree,
-	// so CommitOutput's checkout step would fail). Both internal and courier tasks use this.
+
+	// Commit to branch (worktree-aware or legacy checkout)
+	var commitErr error
 	if worktreePath != "" {
-		return h.git.CommitOutputToWorktree(ctx, worktreePath, branchName, outputMap)
+		commitErr = h.git.CommitOutputToWorktree(ctx, worktreePath, branchName, outputMap)
+	} else {
+		commitErr = h.git.CommitOutput(ctx, branchName, outputMap)
 	}
-	return h.git.CommitOutput(ctx, branchName, outputMap)
+	if commitErr != nil {
+		log.Printf("[commitOutput] Git commit error for %s: %v", truncateID(taskID), commitErr)
+		// Don't fail the whole task -- we still have raw output in memory
+		// The scan below will get whatever IS on disk
+	}
+
+	// NOW scan the actual filesystem for what's there.
+	// This is the truth: whatever files exist on the branch after execution + commit.
+	var actualFiles []gitree.DiskFile
+	if worktreePath != "" {
+		scanFiles, scanErr := h.git.ScanWorktreeFiles(ctx, worktreePath, nil)
+		if scanErr != nil {
+			log.Printf("[commitOutput] Warning: worktree scan failed for %s: %v", truncateID(taskID), scanErr)
+		} else {
+			actualFiles = scanFiles
+		}
+	} else {
+		// Non-worktree path: scan from the branch
+		scanFiles, scanErr := h.git.ScanBranchFiles(ctx, branchName, nil)
+		if scanErr != nil {
+			log.Printf("[commitOutput] Warning: branch scan failed for %s: %v", truncateID(taskID), scanErr)
+		} else {
+			actualFiles = scanFiles
+		}
+	}
+
+	log.Printf("[commitOutput] %s: %d parsed files → %d actual files on branch", truncateID(taskID), len(files), len(actualFiles))
+	return actualFiles, commitErr
 }
 
 func (h *TaskHandler) recordSuccess(ctx context.Context, taskID, modelID, taskType string, durationSeconds float64, tokensUsed int) {

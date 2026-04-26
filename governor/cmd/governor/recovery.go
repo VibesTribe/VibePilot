@@ -398,7 +398,7 @@ func runStartupRehydration(ctx context.Context, database db.Database, router *ru
 	// Rehydrate tasks in active states (pending, review, testing)
 	// Skip in_progress — those have processing_by set and will be caught by stale recovery
 	tasksRaw, err := database.Query(ctx, "tasks", map[string]any{
-		"status": "in.(available,review,testing)",
+		"status": "in.(pending,available,review,testing)",
 		"order":  "created_at.asc",
 	})
 	if err != nil {
