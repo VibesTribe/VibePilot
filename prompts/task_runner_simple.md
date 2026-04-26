@@ -36,24 +36,31 @@ Output final JSON (see format below).
 
 ---
 
-## OUTPUT FORMAT
+## OUTPUT FORMAT - CRITICAL
 
-End your response with this JSON (no markdown, just raw JSON):
+End your response with ONLY this JSON. No markdown. No code fences. No explanations before or after.
+
+The `files_created` field MUST be an array of objects with `path` AND `content`:
 
 ```json
 {
   "task_id": "T001",
   "status": "complete",
-  "files_created": ["file1.py", "file2.txt"],
-  "files_modified": [],
-  "verification": {
-    "build_status": "PASS",
-    "execution_status": "PASS",
-    "output": "Actual output if applicable"
-  },
+  "files_created": [
+    {"path": "output/hello.json", "content": "{\"message\": \"Hello, World!\"}"}
+  ],
   "summary": "Brief description of what was built"
 }
 ```
+
+### WRONG - DO NOT OUTPUT THIS:
+```json
+{
+  "files_created": ["output/hello.json"]
+}
+```
+
+That format is REJECTED. String arrays without content are useless. Every file MUST have its full content in the `content` field.
 
 ---
 
@@ -72,8 +79,10 @@ End your response with this JSON (no markdown, just raw JSON):
 
 - Stay in ONE session - don't exit early
 - Fix issues before completing
-- Output ONLY JSON at the end (no markdown wrapper)
+- Output ONLY raw JSON at the end - no ```json``` wrapper, no explanations
 - Follow prompt_packet exactly
+- Every file in files_created MUST be {"path": "...", "content": "..."}, NOT a string
+- File content goes in the JSON output, not just in verification.output
 
 ---
 
