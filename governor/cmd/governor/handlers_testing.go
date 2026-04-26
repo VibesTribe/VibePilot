@@ -1029,7 +1029,7 @@ func (h *TestingHandler) getExecutorModelID(ctx context.Context, taskID string) 
 	data, err := h.database.Query(ctx, "task_runs", map[string]any{
 		"task_id": "eq." + taskID,
 		"select":  "model_id",
-		"order":   "created_at.desc",
+		"order":   "started_at.desc",
 		"limit":   "1",
 	})
 	if err != nil {
