@@ -825,8 +825,22 @@ func (h *TestingHandler) tryMergeModuleToTesting(ctx context.Context, taskID, sl
 
 	if err := h.git.MergeBranch(ctx, moduleBranch, "testing"); err != nil {
 		log.Printf("[Testing] Module-to-testing merge FAILED for %s: %v", moduleBranch, err)
+		recordPipelineEvent(ctx, h.database, "module_merge_failed", taskID, "",
+			fmt.Sprintf("module %s → testing failed: %v", sliceID, err),
+			map[string]any{
+				"slice_id":      sliceID,
+				"source_branch": moduleBranch,
+				"target_branch": "testing",
+			})
 	} else {
 		log.Printf("[Testing] Module %s successfully merged to testing branch", sliceID)
+		recordPipelineEvent(ctx, h.database, "module_merged_to_testing", taskID, "",
+			fmt.Sprintf("module %s → testing", sliceID),
+			map[string]any{
+				"slice_id":      sliceID,
+				"source_branch": moduleBranch,
+				"target_branch": "testing",
+			})
 		// Step 3: Check if ALL modules for this plan are merged to testing → merge testing to main
 		h.tryMergeTestingToMain(ctx, planID)
 	}
@@ -880,8 +894,18 @@ func (h *TestingHandler) tryMergeTestingToMain(ctx context.Context, planID strin
 	log.Printf("[Testing] All modules complete for plan %s → merging testing to main", truncateID(planID))
 	if err := h.git.MergeBranch(ctx, "testing", "main"); err != nil {
 		log.Printf("[Testing] Testing-to-main merge FAILED: %v", err)
+		recordPipelineEvent(ctx, h.database, "integration_merge_failed", "", "",
+			fmt.Sprintf("testing → main failed: %v", err),
+			map[string]any{
+				"plan_id": planID,
+			})
 	} else {
 		log.Printf("[Testing] Plan %s fully integrated: testing → main merge complete", truncateID(planID))
+		recordPipelineEvent(ctx, h.database, "plan_complete", planID, "",
+			"all modules merged to main",
+			map[string]any{
+				"plan_id": planID,
+			})
 	}
 }
 

@@ -230,6 +230,15 @@ func (h *MaintenanceHandler) handleTaskApproved(event runtime.Event) {
 			log.Printf("[TaskApproved] Shadow merge check failed for %s: %v (proceeding anyway)", branchName, shadowErr)
 		} else if shadowResult != nil && shadowResult.HasConflicts {
 			log.Printf("[TaskApproved] Shadow merge found conflicts for %s: %v → merge_pending", branchName, shadowResult.ConflictFiles)
+			recordPipelineEvent(ctx, h.database, "merge_conflict_detected", taskID, "",
+				fmt.Sprintf("conflicts in %v", shadowResult.ConflictFiles),
+				map[string]any{
+					"task_number":    taskNumber,
+					"slice_id":       sliceID,
+					"conflict_files": shadowResult.ConflictFiles,
+					"source_branch":  branchName,
+					"target_branch":  targetBranch,
+				})
 			h.database.RPC(ctx, "transition_task", map[string]any{
 				"p_task_id":    taskID,
 				"p_new_status": "merge_pending",
@@ -267,6 +276,16 @@ func (h *MaintenanceHandler) handleTaskApproved(event runtime.Event) {
 		h.worktreeMgr.RemoveWorktree(ctx, taskID)
 	}
 	h.git.DeleteBranch(ctx, branchName)
+
+	// Record merge event for timeline
+	recordPipelineEvent(ctx, h.database, "task_merged_to_module", taskID, "",
+		fmt.Sprintf("branch=%s → %s", branchName, targetBranch),
+		map[string]any{
+			"task_number":   taskNumber,
+			"slice_id":      sliceID,
+			"source_branch": branchName,
+			"target_branch": targetBranch,
+		})
 
 	// Check if all tasks for this slice are now merged → merge module to testing
 	h.tryMergeModuleToTesting(ctx, taskID, sliceID, targetBranch)
@@ -415,8 +434,22 @@ func (h *MaintenanceHandler) tryMergeModuleToTesting(ctx context.Context, taskID
 	log.Printf("[TaskApproved] All tasks complete for module %s (plan %s) → merging %s to testing", sliceID, truncateID(planID), moduleBranch)
 	if err := h.git.MergeBranch(ctx, moduleBranch, "testing"); err != nil {
 		log.Printf("[TaskApproved] Module-to-testing merge FAILED for %s: %v", moduleBranch, err)
+		recordPipelineEvent(ctx, h.database, "module_merge_failed", taskID, "",
+			fmt.Sprintf("module %s → testing failed: %v", sliceID, err),
+			map[string]any{
+				"slice_id":       sliceID,
+				"source_branch":  moduleBranch,
+				"target_branch":  "testing",
+			})
 	} else {
 		log.Printf("[TaskApproved] Module %s successfully merged to testing branch", sliceID)
+		recordPipelineEvent(ctx, h.database, "module_merged_to_testing", taskID, "",
+			fmt.Sprintf("module %s → testing", sliceID),
+			map[string]any{
+				"slice_id":       sliceID,
+				"source_branch":  moduleBranch,
+				"target_branch":  "testing",
+			})
 		h.tryMergeTestingToMain(ctx, planID)
 	}
 }
@@ -466,8 +499,18 @@ func (h *MaintenanceHandler) tryMergeTestingToMain(ctx context.Context, planID s
 	log.Printf("[TaskApproved] All modules complete for plan %s → merging testing to main", truncateID(planID))
 	if err := h.git.MergeBranch(ctx, "testing", "main"); err != nil {
 		log.Printf("[TaskApproved] Testing-to-main merge FAILED: %v", err)
+		recordPipelineEvent(ctx, h.database, "integration_merge_failed", "", "",
+			fmt.Sprintf("testing → main failed: %v", err),
+			map[string]any{
+				"plan_id": planID,
+			})
 	} else {
 		log.Printf("[TaskApproved] Plan %s fully integrated: testing → main merge complete", truncateID(planID))
+		recordPipelineEvent(ctx, h.database, "plan_complete", planID, "",
+			"all modules merged to main",
+			map[string]any{
+				"plan_id": planID,
+			})
 	}
 }
 
