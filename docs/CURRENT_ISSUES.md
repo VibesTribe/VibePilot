@@ -12,7 +12,7 @@
 | Pipeline gaps | 0 | 0 | 8 | 0 |
 | Learning system | 0 | 0 | 4 | 0 |
 | Model health | 0 | 0 | 1 | 0 |
-| Research/council | 0 | 0 | 1 | 2 |
+| Research/council | 0 | 0 | 2 | 2 |
 | Dashboard | 1 | 0 | 0 | 0 |
 
 ---
@@ -133,19 +133,26 @@
 **What was done**: Added `council` context_policy case in session.go that calls BuildCouncilContext (with fallback to BuildBaseContext on error). Changed council agent's context_policy from `file_tree` to `council` in agents.json. Council members now get file tree + plan reference verification instructions.
 **Files**: session.go, agents.json
 
+### 20. "Blocked" Council Consensus Created Dead-End — FIXED
+**Priority**: P1 → FIXED
+**What was the problem**: When council consensus was "blocked", plan status was set to "blocked" and sat forever with no handler. Also `council_done` event type was defined/mapped but never emitted and had no handler — pure dead code (53 lines). `council_rejected` event name was misleading since nothing is rejected, only feedback given.
+**What was done**: "blocked" consensus now routes to revision_needed with full council feedback (same path as revision_needed). Removed handleCouncilDone function, EventCouncilDone constant, and all council_done mappings from pgnotify listener, server.go, and handler registration. Renamed council_rejected → council_feedback in timeline events. Updated pipeline YAML to remove "blocked" vote option.
+**Files**: handlers_council.go, events.go, listener.go, server.go, code-pipeline.yaml
+**Commit**: 477b84be
+
 ---
 
 ## Deferred Issues (awaiting knowledgebase build)
 
-### 20. Research Flow — DEFERRED
+### 21. Research Flow — DEFERRED
 **Priority**: P2 (blocked on knowledgebase repo being operational)
 **What's needed**: Researcher agent runs via GitHub Actions cron (2x daily), deposits reports to knowledgebase repo (VibesTribe/knowledgebase). Supervisor auto-approves simple model/platform additions. Council reviews complex ones. Feedback appended to report. Human reviews via knowledgebase link. Implementation in vibepilot task branches. All findings become institutional memory in Postgres.
 **Why deferred**: Knowledgebase repo exists (11 commits) but not yet operational. Researcher agent hasn't run yet. Full flow requires knowledgebase schema, sources.txt, and dashboard DOCS button wiring.
 
-### 21. Council for Research — DEFERRED
+### 22. Council for Research — DEFERRED
 **Priority**: P2 (blocked on knowledgebase)
 **What's needed**: Council reads research reports FROM knowledgebase repo, gives feedback per point, feedback appended to same doc, report+feedback goes to human via knowledgebase link. New research+feedback instantly added to knowledgebase.
-**Why deferred**: Same blocker as #20.
+**Why deferred**: Same blocker as #21.
 
 ---
 
@@ -172,6 +179,7 @@
 | 17 | Maintenance commands never processed | Added pg_notify triggers + status filter | 133cd28a |
 | 18 | Plan revisions never re-triggered | handlePlanRevisionNeeded handler with max 3 rounds | 133cd28a |
 | 19 | Council never got proper context | BuildCouncilContext wired via council policy | 54e6eec0 |
+| 20 | "Blocked" council consensus = dead-end | Blocked routes to revision_needed, council_done dead code removed | 477b84be |
 
 ## Non-Issues (log noise only)
 
