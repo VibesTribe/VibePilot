@@ -91,6 +91,21 @@ func (h *GitHubWebhookHandler) checkAndCreatePRD(ctx context.Context, file, repo
 	}
 
 	log.Printf("[GitHub Webhooks] New PRD detected (%s): %s in %s", action, file, repoName)
+
+	// Record webhook event for dashboard timeline
+	h.db.Insert(ctx, "orchestrator_events", map[string]any{
+		"event_type": "prd_committed",
+		"task_id":    file,
+		"model_id":   "",
+		"reason":     "",
+		"details": map[string]any{
+			"prd_path":  file,
+			"repo_name": repoName,
+			"action":    action,
+			"source":    "webhook",
+		},
+	})
+
 	h.createPlanForPRD(ctx, file)
 }
 
