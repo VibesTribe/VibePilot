@@ -715,7 +715,7 @@
         "openrouter-api"
       ],
       "api_key_ref": "GROQ_API_KEY",
-      "status": "benched",
+      "status": "offline",
       "rate_limits": {
         "requests_per_minute": 60,
         "requests_per_day": 1000,
@@ -749,7 +749,7 @@
       ],
       "weaknesses": [],
       "notes": "Groq free tier: 60 RPM, 1K RPD, 10K TPM, 300K TPD. Also available via OpenRouter as emergency fallback.",
-      "status_reason": "Benched from Groq. Use moonshotai/kimi-k2-instruct via NVIDIA instead."
+      "status_reason": "no_longer_free_on_openrouter"
     },
     {
       "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
@@ -1102,7 +1102,7 @@
       "name": "Nemotron 3 Super 120B (OpenRouter)",
       "vendor": "nvidia",
       "context_limit": 262000,
-      "status": "benched",
+      "status": "offline",
       "access_via": [
         "openrouter-api"
       ],
@@ -1137,7 +1137,8 @@
         "code",
         "reasoning",
         "tool_calling"
-      ]
+      ],
+      "status_reason": "no_longer_free_on_openrouter"
     },
     {
       "id": "google/gemma-4-31b-it",
@@ -1769,7 +1770,7 @@
         "openrouter-api"
       ],
       "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
+      "status": "offline",
       "rate_limits": {
         "requests_per_minute": 20,
         "requests_per_hour": 200,
@@ -1808,7 +1809,8 @@
         "tiny_context"
       ],
       "notes": "Purpose-built for GUI automation. Ultra-cheap. Ideal courier fuel for browser navigation.",
-      "courier": true
+      "courier": true,
+      "status_reason": "no_longer_free_on_openrouter"
     },
     {
       "id": "meta-llama/llama-3.2-3b-instruct:free",
@@ -2750,6 +2752,480 @@
         "gemini-api-general"
       ],
       "status": "active"
+    },
+    {
+      "id": "openrouter/free",
+      "name": "OpenRouter Free Router",
+      "provider": "openrouter",
+      "access_type": "api",
+      "context_limit": 200000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tool_calling",
+        "vision",
+        "multimodal"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "auto_routes_to_best_free_model",
+        "supports_tool_calling",
+        "supports_vision",
+        "supports_structured_output",
+        "always_has_fallback"
+      ],
+      "weaknesses": [
+        "non_deterministic_model_selection",
+        "openrouter_rate_limits"
+      ],
+      "notes": "OpenRouter free auto-router. Selects best available free model for each request based on required features. Always use as fallback.",
+      "courier": true
+    },
+    {
+      "id": "qwen/qwen3-next-80b-a3b-instruct:free",
+      "name": "Qwen3 Next 80B A3B (OpenRouter Free)",
+      "provider": "alibaba",
+      "access_type": "api",
+      "context_limit": 262144,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "reasoning",
+        "262K context",
+        "code",
+        "tool_calling"
+      ],
+      "weaknesses": [
+        "openrouter_rate_limits"
+      ],
+      "notes": "MoE 80B model, strong reasoning. Free on OpenRouter.",
+      "courier": false
+    },
+    {
+      "id": "nvidia/nemotron-nano-9b-v2:free",
+      "name": "Nemotron Nano 9B V2 (OpenRouter Free)",
+      "provider": "nvidia",
+      "access_type": "api",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "reasoning",
+        "128K context",
+        "efficient"
+      ],
+      "weaknesses": [
+        "small_model",
+        "openrouter_rate_limits"
+      ],
+      "notes": "Efficient small model. Free on OpenRouter.",
+      "courier": false
+    },
+    {
+      "id": "inclusionai/ling-2.6-1t:free",
+      "name": "Ling 2.6 1T (OpenRouter Free)",
+      "provider": "inclusionai",
+      "access_type": "api",
+      "context_limit": 262144,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "1T_parameters",
+        "262K context",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "openrouter_rate_limits",
+        "unknown_quality"
+      ],
+      "notes": "1T parameter model from inclusionAI. Free on OpenRouter.",
+      "courier": false
+    },
+    {
+      "id": "inclusionai/ling-2.6-flash:free",
+      "name": "Ling 2.6 Flash (OpenRouter Free)",
+      "provider": "inclusionai",
+      "access_type": "api",
+      "context_limit": 262144,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "262K context",
+        "fast",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "openrouter_rate_limits"
+      ],
+      "notes": "Flash variant of Ling 2.6. Free on OpenRouter.",
+      "courier": true
+    },
+    {
+      "id": "tencent/hy3-preview:free",
+      "name": "Tencent Hy3 Preview (OpenRouter Free)",
+      "provider": "tencent",
+      "access_type": "api",
+      "context_limit": 262144,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "262K context",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "preview_model",
+        "openrouter_rate_limits",
+        "unknown_quality"
+      ],
+      "notes": "Tencent Hy3 preview. Free on OpenRouter.",
+      "courier": false
+    },
+    {
+      "id": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+      "name": "Dolphin Mistral 24B Venice (OpenRouter Free)",
+      "provider": "mistral",
+      "access_type": "api",
+      "context_limit": 32768,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "uncensored",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "32K_context_only",
+        "openrouter_rate_limits"
+      ],
+      "notes": "Uncensored variant. Free on OpenRouter.",
+      "courier": false
+    },
+    {
+      "id": "liquid/lfm-2.5-1.2b-instruct:free",
+      "name": "LFM 2.5 1.2B Instruct (OpenRouter Free)",
+      "provider": "liquid",
+      "access_type": "api",
+      "context_limit": 32768,
+      "capabilities": [
+        "code"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "small_fast"
+      ],
+      "weaknesses": [
+        "very_small",
+        "openrouter_rate_limits"
+      ],
+      "notes": "Tiny model for quick tasks. Free on OpenRouter.",
+      "courier": true
+    },
+    {
+      "id": "liquid/lfm-2.5-1.2b-thinking:free",
+      "name": "LFM 2.5 1.2B Thinking (OpenRouter Free)",
+      "provider": "liquid",
+      "access_type": "api",
+      "context_limit": 32768,
+      "capabilities": [
+        "reasoning"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "small_fast",
+        "chain_of_thought"
+      ],
+      "weaknesses": [
+        "very_small",
+        "openrouter_rate_limits"
+      ],
+      "notes": "Tiny thinking model. Free on OpenRouter.",
+      "courier": false
     }
   ],
   "defaults": {
