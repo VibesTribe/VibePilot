@@ -223,7 +223,15 @@ func main() {
 	}
 	loadCancel()
 
+	// Cooldown watcher: probes models whose cooldown recently expired to verify
+	// they're actually healthy before the router sends traffic. Without this,
+	// a model with a dead key cycles forever (cooldown expires → fail → repeat).
+	cooldownWatcher := runtime.NewCooldownWatcher(usageTracker, sessionFactory, cfg, database)
+
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start cooldown watcher with the main context (auto-stops on shutdown)
+	cooldownWatcher.Start(ctx)
 	defer cancel()
 
 	// Initialize CourierRunner for web platform dispatch (courier agent system)

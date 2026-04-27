@@ -8,9 +8,10 @@
 |----------|------|-----------------|-------|----------|
 | Database migration | 0 | 0 | 5 | 0 |
 | SSE bridge | 0 | 0 | 3 | 0 |
-| Infrastructure | 0 | 0 | 3 | 0 |
+| Infrastructure | 0 | 0 | 4 | 0 |
 | Pipeline gaps | 0 | 2 | 4 | 0 |
 | Learning system | 0 | 0 | 4 | 0 |
+| Model health | 0 | 0 | 1 | 0 |
 | Dashboard | 1 | 0 | 0 | 0 |
 
 ---
@@ -57,6 +58,12 @@
 ---
 
 ## Fixed Issues (April 27, 2026 — commit 0f65f686)
+
+### 3.5. Cooldown Expiry Re-verification — FIXED
+**Priority**: Infrastructure → FIXED
+**What was the problem**: When a model's cooldown timer expired (e.g., after a rate limit), the router blindly assumed "timer done = model fine." A model with a dead API key or a deprecated endpoint would cycle forever: cooldown expires → router tries → fails → new cooldown → repeat.
+**What was done**: Added `CooldownWatcher` — a background goroutine that polls every 2 minutes for models whose cooldown recently expired, probes each via its connector's HealthCheck(), and either confirms healthy or extends cooldown. Tracks which expirys have been probed to avoid re-checking. Staggers probes (2s between) to avoid hitting rate limits. Persists state to DB after probe failures.
+**Files**: runtime/cooldown_watcher.go, cmd/governor/main.go (wired after LoadFromDatabase)
 
 ### 4. Module-Level Integration Test — FIXED
 **Priority**: P2 → FIXED

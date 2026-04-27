@@ -177,12 +177,44 @@ All 5 courier bugs fixed (Apr 25):
 - **Local PostgreSQL 16**: vibepilot database, 63+ tables, 144+ RPC functions
 - **Local inference**: Too slow (2 tok/s tested). Cloud API only.
 
+## Router Architecture (config-driven, NOT hardcoded)
+
+The orchestrator/router is fully config-driven via `routing.json` (free_cascade strategy with 21 models in priority order).
+
+### Cascade Selection
+- `getModelCascade()` reads `routing.json` strategies.free_cascade.priority
+- `selectByCascade()` iterates with round-robin rotation for load distribution
+- Each candidate scored by `GetModelLearnedScore()` (0-1): best_for_task_type +0.2, avoid -0.5, failure history penalty
+- Tiebreaker: least-loaded by minute request count
+
+### Rate Limiting & Health
+- `UsageTracker.CanMakeRequestVia()` checks per-model: cooldown, RPM, RPH, RPD, TPM, TPD, context_limit, spacing
+- `ConnectorUsageTracker`: shared limits across models on same connector (e.g., Groq org-level TPD)
+- `PlatformUsageTracker`: web platform free-tier tracking (messages per 3h/8h/day/session)
+- Buffer percentage (configurable, default 80%) prevents hitting hard limits
+
+### Cooldown System
+- On rate limit: `RecordRateLimit()` sets cooldown (configurable per model, default 30 min)
+- On connector limit: `RecordConnectorCooldown()` puts ALL models on that connector in cooldown
+- Cooldown auto-expires when timer runs out
+- **Persistence**: `PersistToDatabase()` saves all cooldown state on shutdown, `LoadFromDatabase()` restores on startup
+- **Re-verification**: `CooldownWatcher` probes models whose cooldown expired to verify they're actually healthy before the router sends traffic
+
+### Startup Health Checks
+- `registerConnectors()` probes each API connector with a minimal request (15s timeout)
+- `CooldownWatcher` starts after cooldown state is restored, probes recently-expired models
+- Failed probes extend cooldown; healthy probes log confirmation
+
+### Learned Scoring
+- `RecordCompletion()` tracks avg task duration, best/avoid task types, failure rates per model
+- Learned data persists to DB, restored on restart
+- Scoring: baseline 0.5, best_for_task +0.2, avoid_for_task -0.5, failure penalty up to -0.4
+
 ## Known Gaps (verified 2026-04-27)
-- Orchestrator is NOT an LLM call — just hardcoded cascade in Go
 - Consultant agent not wired into pipeline
 - Task packet context PARTIALLY FIXED — ContextBuilder wired, reads target_files from planner result, but untested E2E
 - Planner context PARTIALLY FIXED — BuildPlannerContext wired for full_map policy, injects slices/rules/failures + full code map from .context/map.md (auto-refreshed via git hook)
-- No startup model health probe
+- No auto-discovery of new free models from providers (research agent handles daily landscape checks)
 - See docs/CURRENT_ISSUES.md for full details
 
 ## Learning System (FIXED 2026-04-27, commit 0f65f686)
