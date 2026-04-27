@@ -57,8 +57,8 @@ nodes:
       task: |
         Supervisor escalated a complex plan. Review with multiple lenses:
         user_alignment, architecture, feasibility.
-        Vote: approved / needs_revision / blocked.
-        Record council_feedback rules for planner learning.
+        Vote: approved / needs_revision.
+        Nothing is ever blocked — all feedback routes back to improve the plan.
 
   # --- Create tasks from approved plan ---
   - id: create-tasks

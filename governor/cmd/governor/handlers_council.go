@@ -47,7 +47,6 @@ func NewCouncilHandler(
 
 func (h *CouncilHandler) Register(router *runtime.EventRouter) {
 	router.On(runtime.EventCouncilReview, h.handleCouncilReview)
-	router.On(runtime.EventCouncilDone, h.handleCouncilDone)
 }
 
 func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
@@ -316,17 +315,11 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 				"consensus":     consensus,
 			})
 	case "blocked":
+		// Nothing is ever blocked — strong feedback routes back to planner
 		h.recordCouncilFeedback(ctx, planID, validReviews)
-		_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
-			"p_plan_id": planID,
-			"p_status":  "blocked",
-			"p_review_notes": map[string]any{
-				"consensus": consensus,
-				"reviews":   validReviews,
-			},
-		})
-		// Record council rejection for timeline
-		recordPipelineEvent(ctx, h.database, "council_rejected", planID, "", "blocked",
+		h.updatePlanForRevision(ctx, planID, validReviews)
+		// Record council feedback for timeline
+		recordPipelineEvent(ctx, h.database, "council_feedback", planID, "", "revision_needed",
 			map[string]any{
 				"plan_id":       planID,
 				"member_count":  len(validReviews),
@@ -335,66 +328,13 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 	case "revision_needed":
 		h.recordCouncilFeedback(ctx, planID, validReviews)
 		h.updatePlanForRevision(ctx, planID, validReviews)
-		// Record council revision for timeline
-		recordPipelineEvent(ctx, h.database, "council_rejected", planID, "", "revision_needed",
+		// Record council feedback for timeline
+		recordPipelineEvent(ctx, h.database, "council_feedback", planID, "", "revision_needed",
 			map[string]any{
 				"plan_id":       planID,
 				"member_count":  len(validReviews),
 				"consensus":     consensus,
 			})
-	}
-}
-
-func (h *CouncilHandler) handleCouncilDone(event runtime.Event) {
-	ctx := context.Background()
-
-	plan, err := fetchRecord(ctx, h.database, event)
-	if err != nil {
-		log.Printf("[CouncilDone] Failed to get plan record: %v", err)
-		return
-	}
-
-	planID := getString(plan, "id")
-	if planID == "" {
-		return
-	}
-
-	processingBy := fmt.Sprintf("council_done:%d", time.Now().UnixNano())
-	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
-		"p_table":         "plans",
-		"p_id":            planID,
-		"p_processing_by": processingBy,
-	})
-	if err != nil || !parseBool(claimed) {
-		log.Printf("[CouncilDone] Plan %s already being processed", truncateID(planID))
-		return
-	}
-
-	defer h.database.RPC(ctx, "clear_processing", map[string]any{
-		"p_table": "plans",
-		"p_id":    planID,
-	})
-
-	councilReviews := h.extractCouncilReviews(plan)
-	consensus := getString(plan, "council_consensus")
-	if consensus == "" {
-		consensus = h.determineConsensus(councilReviews, h.cfg.GetCouncilMemberCount())
-	}
-
-	log.Printf("[CouncilDone] Plan %s consensus: %s", truncateID(planID), consensus)
-
-	switch consensus {
-	case "approved":
-		h.handleApprovedPlan(ctx, plan, planID)
-	case "blocked":
-		h.recordCouncilFeedback(ctx, planID, councilReviews)
-		_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
-			"p_plan_id": planID,
-			"p_status":  "blocked",
-		})
-	case "revision_needed":
-		h.recordCouncilFeedback(ctx, planID, councilReviews)
-		h.updatePlanForRevision(ctx, planID, councilReviews)
 	}
 }
 

@@ -316,8 +316,6 @@ func (s *Server) mapToEventType(payload *Payload) string {
 			return string(runtime.EventPlanReview)
 		case "council_review":
 			return string(runtime.EventCouncilReview)
-		case "council_done":
-			return string(runtime.EventCouncilDone)
 		case "approved":
 			return string(runtime.EventPlanApproved)
 		case "blocked":
