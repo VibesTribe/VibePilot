@@ -8,8 +8,8 @@
 |----------|------|-----------------|-------|----------|
 | Database migration | 0 | 0 | 5 | 0 |
 | SSE bridge | 0 | 0 | 3 | 0 |
-| Infrastructure | 0 | 0 | 4 | 0 |
-| Pipeline gaps | 0 | 2 | 4 | 0 |
+| Infrastructure | 0 | 0 | 5 | 0 |
+| Pipeline gaps | 0 | 0 | 7 | 0 |
 | Learning system | 0 | 0 | 4 | 0 |
 | Model health | 0 | 0 | 1 | 0 |
 | Dashboard | 1 | 0 | 0 | 0 |
@@ -26,24 +26,16 @@
 
 ---
 
-## Pipeline Gaps (partially fixed)
+## Fixed Issues (April 27, 2026 — commit 133cd28a)
 
-### 2. Task Packets — Context PARTIALLY WIRED
-**Priority**: P2
-**Impact**: contextBuilder IS wired (handlers_task.go:177, session.go:164). Reads `target_files` from planner result JSONB and injects file contents via `BuildTargetedContext()`. BUT: depends on planner outputting `target_files` array, which has never been tested E2E.
-**What's done**:
-  - `ContextBuilder` injected in main.go:199, wired to TaskHandler via SetContextBuilder
-  - `BuildTargetedContext()` reads actual file contents and appends to prompt
-  - `BuildBaseContext()` provides file tree for `file_tree` policy
-**What's untested**:
-  - Does the planner actually return `target_files` in its structured output?
-  - Does the file content injection actually improve executor output quality?
-**Files**: handlers_task.go:162-183, context_builder.go:142-155, session.go:155-175
-**Verified**: 2026-04-27 against Go code
+### 2. Task Packets — Target Files — FIXED
+**Priority**: P2 → FIXED
+**What was the problem**: Planner prompt never asked the model to include "Target Files" in task output, so validation.go always parsed empty TargetFiles. Task agents got zero code context.
+**What was done**: Added "Target Files" as required field in planner prompt task template, example output, and constraints. Now every task must list the files it will create/modify, feeding BuildTargetedContext().
+**Files**: prompts/planner.md, cmd/governor/validation.go (already parses **Target Files:**)
 
-### 3. Planner — Context PARTIALLY WIRED
-**Priority**: P2
-**Impact**: `BuildPlannerContext()` IS wired in session.go:164 for agents with `context_policy: full_map` (planner has this in agents.json). Injects: incomplete slices, learned rules, recent failures, MCP tools, AND the full code map from `.context/map.md` (context_builder.go:231-237). The code map is auto-regenerated on git checkout via post-checkout hook.
+### 3. Planner — Context FULLY WIRED
+**Priority**: P2 → FIXED (was already wired, just untested)
 **What's done**:
   - `BuildPlannerContext()` called for `full_map` policy agents (planner)
   - Queries `get_slice_task_info`, `get_supervisor_rules`, `get_problem_solution`, `get_heuristic`
@@ -54,6 +46,32 @@
   - E2E verification that planner uses the code map correctly
 **Files**: context_builder.go:157-237, session.go:155-175, .git/hooks/post-checkout
 **Verified**: 2026-04-27 against Go code
+
+---
+
+## Fixed Issues (April 27, 2026 — commit 133cd28a)
+
+### 11. Maintenance Commands Never Processed — FIXED
+**Priority**: P0 → FIXED (showstopper)
+**What was the problem**: maintenance_commands and research_suggestions tables had no pg_notify triggers. When handlers created maintenance commands (e.g., for merge conflicts), no event fired, so handleMaintenanceCommand never ran. Merge conflicts sat forever.
+**What was done**:
+  - Added `notify_maintenance_commands` trigger on maintenance_commands table
+  - Added `notify_research_suggestions` trigger on research_suggestions table
+  - Filtered listener.go to only fire EventMaintenanceCmd for status=pending (prevents infinite re-trigger after completion)
+  - Added handler guard in handlers_maint.go against non-pending commands
+**Files**: listener.go, handlers_maint.go, DB triggers
+
+### 12. Plan Revisions Never Re-Triggered — FIXED
+**Priority**: P0 → FIXED (showstopper)
+**What was the problem**: When supervisor rejected a plan (status → revision_needed), EventRevisionNeeded fired but no handler was registered. Rejected plans sat in revision_needed forever.
+**What was done**: Added handlePlanRevisionNeeded handler that:
+  - Re-runs planner with supervisor feedback (latest_feedback, tasks_needing_revision)
+  - Includes existing plan content so planner revises rather than starts from scratch
+  - Increments revision_round via increment_revision_round RPC
+  - Max 3 revision rounds, then sets plan to "error"
+  - On success, sets plan to "review" (re-triggers supervisor re-review)
+  - Full cascade retry (5 attempts) with model health tracking
+**Files**: handlers_plan.go, setupPlanHandlers registration
 
 ---
 
@@ -120,12 +138,14 @@
 | 8 | Courier writes to local PG | governor API endpoint replaces Supabase | Apr 23 |
 | 9 | Dashboard polling | SSE EventSource replaces polling | Apr 23 |
 | 10 | Pipeline timeline shows meaningless events | Full 26-event lifecycle with readable labels | Apr 27 |
-| 11 | Task packets had zero codebase context | ContextBuilder wired, reads target_files from planner | uncommitted |
-| 12 | Planner had no codebase context | BuildPlannerContext wired for full_map policy | uncommitted |
+| 11 | Task packets had zero codebase context | ContextBuilder wired, planner prompt requires Target Files | 133cd28a |
+| 12 | Planner had no codebase context | BuildPlannerContext wired for full_map policy | 0f65f686 |
 | 13 | Learning RPCs never called | All 5 learning RPCs wired into handlers | 0f65f686 |
 | 14 | 3 DB functions missing | create_tester_rule, record_tester_rule_hit, upsert_heuristic | 0f65f686 |
 | 15 | No module integration test | go build gate before module-to-testing merge | 0f65f686 |
 | 16 | Code map goes stale | git post-checkout hook auto-regenerates | 0f65f686 |
+| 17 | Maintenance commands never processed | Added pg_notify triggers + status filter | 133cd28a |
+| 18 | Plan revisions never re-triggered | handlePlanRevisionNeeded handler with max 3 rounds | 133cd28a |
 
 ## Non-Issues (log noise only)
 
