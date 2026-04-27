@@ -441,6 +441,80 @@ func (g *Gitree) MergeBranch(ctx context.Context, sourceBranch, targetBranch str
 	return g.ResetToMain(ctx)
 }
 
+// MergeBranchToSubdir merges sourceBranch into targetBranch, placing all files
+// under the given prefix directory. This keeps test artifacts isolated:
+//   MergeBranchToSubdir("testing", "main", "testing/")
+// results in all testing branch files landing under testing/ on main.
+// Uses git read-tree with --prefix for a clean subtree-style merge.
+func (g *Gitree) MergeBranchToSubdir(ctx context.Context, sourceBranch, targetBranch, prefix string) error {
+	if !isValidBranchName(sourceBranch) {
+		return fmt.Errorf("invalid source branch name: %s", sourceBranch)
+	}
+	if !isValidBranchName(targetBranch) {
+		return fmt.Errorf("invalid target branch name: %s", targetBranch)
+	}
+	if prefix == "" {
+		return fmt.Errorf("prefix is required for subtree merge")
+	}
+	// Ensure prefix ends with /
+	if prefix[len(prefix)-1] != '/' {
+		prefix = prefix + "/"
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, g.timeout*3)
+	defer cancel()
+
+	if err := g.ResetToMain(ctx); err != nil {
+		return fmt.Errorf("MergeBranchToSubdir: reset to main failed: %w", err)
+	}
+
+	// Checkout target branch and pull latest
+	if err := g.gitCommand(ctx, "checkout", targetBranch).Run(); err != nil {
+		return fmt.Errorf("checkout %s failed: %w", targetBranch, err)
+	}
+	if err := g.gitCommand(ctx, "pull", g.remoteName, targetBranch).Run(); err != nil {
+		log.Printf("[Gitree] Warning: pull %s failed: %v", targetBranch, err)
+	}
+
+	// Fetch source branch to ensure it's available locally
+	g.gitCommand(ctx, "fetch", g.remoteName, sourceBranch).Run()
+
+	// Remove existing prefix directory if present (clean slate for this merge)
+	g.gitCommand(ctx, "rm", "-rf", "--cached", prefix).Run()
+
+	// Read the source branch tree into the prefix directory
+	var out bytes.Buffer
+	readCmd := g.gitCommand(ctx, "read-tree", "--prefix="+prefix, "-u", "refs/remotes/"+g.remoteName+"/"+sourceBranch)
+	readCmd.Stdout = &out
+	readCmd.Stderr = &out
+	if err := readCmd.Run(); err != nil {
+		return fmt.Errorf("read-tree --prefix=%s from %s failed: %w - %s", prefix, sourceBranch, err, out.String())
+	}
+
+	// Stage everything (the read-tree + rm should handle it, but be safe)
+	g.gitCommand(ctx, "add", prefix).Run()
+
+	// Commit
+	commitCmd := g.gitCommand(ctx, "commit", "-m", fmt.Sprintf("Merge %s into %s/ on %s", sourceBranch, prefix, targetBranch))
+	commitCmd.Stdout = &out
+	commitCmd.Stderr = &out
+	if err := commitCmd.Run(); err != nil {
+		// If nothing to commit, that's OK
+		if !strings.Contains(out.String(), "nothing to commit") {
+			return fmt.Errorf("commit subtree merge failed: %w - %s", err, out.String())
+		}
+		log.Printf("[Gitree] Subtree merge had nothing new to commit")
+	}
+
+	// Push
+	if err := g.gitCommand(ctx, "push", g.remoteName, targetBranch).Run(); err != nil {
+		return fmt.Errorf("push after subtree merge: %w", err)
+	}
+
+	log.Printf("[Gitree] Subtree merge: %s → %s/ on %s", sourceBranch, prefix, targetBranch)
+	return g.ResetToMain(ctx)
+}
+
 func (g *Gitree) DeleteBranch(ctx context.Context, branchName string) error {
 	if !isValidBranchName(branchName) {
 		return fmt.Errorf("invalid branch name: %s", branchName)
