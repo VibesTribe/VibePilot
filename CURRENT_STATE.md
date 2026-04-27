@@ -32,7 +32,7 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 0f65f686
+- **Git:** main branch. Last: 34678659
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
 - **Chrome CDP:** 127.0.0.1:9222
 - **Pipeline tables:** EMPTY (truncated, ready for E2E test)
@@ -90,7 +90,7 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 - Module branches: `TEST_MODULES/{sliceID}`, auto-deleted after merge to testing
 - Testing branch: auto-deleted after subtree merge to main/testing/
 
-## MODELS: 58 in config, routed via free_cascade
+## MODELS: 66 in config (56 active, 4 benched, 3 offline, 2 paused), routed via free_cascade
 
 ### Active API Connectors (internal execution)
 - hermes (CLI) — glm-5
@@ -157,7 +157,8 @@ All 5 courier bugs fixed (Apr 25):
 
 ## RECENT COMMITS (Apr 25-27)
 
-1. 0f65f686 — feat: wire learning RPCs + module integration test gate
+1. 34678659 — feat: CooldownWatcher + doc accuracy fixes
+2. 0f65f686 — feat: wire learning RPCs + module integration test gate
 2. fcf7b198 — docs: verify all open issues against actual code (8/8 verified)
 3. 16d9724a — feat: module branch cleanup + maintenance agent for all merge failures
 4. a08afe74 — feat: pipeline event emissions (23 event types, standalone recordPipelineEvent)
