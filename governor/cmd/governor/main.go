@@ -194,7 +194,7 @@ func main() {
 	})
 
 	sessionFactory := runtime.NewSessionFactory(cfg)
-	registerConnectors(sessionFactory, cfg, v, repoPath)
+	registerConnectors(context.Background(), sessionFactory, cfg, v, repoPath)
 
 	contextBuilder := runtime.NewContextBuilder(database, repoPath, cfg.System.CodeMap)
 	sessionFactory.SetContextBuilder(contextBuilder)
@@ -580,7 +580,7 @@ func runVaultCLI(args []string) {
 	}
 }
 
-func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault, repoPath string) {
+func registerConnectors(ctx context.Context, factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault, repoPath string) {
 	connectorsCfg := cfg.Connectors
 	if connectorsCfg == nil {
 		log.Println("Warning: no connectors configured")
@@ -618,6 +618,27 @@ func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v 
 			// Skip unknown types silently
 		}
 	}
+
+	// Run startup health checks on connectors that support it
+	healthyCount := 0
+	for _, conn := range connectorsCfg.Connectors {
+		if conn.Status != "active" {
+			continue
+		}
+		runner, ok := factory.GetConnector(conn.ID)
+		if !ok || runner == nil {
+			continue
+		}
+		if hc, ok := runner.(runtime.HealthChecker); ok {
+			if err := hc.HealthCheck(ctx); err != nil {
+				log.Printf("HEALTH CHECK FAILED: %s — %v (connector remains registered but may fail at runtime)", conn.ID, err)
+			} else {
+				healthyCount++
+				log.Printf("HEALTH CHECK OK: %s", conn.ID)
+			}
+		}
+	}
+	log.Printf("Startup health checks: %d/%d API connectors healthy", healthyCount, activeCount)
 
 	if activeCount == 0 {
 		log.Println("Warning: no active connectors registered")

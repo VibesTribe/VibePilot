@@ -49,6 +49,7 @@ The `files_created` field MUST be an array of objects with `path` AND `content`:
   "files_created": [
     {"path": "output/hello.json", "content": "{\"message\": \"Hello, World!\"}"}
   ],
+  "model_note": "gemini-2.5-flash via Google AI",
   "summary": "Brief description of what was built"
 }
 ```
@@ -83,6 +84,7 @@ That format is REJECTED. String arrays without content are useless. Every file M
 - Follow prompt_packet exactly
 - Every file in files_created MUST be {"path": "...", "content": "..."}, NOT a string
 - File content goes in the JSON output, not just in verification.output
+- Include model_note in your JSON output stating what model and platform you are (e.g. "glm-5.1 via z.ai" or "gemini-2.5-flash via Google AI")
 
 ---
 

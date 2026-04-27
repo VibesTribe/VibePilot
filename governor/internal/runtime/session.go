@@ -16,6 +16,12 @@ type ConnectorRunner interface {
 	Run(ctx context.Context, prompt string, timeout int) (output string, tokensIn, tokensOut int, err error)
 }
 
+// HealthChecker is an optional interface that connectors can implement
+// to verify their endpoint and credentials are valid at startup or periodically.
+type HealthChecker interface {
+	HealthCheck(ctx context.Context) error
+}
+
 type Session struct {
 	ID          string
 	AgentID     string

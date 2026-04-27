@@ -337,6 +337,22 @@ func (r *APIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 	}
 }
 
+// HealthCheck verifies the connector endpoint and API key are valid
+// by sending a minimal request. Implements runtime.HealthChecker.
+func (r *APIRunner) HealthCheck(ctx context.Context) error {
+	const healthCheckPrompt = "Reply with exactly: ok"
+	const healthTimeout = 15
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(healthTimeout)*time.Second)
+	defer cancel()
+
+	_, _, _, err := r.Run(ctx, healthCheckPrompt, healthTimeout)
+	if err != nil {
+		return fmt.Errorf("health check failed for %s (%s): %w", r.endpoint, r.provider, err)
+	}
+	return nil
+}
+
 func (r *APIRunner) callGemini(ctx context.Context, prompt, apiKey string) (string, int, int, error) {
 	url := fmt.Sprintf("%s/%s:generateContent", r.endpoint, r.model)
 
