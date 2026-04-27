@@ -32,7 +32,7 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 16d9724a
+- **Git:** main branch. Last: 0f65f686
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
 - **Chrome CDP:** 127.0.0.1:9222
 - **Pipeline tables:** EMPTY (truncated, ready for E2E test)
@@ -157,11 +157,11 @@ All 5 courier bugs fixed (Apr 25):
 
 ## RECENT COMMITS (Apr 25-27)
 
-1. 16d9724a — feat: module branch cleanup + maintenance agent for all merge failures
-2. a08afe74 — feat: pipeline event emissions (23 event types, standalone recordPipelineEvent)
-3. (multiple) — Rich pipeline lifecycle events, merge events, subtree merge to testing/
-4. ef612db1 — fix: remove remaining Supabase references from codebase
-5. c67c4472 — fix: CommitOutput targets worktree not main repo
+1. 0f65f686 — feat: wire learning RPCs + module integration test gate
+2. fcf7b198 — docs: verify all open issues against actual code (8/8 verified)
+3. 16d9724a — feat: module branch cleanup + maintenance agent for all merge failures
+4. a08afe74 — feat: pipeline event emissions (23 event types, standalone recordPipelineEvent)
+5. (multiple) — Rich pipeline lifecycle events, merge events, subtree merge to testing/
 
 ## Budget
 - **OpenRouter**: $0 credit account. No payment added.
@@ -174,18 +174,25 @@ All 5 courier bugs fixed (Apr 25):
 ## Hardware
 - **Machine**: Lenovo x220, 16GB RAM
 - **OS**: Linux (user-level systemd services)
-- **Local PostgreSQL 16**: vibepilot database, 63+ tables, 141+ RPC functions
+- **Local PostgreSQL 16**: vibepilot database, 63+ tables, 144+ RPC functions
 - **Local inference**: Too slow (2 tok/s tested). Cloud API only.
 
 ## Known Gaps (verified 2026-04-27)
 - Orchestrator is NOT an LLM call — just hardcoded cascade in Go
 - Consultant agent not wired into pipeline
-- No module-level integration test before module merges to testing
 - Task packet context PARTIALLY FIXED — ContextBuilder wired, reads target_files from planner result, but untested E2E
-- Planner context PARTIALLY FIXED — BuildPlannerContext wired for full_map policy, injects slices/rules/failures, but NO file tree or code contents
-- 4 learning RPCs exist in DB but never called from handlers: record_supervisor_rule, create_tester_rule, upsert_heuristic, record_solution_on_success
+- Planner context PARTIALLY FIXED — BuildPlannerContext wired for full_map policy, injects slices/rules/failures + full code map from .context/map.md (auto-refreshed via git hook)
 - No startup model health probe
 - See docs/CURRENT_ISSUES.md for full details
+
+## Learning System (FIXED 2026-04-27, commit 0f65f686)
+All learning RPCs now wired into handlers:
+- **Supervisor rules**: `record_supervisor_rule` + `create_rule_from_rejection` called on supervisor fail/needs_revision
+- **Tester rules**: `create_tester_rule` called on test failure (DB function created)
+- **Heuristics**: `upsert_heuristic` called on task success (DB function created)
+- **Problem-solutions**: `record_solution_on_success` called on task success
+- **Module integration test**: `go build ./...` gate before module-to-testing merge
+- **Code map refresh**: git post-checkout hook auto-regenerates .context/
 
 ## Vault (Local PostgreSQL secrets_vault)
 AES-GCM encrypted, PBKDF2 SHA256 100k iterations. 15 keys stored.

@@ -1,5 +1,5 @@
 # VibePilot Current Issues
-> Last updated: April 27, 2026 (verified against actual code and DB)
+> Last updated: April 27, 2026 (verified + fixed against actual code and DB)
 > Previous: April 27, 2026
 
 ## Status Summary
@@ -9,8 +9,8 @@
 | Database migration | 0 | 0 | 5 | 0 |
 | SSE bridge | 0 | 0 | 3 | 0 |
 | Infrastructure | 0 | 0 | 3 | 0 |
-| Pipeline gaps | 0 | 2 | 3 | 0 |
-| Learning system | 4 | 0 | 0 | 0 |
+| Pipeline gaps | 0 | 2 | 4 | 0 |
+| Learning system | 0 | 0 | 4 | 0 |
 | Dashboard | 1 | 0 | 0 | 0 |
 
 ---
@@ -42,62 +42,60 @@
 
 ### 3. Planner — Context PARTIALLY WIRED
 **Priority**: P2
-**Impact**: `BuildPlannerContext()` IS wired in session.go:164 for agents with `context_policy: full_map` (planner has this in agents.json). Injects: incomplete slices, learned rules, recent failures, MCP tools. BUT: does NOT inject actual file tree or codebase contents — only metadata about existing slices/rules/failures.
+**Impact**: `BuildPlannerContext()` IS wired in session.go:164 for agents with `context_policy: full_map` (planner has this in agents.json). Injects: incomplete slices, learned rules, recent failures, MCP tools, AND the full code map from `.context/map.md` (context_builder.go:231-237). The code map is auto-regenerated on git checkout via post-checkout hook.
 **What's done**:
   - `BuildPlannerContext()` called for `full_map` policy agents (planner)
   - Queries `get_slice_task_info`, `get_supervisor_rules`, `get_problem_solution`, `get_heuristic`
   - Includes MCP tool listings
-**What's missing**:
-  - No file tree injection (planner doesn't see the repo structure)
-  - No file contents (planner doesn't see actual code)
-  - Planner can still invent file paths that don't exist
-**Files**: context_builder.go:157-230, session.go:155-175
+  - Includes full `.context/map.md` (64KB, 1281 lines of compressed function signatures)
+  - `.context/` auto-regenerated via git post-checkout hook (fires on git pull, git reset)
+**What's untested**:
+  - E2E verification that planner uses the code map correctly
+**Files**: context_builder.go:157-237, session.go:155-175, .git/hooks/post-checkout
 **Verified**: 2026-04-27 against Go code
-
-### 4. No Module-Level Integration Test
-**Priority**: P2
-**Impact**: After all tasks in a module pass individual testing, module merges to testing branch without running a module-level integration test
-**Fix**: Add module integration test step before tryMergeModuleToTesting
-**Files**: handlers_testing.go, handlers_maint.go
-**Verified**: 2026-04-27 — grep confirms no module integration test code exists
 
 ---
 
-## Learning System Gaps (all same root cause)
+## Fixed Issues (April 27, 2026 — commit 0f65f686)
 
-> All 4 issues share the same pattern: RPC functions exist in PostgreSQL and are
-> whitelisted in Go (rpc.go), but no handler actually CALLS them at the right moment.
+### 4. Module-Level Integration Test — FIXED
+**Priority**: P2 → FIXED
+**What was done**: Added `runModuleIntegrationTest()` to MaintenanceHandler. Before merging module branch to testing, runs `go build ./...` on the module branch. If build fails, creates maintenance command instead of merging broken code. Records `module_integration_test` pipeline event.
+**Files**: handlers_maint.go:580-632
 
-### 5. Supervisor Rules Not Created from Rejections
-**Priority**: P3
-**Location**: `governor/cmd/governor/handlers_task.go`
-**Impact**: System doesn't learn from supervisor rejections. `supervisor_learned_rules` table has 42 rows (from direct DB inserts), but `record_supervisor_rule` RPC is never called from any handler.
-**Fix**: Call `record_supervisor_rule` RPC in the supervisor rejection path
-**RPC exists**: YES — `rpc.go:64`, `create_rule_from_rejection` also exists but unused
-**Verified**: 2026-04-27 — grep confirms zero handler calls
+### 5. Supervisor Rules Not Created from Rejections — FIXED
+**Priority**: P3 → FIXED
+**What was done**: Added `record_supervisor_rule` call in both "fail" and "needs_revision" cases of `handleTaskReview()`. Also added `create_rule_from_rejection` call in "needs_revision" case to create planner learning rules from rejection patterns.
+**Files**: handlers_task.go (fail case ~line 1090, needs_revision case ~line 1148)
 
-### 6. Tester Rules Never Created
-**Priority**: P3
-**Location**: `governor/cmd/governor/handlers_testing.go`
-**Impact**: No learning from test failures. `get_tester_rules` IS called (context_builder.go:297 for context injection), but `create_tester_rule` RPC is never called from any handler.
-**Fix**: Call `create_tester_rule` RPC on test failure
-**RPC exists**: YES — `rpc.go:68`
-**Verified**: 2026-04-27 — grep confirms zero handler calls
+### 6. Tester Rules Never Created — FIXED
+**Priority**: P3 → FIXED
+**What was done**: Created `create_tester_rule` DB function (was whitelisted in Go but never existed in DB). Wired call in `handleTaskTesting()` test failure path. Creates rule from test output pattern so future runs can catch similar issues.
+**DB function**: `create_tester_rule(p_applies_to, p_test_type, p_test_command, p_trigger_pattern, ...)`
+**Files**: handlers_testing.go ~line 207
 
-### 7. Heuristics Never Recorded from Task Outcomes
-**Priority**: P3
-**Impact**: Router doesn't learn model preferences per task type. `get_heuristic` IS called (context_builder.go:316 for routing context), but `upsert_heuristic` RPC is never called from any handler.
-**Fix**: Call `upsert_heuristic` RPC on task success
-**RPC exists**: YES — `rpc.go:100`
-**Verified**: 2026-04-27 — grep confirms zero handler calls
-**Note**: `learned_heuristics` table has 0 rows
+### 7. Heuristics Never Recorded from Task Outcomes — FIXED
+**Priority**: P3 → FIXED
+**What was done**: Created `upsert_heuristic` DB function. Wired call in `recordSuccess()` — on every task success, records that the model succeeded at this task type, boosting confidence for future routing.
+**DB function**: `upsert_heuristic(p_task_type, p_condition, p_action, p_preferred_model, ...)`
+**Files**: handlers_task.go:1419-1427
 
-### 8. Problem-Solutions Never Recorded
-**Priority**: P3
-**Impact**: Same failures repeat, no automatic remediation. `get_problem_solution` IS called (context_builder.go:336 for context injection), but `record_solution_on_success` RPC is never called from any handler.
-**Fix**: Call `record_solution_on_success` RPC on retry success
-**RPC exists**: YES — `rpc.go:105`
-**Verified**: 2026-04-27 — grep confirms zero handler calls
+### 8. Problem-Solutions Never Recorded — FIXED
+**Priority**: P3 → FIXED
+**What was done**: Wired `record_solution_on_success` call in `recordSuccess()`. When a task succeeds after previous failures, records the model that solved it as a solution for that failure pattern.
+**Files**: handlers_task.go:1428-1433
+
+### 9. Code Map Staleness — FIXED
+**Priority**: Infrastructure → FIXED
+**What was done**: Added git post-checkout hook that runs `.context/build.sh` in background when HEAD changes. Also regenerated map.md from commit 952e2898 to current 0f65f686.
+**Files**: .git/hooks/post-checkout
+
+### 10. Missing DB Functions — FIXED
+**Priority**: Infrastructure → FIXED
+**What was done**: Created 3 DB functions that were whitelisted in Go rpc.go but never existed in PostgreSQL:
+- `create_tester_rule()` — idempotent, deduplicates by trigger_pattern + applies_to
+- `record_tester_rule_hit()` — increments caught_bugs or false_positives
+- `upsert_heuristic()` — creates new or boosts confidence on existing
 
 ---
 
@@ -117,6 +115,10 @@
 | 10 | Pipeline timeline shows meaningless events | Full 26-event lifecycle with readable labels | Apr 27 |
 | 11 | Task packets had zero codebase context | ContextBuilder wired, reads target_files from planner | uncommitted |
 | 12 | Planner had no codebase context | BuildPlannerContext wired for full_map policy | uncommitted |
+| 13 | Learning RPCs never called | All 5 learning RPCs wired into handlers | 0f65f686 |
+| 14 | 3 DB functions missing | create_tester_rule, record_tester_rule_hit, upsert_heuristic | 0f65f686 |
+| 15 | No module integration test | go build gate before module-to-testing merge | 0f65f686 |
+| 16 | Code map goes stale | git post-checkout hook auto-regenerates | 0f65f686 |
 
 ## Non-Issues (log noise only)
 
@@ -124,16 +126,10 @@
 
 ---
 
-## Fix Priority Order
+## Fix Priority Order (REMAINING only)
 
 | Priority | Issue | Effort | What's Needed |
 |----------|-------|--------|---------------|
 | P0 | E2E test to verify pipeline | Low | Push PRD, monitor |
 | P1 | ROI popup revisions | Low | User specs |
 | P2 | Task context E2E verification | Low | Run E2E, check if planner outputs target_files |
-| P2 | Planner file tree injection | Medium | Add file tree to BuildPlannerContext |
-| P2 | Module integration test | Medium | handlers_testing.go |
-| P3 | Supervisor rule creation | Low | 1 RPC call in rejection handler |
-| P3 | Tester rule creation | Low | 1 RPC call in test failure handler |
-| P3 | Heuristic recording | Low | 1 RPC call on task success |
-| P3 | Solution recording | Low | 1 RPC call on retry success |
