@@ -27,6 +27,10 @@
       "description": "Cascade through free API models in priority order. Used when agent has no model pin.",
       "priority": [
         "gemini-2.5-flash-lite",
+        "nvidia/nemotron-nano-9b-v2:free",
+        "inclusionai/ling-2.6-flash:free",
+        "qwen/qwen3-next-80b-a3b-instruct:free",
+        "openrouter/free",
         "gemini-3.1-flash-lite-preview",
         "gemini-3-flash-preview",
         "gemini-2.5-flash",
@@ -38,7 +42,6 @@
         "llama-3.1-8b-instant",
         "nvidia/llama-3.1-nemotron-ultra-253b-v1",
         "meta/llama-3.3-70b-instruct",
-        "moonshotai/kimi-k2-instruct",
         "google/gemma-4-26b-a4b-it:free",
         "nvidia/nemotron-nano-12b-v2-vl:free",
         "google/gemma-3-27b-it:free",
