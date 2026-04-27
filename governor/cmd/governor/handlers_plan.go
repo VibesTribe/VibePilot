@@ -131,6 +131,14 @@ func handlePlanCreated(
 			return
 		}
 
+		// Record planner call for dashboard timeline
+		recordPipelineEvent(ctx, database, "planner_called", prdPath, routingResult.ModelID, "",
+			map[string]any{
+				"plan_id":       planID,
+				"planner_model": routingResult.ModelID,
+				"connector_id":  routingResult.ConnectorID,
+			})
+
 		result, err = session.Run(ctx, map[string]any{
 			"prd_content": string(prdContent),
 			"plan_id":     planID,
@@ -377,6 +385,16 @@ func runPlanReview(
 			log.Printf("[PlanReview] Failed to create supervisor session: %v", err)
 			setPlanError(ctx, database, planID, "session_failed")
 			return
+		}
+
+		// Record supervisor call for plan review (first attempt only)
+		if attempt == 0 {
+			recordPipelineEvent(ctx, database, "supervisor_called", prdPath, routingResult.ModelID, "",
+				map[string]any{
+					"plan_id":            planID,
+					"supervisor_model":   routingResult.ModelID,
+					"review_type":       "plan_review",
+				})
 		}
 
 		result, err = session.Run(ctx, map[string]any{

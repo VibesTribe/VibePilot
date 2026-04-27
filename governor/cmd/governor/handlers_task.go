@@ -476,6 +476,17 @@ func (h *TaskHandler) executeTask(
 		}
 	}
 
+	// Record output received for dashboard timeline
+	recordPipelineEvent(ctx, h.database, "output_received", taskID, modelID, "",
+		map[string]any{
+			"task_number":  taskNumber,
+			"duration_ms":  duration.Milliseconds(),
+			"tokens_in":    tokensIn,
+			"tokens_out":   tokensOut,
+			"files_count":  len(files),
+			"connector_id": connectorID,
+		})
+
 	// Build execution result for supervisor review
 	// Commit output to branch and get ACTUAL files from disk
 	actualFiles, _ := h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds(), worktreePath)
@@ -914,6 +925,17 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		}
 
 		supervisorModelID = routingResult.ModelID
+
+		// Record supervisor call for task output review (first attempt only)
+		if attempt == 0 {
+			recordPipelineEvent(ctx, h.database, "supervisor_called", taskID, routingResult.ModelID, "",
+				map[string]any{
+					"task_number":       taskNumber,
+					"supervisor_model":  routingResult.ModelID,
+					"review_type":       "task_output_review",
+				})
+		}
+
 		reviewStart := time.Now()
 
 		// Run synchronously — supervisor review is fast, no need for pool submission
@@ -1030,10 +1052,12 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			"p_failure_category": "",
 			"p_failure_detail":   "",
 		})
-		h.recordEvent(ctx, "approved", taskID, modelID, "review_passed", map[string]any{
-			"checks":          decision.Checks,
-			"supervisor_model": supervisorModelID,
-		})
+		recordPipelineEvent(ctx, h.database, "run_completed", taskID, modelID, "",
+			map[string]any{
+				"checks":           decision.Checks,
+				"supervisor_model": supervisorModelID,
+				"review_type":      "task_review",
+			})
 		log.Printf("[TaskReview] Task %s → testing (supervisor=%s approved)", truncateID(taskID), supervisorModelID)
 
 	case "fail", "failed":
@@ -1061,10 +1085,13 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 		h.recordFailure(ctx, modelID, taskID, failureClass)
 		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
-		h.recordEvent(ctx, "failure", taskID, modelID, failureClass, map[string]any{
-			"class": failureClass, "detail": failureDetail,
-			"supervisor_model": supervisorModelID,
-		})
+		recordPipelineEvent(ctx, h.database, "run_failed", taskID, modelID, failureClass,
+			map[string]any{
+				"class":            failureClass,
+				"detail":           failureDetail,
+				"supervisor_model": supervisorModelID,
+				"review_type":      "task_review",
+			})
 		if h.worktreeMgr != nil {
 			h.worktreeMgr.RemoveWorktree(ctx, taskID)
 		}
@@ -1108,10 +1135,13 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		}
 
 		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
-		h.recordEvent(ctx, "revision_needed", taskID, modelID, failureClass, map[string]any{
-			"class": failureClass, "detail": failureDetail, "revision_notes": revisionNotes,
-			"supervisor_model": supervisorModelID,
-		})
+		recordPipelineEvent(ctx, h.database, "revision_needed", taskID, modelID, failureClass,
+			map[string]any{
+				"class":            failureClass,
+				"detail":           failureDetail,
+				"revision_notes":   revisionNotes,
+				"supervisor_model": supervisorModelID,
+			})
 		if h.worktreeMgr != nil {
 			h.worktreeMgr.RemoveWorktree(ctx, taskID)
 		}
@@ -1147,10 +1177,12 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 			failureDetail = "Supervisor recommends different model"
 		}
 		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
-		h.recordEvent(ctx, "reroute", taskID, modelID, failureClass, map[string]any{
-			"class": failureClass, "detail": failureDetail,
-			"supervisor_model": supervisorModelID,
-		})
+		recordPipelineEvent(ctx, h.database, "reroute", taskID, modelID, failureClass,
+			map[string]any{
+				"class":            failureClass,
+				"detail":           failureDetail,
+				"supervisor_model": supervisorModelID,
+			})
 		if h.worktreeMgr != nil {
 			h.worktreeMgr.RemoveWorktree(ctx, taskID)
 		}
