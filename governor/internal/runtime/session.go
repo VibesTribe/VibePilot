@@ -167,6 +167,14 @@ func (f *SessionFactory) buildAgentContext(ctx context.Context, agentID string, 
 		}
 		return extra
 
+	case "council":
+		extra, err := f.contextBuilder.BuildCouncilContext(ctx, taskType)
+		if err != nil {
+			// Fallback to base file tree
+			return f.contextBuilder.BuildBaseContext()
+		}
+		return extra
+
 	case "file_tree":
 		return f.contextBuilder.BuildBaseContext()
 
