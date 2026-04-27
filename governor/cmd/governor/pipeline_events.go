@@ -14,11 +14,14 @@ import (
 //   - vibeflow/apps/dashboard/hooks/useMissionData.ts (pipeline event builder)
 //
 // Standard event types the dashboard recognizes:
-//   prd_committed, plan_created, plan_approved, plan_rejected,
-//   council_approved, council_rejected, task_started, task_dispatched,
-//   run_completed, run_failed, task_completed, task_failed,
-//   test_passed, test_failed, failure_detected,
-//   revision_needed, reroute, approved, maintenance_started/completed/failed
+//   PLANNING: prd_committed, planner_called, plan_created, supervisor_called,
+//   plan_approved, plan_rejected, council_approved, council_rejected
+//   EXECUTION: task_dispatched, output_received, run_completed, run_failed,
+//   revision_needed, reroute
+//   TESTING: test_passed, test_failed
+//   MERGE: task_merged_to_module, merge_conflict_detected,
+//   module_merged_to_testing, module_merge_failed,
+//   integration_merge_failed, plan_complete
 func recordPipelineEvent(ctx context.Context, database db.Database, eventType, taskID, modelID, reason string, details map[string]any) {
 	eventDetails := details
 	if eventDetails == nil {
