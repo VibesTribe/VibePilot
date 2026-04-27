@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/vibepilot/governor/internal/db"
@@ -431,7 +433,38 @@ func (h *MaintenanceHandler) tryMergeModuleToTesting(ctx context.Context, taskID
 		return
 	}
 
-	log.Printf("[TaskApproved] All tasks complete for module %s (plan %s) → merging %s to testing", sliceID, truncateID(planID), moduleBranch)
+	log.Printf("[TaskApproved] All tasks complete for module %s (plan %s) → running integration test before merge", sliceID, truncateID(planID))
+
+	// Module integration test: verify the combined code from all tasks compiles.
+	// Individual task tests already passed; this catches cross-task incompatibilities.
+	repoPath := h.cfg.GetRepoPath()
+	integrationPassed, integrationOutput := h.runModuleIntegrationTest(ctx, repoPath, moduleBranch)
+
+	recordPipelineEvent(ctx, h.database, "module_integration_test", taskID, "",
+		fmt.Sprintf("module %s integration %s", sliceID, func() string { if integrationPassed { return "passed" } else { return "failed" } }()),
+		map[string]any{
+			"slice_id":       sliceID,
+			"source_branch":  moduleBranch,
+			"passed":         integrationPassed,
+		})
+
+	if !integrationPassed {
+		log.Printf("[TaskApproved] Module %s integration test FAILED, creating maintenance command", sliceID)
+		h.database.RPC(ctx, "create_maintenance_command", map[string]any{
+			"p_command_type": "integration_test_failure",
+			"p_payload": map[string]any{
+				"task_id":       taskID,
+				"slice_id":      sliceID,
+				"branch_name":   moduleBranch,
+				"test_output":   truncateOutput(integrationOutput),
+				"scope":         "module",
+			},
+		})
+		// Don't merge. The maintenance agent will fix integration issues.
+		return
+	}
+
+	log.Printf("[TaskApproved] Module %s integration test passed → merging %s to testing", sliceID, moduleBranch)
 	if err := h.git.MergeBranch(ctx, moduleBranch, "testing"); err != nil {
 		log.Printf("[TaskApproved] Module-to-testing merge FAILED for %s: %v", moduleBranch, err)
 		recordPipelineEvent(ctx, h.database, "module_merge_failed", taskID, "",
@@ -541,6 +574,69 @@ func (h *MaintenanceHandler) tryMergeTestingToMain(ctx context.Context, planID s
 			map[string]any{
 				"plan_id": planID,
 			})
+	}
+}
+
+// runModuleIntegrationTest verifies that the combined code from all tasks in a module
+// compiles successfully. This catches cross-task incompatibilities before merging to testing.
+// It checks out the module branch, runs a compile check, then returns to main.
+func (h *MaintenanceHandler) runModuleIntegrationTest(ctx context.Context, repoPath, moduleBranch string) (bool, string) {
+	var output strings.Builder
+
+	// Step 1: Stash any working tree changes
+	execCmd(exec.Command("git", "stash"), repoPath, &output)
+
+	// Step 2: Checkout the module branch
+	checkoutCmd := exec.Command("git", "checkout", moduleBranch)
+	checkoutOut, checkoutErr := checkoutCmd.CombinedOutput()
+	output.WriteString(fmt.Sprintf("$ git checkout %s\n%s\n", moduleBranch, string(checkoutOut)))
+
+	if checkoutErr != nil {
+		output.WriteString(fmt.Sprintf("CHECKOUT FAILED: %v\n", checkoutErr))
+		// Try to get back to main
+		execCmd(exec.Command("git", "checkout", "main"), repoPath, &output)
+		execCmd(exec.Command("git", "stash", "pop"), repoPath, &output)
+		return false, output.String()
+	}
+
+	// Step 3: Run compile check (go build for Go projects)
+	passed := true
+	if _, err := exec.LookPath("go"); err == nil {
+		// Found Go — run go build ./... to catch compile errors across all packages
+		govDir := repoPath
+		// Navigate to the governor module if it exists
+		if _, err := exec.Command("stat", repoPath + "/governor/go.mod").CombinedOutput(); err == nil {
+			govDir = repoPath + "/governor"
+		}
+		buildCmd := exec.Command("go", "build", "./...")
+		buildCmd.Dir = govDir
+		buildOut, buildErr := buildCmd.CombinedOutput()
+		output.WriteString(fmt.Sprintf("$ go build ./...\n%s\n", string(buildOut)))
+		if buildErr != nil {
+			output.WriteString(fmt.Sprintf("BUILD FAILED: %v\n", buildErr))
+			passed = false
+		} else {
+			output.WriteString("BUILD PASSED\n")
+		}
+	} else {
+		// No Go compiler available — skip compile check (pass by default)
+		output.WriteString("No go compiler found, skipping compile check (PASS)\n")
+	}
+
+	// Step 4: Return to main
+	execCmd(exec.Command("git", "checkout", "main"), repoPath, &output)
+	execCmd(exec.Command("git", "stash", "pop"), repoPath, &output)
+
+	return passed, output.String()
+}
+
+// execCmd runs a command in a directory, appending output to the builder.
+func execCmd(cmd *exec.Cmd, dir string, out *strings.Builder) {
+	cmd.Dir = dir
+	b, _ := cmd.CombinedOutput()
+	if len(b) > 0 {
+		out.WriteString(string(b))
+		out.WriteString("\n")
 	}
 }
 

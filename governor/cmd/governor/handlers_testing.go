@@ -205,6 +205,19 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			log.Printf("[Testing] Recorded test FAIL for executor model %s", executorModelID)
 		}
 
+		// Record tester learning: this failure pattern → create rule to catch it earlier
+		taskType := getString(task, "type")
+		h.database.RPC(ctx, "create_tester_rule", map[string]any{
+			"p_applies_to":      taskType,
+			"p_test_type":       "native_test",
+			"p_test_command":    "run_native_tests",
+			"p_trigger_pattern": truncateOutput(testOutput),
+			"p_priority":        2,
+			"p_source":          "testing_handler",
+			"p_source_details":  fmt.Sprintf("Task %s test failure", taskNumber),
+			"p_source_task_id":  taskID,
+		})
+
 		// Store the failed executor model ID BEFORE transitioning.
 		// transition_task fires pgnotify → handler reads routing_flag_reason.
 		if executorModelID != "" {
