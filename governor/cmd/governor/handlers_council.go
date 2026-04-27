@@ -308,6 +308,13 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 	switch consensus {
 	case "approved":
 		h.handleApprovedPlan(ctx, plan, planID)
+		// Record council approval for timeline
+		recordPipelineEvent(ctx, h.database, "council_approved", planID, "", "",
+			map[string]any{
+				"plan_id":       planID,
+				"member_count":  len(validReviews),
+				"consensus":     consensus,
+			})
 	case "blocked":
 		h.recordCouncilFeedback(ctx, planID, validReviews)
 		_, _ = h.database.RPC(ctx, "update_plan_status", map[string]any{
@@ -318,9 +325,23 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 				"reviews":   validReviews,
 			},
 		})
+		// Record council rejection for timeline
+		recordPipelineEvent(ctx, h.database, "council_rejected", planID, "", "blocked",
+			map[string]any{
+				"plan_id":       planID,
+				"member_count":  len(validReviews),
+				"consensus":     consensus,
+			})
 	case "revision_needed":
 		h.recordCouncilFeedback(ctx, planID, validReviews)
 		h.updatePlanForRevision(ctx, planID, validReviews)
+		// Record council revision for timeline
+		recordPipelineEvent(ctx, h.database, "council_rejected", planID, "", "revision_needed",
+			map[string]any{
+				"plan_id":       planID,
+				"member_count":  len(validReviews),
+				"consensus":     consensus,
+			})
 	}
 }
 
