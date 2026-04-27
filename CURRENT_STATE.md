@@ -177,13 +177,15 @@ All 5 courier bugs fixed (Apr 25):
 - **Local PostgreSQL 16**: vibepilot database, 63+ tables, 141+ RPC functions
 - **Local inference**: Too slow (2 tok/s tested). Cloud API only.
 
-## Known Gaps (pre-existing)
+## Known Gaps (verified 2026-04-27)
 - Orchestrator is NOT an LLM call — just hardcoded cascade in Go
 - Consultant agent not wired into pipeline
-- No module-level integration test before module merges to testing (goes straight from "all tasks done" to merge)
-- Task packets have zero codebase context (executor gets prompt text only, no file contents)
-- Planner has no codebase context (invents file paths)
+- No module-level integration test before module merges to testing
+- Task packet context PARTIALLY FIXED — ContextBuilder wired, reads target_files from planner result, but untested E2E
+- Planner context PARTIALLY FIXED — BuildPlannerContext wired for full_map policy, injects slices/rules/failures, but NO file tree or code contents
+- 4 learning RPCs exist in DB but never called from handlers: record_supervisor_rule, create_tester_rule, upsert_heuristic, record_solution_on_success
 - No startup model health probe
+- See docs/CURRENT_ISSUES.md for full details
 
 ## Vault (Local PostgreSQL secrets_vault)
 AES-GCM encrypted, PBKDF2 SHA256 100k iterations. 15 keys stored.

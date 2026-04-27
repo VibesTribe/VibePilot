@@ -1,17 +1,17 @@
 # VibePilot Current Issues
-> Last updated: April 27, 2026
-> Previous: April 23, 2026
+> Last updated: April 27, 2026 (verified against actual code and DB)
+> Previous: April 27, 2026
 
 ## Status Summary
 
-| Category | Open | Fixed | Deferred |
-|----------|------|-------|----------|
-| Database migration | 0 | 5 | 0 |
-| SSE bridge | 0 | 3 | 0 |
-| Infrastructure | 0 | 3 | 0 |
-| Pipeline gaps | 3 | 5 | 0 |
-| Learning system | 4 | 0 | 0 |
-| Dashboard | 1 | 0 | 0 |
+| Category | Open | Partially Fixed | Fixed | Deferred |
+|----------|------|-----------------|-------|----------|
+| Database migration | 0 | 0 | 5 | 0 |
+| SSE bridge | 0 | 0 | 3 | 0 |
+| Infrastructure | 0 | 0 | 3 | 0 |
+| Pipeline gaps | 0 | 2 | 3 | 0 |
+| Learning system | 4 | 0 | 0 | 0 |
+| Dashboard | 1 | 0 | 0 | 0 |
 
 ---
 
@@ -25,48 +25,79 @@
 
 ---
 
-## Pipeline Gaps (remaining)
+## Pipeline Gaps (partially fixed)
 
-### 2. No Module-Level Integration Test
+### 2. Task Packets — Context PARTIALLY WIRED
+**Priority**: P2
+**Impact**: contextBuilder IS wired (handlers_task.go:177, session.go:164). Reads `target_files` from planner result JSONB and injects file contents via `BuildTargetedContext()`. BUT: depends on planner outputting `target_files` array, which has never been tested E2E.
+**What's done**:
+  - `ContextBuilder` injected in main.go:199, wired to TaskHandler via SetContextBuilder
+  - `BuildTargetedContext()` reads actual file contents and appends to prompt
+  - `BuildBaseContext()` provides file tree for `file_tree` policy
+**What's untested**:
+  - Does the planner actually return `target_files` in its structured output?
+  - Does the file content injection actually improve executor output quality?
+**Files**: handlers_task.go:162-183, context_builder.go:142-155, session.go:155-175
+**Verified**: 2026-04-27 against Go code
+
+### 3. Planner — Context PARTIALLY WIRED
+**Priority**: P2
+**Impact**: `BuildPlannerContext()` IS wired in session.go:164 for agents with `context_policy: full_map` (planner has this in agents.json). Injects: incomplete slices, learned rules, recent failures, MCP tools. BUT: does NOT inject actual file tree or codebase contents — only metadata about existing slices/rules/failures.
+**What's done**:
+  - `BuildPlannerContext()` called for `full_map` policy agents (planner)
+  - Queries `get_slice_task_info`, `get_supervisor_rules`, `get_problem_solution`, `get_heuristic`
+  - Includes MCP tool listings
+**What's missing**:
+  - No file tree injection (planner doesn't see the repo structure)
+  - No file contents (planner doesn't see actual code)
+  - Planner can still invent file paths that don't exist
+**Files**: context_builder.go:157-230, session.go:155-175
+**Verified**: 2026-04-27 against Go code
+
+### 4. No Module-Level Integration Test
 **Priority**: P2
 **Impact**: After all tasks in a module pass individual testing, module merges to testing branch without running a module-level integration test
 **Fix**: Add module integration test step before tryMergeModuleToTesting
 **Files**: handlers_testing.go, handlers_maint.go
-
-### 3. Task Packets Have Zero Codebase Context
-**Priority**: P2
-**Impact**: Executor gets prompt text only, no actual file contents. Models produce generic/ungrounded output.
-**Fix**: Inject relevant file contents into task packets before execution
-**Files**: validation.go, handlers_task.go
-
-### 4. Planner Has No Codebase Context
-**Priority**: P2
-**Impact**: Planner invents file paths and patterns without seeing the repo
-**Fix**: Give planner a file tree + key file contents
-**Files**: handlers_plan.go
+**Verified**: 2026-04-27 — grep confirms no module integration test code exists
 
 ---
 
-## Learning System Gaps (pre-existing)
+## Learning System Gaps (all same root cause)
+
+> All 4 issues share the same pattern: RPC functions exist in PostgreSQL and are
+> whitelisted in Go (rpc.go), but no handler actually CALLS them at the right moment.
 
 ### 5. Supervisor Rules Not Created from Rejections
+**Priority**: P3
 **Location**: `governor/cmd/governor/handlers_task.go`
-**Impact**: System doesn't learn from supervisor rejections
-**Fix**: Call `create_supervisor_rule` RPC in rejection handler
+**Impact**: System doesn't learn from supervisor rejections. `supervisor_learned_rules` table has 42 rows (from direct DB inserts), but `record_supervisor_rule` RPC is never called from any handler.
+**Fix**: Call `record_supervisor_rule` RPC in the supervisor rejection path
+**RPC exists**: YES — `rpc.go:64`, `create_rule_from_rejection` also exists but unused
+**Verified**: 2026-04-27 — grep confirms zero handler calls
 
 ### 6. Tester Rules Never Created
+**Priority**: P3
 **Location**: `governor/cmd/governor/handlers_testing.go`
-**Impact**: No learning from test failures
+**Impact**: No learning from test failures. `get_tester_rules` IS called (context_builder.go:297 for context injection), but `create_tester_rule` RPC is never called from any handler.
 **Fix**: Call `create_tester_rule` RPC on test failure
+**RPC exists**: YES — `rpc.go:68`
+**Verified**: 2026-04-27 — grep confirms zero handler calls
 
 ### 7. Heuristics Never Recorded from Task Outcomes
-**Impact**: Router doesn't learn model preferences per task type
+**Priority**: P3
+**Impact**: Router doesn't learn model preferences per task type. `get_heuristic` IS called (context_builder.go:316 for routing context), but `upsert_heuristic` RPC is never called from any handler.
 **Fix**: Call `upsert_heuristic` RPC on task success
-**Note**: `learned_heuristics` table has 20 entries (from direct DB inserts), but handler doesn't automatically create them
+**RPC exists**: YES — `rpc.go:100`
+**Verified**: 2026-04-27 — grep confirms zero handler calls
+**Note**: `learned_heuristics` table has 0 rows
 
 ### 8. Problem-Solutions Never Recorded
-**Impact**: Same failures repeat, no automatic remediation
-**Fix**: Call `record_solution_result` RPC on retry success
+**Priority**: P3
+**Impact**: Same failures repeat, no automatic remediation. `get_problem_solution` IS called (context_builder.go:336 for context injection), but `record_solution_on_success` RPC is never called from any handler.
+**Fix**: Call `record_solution_on_success` RPC on retry success
+**RPC exists**: YES — `rpc.go:105`
+**Verified**: 2026-04-27 — grep confirms zero handler calls
 
 ---
 
@@ -84,6 +115,8 @@
 | 8 | Courier writes to local PG | governor API endpoint replaces Supabase | Apr 23 |
 | 9 | Dashboard polling | SSE EventSource replaces polling | Apr 23 |
 | 10 | Pipeline timeline shows meaningless events | Full 26-event lifecycle with readable labels | Apr 27 |
+| 11 | Task packets had zero codebase context | ContextBuilder wired, reads target_files from planner | uncommitted |
+| 12 | Planner had no codebase context | BuildPlannerContext wired for full_map policy | uncommitted |
 
 ## Non-Issues (log noise only)
 
@@ -93,13 +126,14 @@
 
 ## Fix Priority Order
 
-| Priority | Issue | Effort | Files |
-|----------|-------|--------|-------|
+| Priority | Issue | Effort | What's Needed |
+|----------|-------|--------|---------------|
 | P0 | E2E test to verify pipeline | Low | Push PRD, monitor |
-| P1 | ROI popup revisions | Low | MissionModals.tsx |
+| P1 | ROI popup revisions | Low | User specs |
+| P2 | Task context E2E verification | Low | Run E2E, check if planner outputs target_files |
+| P2 | Planner file tree injection | Medium | Add file tree to BuildPlannerContext |
 | P2 | Module integration test | Medium | handlers_testing.go |
-| P2 | Task packet codebase context | Medium | validation.go, handlers_task.go |
-| P2 | Planner codebase context | Medium | handlers_plan.go |
-| P3 | Supervisor rule creation | Low | handlers_task.go |
-| P3 | Tester rule creation | Low | handlers_testing.go |
-| P3 | Heuristic recording | Low | handlers_task.go |
+| P3 | Supervisor rule creation | Low | 1 RPC call in rejection handler |
+| P3 | Tester rule creation | Low | 1 RPC call in test failure handler |
+| P3 | Heuristic recording | Low | 1 RPC call on task success |
+| P3 | Solution recording | Low | 1 RPC call on retry success |
