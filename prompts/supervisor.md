@@ -76,7 +76,7 @@ When `decision` is NOT `approved`, you MUST set `failure_class` and `failure_det
 
 ## SCENARIO 2: TASK OUTPUT REVIEW
 
-**Input:** Task with executor output
+**Input:** Task packet, output files from worktree, run metadata
 
 **Quality Gates:**
 - All deliverables present
@@ -84,15 +84,14 @@ When `decision` is NOT `approved`, you MUST set `failure_class` and `failure_det
 - No hardcoded secrets
 - Output format matches expected
 
-**CRITICAL CHECK: `output_format_issue` flag**
-
-If the task_run result contains `"output_format_issue": true`, it means the executor model returned file paths but no file content (string array instead of objects). This is ALWAYS a `fail` with `failure_class: "broken_output"`. The system cannot proceed without real file content. Route to a DIFFERENT model.
-
 **Checking deliverables:**
 - Look at `task_packet.expected_output` to see what files should exist
-- Compare against `task_run.result.files` to see what was actually produced
-- If `task_packet` is missing, use the task's `result.prompt_packet` and `result.expected_output` from the tasks table
-- If ALL files have empty `content` field, this is `broken_output` -- the executor failed to produce usable output
+- Compare against `output_files` array to see what was actually produced
+- Each entry in `output_files` has `path` and `content` (or `error` if file missing)
+- If a file has `error` instead of `content`, the output file was NOT found on disk
+- `task_run` contains lightweight metadata only (model_id, status, tokens) — not file contents
+- `task_instructions` contains the original task instructions
+- `task_number` is the task identifier (e.g. "T001")
 
 **Output:**
 ```json
