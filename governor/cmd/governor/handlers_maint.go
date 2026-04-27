@@ -64,9 +64,16 @@ func (h *MaintenanceHandler) handleMaintenanceCommand(event runtime.Event) {
 
 	cmdID := getString(cmd, "id")
 	cmdType := getString(cmd, "command_type")
+	cmdStatus := getString(cmd, "status")
 	payload := cmd["payload"]
 
 	if cmdID == "" {
+		return
+	}
+
+	// Guard: only process pending commands (defense against re-trigger after completion)
+	if cmdStatus != "" && cmdStatus != "pending" {
+		log.Printf("[MaintenanceCmd] Skipping command %s with status=%s (expected pending)", truncateID(cmdID), cmdStatus)
 		return
 	}
 

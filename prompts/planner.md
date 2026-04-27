@@ -105,6 +105,7 @@ Each task must have:
 - **title**: Short, descriptive title
 - **category**: For routing
 - **confidence**: 0.95-1.0 (required)
+- **Target Files**: List of files the task will create or modify (comma-separated paths)
 - **prompt_packet**: Complete, self-contained instructions
 - **expected_output**: What success looks like
 
@@ -167,6 +168,7 @@ Create a simple JSON file as a pipeline test artifact.
 **Confidence:** 0.99
 **Category:** coding
 **Dependencies:** none
+**Target Files:** output/hello.json
 
 #### Prompt Packet
 ```
@@ -238,6 +240,7 @@ If your input contains `"event": "revision_needed"`:
 - **NEVER create a task with confidence < 0.95**
 - **NEVER create a task with empty prompt_packet**
 - **NEVER create a task without expected_output**
+- **NEVER create a task without Target Files** — every task must list the files it will create or modify
 - **ALWAYS output valid JSON (no markdown, no explanations)**
 - **NEVER assume the target project is Go, Python, or any specific language** -- follow the PRD exactly
 - **NEVER modify existing project files unless the PRD explicitly asks for it**

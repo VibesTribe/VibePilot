@@ -215,7 +215,12 @@ func (l *Listener) mapEvent(p notifyPayload) *runtime.Event {
 		}
 
 	case p.Table == "maintenance_commands":
-		eventType = runtime.EventMaintenanceCmd
+		// Only trigger handler for new/pending commands — not status updates
+		// (update_maintenance_command_status clears processing_by, which would
+		// re-trigger the handler and cause infinite re-processing)
+		if p.Status == "pending" {
+			eventType = runtime.EventMaintenanceCmd
+		}
 
 	case p.Table == "test_results":
 		eventType = runtime.EventTestResults
