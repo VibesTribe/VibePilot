@@ -9,7 +9,7 @@
 | Database migration | 0 | 0 | 5 | 0 |
 | SSE bridge | 0 | 0 | 3 | 0 |
 | Infrastructure | 0 | 0 | 5 | 0 |
-| Pipeline gaps | 0 | 0 | 8 | 0 |
+| Pipeline gaps | 0 | 0 | 10 | 0 |
 | Learning system | 0 | 0 | 4 | 0 |
 | Model health | 0 | 0 | 1 | 0 |
 | Research/council | 0 | 0 | 2 | 2 |
@@ -156,7 +156,22 @@
 
 ---
 
-## Fixed Since Last Update (April 23-27, 2026)
+## Fixed Issues (April 27, 2026 — commit 2384b572)
+
+### 21. "Blocked" Eliminated System-Wide — FIXED
+**Priority**: P1 → FIXED
+**What was the problem**: "Blocked" consensus existed in council handler, research handler, consensus functions, council prompt, and pgnotify/server mappings. All created dead-end states where tasks/plans sat forever. Nothing should ever be blocked — feedback should always route to the right agent.
+**What was done**: 
+- determineConsensus in council and research handlers only returns approved/revision_needed
+- "Blocked" vote in council prompt replaced with STRONG REVISION_NEEDED
+- BLOCKED votes counted as revision_needed in vote alignment tracking
+- Dead "blocked" pgnotify and server.go mappings removed
+- Research handler "blocked→rejected" dead-end removed
+- 5 dead event types removed (EventPlanBlocked, EventHumanQuery, EventPRDIncomplete, EventPlanError, EventCouncilComplete)
+- EventTaskEscalated removed (nothing escalates to human for code)
+- maxRetries hardcoded in 6 locations → config-driven via system.json
+**Files**: handlers_council.go, handlers_research.go, handlers_task.go, handlers_plan.go, events.go, state.go, listener.go, server.go, config.go, system.json, council.md
+**Commit**: 2384b572
 
 | # | Issue | Fix | Commit |
 |---|-------|-----|--------|
@@ -180,6 +195,7 @@
 | 18 | Plan revisions never re-triggered | handlePlanRevisionNeeded handler with max 3 rounds | 133cd28a |
 | 19 | Council never got proper context | BuildCouncilContext wired via council policy | 54e6eec0 |
 | 20 | "Blocked" council consensus = dead-end | Blocked routes to revision_needed, council_done dead code removed | 477b84be |
+| 21 | "Blocked" everywhere + dead events + hardcoded maxRetries | System-wide elimination, 5 dead events removed, config-driven | 2384b572 |
 
 ## Non-Issues (log noise only)
 

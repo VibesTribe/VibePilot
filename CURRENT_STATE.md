@@ -32,7 +32,7 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 477b84be
+- **Git:** main branch. Last: 2384b572
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
 - **Chrome CDP:** 127.0.0.1:9222
 - **Pipeline tables:** EMPTY (truncated, ready for E2E test)
@@ -157,16 +157,18 @@ All 5 courier bugs fixed (Apr 25):
 
 ## RECENT COMMITS (Apr 25-27)
 
-1. 477b84be — fix: eliminate 'blocked' dead-end, remove council_done dead code (5 files, -65 lines)
-2. 54e6eec0 — feat: wire BuildCouncilContext for plan reviews (council policy in session.go + agents.json)
-3. 2c64acff — docs: update current state — council context wired, knowledgebase section, research deferred
-4. 133cd28a — feat: maintenance pg_notify triggers + plan revision handler + target files in planner
-5. 34678659 — feat: CooldownWatcher + doc accuracy fixes
-6. 0f65f686 — feat: wire learning RPCs + module integration test gate
-7. fcf7b198 — docs: verify all open issues against actual code (8/8 verified)
-8. 16d9724a — feat: module branch cleanup + maintenance agent for all merge failures
-9. a08afe74 — feat: pipeline event emissions (23 event types, standalone recordPipelineEvent)
-10. (multiple) — Rich pipeline lifecycle events, merge events, subtree merge to testing/
+1. 2384b572 — fix: eliminate 'blocked' everywhere, clean dead events, config-driven maxRetries (11 files)
+2. 17c95628 — docs: update state docs with blocked elimination fix
+3. 477b84be — fix: eliminate 'blocked' dead-end, remove council_done dead code
+4. 54e6eec0 — feat: wire BuildCouncilContext for plan reviews
+5. 2c64acff — docs: update current state — council context wired, knowledgebase section
+6. 133cd28a — feat: maintenance pg_notify triggers + plan revision handler + target files in planner
+7. 34678659 — feat: CooldownWatcher + doc accuracy fixes
+8. 0f65f686 — feat: wire learning RPCs + module integration test gate
+9. fcf7b198 — docs: verify all open issues against actual code (8/8 verified)
+10. 16d9724a — feat: module branch cleanup + maintenance agent for all merge failures
+11. a08afe74 — feat: pipeline event emissions (23 event types, standalone recordPipelineEvent)
+12. (multiple) — Rich pipeline lifecycle events, merge events, subtree merge to testing/
 
 ## Knowledgebase (VibesTribe/knowledgebase — 11 commits, ready to build)
 
@@ -235,12 +237,17 @@ The orchestrator/router is fully config-driven via `routing.json` (free_cascade 
 - Learned data persists to DB, restored on restart
 - Scoring: baseline 0.5, best_for_task +0.2, avoid_for_task -0.5, failure penalty up to -0.4
 
+## Architecture Principles (enforced)
+- Nothing is ever blocked. All feedback routes to the right agent for revision.
+- No hardcoded values. Everything configurable via system.json.
+- Dead code removed promptly. No orphan event types or unreachable paths.
+- Human only involved for: visual UI/UX review, API budget, research after council.
+- Self-correcting: council→planner→consultant chain flows backward when needed.
+
 ## Known Gaps (verified 2026-04-27)
-- Consultant agent not wired into pipeline
+- Consultant agent not wired into pipeline (interactive chat agent — separate scope)
 - Task packet context PARTIALLY FIXED — ContextBuilder wired, reads target_files from planner result, but untested E2E
 - Planner context PARTIALLY FIXED — BuildPlannerContext wired for full_map policy, injects slices/rules/failures + full code map from .context/map.md (auto-refreshed via git hook)
-- Council context WIRED — BuildCouncilContext called for council policy (commit 54e6eec0), provides file tree + plan reference verification. Deeper context deferred to knowledgebase.
-- Council feedback FIXED — "blocked" dead-end eliminated (commit 477b84be). All council feedback routes back to planner via revision_needed. Nothing ever blocks. council_done dead code removed.
 - Research flow DEFERRED — Researcher agent not yet running. Reports will go to knowledgebase repo (VibesTribe/knowledgebase). Council reviews from there. Implementation happens in vibepilot task branches. Dashboard DOCS button will link to knowledgebase graph.
 - No auto-discovery of new free models from providers (research agent handles daily landscape checks)
 - See docs/CURRENT_ISSUES.md for full details
