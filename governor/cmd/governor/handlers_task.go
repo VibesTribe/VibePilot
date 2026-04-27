@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -813,11 +814,74 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 	// Route to supervisor with cascade retry — covers BOTH routing AND execution
 	// Get context for review (needed regardless of which model runs it)
 	taskPacket, _ := h.database.GetTaskPacket(ctx, taskID)
-	taskRunData, _ := h.database.Query(ctx, "task_runs", map[string]any{"task_id": taskID, "order": "created_at.desc", "limit": 1})
+
+	// Build a clean review payload from the worktree output files.
+	// We do NOT stuff the entire task_run DB record (which can be 3+MB of repo files)
+	// into the supervisor prompt. Instead, read only the output files from disk.
+	var outputFiles []map[string]any
+	var runMeta map[string]any
+	worktreePath := ""
+	if h.worktreeMgr != nil {
+		worktreePath = h.worktreeMgr.GetWorktreePath(taskID)
+	}
+	if worktreePath == "" {
+		worktreePath = h.cfg.GetRepoPath()
+	}
+
+	// Parse expected_output to find which files to look for
+	var expectedPaths []string
+	if taskPacket != nil && taskPacket.ExpectedOutput != "" {
+		var exp map[string]any
+		if json.Unmarshal([]byte(taskPacket.ExpectedOutput), &exp) == nil {
+			if fc, ok := exp["files_created"].([]any); ok {
+				for _, f := range fc {
+					if s, ok := f.(string); ok {
+						expectedPaths = append(expectedPaths, s)
+					}
+				}
+			}
+		}
+	}
+
+	// Read each expected output file from disk
+	for _, relPath := range expectedPaths {
+		fullPath := filepath.Join(worktreePath, relPath)
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			log.Printf("[TaskReview] Warning: could not read output file %s: %v", relPath, err)
+			outputFiles = append(outputFiles, map[string]any{
+				"path":    relPath,
+				"content": nil,
+				"error":   err.Error(),
+			})
+			continue
+		}
+		outputFiles = append(outputFiles, map[string]any{
+			"path":    relPath,
+			"content": string(content),
+		})
+	}
+
+	// Also get lightweight metadata from the latest task_run (model, tokens, status — NOT the full files)
+	taskRunData, _ := h.database.Query(ctx, "task_runs", map[string]any{
+		"task_id": taskID,
+		"select":  "id,model_id,status,tokens_in,tokens_out,started_at,completed_at",
+		"order":   "started_at.desc",
+		"limit":   1,
+	})
 	var taskRuns []map[string]any
 	var latestRun map[string]any
 	if err := json.Unmarshal(taskRunData, &taskRuns); err == nil && len(taskRuns) > 0 {
 		latestRun = taskRuns[0]
+	}
+	// Build lightweight run metadata (without the bloated result.files)
+	runMeta = map[string]any{
+		"model_id":   getString(latestRun, "model_id"),
+		"status":     getString(latestRun, "status"),
+		"tokens_in":  latestRun["tokens_in"],
+		"tokens_out": latestRun["tokens_out"],
+		"started_at": latestRun["started_at"],
+		"completed_at": latestRun["completed_at"],
 	}
 
 	var result *runtime.SessionResult
@@ -854,12 +918,20 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 		// Run synchronously — supervisor review is fast, no need for pool submission
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, 2*time.Minute)
-		runResult, runErr := session.Run(reviewCtx, map[string]any{
-			"task":        task,
+		reviewInput := map[string]any{
 			"event":       "task_review",
 			"task_packet": taskPacket,
-			"task_run":    latestRun,
-		})
+			"task_run":    runMeta,
+			"output_files": outputFiles,
+		}
+		// Add task instructions for context (not the full DB row)
+		if instructions := getString(task, "instructions"); instructions != "" {
+			reviewInput["task_instructions"] = instructions
+		}
+		if taskNumber != "" {
+			reviewInput["task_number"] = taskNumber
+		}
+		runResult, runErr := session.Run(reviewCtx, reviewInput)
 		reviewCancel()
 		reviewDuration := time.Since(reviewStart).Seconds()
 
@@ -1215,23 +1287,37 @@ func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files
 		// The scan below will get whatever IS on disk
 	}
 
-	// NOW scan the actual filesystem for what's there.
-	// This is the truth: whatever files exist on the branch after execution + commit.
+	// Verify the files we wrote actually exist on disk.
+	// We only check the files we produced, NOT the entire worktree.
+	// (Scanning the whole repo includes hundreds of irrelevant files.)
 	var actualFiles []gitree.DiskFile
-	if worktreePath != "" {
-		scanFiles, scanErr := h.git.ScanWorktreeFiles(ctx, worktreePath, nil)
-		if scanErr != nil {
-			log.Printf("[commitOutput] Warning: worktree scan failed for %s: %v", truncateID(taskID), scanErr)
-		} else {
-			actualFiles = scanFiles
+	baseDir := worktreePath
+	if baseDir == "" {
+		baseDir = h.cfg.GetRepoPath()
+	}
+	for _, f := range files {
+		if f.Path == "" {
+			continue
 		}
-	} else {
-		// Non-worktree path: scan from the branch
-		scanFiles, scanErr := h.git.ScanBranchFiles(ctx, branchName, nil)
-		if scanErr != nil {
-			log.Printf("[commitOutput] Warning: branch scan failed for %s: %v", truncateID(taskID), scanErr)
-		} else {
-			actualFiles = scanFiles
+		fullPath := filepath.Join(baseDir, f.Path)
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			log.Printf("[commitOutput] Warning: could not read back %s: %v", f.Path, err)
+			continue
+		}
+		actualFiles = append(actualFiles, gitree.DiskFile{
+			Path:    f.Path,
+			Content: string(content),
+		})
+	}
+	// Also check for raw_output fallback file
+	if len(actualFiles) == 0 && rawOutput != "" {
+		fallbackPath := filepath.Join(baseDir, "task_output.txt")
+		if content, err := os.ReadFile(fallbackPath); err == nil {
+			actualFiles = append(actualFiles, gitree.DiskFile{
+				Path:    "task_output.txt",
+				Content: string(content),
+			})
 		}
 	}
 
