@@ -330,6 +330,15 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		"assigned_to": modelID,
 	})
 
+	// Record dispatch event for timeline
+	recordPipelineEvent(ctx, h.database, "task_dispatched", taskID, modelID, "",
+		map[string]any{
+			"task_number":  taskNumber,
+			"connector_id": connectorID,
+			"slice_id":     sliceID,
+			"routing_flag": routingFlag,
+		})
+
 	// Web courier dispatch: if router selected a web platform, use CourierRunner
 	if routingFlag == "web" && h.courierRunner != nil {
 		platformURL := routingResult.PlatformURL

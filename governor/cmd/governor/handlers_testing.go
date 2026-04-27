@@ -125,6 +125,19 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 	// Record test result to DB for dashboard consumption
 	h.recordTestResult(ctx, taskID, taskNumber, sliceID, testDir, passed, "", testOutput, duration)
 
+	// Record test event for timeline
+	testEventType := "test_passed"
+	if !passed {
+		testEventType = "test_failed"
+	}
+	recordPipelineEvent(ctx, h.database, testEventType, taskID, "", "",
+		map[string]any{
+			"task_number":  taskNumber,
+			"slice_id":     sliceID,
+			"passed":       passed,
+			"duration_sec": duration,
+		})
+
 	if passed {
 		log.Printf("[Testing] Task %s tests PASSED in %.1fs", truncateID(taskID), duration)
 

@@ -231,6 +231,15 @@ func handlePlanCreated(
 
 	log.Printf("[EventPlanCreated] Plan %s created successfully in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
 
+	// Record plan creation for timeline
+	recordPipelineEvent(ctx, database, "plan_created", prdPath, routingResult.ModelID, "",
+		map[string]any{
+			"plan_id":       planID,
+			"plan_path":     plannerOutput.PlanPath,
+			"total_tasks":   plannerOutput.TotalTasks,
+			"planner_model": routingResult.ModelID,
+		})
+
 	// Note: We do NOT call runPlanReview directly here.
 	// The update_plan_status RPC (line 147) triggers a realtime UPDATE event,
 	// which will be handled by handlePlanReview -> runPlanReview.
@@ -491,6 +500,15 @@ func runPlanReview(
 
 		log.Printf("[PlanReview] Plan %s approved and tasks created in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
 
+		// Record plan approval for timeline
+		recordPipelineEvent(ctx, database, "plan_approved", prdPath, routingResult.ModelID, "",
+			map[string]any{
+				"plan_id":            planID,
+				"supervisor_model":   routingResult.ModelID,
+				"complexity":         review.Complexity,
+				"review_duration_ms": time.Since(startTime).Milliseconds(),
+			})
+
 	case "needs_revision":
 		failureClass := review.FailureClass
 		if failureClass == "" {
@@ -558,6 +576,15 @@ func runPlanReview(
 		}
 
 		log.Printf("[PlanReview] Plan %s needs revision: %s (%s)", truncateID(planID), failureClass, failureDetail)
+
+		// Record plan rejection for timeline
+		recordPipelineEvent(ctx, database, "plan_rejected", prdPath, routingResult.ModelID, failureClass,
+			map[string]any{
+				"plan_id":            planID,
+				"supervisor_model":   routingResult.ModelID,
+				"failure_detail":     failureDetail,
+				"review_duration_ms": time.Since(startTime).Milliseconds(),
+			})
 
 	case "council_review":
 		_, err = database.RPC(ctx, "update_plan_status", map[string]any{
