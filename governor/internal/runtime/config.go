@@ -203,6 +203,7 @@ type RuntimeConfig struct {
 	EventPollIntervalMs    int `json:"event_poll_interval_ms"`
 	AgentTimeoutSeconds    int `json:"agent_timeout_seconds"`
 	MaxToolTurns           int `json:"max_tool_turns"`
+	MaxRetries             int `json:"max_retries"`
 	EventQueryLimit        int `json:"event_query_limit"`
 }
 
@@ -1015,6 +1016,15 @@ func (c *Config) GetConsensusMethod() string {
 		return "unanimous_approval"
 	}
 	return c.PlanLifecycle.ConsensusRules.Method
+}
+
+func (c *Config) GetMaxRetries() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.System == nil || c.System.Runtime.MaxRetries <= 0 {
+		return 5 // sensible default
+	}
+	return c.System.Runtime.MaxRetries
 }
 
 func (c *Config) GetWebToolsConfig() *WebToolsConfig {

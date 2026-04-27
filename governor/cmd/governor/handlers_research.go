@@ -375,7 +375,6 @@ func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 
 	approved := 0
 	revisionNeeded := 0
-	blocked := 0
 	var allConcerns []string
 
 	for _, r := range validReviews {
@@ -383,10 +382,8 @@ func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 		switch vote {
 		case "APPROVED", "approved":
 			approved++
-		case "REVISION_NEEDED", "revision_needed":
+		case "REVISION_NEEDED", "revision_needed", "BLOCKED", "blocked":
 			revisionNeeded++
-		case "BLOCKED", "blocked":
-			blocked++
 		}
 		if concerns, ok := r["concerns"].([]interface{}); ok {
 			for _, c := range concerns {
@@ -408,22 +405,20 @@ func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 	if consensusMethod == "unanimous_approval" {
 		if approved == memberCount {
 			consensus = "approved"
-		} else if blocked > 0 {
-			consensus = "blocked"
 		} else {
+			// Any concerns → revision_needed (nothing is ever blocked)
 			consensus = "revision_needed"
 		}
 	} else {
 		if approved > memberCount/2 {
 			consensus = "approved"
-		} else if blocked > memberCount/2 {
-			consensus = "blocked"
 		} else {
+			// Majority concerns → revision_needed with strong feedback
 			consensus = "revision_needed"
 		}
 	}
 
-	log.Printf("[ResearchCouncil] Consensus: %s (approved=%d, revision=%d, blocked=%d)", consensus, approved, revisionNeeded, blocked)
+	log.Printf("[ResearchCouncil] Consensus: %s (approved=%d, revision=%d)", consensus, approved, revisionNeeded)
 
 	switch consensus {
 	case "approved":
@@ -436,18 +431,6 @@ func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 			},
 		})
 		log.Printf("[ResearchCouncil] %s approved by council", truncateID(suggestionID))
-
-	case "blocked":
-		_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
-			"p_id":     suggestionID,
-			"p_status": "rejected",
-			"p_review_notes": map[string]any{
-				"council_consensus": consensus,
-				"concerns":          allConcerns,
-				"reviews":           validReviews,
-			},
-		})
-		log.Printf("[ResearchCouncil] %s blocked by council", truncateID(suggestionID))
 
 	case "revision_needed":
 		_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{

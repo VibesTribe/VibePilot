@@ -209,7 +209,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 
 	var modelID, connectorID, routingFlag string
 	var connConfig *runtime.ConnectorConfig
-	maxRetries := 5
+	maxRetries := h.cfg.GetMaxRetries()
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		var routeErr error
 		if attempt > 0 {
@@ -899,7 +899,7 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 	var routingResult *runtime.RoutingResult
 	var failedModels []string
 	var supervisorModelID string
-	maxRetries := 5
+	maxRetries := h.cfg.GetMaxRetries()
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
 			log.Printf("[TaskReview] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)

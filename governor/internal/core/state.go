@@ -157,7 +157,6 @@ const (
 	EventPlanApproved        EventType = "plan_approved"
 	EventPlanRevisionNeeded  EventType = "plan_revision_needed"
 	EventPlanCouncilReview   EventType = "plan_council_review"
-	EventPlanError           EventType = "plan_error"
 	EventPlanComplete        EventType = "plan_complete"
 
 	EventTaskAvailable       EventType = "task_available"
@@ -171,12 +170,10 @@ const (
 	EventTaskTestCompleted   EventType = "task_test_completed"
 	EventTaskMerged          EventType = "task_merged"
 	EventTaskError           EventType = "task_error"
-	EventTaskEscalated       EventType = "task_escalated"
 	EventTaskHumanReview     EventType = "task_human_review"
 
 	EventCouncilStarted   EventType = "council_started"
 	EventCouncilVote      EventType = "council_vote"
-	EventCouncilComplete  EventType = "council_complete"
 	EventCouncilConsensus EventType = "council_consensus"
 
 	EventRecoveryStarted   EventType = "recovery_started"

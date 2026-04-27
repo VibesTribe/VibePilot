@@ -277,10 +277,8 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 			switch consensus {
 			case "approved":
 				voteAligned = vote == "APPROVED"
-			case "blocked":
-				voteAligned = vote == "BLOCKED"
 			case "revision_needed":
-				voteAligned = vote == "REVISION_NEEDED"
+				voteAligned = vote == "REVISION_NEEDED" || vote == "BLOCKED"
 			}
 			if voteAligned {
 				h.usageTracker.RecordCompletion(ctx, modelID, "council_vote", 0, true)
@@ -309,17 +307,6 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 		h.handleApprovedPlan(ctx, plan, planID)
 		// Record council approval for timeline
 		recordPipelineEvent(ctx, h.database, "council_approved", planID, "", "",
-			map[string]any{
-				"plan_id":       planID,
-				"member_count":  len(validReviews),
-				"consensus":     consensus,
-			})
-	case "blocked":
-		// Nothing is ever blocked — strong feedback routes back to planner
-		h.recordCouncilFeedback(ctx, planID, validReviews)
-		h.updatePlanForRevision(ctx, planID, validReviews)
-		// Record council feedback for timeline
-		recordPipelineEvent(ctx, h.database, "council_feedback", planID, "", "revision_needed",
 			map[string]any{
 				"plan_id":       planID,
 				"member_count":  len(validReviews),
@@ -388,15 +375,11 @@ func (h *CouncilHandler) determineConsensus(reviews []map[string]any, memberCoun
 	}
 
 	approved := 0
-	blocked := 0
-
 	for _, r := range reviews {
 		vote := getString(r, "vote")
 		switch vote {
 		case "APPROVED", "approved":
 			approved++
-		case "BLOCKED", "blocked":
-			blocked++
 		}
 	}
 
@@ -405,18 +388,14 @@ func (h *CouncilHandler) determineConsensus(reviews []map[string]any, memberCoun
 		if approved == memberCount {
 			return "approved"
 		}
-		if blocked > 0 {
-			return "blocked"
-		}
+		// Any concerns → revision_needed (nothing is ever blocked)
 		return "revision_needed"
 	}
 
 	if approved > memberCount/2 {
 		return "approved"
 	}
-	if blocked > memberCount/2 {
-		return "blocked"
-	}
+	// Majority concerns → revision_needed with strong feedback
 	return "revision_needed"
 }
 
