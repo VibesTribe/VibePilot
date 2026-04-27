@@ -496,18 +496,18 @@ func (h *MaintenanceHandler) tryMergeTestingToMain(ctx context.Context, planID s
 		}
 	}
 
-	log.Printf("[TaskApproved] All modules complete for plan %s → merging testing to main", truncateID(planID))
-	if err := h.git.MergeBranch(ctx, "testing", "main"); err != nil {
-		log.Printf("[TaskApproved] Testing-to-main merge FAILED: %v", err)
+	log.Printf("[TaskApproved] All modules complete for plan %s → merging testing to main/testing/", truncateID(planID))
+	if err := h.git.MergeBranchToSubdir(ctx, "testing", "main", "testing"); err != nil {
+		log.Printf("[TaskApproved] Testing-to-main subtree merge FAILED: %v", err)
 		recordPipelineEvent(ctx, h.database, "integration_merge_failed", "", "",
-			fmt.Sprintf("testing → main failed: %v", err),
+			fmt.Sprintf("testing → main/testing/ failed: %v", err),
 			map[string]any{
 				"plan_id": planID,
 			})
 	} else {
-		log.Printf("[TaskApproved] Plan %s fully integrated: testing → main merge complete", truncateID(planID))
+		log.Printf("[TaskApproved] Plan %s fully integrated: testing → main/testing/ merge complete", truncateID(planID))
 		recordPipelineEvent(ctx, h.database, "plan_complete", planID, "",
-			"all modules merged to main",
+			"all modules merged to main/testing/",
 			map[string]any{
 				"plan_id": planID,
 			})
