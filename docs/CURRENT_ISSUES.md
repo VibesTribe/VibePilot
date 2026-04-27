@@ -1,120 +1,93 @@
 # VibePilot Current Issues
-> Last updated: April 23, 2026
-> Previous: April 22, 2026
+> Last updated: April 27, 2026
+> Previous: April 23, 2026
 
 ## Status Summary
 
 | Category | Open | Fixed | Deferred |
 |----------|------|-------|----------|
 | Database migration | 0 | 5 | 0 |
-| SSE bridge | 1 | 2 | 0 |
-| Infrastructure | 2 | 1 | 0 |
-| Pipeline gaps | 5 | 0 | 0 |
+| SSE bridge | 0 | 3 | 0 |
+| Infrastructure | 0 | 3 | 0 |
+| Pipeline gaps | 3 | 5 | 0 |
 | Learning system | 4 | 0 | 0 |
+| Dashboard | 1 | 0 | 0 |
 
 ---
 
-## SSE Bridge Issues
+## Dashboard Issues
 
-### 1. SSE Not End-to-End Tested
-**Priority**: P1
-**Impact**: Code compiles clean, wiring verified in code, but never run with governor + dashboard together
-**Status**: Code complete, needs live test
-**Files**: sse.go, listener.go, server.go, main.go, useMissionData.ts
-
----
-
-## Infrastructure Issues
-
-### 2. systemd Service Not Enabled
-**Priority**: Medium
-**Impact**: Governor runs as manual process (PID 95117). Won't survive reboot.
-**Fix**: `systemctl --user enable governor`
-
-### 3. Courier Still Writes to Supabase
-**Priority**: High (pipeline broken for courier tasks)
-**Impact**: courier_run.py writes results to Supabase REST, but realtime listener is gone. Governor will never see courier results.
-**Fix Needed**: Update courier_run.py to write to governor API or directly to local PG
+### 1. ROI Popup Needs Work
+**Priority**: P3 (after E2E verified)
+**Impact**: ProjectTracker and SessionTracker deployed but user says "it needs work"
+**Status**: Waiting for user specifications after E2E test
+**Files**: MissionModals.tsx
 
 ---
 
-## Pipeline Gaps (pre-existing)
+## Pipeline Gaps (remaining)
 
-### 4. Module Branches Never Created
-**Location**: `governor/internal/gitree/gitree.go:387`
-**Impact**: Task branches have nowhere to merge to. Merge fails.
-**Fix**: Call `CreateModuleBranch()` after task creation in `handlers_plan.go`
+### 2. No Module-Level Integration Test
+**Priority**: P2
+**Impact**: After all tasks in a module pass individual testing, module merges to testing branch without running a module-level integration test
+**Fix**: Add module integration test step before tryMergeModuleToTesting
+**Files**: handlers_testing.go, handlers_maint.go
 
-### 5. Maintenance Agent Not Wired
-**Impact**: Git write access disconnected, maintenance commands go nowhere
+### 3. Task Packets Have Zero Codebase Context
+**Priority**: P2
+**Impact**: Executor gets prompt text only, no actual file contents. Models produce generic/ungrounded output.
+**Fix**: Inject relevant file contents into task packets before execution
+**Files**: validation.go, handlers_task.go
 
-### 6. Worktrees Disabled
-**Impact**: All tasks share same directory, no isolation
-
-### 7. Orchestrator Not an LLM Call
-**Impact**: Just hardcoded cascade in Go, no intelligent routing
-
-### 8. Consultant Agent Not Wired
-**Impact**: PRD template and prompt exist but aren't integrated into governor flow
+### 4. Planner Has No Codebase Context
+**Priority**: P2
+**Impact**: Planner invents file paths and patterns without seeing the repo
+**Fix**: Give planner a file tree + key file contents
+**Files**: handlers_plan.go
 
 ---
 
 ## Learning System Gaps (pre-existing)
 
-### 9. Supervisor Rules Not Created from Rejections
+### 5. Supervisor Rules Not Created from Rejections
 **Location**: `governor/cmd/governor/handlers_task.go`
 **Impact**: System doesn't learn from supervisor rejections
 **Fix**: Call `create_supervisor_rule` RPC in rejection handler
 
-### 10. Tester Rules Never Created
+### 6. Tester Rules Never Created
 **Location**: `governor/cmd/governor/handlers_testing.go`
 **Impact**: No learning from test failures
 **Fix**: Call `create_tester_rule` RPC on test failure
 
-### 11. Heuristics Never Recorded from Task Outcomes
+### 7. Heuristics Never Recorded from Task Outcomes
 **Impact**: Router doesn't learn model preferences per task type
 **Fix**: Call `upsert_heuristic` RPC on task success
 **Note**: `learned_heuristics` table has 20 entries (from direct DB inserts), but handler doesn't automatically create them
 
-### 12. Problem-Solutions Never Recorded
+### 8. Problem-Solutions Never Recorded
 **Impact**: Same failures repeat, no automatic remediation
 **Fix**: Call `record_solution_result` RPC on retry success
 
 ---
 
-## Recently Fixed (April 23, 2026)
-
-| # | Issue | Fix | Status |
-|---|-------|-----|--------|
-| 1 | Dashboard polling every 5s | SSE EventSource replaces polling | Code done, not E2E tested |
-| 2 | Supabase Realtime dependency removed | pg_notify + SSE bridge | Code done, not E2E tested |
-
-## Previously Fixed (April 22, 2026)
+## Fixed Since Last Update (April 23-27, 2026)
 
 | # | Issue | Fix | Commit |
 |---|-------|-----|--------|
-| 3 | Rehydration SQL ordering (`ORDER BY` before `WHERE`) | Collect clauses separately in `buildSelectQuery` | e3767ba5 |
-| 4 | UUID `[16]byte` not converted to string | Added case in `convertValue()` | e3767ba5 |
-| 5 | Timestamp parse warnings (Go Time.String format) | Added `parseTime()` with fallback formats | e3767ba5 |
-| 6 | Routing referenced nonexistent `gemini-2.5-flash` | Changed to `gemini-2.5-flash-lite` in routing.json | e3767ba5 |
-| 7 | Supabase polling pounding remote DB | Native pgx backend replaces Supabase entirely | ffd29bfa |
-
-## Previously Fixed (March-April 2026)
-
-| # | Issue | Fix | Commit |
-|---|-------|-----|--------|
-| 8 | Testing event mapped wrong | Fixed `status == "testing"` to emit `EventTaskTesting` | Session 73 |
-| 9 | Failure notes not recorded in testing | Added `recordFailureNotes()` calls | Session 73 |
-| 10 | Plan review race condition | Retry loop (3 attempts, 3s sleep) | April 21 |
-| 11 | Stale lock cleanup | Recovery.go cleanup | April 21 |
-| 12 | Supervisor rubber-stamping | Intelligence overhaul (code map + verification) | 57654556 |
-| 13 | Planner over-engineering | Code map context + targeted file injection | 57654556 |
-
----
+| 1 | Pipeline events showed raw types (broken_output) | 26 semantic event types with human-readable labels | a08afe74+ |
+| 2 | Module branches never deleted after merge | Added DeleteBranch after module-to-testing merge | 16d9724a |
+| 3 | Testing branch never deleted after merge | Added DeleteBranch after testing-to-main merge | 16d9724a |
+| 4 | Module merge failures had no recovery | Maintenance agent dispatches on module merge failure | 16d9724a |
+| 5 | Integration merge failures had no recovery | Maintenance agent dispatches on integration merge failure | 16d9724a |
+| 6 | Task merge conflicts reassigned to model | Maintenance agent handles merge conflicts, no model penalty | pre-existing |
+| 7 | SSE E2E tested | Working with live dashboard | Apr 24 |
+| 8 | Courier writes to local PG | governor API endpoint replaces Supabase | Apr 23 |
+| 9 | Dashboard polling | SSE EventSource replaces polling | Apr 23 |
+| 10 | Pipeline timeline shows meaningless events | Full 26-event lifecycle with readable labels | Apr 27 |
 
 ## Non-Issues (log noise only)
 
-- jcodemunch CodeMap refresh transport error on startup -- graceful fallback to existing map.md, does not affect operation
+- jcodemunch CodeMap refresh transport error on startup — graceful fallback to existing map.md
 
 ---
 
@@ -122,10 +95,11 @@
 
 | Priority | Issue | Effort | Files |
 |----------|-------|--------|-------|
-| P1 | SSE E2E test | Low | Start governor, open dashboard, verify live |
-| P2 | Courier writes to local PG instead of Supabase | Medium | courier_run.py |
-| P3 | Enable systemd service | Trivial | systemctl |
-| P4 | Module branch creation | Medium | handlers_plan.go |
-| P5 | Supervisor rule creation | Low | handlers_task.go |
-| P6 | Tester rule creation | Low | handlers_testing.go |
-| P7 | Heuristic recording | Low | handlers_task.go |
+| P0 | E2E test to verify pipeline | Low | Push PRD, monitor |
+| P1 | ROI popup revisions | Low | MissionModals.tsx |
+| P2 | Module integration test | Medium | handlers_testing.go |
+| P2 | Task packet codebase context | Medium | validation.go, handlers_task.go |
+| P2 | Planner codebase context | Medium | handlers_plan.go |
+| P3 | Supervisor rule creation | Low | handlers_task.go |
+| P3 | Tester rule creation | Low | handlers_testing.go |
+| P3 | Heuristic recording | Low | handlers_task.go |
