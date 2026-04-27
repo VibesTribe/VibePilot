@@ -1085,6 +1085,17 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 		h.recordFailure(ctx, modelID, taskID, failureClass)
 		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
+		// Record supervisor learning: this failure pattern → avoid future
+		h.database.RPC(ctx, "record_supervisor_rule", map[string]any{
+			"p_rule_text":  fmt.Sprintf("Task failed review: [%s] %s", failureClass, failureDetail),
+			"p_applies_to": taskType,
+			"p_source":     "supervisor_task_review",
+			"p_details": map[string]any{
+				"failure_class": failureClass,
+				"model_id":      modelID,
+				"issues":        len(decision.Issues),
+			},
+		})
 		recordPipelineEvent(ctx, h.database, "run_failed", taskID, modelID, failureClass,
 			map[string]any{
 				"class":            failureClass,
@@ -1135,6 +1146,25 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		}
 
 		h.recordModelLearning(ctx, modelID, taskType, failureClass, failureDetail)
+		// Record supervisor learning: revision pattern for future reviews
+		h.database.RPC(ctx, "record_supervisor_rule", map[string]any{
+			"p_rule_text":  fmt.Sprintf("Task needs revision: [%s] %s", failureClass, failureDetail),
+			"p_applies_to": taskType,
+			"p_source":     "supervisor_task_review",
+			"p_details": map[string]any{
+				"failure_class":    failureClass,
+				"model_id":         modelID,
+				"revision_issues":  len(decision.ReturnFeedback.SpecificIssues),
+			},
+		})
+		// Also create a planner rule from this rejection pattern
+		h.database.RPC(ctx, "create_rule_from_rejection", map[string]any{
+			"p_task_id":          taskID,
+			"p_rejection_type":   failureClass,
+			"p_rejection_reason": failureDetail,
+			"p_applies_to":       taskType,
+			"p_source":           "supervisor_task_review",
+		})
 		recordPipelineEvent(ctx, h.database, "revision_needed", taskID, modelID, failureClass,
 			map[string]any{
 				"class":            failureClass,
@@ -1375,6 +1405,21 @@ func (h *TaskHandler) recordSuccess(ctx context.Context, taskID, modelID, taskTy
 		"p_failure_class":  "",
 		"p_failure_category": "",
 		"p_failure_detail": "",
+	})
+	// Record heuristic: this model succeeded at this task type → prefer future
+	h.database.RPC(ctx, "upsert_heuristic", map[string]any{
+		"p_task_type":       taskType,
+		"p_condition":       fmt.Sprintf("task_type=%s", taskType),
+		"p_action":          fmt.Sprintf("prefer_model:%s", modelID),
+		"p_preferred_model": modelID,
+		"p_confidence":      0.7,
+		"p_source":          "task_success",
+	})
+	// Record problem-solution: if this task had previous failures, this model solved it
+	h.database.RPC(ctx, "record_solution_on_success", map[string]any{
+		"p_task_id":   taskID,
+		"p_model_id":  modelID,
+		"p_task_type": taskType,
 	})
 }
 

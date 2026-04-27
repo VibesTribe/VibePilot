@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-21T06:07:29Z | Commit: b383a418 | Branch: main
+# Generated: 2026-04-27T19:01:09Z | Commit: fcf7b198 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -171,26 +171,27 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Codebase Structure (auto-discovered)
 - governor/cmd/cleanup/ (1 files, 1 funcs, 0 types)
 - governor/cmd/encrypt_secret/ (1 files, 1 funcs, 0 types)
-- governor/cmd/governor/ (14 files, 120 funcs, 14 types)
+- governor/cmd/governor/ (17 files, 142 funcs, 15 types)
 - governor/cmd/migrate_vault/ (1 files, 5 funcs, 1 types)
-- governor/internal/connectors/ (2 files, 26 funcs, 9 types)
+- governor/cmd/vault_encrypt/ (1 files, 1 funcs, 0 types)
+- governor/internal/connectors/ (2 files, 28 funcs, 9 types)
 - governor/internal/core/ (4 files, 35 funcs, 27 types)
 - governor/internal/dag/ (3 files, 18 funcs, 13 types)
-- governor/internal/db/ (3 files, 27 funcs, 7 types)
-- governor/internal/gitree/ (2 files, 28 funcs, 5 types)
+- governor/internal/db/ (5 files, 52 funcs, 9 types)
+- governor/internal/gitree/ (3 files, 46 funcs, 8 types)
 - governor/internal/hello/ (1 files, 2 funcs, 0 types)
 - governor/internal/maintenance/ (3 files, 31 funcs, 7 types)
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
 - governor/internal/memory/ (2 files, 19 funcs, 5 types)
-- governor/internal/realtime/ (1 files, 23 funcs, 8 types)
-- governor/internal/runtime/ (14 files, 218 funcs, 101 types)
+- governor/internal/pgnotify/ (1 files, 4 funcs, 3 types)
+- governor/internal/runtime/ (14 files, 239 funcs, 108 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
-- governor/internal/vault/ (1 files, 15 funcs, 4 types)
-- governor/internal/webhooks/ (2 files, 24 funcs, 7 types)
+- governor/internal/vault/ (1 files, 20 funcs, 4 types)
+- governor/internal/webhooks/ (3 files, 62 funcs, 17 types)
 - governor/pkg/types/ (1 files, 0 funcs, 9 types)
 ## Config: JSON (auto-discovered)
-  config/agents.json - Agent definitions with capability declarations. Roles separated: decide vs execute. Only Maintenance has git write.
+  config/agents.json - Agent configurations. Empty model field = use cascade routing from routing.json free_cascade strategy. context_policy: full_map=entire codebase, file_tree=section headers only, targeted=specific task files only, none=no codebase context.
   config/connectors.json - Destination configurations with native tool capabilities. CLI destinations provide tools, API destinations do other.
   config/destinations.json - WHERE tasks execute. CLI, Web platforms, API endpoints. All swappable.
   config/kilo-session.json - keys: max_sessions, max_concurrent_tasks_per_session, notes, memory_per_session_mb, reason
@@ -200,12 +201,12 @@ Runtime: Go binary (governor). Event-driven via Supabase.
   config/platforms.json - Web platforms and API models for VibePilot routing. Updated April 8, 2026 with verified OpenRouter data.
   config/roles.json - WHAT job is being done. Roles are job definitions. Model and destination assigned by orchestrator at runtime.
   config/routing_contract.json - Routing decision contract - what orchestrator returns when routing a task
-  config/routing.json - Routing strategy. How VibePilot decides WHERE to send tasks. The free_cascade strategy uses UsageTracker to pick only currently-active providers.
+  config/routing.json - Routing configuration. All priority and restrictions are configurable. Nothing hardcoded in code.
   config/skills.json - All available skills in VibePilot. Add/remove skills here. Agents reference these by ID.
-  config/system.json - System configuration - database, vault, git, runtime settings. All swappable.
-  config/tools.json - Tool definitions for VibePilot runtime. Parameters + security + implementation.
+  config/system.json - keys: prompts_dir, database, vault, git, db, http
+  config/tools.json - keys: tools
 ## Config: Prompt Templates (auto-discovered)
-  config/prompts/consultant.md - Consultant Agent
+  config/prompts/consultant.md - VibePilot Consultant Agent
   config/prompts/council.md - Council Agent
   config/prompts/courier.md - Courier Agent
   config/prompts/internal_api.md - Internal API Agent
@@ -222,7 +223,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: b383a418
+- Commit: fcf7b198
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -242,32 +243,32 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-21 02:45 UTC — VERIFIED AGAINST CODE AND SUPABASE
-# NOTE: CONFIG AND DB ARE NOW IN SYNC VIA DETERMINISTIC RESEARCH PIPELINE
+# AUTO-UPDATED: 2026-04-27 — VERIFIED AGAINST CODE AND RUNNING SYSTEM
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 ## Three Sources of Truth
 1. **GitHub (code):** https://github.com/VibesTribe/VibePilot — pushed=real
-2. **Supabase (data):** https://qtpdzsinvifkgpxyxlaz.supabase.co — in DB=real
+2. **Local PostgreSQL (data):** localhost:5432, db=vibepilot, user=vibes — in DB=real
 3. **Dashboard (live):** https://vibeflow-dashboard.vercel.app/ — rendering=working
-   - Dashboard is USER DOMAIN. Hermes never modifies dashboard code.
+   - Dashboard is USER DOMAIN. Additive-only, never remove without explicit OK.
 ## Hierarchy (everything serves what's above it)
 ```
 VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
-  → Dashboard (what user sees and controls)
-    → Supabase (data layer)
+  → Dashboard (what user sees and controls) — DASHBOARD IS SACRED
+    → PostgreSQL (data layer, local)
       → Governor (pipeline executor)
         → Hermes (maintenance, audit, contract enforcement)
 ```
 ## System Status
-- **Governor:** STOPPED + DISABLED (inactive/dead)
-- **Git:** main branch, clean, synced. Last: 576e93f8
-- **Dashboard:** Live at vibeflow-dashboard.vercel.app
-- **Chrome CDP:** 127.0.0.1:9222
-## Human Role (3 things only)
-1. **Visual UI/UX review** — after visual tester agent has reviewed
-2. **Paid API benched** — out of credit, human decides add credits or keep benched
-3. **Research after council** — council-reviewed suggestions, human gives final yes/no
-## MODELS: CONFIG ↔ DB SYNC VIA RESEARCH PIPELINE
-### Current State (Verified)
-- **Config/models.json:** 30 models (source of truth)
+- **Governor:** RUNNING (systemd service, Restart=always)
+  - Binary: /home/vibes/vibepilot/governor/governor
+  - Config: /home/vibes/vibepilot/governor/config/ (GOVERNOR_CONFIG_DIR env var)
+  - WARNING: /vibepilot/config/ is a stale git copy. Always use governor/config/.
+  - Database: Local PostgreSQL 16 (system.json type=postgres)
+  - Webhook: port 8080/webhooks
+  - SSE: pg_notify on vp_changes → SSE broker → dashboard
+  - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
+  - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
+  - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
+- **Git:** main branch. Last: 16d9724a
+- **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
