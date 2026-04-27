@@ -32,7 +32,7 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 34678659
+- **Git:** main branch. Last: 54e6eec0
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
 - **Chrome CDP:** 127.0.0.1:9222
 - **Pipeline tables:** EMPTY (truncated, ready for E2E test)
@@ -104,7 +104,7 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 
 ### Agents (governor/config/agents.json v2.3)
 - All agents have empty model field = cascade routing via free_cascade
-- context_policy per agent: planner=full_map, task_runner=targeted, most=file_tree
+- context_policy per agent: planner=full_map, task_runner=targeted, council=council, most=file_tree
 
 ## COURIER SYSTEM — READY FOR E2E
 
@@ -157,12 +157,27 @@ All 5 courier bugs fixed (Apr 25):
 
 ## RECENT COMMITS (Apr 25-27)
 
-1. 34678659 — feat: CooldownWatcher + doc accuracy fixes
-2. 0f65f686 — feat: wire learning RPCs + module integration test gate
-2. fcf7b198 — docs: verify all open issues against actual code (8/8 verified)
-3. 16d9724a — feat: module branch cleanup + maintenance agent for all merge failures
-4. a08afe74 — feat: pipeline event emissions (23 event types, standalone recordPipelineEvent)
-5. (multiple) — Rich pipeline lifecycle events, merge events, subtree merge to testing/
+1. 54e6eec0 — feat: wire BuildCouncilContext for plan reviews (council policy in session.go + agents.json)
+2. a1669079 — docs: update CURRENT_ISSUES with pipeline gap audit results
+3. 133cd28a — feat: maintenance pg_notify triggers + plan revision handler + target files in planner
+4. 34678659 — feat: CooldownWatcher + doc accuracy fixes
+5. 0f65f686 — feat: wire learning RPCs + module integration test gate
+6. fcf7b198 — docs: verify all open issues against actual code (8/8 verified)
+7. 16d9724a — feat: module branch cleanup + maintenance agent for all merge failures
+8. a08afe74 — feat: pipeline event emissions (23 event types, standalone recordPipelineEvent)
+9. (multiple) — Rich pipeline lifecycle events, merge events, subtree merge to testing/
+
+## Knowledgebase (VibesTribe/knowledgebase — 11 commits, ready to build)
+
+- **Repo**: https://github.com/VibesTribe/knowledgebase (exists, 11 commits)
+- **Storage**: Local PostgreSQL (NOT SQLite — already running, proven)
+- **Human-readable backup**: Markdown + Frontmatter files in repo
+- **Index**: map.json for low-token agent discovery
+- **Dashboard**: DOCS button links to vis.js graph (nodes colored by status)
+- **Researcher**: GitHub Actions cron (2x daily), reads from sources.txt RSS list
+- **Flow**: Researcher deposits reports to knowledgebase repo → supervisor auto-approves simple additions → council reviews complex ones → feedback appended to report → comes to human via knowledgebase link → implementation happens in vibepilot task branches
+- **Institutional memory**: Every model/tool/API ever researched, when adopted/rejected, why, relationships, reconsideration when updates fix past rejection reasons
+- **Status**: Not yet operational. Will be built and dogfooded by VibePilot after E2E verified.
 
 ## Budget
 - **OpenRouter**: $0 credit account. No payment added.
@@ -177,6 +192,14 @@ All 5 courier bugs fixed (Apr 25):
 - **OS**: Linux (user-level systemd services)
 - **Local PostgreSQL 16**: vibepilot database, 63+ tables, 144+ RPC functions
 - **Local inference**: Too slow (2 tok/s tested). Cloud API only.
+
+## VibesTribe Repos (April 2026)
+| Repo | Commits | Purpose |
+|------|---------|---------|
+| VibePilot | 464 | Governor, pipeline, agents |
+| vibeflow | 55 | Dashboard UI |
+| knowledgebase | 11 | Institutional memory (building next) |
+| vibes-agent-context | 48 | Hermes memory backups |
 
 ## Router Architecture (config-driven, NOT hardcoded)
 
@@ -215,6 +238,8 @@ The orchestrator/router is fully config-driven via `routing.json` (free_cascade 
 - Consultant agent not wired into pipeline
 - Task packet context PARTIALLY FIXED — ContextBuilder wired, reads target_files from planner result, but untested E2E
 - Planner context PARTIALLY FIXED — BuildPlannerContext wired for full_map policy, injects slices/rules/failures + full code map from .context/map.md (auto-refreshed via git hook)
+- Council context WIRED — BuildCouncilContext now called for council policy (commit 54e6eec0), provides file tree + plan reference verification. Deeper context deferred to knowledgebase.
+- Research flow DEFERRED — Researcher agent not yet running. Reports will go to knowledgebase repo (VibesTribe/knowledgebase). Council reviews from there. Implementation happens in vibepilot task branches. Dashboard DOCS button will link to knowledgebase graph.
 - No auto-discovery of new free models from providers (research agent handles daily landscape checks)
 - See docs/CURRENT_ISSUES.md for full details
 

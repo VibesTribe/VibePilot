@@ -9,9 +9,10 @@
 | Database migration | 0 | 0 | 5 | 0 |
 | SSE bridge | 0 | 0 | 3 | 0 |
 | Infrastructure | 0 | 0 | 5 | 0 |
-| Pipeline gaps | 0 | 0 | 7 | 0 |
+| Pipeline gaps | 0 | 0 | 8 | 0 |
 | Learning system | 0 | 0 | 4 | 0 |
 | Model health | 0 | 0 | 1 | 0 |
+| Research/council | 0 | 0 | 1 | 2 |
 | Dashboard | 1 | 0 | 0 | 0 |
 
 ---
@@ -124,6 +125,30 @@
 
 ---
 
+## Fixed Issues (April 27, 2026 — commit 54e6eec0)
+
+### 19. Council Context Never Provided — FIXED
+**Priority**: P1 → FIXED
+**What was the problem**: BuildCouncilContext existed in context_builder.go but was never called. Council agents had `context_policy: file_tree` which only gave them a bare file tree — no instructions to verify plan references, no verification guidance.
+**What was done**: Added `council` context_policy case in session.go that calls BuildCouncilContext (with fallback to BuildBaseContext on error). Changed council agent's context_policy from `file_tree` to `council` in agents.json. Council members now get file tree + plan reference verification instructions.
+**Files**: session.go, agents.json
+
+---
+
+## Deferred Issues (awaiting knowledgebase build)
+
+### 20. Research Flow — DEFERRED
+**Priority**: P2 (blocked on knowledgebase repo being operational)
+**What's needed**: Researcher agent runs via GitHub Actions cron (2x daily), deposits reports to knowledgebase repo (VibesTribe/knowledgebase). Supervisor auto-approves simple model/platform additions. Council reviews complex ones. Feedback appended to report. Human reviews via knowledgebase link. Implementation in vibepilot task branches. All findings become institutional memory in Postgres.
+**Why deferred**: Knowledgebase repo exists (11 commits) but not yet operational. Researcher agent hasn't run yet. Full flow requires knowledgebase schema, sources.txt, and dashboard DOCS button wiring.
+
+### 21. Council for Research — DEFERRED
+**Priority**: P2 (blocked on knowledgebase)
+**What's needed**: Council reads research reports FROM knowledgebase repo, gives feedback per point, feedback appended to same doc, report+feedback goes to human via knowledgebase link. New research+feedback instantly added to knowledgebase.
+**Why deferred**: Same blocker as #20.
+
+---
+
 ## Fixed Since Last Update (April 23-27, 2026)
 
 | # | Issue | Fix | Commit |
@@ -146,6 +171,7 @@
 | 16 | Code map goes stale | git post-checkout hook auto-regenerates | 0f65f686 |
 | 17 | Maintenance commands never processed | Added pg_notify triggers + status filter | 133cd28a |
 | 18 | Plan revisions never re-triggered | handlePlanRevisionNeeded handler with max 3 rounds | 133cd28a |
+| 19 | Council never got proper context | BuildCouncilContext wired via council policy | 54e6eec0 |
 
 ## Non-Issues (log noise only)
 
