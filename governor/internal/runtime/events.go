@@ -17,7 +17,6 @@ const (
 	EventTaskTesting      EventType = "task_testing"
 	EventPlanReview       EventType = "plan_review"
 	EventPlanCreated      EventType = "plan_created"
-	EventCouncilDone      EventType = "council_done"
 	EventCouncilReview    EventType = "council_review"
 	EventResearchReady    EventType = "research_ready"
 	EventResearchCouncil  EventType = "research_council"

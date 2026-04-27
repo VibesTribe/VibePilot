@@ -191,8 +191,6 @@ func (l *Listener) mapEvent(p notifyPayload) *runtime.Event {
 			eventType = runtime.EventPlanReview
 		case p.Status == "council_review":
 			eventType = runtime.EventCouncilReview
-		case p.Status == "council_done":
-			eventType = runtime.EventCouncilDone
 		case p.Status == "approved":
 			eventType = runtime.EventPlanApproved
 		case p.Status == "blocked":
