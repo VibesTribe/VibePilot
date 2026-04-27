@@ -1,7 +1,7 @@
 # PLAN: E2E Smoke Test: Greeting JSON
 
 ## Overview
-This plan outlines the steps to generate a simple JSON file as an end-to-end smoke test.
+This plan outlines the steps to generate a greeting JSON file for end-to-end smoke testing.
 
 ## Tasks
 
@@ -11,20 +11,20 @@ This plan outlines the steps to generate a simple JSON file as an end-to-end smo
 **Dependencies:** none
 
 #### Prompt Packet
-```
+```markdown
 # TASK: T001 - Generate greeting JSON file
 
 ## Context
-This task is part of an end-to-end smoke test. The goal is to create a single JSON file that verifies basic pipeline functionality.
+This task is part of an end-to-end smoke test to verify basic file generation and JSON formatting capabilities.
 
 ## What to Build
-Create a single file named `output/hello.json`. This file should contain a valid JSON object with the following structure:
+Create a single file named `output/hello.json`. This file should contain a JSON object with the following structure:
 
 - `greeting`: A string value of "Hello from VibePilot!".
-- `timestamp`: The current time in ISO 8601 format.
+- `timestamp`: The current timestamp in ISO 8601 format (e.g., "2023-10-27T10:30:00Z").
 - `status`: A string value of "ok".
 
-Ensure that no other files are modified and no external dependencies are introduced.
+Ensure the output is valid JSON.
 
 ## Files
 - `output/hello.json` - The generated greeting JSON file.
@@ -33,43 +33,7 @@ Ensure that no other files are modified and no external dependencies are introdu
 #### Expected Output
 ```json
 {
-  "task_id": "T001",
   "files_created": ["output/hello.json"],
-  "tests_written": []
+  "tests_required": []
 }
 ```
-",
-  "tasks": [
-    {
-      "task_number": "T001",
-      "title": "Generate greeting JSON file",
-      "category": "coding",
-      "confidence": 0.99,
-      "dependencies": [],
-      "prompt_packet": "# TASK: T001 - Generate greeting JSON file
-
-## Context
-This task is part of an end-to-end smoke test. The goal is to create a single JSON file that verifies basic pipeline functionality.
-
-## What to Build
-Create a single file named `output/hello.json`. This file should contain a valid JSON object with the following structure:
-
-- `greeting`: A string value of "Hello from VibePilot!".
-- `timestamp`: The current time in ISO 8601 format.
-- `status`: A string value of "ok".
-
-Ensure that no other files are modified and no external dependencies are introduced.
-
-## Files
-- `output/hello.json` - The generated greeting JSON file.
-",
-      "expected_output": {
-        "files_created": [
-          "output/hello.json"
-        ],
-        "tests_written": []
-      }
-    }
-  ],
-  "total_tasks": 1,
-  "status": "review
