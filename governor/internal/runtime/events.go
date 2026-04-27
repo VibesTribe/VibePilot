@@ -12,29 +12,24 @@ type EventType string
 
 const (
 	EventTaskAvailable    EventType = "task_available"
-	EventTaskCompleted    EventType = "task_completed"
+	EventTaskCompleted    EventType = "task_completed" // fires on task complete, future hook for post-completion analytics
 	EventTaskReview       EventType = "task_review"
 	EventTaskTesting      EventType = "task_testing"
 	EventPlanReview       EventType = "plan_review"
 	EventPlanCreated      EventType = "plan_created"
+	EventPlanApproved     EventType = "plan_approved"
 	EventCouncilReview    EventType = "council_review"
 	EventResearchReady    EventType = "research_ready"
 	EventResearchCouncil  EventType = "research_council"
 	EventMaintenanceCmd   EventType = "maintenance_command"
-	EventPRDReady         EventType = "prd_ready"
+	EventPRDReady         EventType = "prd_ready" // consultant finalizes PRD → triggers pipeline
 	EventTestResults      EventType = "test_results"
-	EventHumanQuery       EventType = "human_query"
 	EventRevisionNeeded   EventType = "revision_needed"
-	EventCouncilComplete  EventType = "council_complete"
-	EventPlanApproved     EventType = "plan_approved"
-	EventPlanBlocked      EventType = "plan_blocked"
-	EventPRDIncomplete    EventType = "prd_incomplete"
-	EventPlanError        EventType = "plan_error"
 	EventTaskApproval     EventType = "task_approved"
-	EventTaskMerged       EventType = "task_merged"
 	EventTaskMergePending EventType = "task_merge_pending"
-	EventTaskHumanReview  EventType = "task_human_review"
-	EventCourierResult    EventType = "courier_result" // task_runs UPDATE with success/failed status
+	EventTaskMerged       EventType = "task_merged"
+	EventTaskHumanReview  EventType = "task_human_review" // visual QA review
+	EventCourierResult    EventType = "courier_result"
 )
 
 type Event struct {

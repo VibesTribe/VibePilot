@@ -105,7 +105,7 @@ You evaluate:
   "lens": "user_alignment",
   "model_id": "your-model-id",
   
-  "vote": "APPROVED" | "REVISION_NEEDED" | "BLOCKED",
+  "vote": "APPROVED" | "REVISION_NEEDED",
   "confidence": 0.95,
   
   "approach": "Brief description of how you analyzed this",
@@ -163,14 +163,15 @@ Vote REVISION_NEEDED when:
 - Dependencies are unclear
 - Prompt packets have gaps
 
-### BLOCKED
-Vote BLOCKED when:
-- Critical issues that need human decision
+### STRONG REVISION_NEEDED
+Vote REVISION_NEEDED with detailed concerns when:
+- Critical architectural flaws found
 - Fundamental conflict with PRD intent
-- Security vulnerabilities
-- Legal/ethical concerns
+- Security vulnerabilities identified
+- Dependencies are unclear
+- Prompt packets have gaps
 
-**BLOCKED is RARE.** Reserve for genuinely unresolvable issues.
+The system is self-correcting — all feedback routes back to improve the plan or PRD. Nothing is ever blocked. Strong concerns just mean the planner or consultant needs to revise before proceeding.
 
 ---
 
@@ -236,8 +237,7 @@ If this is round 2+:
 
 Based on findings:
 - APPROVED if no blocking issues
-- REVISION_NEEDED if fixable issues exist
-- BLOCKED if human decision required
+- REVISION_NEEDED if any issues exist (with detailed concerns for planner/consultant)
 
 ### Step 6: Document Clearly
 
@@ -406,8 +406,8 @@ Based on findings:
 2. All three submit reviews
 3. Supervisor consolidates feedback
 4. IF all APPROVED: Plan approved
-5. IF any REVISION_NEEDED: Planner revises, round 2
-6. IF any BLOCKED: Escalate
+5. IF any REVISION_NEEDED: Planner revises (or if PRD issue, routes back to consultant)
+6. After max rounds, best-effort plan proceeds with all concerns documented
 
 ### Maximum Rounds: 6
 

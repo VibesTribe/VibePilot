@@ -105,7 +105,7 @@ func handlePlanCreated(
 	var result *runtime.SessionResult
 	var routingResult *runtime.RoutingResult
 	var failedModels []string
-	maxRetries := 5
+	maxRetries := cfg.GetMaxRetries()
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		var routeErr error
 		if attempt > 0 && routingResult != nil {
@@ -369,7 +369,7 @@ func handlePlanRevisionNeeded(
 	var result *runtime.SessionResult
 	var routingResult *runtime.RoutingResult
 	var failedModels []string
-	maxRetries := 5
+	maxRetries := cfg.GetMaxRetries()
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 && routingResult != nil {
 			failedModels = append(failedModels, routingResult.ModelID)
@@ -593,7 +593,7 @@ func runPlanReview(
 	var result *runtime.SessionResult
 	var routingResult *runtime.RoutingResult
 	var failedModels []string
-	maxRetries := 5
+	maxRetries := cfg.GetMaxRetries()
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 && routingResult != nil {
 			failedModels = append(failedModels, routingResult.ModelID)
