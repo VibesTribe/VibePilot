@@ -586,13 +586,10 @@ func registerConnectors(ctx context.Context, factory *runtime.SessionFactory, cf
 		log.Println("Warning: no connectors configured")
 		return
 	}
-	log.Printf("[Connectors] Loading from config: %d destinations defined", len(connectorsCfg.Connectors))
-
 	secretProvider := connectors.NewVaultAdapter(v)
 	activeCount := 0
 
 	for _, conn := range connectorsCfg.Connectors {
-		log.Printf("[Connectors] Processing: %s type=%s status=%s", conn.ID, conn.Type, conn.Status)
 		if conn.Status != "active" {
 			continue
 		}
