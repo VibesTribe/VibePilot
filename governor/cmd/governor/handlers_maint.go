@@ -441,6 +441,19 @@ func (h *MaintenanceHandler) tryMergeModuleToTesting(ctx context.Context, taskID
 				"source_branch":  moduleBranch,
 				"target_branch":  "testing",
 			})
+		// Module merge failure is infrastructure, not task failure.
+		// Create maintenance command for internal agent to resolve.
+		h.database.RPC(ctx, "create_maintenance_command", map[string]any{
+			"p_command_type": "merge_conflict",
+			"p_payload": map[string]any{
+				"task_id":       taskID,
+				"slice_id":      sliceID,
+				"branch_name":   moduleBranch,
+				"target_branch": "testing",
+				"scope":         "module",
+			},
+			"p_status": "pending",
+		})
 	} else {
 		log.Printf("[TaskApproved] Module %s successfully merged to testing branch", sliceID)
 		recordPipelineEvent(ctx, h.database, "module_merged_to_testing", taskID, "",
@@ -450,6 +463,12 @@ func (h *MaintenanceHandler) tryMergeModuleToTesting(ctx context.Context, taskID
 				"source_branch":  moduleBranch,
 				"target_branch":  "testing",
 			})
+		// Delete module branch — all tasks merged, branch no longer needed
+		if err := h.git.DeleteBranch(ctx, moduleBranch); err != nil {
+			log.Printf("[TaskApproved] Warning: failed to delete module branch %s: %v", moduleBranch, err)
+		} else {
+			log.Printf("[TaskApproved] Deleted module branch %s", moduleBranch)
+		}
 		h.tryMergeTestingToMain(ctx, planID)
 	}
 }
@@ -504,6 +523,17 @@ func (h *MaintenanceHandler) tryMergeTestingToMain(ctx context.Context, planID s
 			map[string]any{
 				"plan_id": planID,
 			})
+		// Integration merge failure is infrastructure. Maintenance agent handles it.
+		h.database.RPC(ctx, "create_maintenance_command", map[string]any{
+			"p_command_type": "merge_conflict",
+			"p_payload": map[string]any{
+				"plan_id":       planID,
+				"branch_name":   "testing",
+				"target_branch": "main",
+				"scope":         "integration",
+			},
+			"p_status": "pending",
+		})
 	} else {
 		log.Printf("[TaskApproved] Plan %s fully integrated: testing → main/testing/ merge complete", truncateID(planID))
 		recordPipelineEvent(ctx, h.database, "plan_complete", planID, "",
