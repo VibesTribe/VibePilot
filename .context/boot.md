@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-28T22:35:19Z | Commit: 3cf0c244 | Branch: main
+# Generated: 2026-04-28T23:47:17Z | Commit: 99e59b7c | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -188,7 +188,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 20 funcs, 4 types)
-- governor/internal/webhooks/ (3 files, 62 funcs, 17 types)
+- governor/internal/webhooks/ (3 files, 45 funcs, 12 types)
 - governor/pkg/types/ (1 files, 0 funcs, 9 types)
 ## Config: JSON (auto-discovered)
   config/agents.json - Agent configurations. Empty model field = use cascade routing from routing.json free_cascade strategy. context_policy: full_map=entire codebase, file_tree=section headers only, targeted=specific task files only, none=no codebase context.
@@ -223,7 +223,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 3cf0c244
+- Commit: 99e59b7c
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)

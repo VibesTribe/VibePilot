@@ -12,7 +12,6 @@ type EventType string
 
 const (
 	EventTaskAvailable    EventType = "task_available"
-	EventTaskCompleted    EventType = "task_completed" // fires on task complete, future hook for post-completion analytics
 	EventTaskReview       EventType = "task_review"
 	EventTaskTesting      EventType = "task_testing"
 	EventPlanReview       EventType = "plan_review"

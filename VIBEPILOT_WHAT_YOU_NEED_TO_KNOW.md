@@ -30,7 +30,7 @@ A global, massively scalable, multilingual, multimedia social media platform whe
 - **Network:** Phone USB tethered (wifi chip died during repaste), planning ethernet + headless
 - **Architecture:** Config-driven plug-and-play modules, YAML DAG pipeline
 - **Model Strategy:** Cloud free tier cascade across multiple providers. Counts change frequently — see `CURRENT_STATE.md` for verified numbers. Providers include Groq, OpenRouter (free + low-cost), Gemini (4 independent Google Cloud projects = 60 RPM free), NVIDIA NIM. Local inference too slow on this hardware (tested, 2 tok/s).
-- **Config/DB Sync:** Research findings write to config/models.json AND Supabase atomically via `ResearchActionApplier`. No LLM middleman. Both sources stay in sync automatically.
+- **Config/DB Sync:** Research findings write to config/models.json AND PostgreSQL atomically via `ResearchActionApplier`. No LLM middleman. Both sources stay in sync automatically.
 - **Dashboard:** https://vibeflow-dashboard.vercel.app/ (sacred, Vercel auto-deploy)
 - **Tunnel:** vibestribe.rocks via cloudflared (sacred, don't touch)
 - **TTS:** edge-tts (fast, free, no API key)
@@ -72,85 +72,54 @@ VibePilot was designed from the dashboard backwards. **If the dashboard isn't sh
 
 ---
 
-## 3. How the Vault Works
+## 3. How to Access the Database and Vault
 
 ### ⛔ STOP. READ THIS. ⛔
 
-**You WILL need to access the database during this session. The database is LOCAL PostgreSQL, NOT Supabase (cut off April 24). Here's EXACTLY how to do it without wasting 30% of your context window.**
+**The database is LOCAL PostgreSQL. Supabase was cut off April 24 (egress killed by polling). Here's EXACTLY how to do it.**
 
-### The Database System
-
-VibePilot uses a **two-tier credential system**:
-
-| Credential Type | Location | Who Can Access |
-|-----------------|----------|----------------|
-| **Bootstrap Keys** | `~/.config/systemd/user/vibepilot-governor.service.d/override.conf` | User service (no sudo needed) |
-| **All Other Keys** | Supabase Vault (encrypted) | Via vault_manager.py |
-
-### Bootstrap Keys (User Service)
-```bash
-# These are in the systemd user service override file
-cat ~/.config/systemd/user/vibepilot-governor.service.d/override.conf
-```
-
-Contains:
-- `SUPABASE_URL` - Your Supabase project URL
-- `SUPABASE_SERVICE_KEY` - Service role key (admin access)
-- `VAULT_KEY` - Decrypts the Supabase vault
-
-### ⛔ How to Access Supabase (Read This Carefully)
-
-**Method 1: Extract from User Service Environment**
+### Quick Database Access
 
 ```bash
-# Get env vars from the user systemd service
-source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n" | grep -E "^(SUPABASE_URL|SUPABASE_SERVICE_KEY)=")
+# Connect directly (peer auth, no password)
+psql -d vibepilot
 
-# Query tasks
-curl -s "${SUPABASE_URL}/rest/v1/tasks?select=id,title,status" \
-  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
+# Connection string for apps/scripts
+DATABASE_URL="postgres://vibes@/vibepilot?host=/var/run/postgresql"
+
+# Query examples
+psql -d vibepilot -c "SELECT id, title, status FROM tasks LIMIT 10"
+psql -d vibepilot -c "\df"                    # list all functions
+psql -d vibepilot -c "\dt"                    # list all tables
+psql -d vibepilot -c "\df unlock_*"           # find specific functions
 ```
 
-**Method 2: Use the Running Governor (RECOMMENDED)**
+### Vault (Encrypted Secrets)
 
-The governor binary has access to the environment. Use it to run database operations via Go code.
-The Go vault package (`governor/internal/vault/vault.go`) handles all vault access.
+All API keys stored in `secrets_vault` table, AES-256-GCM encrypted.
 
-**Method 3: Environment Variables from ~/.governor_env**
 ```bash
-# Source the environment file
-source ~/.governor_env
-echo "URL: $SUPABASE_URL"
+# Get VAULT_KEY from systemd override
+export VAULT_KEY="$(grep VAULT_KEY ~/.config/systemd/user/vibepilot-governor.service.d/override.conf | cut -d'"' -f2)"
 
-# Or extract from systemd user service
-source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n")
+# Use governor CLI to manage secrets
+cd ~/vibepilot/governor
+./governor vault list                    # List all key names
+./governor vault set KEY_NAME "value"    # Add or update a key
+./governor vault get KEY_NAME            # Decrypt and show a key
+./governor vault delete KEY_NAME         # Remove a key
 ```
 
-### ⛔ What NOT to Do (Wastes Time)
+15 keys stored: GROQ, OPENROUTER, GEMINI (4 projects), NVIDIA, DEEPSEEK, GITHUB_TOKEN, ZAI_API_KEY, webhook_secret, Gmail SSO.
+
+### ⛔ What NOT to Do
 
 ❌ **DON'T look for .env files** - They don't exist
+❌ **DON'T curl Supabase REST API** - It's gone. Local PG only.
 ❌ **DON'T use `sudo systemctl`** - It's a user service, use `systemctl --user`
 ❌ **DON'T use `journalctl -u governor`** - Use `journalctl --user -u vibepilot-governor`
 ❌ **DON'T hardcode credentials** - Use the vault
 ❌ **DON'T guess** - Check what exists first
-
-### ✅ Quick Reference: Database Operations
-
-```bash
-# Check for query tools
-ls ~/VibePilot/governor/cmd/tools/
-
-# Use the systemd user environment
-source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n")
-echo "URL: $SUPABASE_URL"
-
-# Query Supabase via curl
-source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n")
-curl -s "${SUPABASE_URL}/rest/v1/tasks?select=id,title,status" \
-  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
-```
 
 ### GitHub Access
 
@@ -193,9 +162,9 @@ database.RPC(ctx, "update_task", map[string]any{
 ```
 
 ### All Schema Changes in `docs/supabase-schema/`
-- Human applies from GitHub (source of truth)
-- Numbered migrations: `064_update_task_assignment.sql`
-- Never apply directly - commit to GitHub first
+- Numbered migrations: `132_description.sql`
+- Applied directly via `psql -d vibepilot -f path/to/migration.sql`
+- Always commit to GitHub first, then apply locally
 
 ### File Organization
 - 1 file = 1 concern
@@ -221,7 +190,7 @@ It ONLY displays what VibePilot has already done.
 
 **The problem is in the Go code, NOT the dashboard.**
 
-Fix the Go code that writes to Supabase.
+Fix the Go code that writes to PostgreSQL.
 
 ### What Dashboard Displays
 
@@ -468,16 +437,16 @@ Merge problems are solved by agents, not human.
 │   ├── cmd/governor/        # Main entry point + handlers
 │   ├── internal/            # Core logic
 │   │   ├── core/           # State machine, checkpointing, test runner
-│   │   ├── db/             # Supabase client, RPCs
+│   │   ├── db/             # PostgreSQL client, RPCs (postgres.go, NOT supabase.go — legacy dead code)
 │   │   ├── runtime/        # Router, agents, sessions, context builder
 │   │   ├── dag/            # DAG engine, YAML workflow execution
 │   │   ├── gitree/         # Git worktree management (isolated worktrees per parallel agent)
 │   │   ├── mcp/            # MCP protocol support
 │   │   ├── connectors/     # Courier agents, runner connectors
 │   │   ├── security/       # Leak detection
-│   │   ├── vault/          # Supabase vault access
+│   │   ├── vault/          # PostgreSQL vault access (encrypted secrets)
 │   │   ├── webhooks/       # GitHub webhook handling
-│   │   ├── realtime/       # Supabase realtime subscriptions
+│   │   ├── realtime/       # pg_notify listener (replaced Supabase Realtime)
 │   │   ├── maintenance/    # System maintenance operations
 │   │   └── tools/          # Tool registry (db, file, git, sandbox, vault, web)
 │   └── config/              # JSON configs + YAML pipelines
@@ -498,7 +467,7 @@ Merge problems are solved by agents, not human.
 │       ├── tier0-static.md # Single source of truth for all rules
 │       └── build-knowledge-db.py  # Builds knowledge.db from tier0 + sources
 │
-├── prompts/                  # Agent system prompts (synced to Supabase on startup)
+├── prompts/                  # Agent system prompts (synced to DB on startup for legacy compat)
 │
 ├── docs/
 │   ├── prd/                 # Product Requirements (INPUT)
@@ -640,32 +609,62 @@ Every agent receives feedback from downstream outcomes. The system learns which 
 ### Config ↔ DB Sync
 
 When supervisor approves research findings (new_model, pricing_change, config_tweak, new_platform):
-1. `ResearchActionApplier` writes config file (models.json or connectors.json) **and** upserts Supabase DB
+1. `ResearchActionApplier` writes config file (models.json or connectors.json) **and** upserts PostgreSQL DB
 2. Both sources update atomically — no LLM middleman, no drift
 3. Fallback to maintenance command if direct apply fails
 4. Thread-safe with mutex-protected config writes
 
 ---
 
-## 7. GitHub and Supabase as Sources of Truth
+## 7. GitHub and PostgreSQL as Sources of Truth
 
-### ⚠️ CRITICAL: Supabase Realtime (NEVER Poll)
+### Data Flow: Who Talks to What
 
-**VibePilot uses Supabase Realtime subscriptions, NOT polling.** Polling nearly killed the project (Supabase egress costs). All dashboard updates, task state changes, and event tracking use realtime subscriptions.
+```
+┌─────────────────────────────────────────────────────────────┐
+│ GITHUB (Source of Truth for Code)                           │
+│  - PRDs, plans, migrations, prompts, configs               │
+│  - Push events trigger pipeline via webhook                 │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│ GOVERNOR (Go Backend, reads both)                           │
+│  - Reads PRDs from GitHub                                   │
+│  - Reads/writes state to local PostgreSQL                   │
+│  - pg_notify events drive the pipeline                      │
+│  - SSE broker pushes live updates to dashboard              │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│ POSTGRESQL (Source of Truth for State, LOCAL)               │
+│  - 66 tables, 152 functions                                 │
+│  - Tasks, task_runs, plans, models, platforms, events       │
+│  - pg_notify on vp_changes channel                          │
+│  - Encrypted vault (secrets_vault table)                    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│ DASHBOARD (React, READ-ONLY view)                           │
+│  - Reads from governor /api/dashboard (REST + SSE)          │
+│  - Does NOT connect to PostgreSQL directly                  │
+│  - Human reviews visual UI/UX changes here ONLY             │
+└─────────────────────────────────────────────────────────────┘
+```
 
-GitHub push events are received via webhooks (webhooks.vibestribe.rocks) and written to Supabase. Governor watches Supabase via realtime -- never polls GitHub either.
-
-### GitHub: Code & Schema Source of Truth
+### GitHub: Code Source of Truth
 
 | What | Where | Why |
 |------|-------|-----|
 | PRDs | `docs/prd/*.md` | Human creates, Governor reads |
 | Plans | `docs/plans/*.md` | Governor creates, tracks progress |
-| Schema Migrations | `docs/supabase-schema/*.sql` | Human applies from GitHub |
+| Schema Migrations | `docs/supabase-schema/*.sql` | Numbered, applied via psql |
 | Agent Prompts | `prompts/*.md` | Configurable agent behavior |
 | Config Files | `governor/config/*.json` | Models, connectors, routing |
 
-### Supabase: State & Realtime Source of Truth
+### PostgreSQL: State Source of Truth (LOCAL)
 
 | What | Table | Why |
 |------|-------|-----|
@@ -675,63 +674,18 @@ GitHub push events are received via webhooks (webhooks.vibestribe.rocks) and wri
 | Models | `models` | Model profiles, status, limits |
 | Platforms | `platforms` | Web platforms (courier destinations) |
 | Events | `orchestrator_events` | Event log for timeline |
-| Review Queue | `review_queue` | Tasks awaiting human review |
-
-### How They Work Together
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ GITHUB (Source of Truth for Code)                           │
-│                                                              │
-│  - PRDs pushed here                                          │
-│  - Migrations stored here                                    │
-│  - Agent prompts stored here                                 │
-│  - Config files stored here                                  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ Governor reads from here
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ GOVERNOR (Go Backend)                                        │
-│                                                              │
-│  - Watches Supabase for changes (Live)                      │
-│  - Reads PRDs from GitHub                                    │
-│  - Writes tasks to Supabase                                  │
-│  - Updates task_runs with tokens/costs                      │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ Writes state here
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ SUPABASE (Source of Truth for State)                         │
-│                                                              │
-│  - Realtime subscriptions (no webhooks)                     │
-│  - Task records                                              │
-│  - Execution history                                         │
-│  - Model/platform status                                     │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ Realtime subscriptions (NEVER poll)
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ DASHBOARD (React Frontend)                                   │
-│                                                              │
-│  - READ-ONLY view of Supabase                               │
-│  - Displays task status, model assignment, ROI              │
-│  - Human reviews visual UI/UX changes here ONLY             │
-│    (NOT code, NOT merge, NOT general approval)              │
-└─────────────────────────────────────────────────────────────┘
-```
+| Secrets | `secrets_vault` | Encrypted API keys (AES-256-GCM) |
 
 ### Applying Schema Changes
 
-1. Create migration in `docs/supabase-schema/XXX_description.sql`
-2. Commit to GitHub main
-3. Human copies SQL from GitHub
-4. Human applies in Supabase SQL Editor
-5. Governor restarts and uses new schema
+1. Create migration in `docs/supabase-schema/NNN_description.sql` (find next number)
+2. Include `DROP IF EXISTS` for idempotency
+3. Commit and push to GitHub main
+4. `cd ~/vibepilot && git pull`
+5. `psql -d vibepilot -f /path/to/migration.sql`
+6. Verify: `psql -d vibepilot -c "\df function_name"`
 
-**NEVER apply migrations directly. Always go through GitHub first.**
+**Always commit to GitHub first. Local-only work gets lost.**
 
 ---
 
@@ -746,12 +700,12 @@ GitHub push events are received via webhooks (webhooks.vibestribe.rocks) and wri
 | Understand architecture | Root | `ARCHITECTURE.md` |
 | See recent changes | Root | `CHANGELOG.md` |
 || Find agent prompts | `prompts/` | `planner.md`, `supervisor.md`, etc. |
-| Check model config | `governor/config/` | `models.json` |
-| Check connector config | `governor/config/` | `connectors.json` |
-| Check routing config | `governor/config/` | `routing.json` |
-| Find database schema | `docs/supabase-schema/` | `*.sql` files |
-| Understand dashboard | `docs/` | `HOW_DASHBOARD_WORKS.md` |
-| Query Supabase | Use systemctl --user | See Section 3 |
+|| Check model config | `governor/config/` | `models.json` |
+|| Check connector config | `governor/config/` | `connectors.json` |
+|| Check routing config | `governor/config/` | `routing.json` |
+|| Find database schema | `docs/supabase-schema/` | `*.sql` files |
+|| Understand dashboard | `docs/` | `HOW_DASHBOARD_WORKS.md` |
+|| Query database | Use psql | See Section 3 |
 | Check governor logs | System | `journalctl --user -u vibepilot-governor` |
 | Restart governor | System | `systemctl --user restart vibepilot-governor` |
 
@@ -888,7 +842,7 @@ governor/
 | Document | When to Read | What It Contains |
 |----------|--------------|------------------|
 | [docs/HOW_DASHBOARD_WORKS.md](docs/HOW_DASHBOARD_WORKS.md) | Fixing dashboard display issues | Full dashboard data flow, all sections, field mappings |
-| [docs/DASHBOARD_AUDIT.md](docs/DASHBOARD_AUDIT.md) | **CONTRACT: what dashboard needs from Supabase** | Exact columns, types, status maps, computed fields, mismatches, Go↔Dash contract |
+| [docs/DASHBOARD_AUDIT.md](docs/DASHBOARD_AUDIT.md) | **CONTRACT: what dashboard needs from PostgreSQL** | Exact columns, types, status maps, computed fields, mismatches, Go↔Dash contract |
 | [docs/DATA_FLOW_MAPPING.md](docs/DATA_FLOW_MAPPING.md) | Understanding what Go code writes where | Dashboard → Supabase → Go code mapping, current gaps |
 | [docs/supabase-schema/](docs/supabase-schema/) | Making schema changes | All database migrations, numbered SQL files |
 | [docs/core_philosophy.md](docs/core_philosophy.md) | Understanding the "why" | Strategic mindset, principles, decision framework |
@@ -925,32 +879,23 @@ governor/
 3. ✅ Check git branch: `cd ~/VibePilot && git branch --show-current`
 4. ✅ Check governor status: `systemctl --user status vibepilot-governor`
 5. ✅ Check recent logs: `journalctl --user -u vibepilot-governor -n 50`
-6. ✅ Verify you can access Supabase (see Section 3)
+6. ✅ Verify database access: `psql -d vibepilot -c "SELECT count(*) FROM tasks"`
 
 ---
 
 ## Common Tasks Quick Reference
 
-### Query Supabase
+### Query PostgreSQL
 ```bash
-source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n")
-curl -s "${SUPABASE_URL}/rest/v1/tasks?select=id,title,status" \
-  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
+psql -d vibepilot -c "SELECT id, title, status FROM tasks LIMIT 10"
+psql -d vibepilot -c "SELECT task_id, model_id, tokens_in, tokens_out FROM task_runs ORDER BY created_at DESC LIMIT 10"
 ```
 
 ### Clean Up Test Data
 ```bash
-source <(systemctl --user show vibepilot-governor -p Environment | sed "s/Environment=//" | tr " " "\n")
-curl -X DELETE "${SUPABASE_URL}/rest/v1/tasks?id=not.is.null" \
-  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
-curl -X DELETE "${SUPABASE_URL}/rest/v1/task_runs?id=not.is.null" \
-  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
-curl -X DELETE "${SUPABASE_URL}/rest/v1/plans?id=not.is.null" \
-  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}"
+psql -d vibepilot -c "DELETE FROM task_runs WHERE task_id IN (SELECT id FROM tasks WHERE title LIKE 'test%')"
+psql -d vibepilot -c "DELETE FROM tasks WHERE title LIKE 'test%'"
+psql -d vibepilot -c "DELETE FROM plans WHERE title LIKE 'test%'"
 ```
 
 ### Rebuild and Restart Governor
@@ -999,10 +944,10 @@ cd ~/VibePilot && git add docs/prd/test-feature.md && git commit -m "prd: [featu
 ## Remember
 
 - **Dashboard is READ-ONLY** - Fix Go code, not dashboard
-- **NEVER poll Supabase** - Realtime subscriptions only (polling nearly killed the project)
+- **NEVER poll** - pg_notify events drive everything (polling killed Supabase)
 - **No hardcoding** - Everything in config files
 - **GitHub = Code source of truth**
-- **PostgreSQL = State source of truth** (local, not Supabase — cut off April 24)
+- **PostgreSQL = State source of truth** (local, peer auth)
 - **User service, not system** - `systemctl --user`, not `sudo systemctl`
 - **Cloud free tiers = primary** — Multiple providers, free and near-free. Counts change, see CURRENT_STATE.md.
 - **Token counting = client-side** - Never trust external counts
