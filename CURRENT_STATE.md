@@ -239,18 +239,52 @@ The orchestrator/router is fully config-driven via `routing.json` (free_cascade 
 
 ## Architecture Principles (enforced)
 - Nothing is ever blocked. All feedback routes to the right agent for revision.
-- No hardcoded values. Everything configurable via system.json.
-- Dead code removed promptly. No orphan event types or unreachable paths.
+- No hardcoded values. Everything configurable via system.json. EXCEPTION: supervisor timeout 2min (Bug 3)
+- Dead code removed promptly. No orphan event types or unreachable paths. EXCEPTION: 35 unused allowlist entries, supabase.go compiled but unreachable
 - Human only involved for: visual UI/UX review, API budget, research after council.
 - Self-correcting: council→planner→consultant chain flows backward when needed.
+- Learning system is WIRED but BLOCKED by 14 allowlist gaps — self-improvement won't work until fixed
 
-## Known Gaps (verified 2026-04-27)
+## Known Gaps (verified 2026-04-28)
+
+### CRITICAL
+- **14 RPCs called in Go but MISSING from allowlist** — all blocked at runtime:
+  - Learning: update_model_learning (4 sites), calc_run_costs, create_rule_from_rejection, record_planner_rule_prevented_issue
+  - Analysis: get_model_performance, get_failure_patterns, get_slice_task_info
+  - Memory: store_memory, recall_memories
+  - Maintenance: update_maintenance_command_status, log_orchestrator_event, queue_maintenance_command
+  - Other: add_bookmark
+- **3 RPCs called but DON'T EXIST in DB at all**: get_change_approvals, p_change_id, queue_maintenance_command (double failure)
+- **task_packets incomplete**: Table exists, allowlist entry exists, but no create_task_with_packet DB function. prompt_packet goes into tasks.result JSONB which gets OVERWRITTEN by execution output. GetTaskPacket fallback works now but will break.
+
+### HIGH
+- **commitOutput error swallowing** (Bug 6): Callers use `_ = h.commitOutput(...)` — pipeline continues on commit failure
+- **Supervisor timeout hardcoded 2 min** (Bug 3): Not configurable via system.json
+- **Bug 10**: No explicit terminal state when max retries exceeded in review loop
+
+### MEDIUM
+- **Dead plan statuses**: "blocked", "active" in plan_lifecycle.json but Go never writes them. "archived" only in CHECK constraint
+- **Webhook mapToEventType mismatch**: complete → EventTaskCompleted (no handler) vs pgnotify complete → EventTaskApproval (correct)
+- **35 unused allowlist entries**: 15 exist in DB but never called, 20 also missing from DB
+- **23 stale prompts** in DB from Supabase era (governor reads from filesystem)
+
+### DEFERRED
 - Consultant agent not wired into pipeline (interactive chat agent — separate scope)
-- Task packet context PARTIALLY FIXED — ContextBuilder wired, reads target_files from planner result, but untested E2E
-- Planner context PARTIALLY FIXED — BuildPlannerContext wired for full_map policy, injects slices/rules/failures + full code map from .context/map.md (auto-refreshed via git hook)
-- Research flow DEFERRED — Researcher agent not yet running. Reports will go to knowledgebase repo (VibesTribe/knowledgebase). Council reviews from there. Implementation happens in vibepilot task branches. Dashboard DOCS button will link to knowledgebase graph.
-- No auto-discovery of new free models from providers (research agent handles daily landscape checks)
-- See docs/CURRENT_ISSUES.md for full details
+- Research flow DEFERRED — Researcher agent not yet running
+- No auto-discovery of new free models (research agent handles daily checks)
+- Steps 9-10 (module integration test, subtree merge) designed but untested E2E
+
+### Original 10 Bugs Status (Apr 25 → Apr 28)
+1. task_packets never written — STILL BROKEN (see above)
+2. commitOutput on main repo not worktree — FIXED
+3. Supervisor timeout hardcoded — STILL BROKEN (see above)
+4. Testing can't find output in worktree — FIXED
+5. Stale Supabase-era prompts in DB — STILL PRESENT (harmless)
+6. commitOutput errors silently ignored — PARTIALLY FIXED (see above)
+7. STATUS_ORDER missing human_review — FIXED
+8. transition_task no status validation — FIXED
+9. Duplicate task creation race — FIXED
+10. Task stuck at review after max attempts — UNCLEAR (see above)
 
 ## Human Review Workflow Status (Updated 2026-04-27)
 ✅ **Fix #1: Governor creates review JSON files on human_review** - IMPLEMENTED
