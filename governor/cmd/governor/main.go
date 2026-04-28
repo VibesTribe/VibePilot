@@ -194,7 +194,7 @@ func main() {
 	})
 
 	sessionFactory := runtime.NewSessionFactory(cfg)
-	registerConnectors(context.Background(), sessionFactory, cfg, v, repoPath)
+	registerConnectors(sessionFactory, cfg, v, repoPath)
 
 	contextBuilder := runtime.NewContextBuilder(database, repoPath, cfg.System.CodeMap)
 	sessionFactory.SetContextBuilder(contextBuilder)
@@ -223,15 +223,7 @@ func main() {
 	}
 	loadCancel()
 
-	// Cooldown watcher: probes models whose cooldown recently expired to verify
-	// they're actually healthy before the router sends traffic. Without this,
-	// a model with a dead key cycles forever (cooldown expires → fail → repeat).
-	cooldownWatcher := runtime.NewCooldownWatcher(usageTracker, sessionFactory, cfg, database)
-
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// Start cooldown watcher with the main context (auto-stops on shutdown)
-	cooldownWatcher.Start(ctx)
 	defer cancel()
 
 	// Initialize CourierRunner for web platform dispatch (courier agent system)
@@ -409,27 +401,6 @@ func main() {
 	webhookServer.SetGitHubHandler(githubHandler)
 
 	go runProcessingRecovery(ctx, database, cfg)
-
-	// Periodic managed repo sync: keeps prompts and codebase context fresh from GitHub.
-	// GitHub is source of truth. The managed repo must stay current between restarts.
-	go func() {
-		interval := time.Duration(cfg.GetRepoSyncIntervalSeconds()) * time.Second
-		log.Printf("[RepoSync] Periodic sync every %s", interval)
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if err := managedRepo.Reset(ctx); err != nil {
-					log.Printf("[RepoSync] WARNING: periodic sync failed: %v", err)
-				} else {
-					log.Printf("[RepoSync] Synced managed repo with GitHub")
-				}
-			}
-		}
-	}()
 
 	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, configDir, contextBuilder)
 
@@ -609,12 +580,13 @@ func runVaultCLI(args []string) {
 	}
 }
 
-func registerConnectors(ctx context.Context, factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault, repoPath string) {
+func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v *vault.Vault, repoPath string) {
 	connectorsCfg := cfg.Connectors
 	if connectorsCfg == nil {
 		log.Println("Warning: no connectors configured")
 		return
 	}
+
 	secretProvider := connectors.NewVaultAdapter(v)
 	activeCount := 0
 
@@ -649,6 +621,7 @@ func registerConnectors(ctx context.Context, factory *runtime.SessionFactory, cf
 
 	// Run startup health checks on connectors that support it
 	healthyCount := 0
+	hcCtx := context.Background()
 	for _, conn := range connectorsCfg.Connectors {
 		if conn.Status != "active" {
 			continue
@@ -658,7 +631,7 @@ func registerConnectors(ctx context.Context, factory *runtime.SessionFactory, cf
 			continue
 		}
 		if hc, ok := runner.(runtime.HealthChecker); ok {
-			if err := hc.HealthCheck(ctx); err != nil {
+			if err := hc.HealthCheck(hcCtx); err != nil {
 				log.Printf("HEALTH CHECK FAILED: %s — %v (connector remains registered but may fail at runtime)", conn.ID, err)
 			} else {
 				healthyCount++

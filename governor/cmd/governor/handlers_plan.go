@@ -31,9 +31,6 @@ func setupPlanHandlers(
 	router.On(runtime.EventPlanReview, func(event runtime.Event) {
 		handlePlanReview(ctx, factory, pool, database, cfg, connRouter, git, usageTracker, event)
 	})
-	router.On(runtime.EventRevisionNeeded, func(event runtime.Event) {
-		handlePlanRevisionNeeded(ctx, factory, pool, database, cfg, connRouter, git, usageTracker, event)
-	})
 }
 
 func handlePlanCreated(
@@ -105,7 +102,7 @@ func handlePlanCreated(
 	var result *runtime.SessionResult
 	var routingResult *runtime.RoutingResult
 	var failedModels []string
-	maxRetries := cfg.GetMaxRetries()
+	maxRetries := 5
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		var routeErr error
 		if attempt > 0 && routingResult != nil {
@@ -134,13 +131,13 @@ func handlePlanCreated(
 			return
 		}
 
-		// Record planner call for dashboard timeline
-		recordPipelineEvent(ctx, database, "planner_called", prdPath, routingResult.ModelID, "",
-			map[string]any{
-				"plan_id":       planID,
+		// Record planner_called event (first attempt only)
+		if attempt == 0 {
+			recordPipelineEvent(ctx, database, "planner_called", planID, routingResult.ModelID, "", map[string]any{
+				"plan_id":       truncateID(planID),
 				"planner_model": routingResult.ModelID,
-				"connector_id":  routingResult.ConnectorID,
 			})
+		}
 
 		result, err = session.Run(ctx, map[string]any{
 			"prd_content": string(prdContent),
@@ -210,6 +207,11 @@ func handlePlanCreated(
 			} else {
 				log.Printf("[EventPlanCreated] Plan file committed and pushed: %s", plannerOutput.PlanPath)
 			}
+			// Record plan_created event
+			recordPipelineEvent(ctx, database, "plan_created", planID, "", "", map[string]any{
+				"plan_id":   truncateID(planID),
+				"plan_path": plannerOutput.PlanPath,
+			})
 		}
 	}
 
@@ -242,249 +244,10 @@ func handlePlanCreated(
 
 	log.Printf("[EventPlanCreated] Plan %s created successfully in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
 
-	// Record plan creation for timeline
-	recordPipelineEvent(ctx, database, "plan_created", prdPath, routingResult.ModelID, "",
-		map[string]any{
-			"plan_id":       planID,
-			"plan_path":     plannerOutput.PlanPath,
-			"total_tasks":   plannerOutput.TotalTasks,
-			"planner_model": routingResult.ModelID,
-		})
-
 	// Note: We do NOT call runPlanReview directly here.
 	// The update_plan_status RPC (line 147) triggers a realtime UPDATE event,
 	// which will be handled by handlePlanReview -> runPlanReview.
 	// This avoids race conditions with processing locks.
-}
-
-// handlePlanRevisionNeeded handles plans that the supervisor rejected.
-// It re-runs the planner with supervisor feedback so the planner can fix the plan.
-// Max 3 revision rounds before giving up (sets plan to "error").
-func handlePlanRevisionNeeded(
-	ctx context.Context,
-	factory *runtime.SessionFactory,
-	pool *runtime.AgentPool,
-	database db.Database,
-	cfg *runtime.Config,
-	connRouter *runtime.Router,
-	git *gitree.Gitree,
-	usageTracker *runtime.UsageTracker,
-	event runtime.Event,
-) {
-	startTime := time.Now()
-	plan, err := fetchRecord(ctx, database, event)
-	if err != nil {
-		log.Printf("[PlanRevision] Failed to get plan record: %v", err)
-		return
-	}
-
-	planID, _ := plan["id"].(string)
-	prdPath, _ := plan["prd_path"].(string)
-	currentStatus, _ := plan["status"].(string)
-
-	if planID == "" {
-		return
-	}
-
-	log.Printf("[PlanRevision] Processing plan %s, status=%s", truncateID(planID), currentStatus)
-
-	// Only process plans still in revision_needed
-	if currentStatus != "revision_needed" {
-		log.Printf("[PlanRevision] Plan %s no longer revision_needed (status=%s), skipping", truncateID(planID), currentStatus)
-		return
-	}
-
-	// Check revision round — give up after 3 attempts
-	revisionRound := 0
-	if rr, ok := plan["revision_round"].(float64); ok {
-		revisionRound = int(rr)
-	}
-	maxRevisions := 3
-	if revisionRound >= maxRevisions {
-		log.Printf("[PlanRevision] Plan %s exceeded max revisions (%d >= %d), setting to error", truncateID(planID), revisionRound, maxRevisions)
-		setPlanError(ctx, database, planID, "max_revisions_exceeded")
-		return
-	}
-
-	// Claim the plan
-	processingBy := fmt.Sprintf("revision:%d", time.Now().UnixNano())
-	claimed, err := database.RPC(ctx, "set_processing", map[string]any{
-		"p_table":         "plans",
-		"p_id":            planID,
-		"p_processing_by": processingBy,
-	})
-	if err != nil || !parseBool(claimed) {
-		log.Printf("[PlanRevision] Plan %s already being processed", truncateID(planID))
-		return
-	}
-
-	defer database.RPC(ctx, "clear_processing", map[string]any{
-		"p_table": "plans",
-		"p_id":    planID,
-	})
-
-	// Increment revision_round (RPC returns new round number, we already checked the limit above)
-	database.RPC(ctx, "increment_revision_round", map[string]any{
-		"p_plan_id": planID,
-	})
-
-	repoPath := cfg.GetRepoPath()
-
-	// Fetch PRD content
-	prdContent, err := fetchContent(ctx, repoPath, prdPath)
-	if err != nil {
-		log.Printf("[PlanRevision] Failed to fetch PRD: %v", err)
-		setPlanError(ctx, database, planID, "prd_fetch_failed")
-		return
-	}
-
-	// Build revision context from supervisor feedback
-	revisionInput := map[string]any{
-		"prd_content": string(prdContent),
-		"plan_id":     planID,
-		"event":       "revision_needed",
-	}
-
-	// Include supervisor feedback if available
-	if feedback, ok := plan["review_notes"]; ok && feedback != nil {
-		revisionInput["latest_feedback"] = feedback
-	}
-	if latestFeedback, ok := plan["latest_feedback"]; ok && latestFeedback != nil {
-		revisionInput["latest_feedback"] = latestFeedback
-	}
-	if tasksRevision, ok := plan["tasks_needing_revision"]; ok && tasksRevision != nil {
-		revisionInput["tasks_needing_revision"] = tasksRevision
-	}
-
-	// Include existing plan content so the planner can revise rather than start from scratch
-	planPath, _ := plan["plan_path"].(string)
-	if planPath != "" {
-		planContent, err := fetchContent(ctx, repoPath, planPath)
-		if err == nil {
-			revisionInput["plan_content"] = string(planContent)
-		}
-	}
-
-	// Run planner with cascade retry (same pattern as handlePlanCreated)
-	var result *runtime.SessionResult
-	var routingResult *runtime.RoutingResult
-	var failedModels []string
-	maxRetries := cfg.GetMaxRetries()
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		if attempt > 0 && routingResult != nil {
-			failedModels = append(failedModels, routingResult.ModelID)
-			log.Printf("[PlanRevision] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
-		}
-		routingResult, routeErr := connRouter.SelectRouting(ctx, runtime.RoutingRequest{
-			Role:            "planner",
-			TaskType:        "planning",
-			RoutingFlag:     "internal",
-			ExcludeModels:   failedModels,
-			EstimatedTokens: runtime.EstimateTokens(string(prdContent), "planner"),
-		})
-		if routeErr != nil || routingResult == nil {
-			log.Printf("[PlanRevision] No routing available for planner (attempt %d)", attempt+1)
-			setPlanError(ctx, database, planID, "no_routing")
-			return
-		}
-
-		session, err := factory.CreateWithConnector(ctx, "planner", "planning", routingResult.ConnectorID)
-		if err != nil {
-			log.Printf("[PlanRevision] Failed to create planner session: %v", err)
-			setPlanError(ctx, database, planID, "session_failed")
-			return
-		}
-
-		recordPipelineEvent(ctx, database, "planner_called", prdPath, routingResult.ModelID, "revision",
-			map[string]any{
-				"plan_id":         planID,
-				"planner_model":   routingResult.ModelID,
-				"connector_id":    routingResult.ConnectorID,
-				"revision_round":  revisionRound + 1,
-			})
-
-		result, err = session.Run(ctx, revisionInput)
-		if err != nil {
-			log.Printf("[PlanRevision] Planner attempt %d failed (model=%s): %v", attempt+1, routingResult.ModelID, err)
-			if usageTracker != nil {
-				if isRateLimitError(err) {
-					usageTracker.RecordRateLimit(ctx, routingResult.ModelID)
-					if routingResult.ConnectorID != "" {
-						usageTracker.RecordConnectorCooldown(ctx, routingResult.ConnectorID, 5)
-					}
-				}
-				usageTracker.RecordCompletion(ctx, routingResult.ModelID, "", time.Since(startTime).Seconds(), false)
-			}
-			database.RPC(ctx, "record_model_failure", map[string]any{
-				"p_model_id":         routingResult.ModelID,
-				"p_task_id":          planID,
-				"p_failure_type":     "execution_error",
-				"p_failure_category": "model_issue",
-			})
-			if attempt < maxRetries-1 {
-				continue
-			}
-			setPlanError(ctx, database, planID, "revision_execution_failed")
-			return
-		}
-		if usageTracker != nil {
-			usageTracker.RecordUsage(ctx, routingResult.ModelID, result.TokensIn, result.TokensOut)
-			usageTracker.RecordCompletion(ctx, routingResult.ModelID, "planning", time.Since(startTime).Seconds(), true)
-		}
-		break
-	}
-
-	// Parse revised planner output
-	plannerOutput, err := runtime.ParsePlannerOutput(result.Output)
-	if err != nil {
-		raw := result.Output
-		if len(raw) > 500 {
-			raw = raw[:500]
-		}
-		log.Printf("[PlanRevision] Failed to parse revised planner output: %v\nRaw (first 500): %s", err, raw)
-		os.WriteFile("/tmp/planner_revision_debug.json", []byte(result.Output), 0644)
-		setPlanError(ctx, database, planID, "revision_parse_failed")
-		return
-	}
-
-	// Write revised plan file
-	if plannerOutput.PlanPath != "" && plannerOutput.PlanContent != "" {
-		planFilePath := filepath.Join(repoPath, plannerOutput.PlanPath)
-		planDir := filepath.Dir(planFilePath)
-		if err := os.MkdirAll(planDir, 0755); err != nil {
-			log.Printf("[PlanRevision] Failed to create plan directory: %v", err)
-		} else if err := os.WriteFile(planFilePath, []byte(plannerOutput.PlanContent), 0644); err != nil {
-			log.Printf("[PlanRevision] Failed to write revised plan file: %v", err)
-		} else {
-			log.Printf("[PlanRevision] Revised plan file written: %s", plannerOutput.PlanPath)
-			if err := git.CommitAndPush(ctx, plannerOutput.PlanPath, fmt.Sprintf("docs: revise plan %s (round %d)", truncateID(planID), revisionRound+1)); err != nil {
-				log.Printf("[PlanRevision] Failed to commit/push revised plan: %v", err)
-			}
-		}
-	}
-
-	// Update plan to "review" — this triggers pgnotify → EventPlanReview → supervisor re-review
-	// update_plan_status clears processing_by, so no need for clearProcessingLock
-	_, err = database.RPC(ctx, "update_plan_status", map[string]any{
-		"p_plan_id":   planID,
-		"p_status":    "review",
-		"p_plan_path": plannerOutput.PlanPath,
-	})
-	if err != nil {
-		log.Printf("[PlanRevision] Failed to update plan status: %v", err)
-		return
-	}
-
-	log.Printf("[PlanRevision] Plan %s revised (round %d) and sent for re-review in %dms", truncateID(planID), revisionRound+1, time.Since(startTime).Milliseconds())
-
-	recordPipelineEvent(ctx, database, "plan_created", prdPath, routingResult.ModelID, "revision",
-		map[string]any{
-			"plan_id":        planID,
-			"plan_path":      plannerOutput.PlanPath,
-			"total_tasks":    plannerOutput.TotalTasks,
-			"planner_model":  routingResult.ModelID,
-			"revision_round": revisionRound + 1,
-		})
 }
 
 func runPlanReview(
@@ -593,7 +356,7 @@ func runPlanReview(
 	var result *runtime.SessionResult
 	var routingResult *runtime.RoutingResult
 	var failedModels []string
-	maxRetries := cfg.GetMaxRetries()
+	maxRetries := 5
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 && routingResult != nil {
 			failedModels = append(failedModels, routingResult.ModelID)
@@ -620,14 +383,12 @@ func runPlanReview(
 			return
 		}
 
-		// Record supervisor call for plan review (first attempt only)
+		// Record supervisor_called event (first attempt only)
 		if attempt == 0 {
-			recordPipelineEvent(ctx, database, "supervisor_called", prdPath, routingResult.ModelID, "",
-				map[string]any{
-					"plan_id":            planID,
-					"supervisor_model":   routingResult.ModelID,
-					"review_type":       "plan_review",
-				})
+			recordPipelineEvent(ctx, database, "supervisor_called", planID, routingResult.ModelID, "", map[string]any{
+				"plan_id":         truncateID(planID),
+				"supervisor_model": routingResult.ModelID,
+			})
 		}
 
 		result, err = session.Run(ctx, map[string]any{
@@ -751,14 +512,12 @@ func runPlanReview(
 
 		log.Printf("[PlanReview] Plan %s approved and tasks created in %dms", truncateID(planID), time.Since(startTime).Milliseconds())
 
-		// Record plan approval for timeline
-		recordPipelineEvent(ctx, database, "plan_approved", prdPath, routingResult.ModelID, "",
-			map[string]any{
-				"plan_id":            planID,
-				"supervisor_model":   routingResult.ModelID,
-				"complexity":         review.Complexity,
-				"review_duration_ms": time.Since(startTime).Milliseconds(),
-			})
+		// Record plan_approved event
+		recordPipelineEvent(ctx, database, "plan_approved", planID, routingResult.ModelID, "", map[string]any{
+			"plan_id":    truncateID(planID),
+			"complexity": review.Complexity,
+			"reasoning":  review.Reasoning,
+		})
 
 	case "needs_revision":
 		failureClass := review.FailureClass
@@ -828,14 +587,12 @@ func runPlanReview(
 
 		log.Printf("[PlanReview] Plan %s needs revision: %s (%s)", truncateID(planID), failureClass, failureDetail)
 
-		// Record plan rejection for timeline
-		recordPipelineEvent(ctx, database, "plan_rejected", prdPath, routingResult.ModelID, failureClass,
-			map[string]any{
-				"plan_id":            planID,
-				"supervisor_model":   routingResult.ModelID,
-				"failure_detail":     failureDetail,
-				"review_duration_ms": time.Since(startTime).Milliseconds(),
-			})
+		// Record plan_rejected event
+		recordPipelineEvent(ctx, database, "plan_rejected", planID, routingResult.ModelID, "", map[string]any{
+			"plan_id":        truncateID(planID),
+			"failure_class":  failureClass,
+			"failure_detail": failureDetail,
+		})
 
 	case "council_review":
 		_, err = database.RPC(ctx, "update_plan_status", map[string]any{
@@ -856,6 +613,12 @@ func runPlanReview(
 		}
 
 		log.Printf("[PlanReview] Plan %s sent to council review (supervisor=%s)", truncateID(planID), routingResult.ModelID)
+
+		// Record council_review event
+		recordPipelineEvent(ctx, database, "council_review", planID, routingResult.ModelID, "", map[string]any{
+			"plan_id":    truncateID(planID),
+			"reasoning":  review.Reasoning,
+		})
 
 	default:
 		log.Printf("[PlanReview] Unknown decision: %s", review.Decision)

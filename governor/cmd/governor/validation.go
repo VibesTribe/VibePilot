@@ -252,6 +252,29 @@ func createTasksFromApprovedPlan(ctx context.Context, database db.Database, plan
 			}
 		}
 		log.Printf("[createTasksFromApprovedPlan] Created task %s: %s (id: %s)", task.TaskNumber, task.Title, truncateID(taskIDStr))
+
+		// Write prompt_packet to dedicated task_packets table so it survives
+		// result JSONB overwrites during execution. GetTaskPacket already queries
+		// this table first and falls back to tasks.result JSONB.
+		if taskIDStr != "" && task.PromptPacket != "" {
+			_, pktErr := database.Insert(ctx, "task_packets", map[string]any{
+				"task_id":         taskIDStr,
+				"prompt":          task.PromptPacket,
+				"expected_output": task.ExpectedOutput,
+				"context": map[string]any{
+					"target_files": task.TargetFiles,
+					"task_number":  task.TaskNumber,
+					"slice_id":     task.SliceID,
+				},
+				"version": 1,
+			})
+			if pktErr != nil {
+				log.Printf("[createTasksFromApprovedPlan] Warning: failed to insert task_packet for %s: %v", task.TaskNumber, pktErr)
+			} else {
+				log.Printf("[createTasksFromApprovedPlan] Wrote task_packet for task %s (id: %s)", task.TaskNumber, truncateID(taskIDStr))
+			}
+		}
+
 		createdCount++
 	}
 
