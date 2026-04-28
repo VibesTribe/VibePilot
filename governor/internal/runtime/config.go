@@ -204,6 +204,7 @@ type RuntimeConfig struct {
 	AgentTimeoutSeconds    int `json:"agent_timeout_seconds"`
 	MaxToolTurns           int `json:"max_tool_turns"`
 	MaxRetries             int `json:"max_retries"`
+	RepoSyncIntervalSeconds int `json:"repo_sync_interval_seconds"`
 	EventQueryLimit        int `json:"event_query_limit"`
 }
 
@@ -1025,6 +1026,15 @@ func (c *Config) GetMaxRetries() int {
 		return 5 // sensible default
 	}
 	return c.System.Runtime.MaxRetries
+}
+
+func (c *Config) GetRepoSyncIntervalSeconds() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.System == nil || c.System.Runtime.RepoSyncIntervalSeconds <= 0 {
+		return 300 // 5 minutes default
+	}
+	return c.System.Runtime.RepoSyncIntervalSeconds
 }
 
 func (c *Config) GetWebToolsConfig() *WebToolsConfig {

@@ -410,6 +410,27 @@ func main() {
 
 	go runProcessingRecovery(ctx, database, cfg)
 
+	// Periodic managed repo sync: keeps prompts and codebase context fresh from GitHub.
+	// GitHub is source of truth. The managed repo must stay current between restarts.
+	go func() {
+		interval := time.Duration(cfg.GetRepoSyncIntervalSeconds()) * time.Second
+		log.Printf("[RepoSync] Periodic sync every %s", interval)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := managedRepo.Reset(ctx); err != nil {
+					log.Printf("[RepoSync] WARNING: periodic sync failed: %v", err)
+				} else {
+					log.Printf("[RepoSync] Synced managed repo with GitHub")
+				}
+			}
+		}
+	}()
+
 	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, configDir, contextBuilder)
 
 	// Usage state is persisted only on shutdown (no polling).
