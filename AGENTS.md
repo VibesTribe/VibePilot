@@ -10,10 +10,10 @@ It contains:
 - Human boundaries (non-technical, visual decisions only)
 
 **Quick start:**
-1. Read `.hermes.md` -- purpose, principles, pipeline, 10 rules (~3K tokens)
+1. Read `.hermes.md` -- 10 rules, ~2K tokens
 2. Query `.context/knowledge.db` for specifics when you need them
 3. Query `.context/index.db` for code lookups
-4. `CURRENT_STATE.md` for current system state
+4. `CURRENT_STATE.md` and `VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md` for current state
 
 **For humans:**
 - Setup, startup, and rebuild instructions: `docs/STARTUP_GUIDE.md`
@@ -23,4 +23,4 @@ It contains:
 - https://github.com/VibesTribe/VibePilot/blob/main/.hermes.md
 - https://github.com/VibesTribe/VibePilot/blob/main/docs/STARTUP_GUIDE.md
 - https://github.com/VibesTribe/VibePilot/blob/main/CURRENT_STATE.md
-- https://github.com/VibesTribe/VibePilot/blob/main/AGENTS.md
+- https://github.com/VibesTribe/VibePilot/blob/main/VIBEPILOT_WHAT_YOU_NEED_TO_KNOW.md
