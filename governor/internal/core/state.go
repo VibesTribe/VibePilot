@@ -163,7 +163,6 @@ const (
 	EventTaskClaimed         EventType = "task_claimed"
 	EventTaskStarted         EventType = "task_started"
 	EventTaskCheckpoint      EventType = "task_checkpoint"
-	EventTaskCompleted       EventType = "task_completed"
 	EventTaskReviewStarted   EventType = "task_review_started"
 	EventTaskReviewCompleted EventType = "task_review_completed"
 	EventTaskTestStarted     EventType = "task_test_started"
