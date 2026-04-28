@@ -1260,17 +1260,69 @@ func (h *TaskHandler) failTask(ctx context.Context, taskID, modelID, branchName,
 		h.worktreeMgr.RemoveWorktree(ctx, taskID)
 	}
 	h.git.DeleteBranch(ctx, branchName)
-	// Exclude this model BEFORE transitioning to pending.
-	// The transition fires pgnotify → EventTaskAvailable reads routing_flag_reason.
-	// If we write exclusion after transition, the handler reads stale (empty) data
-	// and routes to the same failed model.
+
+	// Read current attempts count to check diagnostic ceiling
+	triggerAttempts := h.cfg.GetDiagnosticTriggerAttempts()
+	currentAttempts := 0
+	if taskRows, err := h.database.Query(ctx, "tasks", map[string]any{"id": taskID, "select": "attempts,failure_notes,routing_flag_reason"}); err == nil {
+		var tasks []map[string]any
+		if json.Unmarshal(taskRows, &tasks) == nil && len(tasks) > 0 {
+			if v, ok := tasks[0]["attempts"].(float64); ok {
+				currentAttempts = int(v)
+			}
+			// Count failed models in routing_flag_reason
+			flagReason, _ := tasks[0]["routing_flag_reason"].(string)
+			accumulatedReason := flagReason
+			if accumulatedReason != "" {
+				accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
+			}
+		}
+	}
+
+	// After next increment (transition_task increments on pending), total will be currentAttempts+1
+	// Check if we've hit the diagnostic ceiling
+	if currentAttempts+1 >= triggerAttempts {
+		// DIAGNOSTIC CEILING HIT: Stop blind retry.
+		// Surface to human_review with accumulated diagnostic info.
+		failedModels := parseFailedModels(reason)
+		isPromptSuspect := isPromptSuspect(reason)
+
+		diagnosticNotes := fmt.Sprintf(
+			"DIAGNOSTIC: Task hit ceiling after %d attempts. Reason: %s. Failed models: %d. Prompt suspect: %v.",
+			currentAttempts+1, reason, len(failedModels), isPromptSuspect,
+		)
+
+		// Accumulate this model into the exclusion list so the notes are complete
+		accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
+
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "human_review",
+			"p_failure_reason": diagnosticNotes,
+		})
+		log.Printf("[TaskHandler] Task %s hit diagnostic ceiling (%d attempts, trigger=%d): %s → human_review",
+			truncateID(taskID), currentAttempts+1, triggerAttempts, reason)
+
+		recordPipelineEvent(ctx, h.database, "task_diagnostic_ceiling", taskID, modelID, "",
+			map[string]any{
+				"attempts":       currentAttempts + 1,
+				"trigger":        triggerAttempts,
+				"reason":         reason,
+				"failed_models":  len(failedModels),
+				"prompt_suspect": isPromptSuspect,
+			})
+		return
+	}
+
+	// Below ceiling: normal retry path
 	accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
 	h.database.RPC(ctx, "transition_task", map[string]any{
 		"p_task_id":        taskID,
 		"p_new_status":     "pending",
 		"p_failure_reason": reason,
 	})
-	log.Printf("[TaskHandler] Task %s failed: %s → pending (excluding model %s)", truncateID(taskID), reason, modelID)
+	log.Printf("[TaskHandler] Task %s failed: %s → pending (attempt %d/%d, excluding model %s)",
+		truncateID(taskID), reason, currentAttempts+1, triggerAttempts, modelID)
 }
 
 func (h *TaskHandler) buildBranchName(sliceID, taskNumber, taskID string) string {
