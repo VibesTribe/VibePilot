@@ -172,6 +172,10 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 		})
 		if nextStatus == "human_review" {
 			log.Printf("[Testing] Task %s → HUMAN_REVIEW (ui_ux task, awaiting human approval)", truncateID(taskID))
+			// Create review JSON file for dashboard visibility
+			if err := h.createReviewFile(ctx, taskID, task); err != nil {
+				log.Printf("[Testing] Failed to create review file for task %s: %v", truncateID(taskID), err)
+			}
 		} else {
 			log.Printf("[Testing] Task %s → COMPLETE (testing passed)", truncateID(taskID))
 		}
@@ -1124,4 +1128,99 @@ func (h *TestingHandler) getExecutorModelID(ctx context.Context, taskID string) 
 
 	modelID, _ := runs[0]["model_id"].(string)
 	return modelID
+}
+
+// createReviewFile creates a review JSON file in the vibeflow repo for dashboard visibility
+// when a task enters human_review status.
+func (h *TestingHandler) createReviewFile(ctx context.Context, taskID string, task map[string]any) error {
+	// Get task details needed for the review file
+	taskNumber := getString(task, "task_number")
+	title := getString(task, "title")
+	branchName := getString(task, "branch_name")
+	sliceID := getString(task, "slice_id")
+	
+	// Try to get preview URL from task result or other fields
+	previewURL := ""
+	resultJSON := getString(task, "result")
+	if resultJSON != "" {
+		var resultMap map[string]any
+		if json.Unmarshal([]byte(resultJSON), &resultMap) == nil {
+			if url, ok := resultMap["preview_url"]; ok {
+				if str, ok := url.(string); ok {
+					previewURL = str
+				}
+			}
+			if url, ok := resultMap["diff_url"]; ok {
+				if str, ok := url.(string); ok && previewURL == "" {
+					previewURL = str
+				}
+			}
+			if url, ok := resultMap["comparison_url"]; ok {
+				if str, ok := url.(string); ok && previewURL == "" {
+					previewURL = str
+				}
+			}
+		}
+	}
+	
+	// If no preview URL in result, try to construct from worktree
+	if previewURL == "" && branchName != "" {
+		previewURL = fmt.Sprintf("https://vibestribe.rocks/%s/%s", branchName, taskNumber)
+	}
+	
+	// Create the review file content matching what useReviewData expects
+	reviewData := map[string]any{
+		"task_id":   taskID,
+		"review":    "pending", // Matches the human_review task status
+		"notes":     "",
+		"updated_at": time.Now().Format(time.RFC3339),
+		"branch":    branchName,
+		"preview_url": previewURL,
+		"task_number": taskNumber,
+		"title":     title,
+		"slice_id":  sliceID,
+	}
+	
+	// Convert to JSON
+	jsonData, err := json.MarshalIndent(reviewData, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal review data: %w", err)
+	}
+	
+	// Write to managed repo's vibeflow clone
+	reviewFilePath := filepath.Join(h.cfg.GetRepoPath(), "data", "state", "reviews", taskID+".json")
+	
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(reviewFilePath), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+	
+	// Write the file
+	if err := os.WriteFile(reviewFilePath, jsonData, 0644); err != nil {
+		return fmt.Errorf("failed to write review file: %w", err)
+	}
+	
+	log.Printf("[Testing] Created review file for task %s at %s", truncateID(taskID), reviewFilePath)
+	
+	// Commit and push the change via managed repo
+	if err := h.commitAndPushReviewFile(ctx, taskID); err != nil {
+		return fmt.Errorf("failed to commit and push review file: %w", err)
+	}
+	
+	return nil
+}
+
+// commitAndPushReviewFile commits and pushes the review file to GitHub
+func (h *TestingHandler) commitAndPushReviewFile(ctx context.Context, taskID string) error {
+	// Use the managed repo's git functionality
+	reviewFilePath := filepath.Join("data", "state", "reviews", taskID+".json")
+
+	// Add, commit, and push the file using Gitree's CommitAndPush
+	commitMsg := fmt.Sprintf("review: create review file for task %s", taskID)
+	if err := h.git.CommitAndPush(ctx, reviewFilePath, commitMsg); err != nil {
+		return fmt.Errorf("git commit and push failed: %w", err)
+	}
+
+	log.Printf("[Testing] Committed and pushed review file for task %s", truncateID(taskID))
+	return nil
 }

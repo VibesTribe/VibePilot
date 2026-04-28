@@ -252,6 +252,35 @@ The orchestrator/router is fully config-driven via `routing.json` (free_cascade 
 - No auto-discovery of new free models from providers (research agent handles daily landscape checks)
 - See docs/CURRENT_ISSUES.md for full details
 
+## Human Review Workflow Status (Updated 2026-04-27)
+✅ **Fix #1: Governor creates review JSON files on human_review** - IMPLEMENTED
+  - Modified: `governor/cmd/governor/handlers_testing.go`
+  - Added `createReviewFile()` function that generates JSON files in `data/state/reviews/{task_id}.json` when ui_ux tasks enter human_review status
+  - Added `commitAndPushReviewFile()` using Gitree's CommitAndPush for atomic Git operations
+  - Status: Code written, requires `go build ./cmd/governor/` verification and service restart
+
+✅ **Fix #2: approve_review.yml calls governor /api/task/review** - ALREADY COMPLETE
+  - Verified: `vibeflow/.github/workflows/approve_review.yml` contains curl step to notify governor on approval
+
+✅ **Fix #3: request_changes.yml calls governor /api/task/review** - ALREADY COMPLETE  
+  - Verified: `vibeflow/.github/workflows/request_changes.yml` contains equivalent curl step for rejection
+
+⏳ **Fix #4: Stale webhook mapper cleanup** - PENDING (low priority)
+  - Location: `governor/internal/webhooks/server.go`
+  - Action: Remove/align outdated Supabase-style webhook mapper
+
+### End-to-End Flow Verification
+Once Fix #1 builds successfully:
+1. ui_ux task completes testing → status = human_review
+2. Governor creates `{task_id}.json` with `review: "pending"` in `data/state/reviews/`
+3. Governor commits/pushes to GitHub via managed repo
+4. Dashboard detects file → shows in Mission Control with "Review Now" button
+5. User approves/rejects → GitHub Actions workflow updates JSON + pushes
+6. Workflow calls `POST /api/task/review` with `{task_id, action: "approve"/"reject"}`
+7. Governor transitions task via DB → complete (approve) or pending (reject)
+
+Zero dashboard changes required - respects "sacred territory" constraint.
+
 ## Learning System (FIXED 2026-04-27, commit 0f65f686)
 All learning RPCs now wired into handlers:
 - **Supervisor rules**: `record_supervisor_rule` + `create_rule_from_rejection` called on supervisor fail/needs_revision
