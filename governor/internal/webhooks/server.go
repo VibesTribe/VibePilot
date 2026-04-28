@@ -304,7 +304,7 @@ func (s *Server) mapToEventType(payload *Payload) string {
 		case status == "testing":
 			return string(runtime.EventTaskTesting)
 		case status == "complete":
-			return string(runtime.EventTaskCompleted)
+			return string(runtime.EventTaskApproval)
 		}
 
 	case table == "plans":

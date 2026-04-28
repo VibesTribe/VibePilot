@@ -139,6 +139,35 @@ var defaultRPCAllowlist = map[string]bool{
 	// Courier result handling
 	"record_courier_result":     true,
 	"update_courier_task_run":   true,
+
+	// Cost calculation
+	"calc_run_costs": true,
+
+	// Model learning (migration 078+)
+	"update_model_learning": true,
+
+	// Memory system (migration 084+)
+	"store_memory":  true,
+	"recall_memories": true,
+
+	// Context building
+	"get_slice_task_info": true,
+	"add_bookmark":       true,
+
+	// Analyst (migration 079+)
+	"get_model_performance": true,
+	"get_failure_patterns":  true,
+
+	// Planner learning reinforcement
+	"record_planner_rule_prevented_issue": true,
+
+	// Supervisor learning from rejections
+	"create_rule_from_rejection": true,
+
+	// Maintenance (migration pending)
+	"get_change_approvals":            true,
+	"queue_maintenance_command":       true,
+	"update_maintenance_command_status": true,
 }
 
 type RPCAllowlist struct {

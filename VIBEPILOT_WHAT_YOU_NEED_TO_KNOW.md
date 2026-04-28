@@ -76,9 +76,9 @@ VibePilot was designed from the dashboard backwards. **If the dashboard isn't sh
 
 ### ⛔ STOP. READ THIS. ⛔
 
-**You WILL need to access Supabase or GitHub during this session. Here's EXACTLY how to do it without wasting 30% of your context window.**
+**You WILL need to access the database during this session. The database is LOCAL PostgreSQL, NOT Supabase (cut off April 24). Here's EXACTLY how to do it without wasting 30% of your context window.**
 
-### The Vault System
+### The Database System
 
 VibePilot uses a **two-tier credential system**:
 
@@ -780,8 +780,8 @@ governor/
 │   │   └── test_runner.go # Test execution
 │   │
 │   ├── db/                # Database layer
-│   │   ├── supabase.go    # Client
-│   │   ├── rpc.go         # RPC allowlist
+│   │   ├── postgres.go    # PostgreSQL client (local PG, not Supabase)
+│   │   ├── rpc.go         # RPC allowlist (101 entries)
 │   │   └── state.go       # DB state tracking
 │   │
 │   ├── runtime/           # Agent runtime
@@ -870,7 +870,7 @@ governor/
 | `governor/internal/runtime/router.go` | Routing logic (SelectRouting) |
 | `governor/internal/dag/engine.go` | DAG execution engine |
 | `governor/internal/gitree/gitree.go` | Git branch + worktree management (isolated worktrees per parallel agent) |
-| `governor/internal/db/supabase.go` | Database client |
+| `governor/internal/db/postgres.go` | PostgreSQL client (local PG) |
 | `governor/config/pipelines/code-pipeline.yaml` | YAML DAG pipeline definition |
 | `governor/config/models.json` | Model definitions |
 | `governor/config/connectors.json` | Connector definitions |
@@ -908,7 +908,11 @@ governor/
 **Key RPCs:**
 - `claim_next_task(courier, platform, model_id)` - Atomically claim task
 - `update_task_status(task_id, status)` - Update task status
-- `unlock_dependent_tasks(completed_task_id)` - Unlock waiting tasks
+- `unlock_dependent_tasks(completed_task_id)` - Unlock waiting tasks (sets locked/pending → available)
+- `set_processing(p_table, p_id, p_processing_by)` - Claim any record atomically
+- `transition_task(p_task_id, p_new_status)` - Status transition with JSONB merge
+
+**RPC Allowlist:** 101 entries in `internal/db/rpc.go`. Any RPC not in this list is silently rejected at runtime. If adding a new RPC call, MUST add to allowlist first.
 
 ---
 
@@ -998,7 +1002,7 @@ cd ~/VibePilot && git add docs/prd/test-feature.md && git commit -m "prd: [featu
 - **NEVER poll Supabase** - Realtime subscriptions only (polling nearly killed the project)
 - **No hardcoding** - Everything in config files
 - **GitHub = Code source of truth**
-- **Supabase = State source of truth**
+- **PostgreSQL = State source of truth** (local, not Supabase — cut off April 24)
 - **User service, not system** - `systemctl --user`, not `sudo systemctl`
 - **Cloud free tiers = primary** — Multiple providers, free and near-free. Counts change, see CURRENT_STATE.md.
 - **Token counting = client-side** - Never trust external counts
@@ -1076,7 +1080,9 @@ curl http://localhost:8080/api/dashboard/stream
 ### Task Statuses (THESE ARE THE ONLY VALID TASK STATUSES)
 
 ```
-pending        Task created, in orchestrator queue
+available      Task created with no dependencies, ready to claim immediately
+pending        Task created with dependencies, waiting for deps to complete
+locked         Task claimed/processing by an agent
 in_progress    Orchestrator assigned to model, executing
 received       Courier/web agent returned results
 review         Supervisor reviewing output quality
@@ -1093,8 +1099,10 @@ human_review   Awaiting human decision (visual UI/UX, researcher suggestions aft
 ### Task Status Flow
 
 ```
-pending → in_progress → received → review → testing → complete → merge_pending → merged
-               ↘ failed (with notes → back to pending for intelligent reassignment)
+available → in_progress → received → review → testing → complete → merge_pending → merged
+pending → (dep completes → available) → in_progress → ...
+                ↘ locked (claimed by agent)
+                ↘ failed (with notes → back to pending for intelligent reassignment)
 
 Visual/UI/UX tasks take a different path after testing:
 testing → human_review (human must approve before merge) → complete → merge_pending → merged

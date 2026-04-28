@@ -43,7 +43,8 @@
     "response_timeout_seconds": 30
   },
   "execution": {
-    "default_timeout_seconds": 300
+    "default_timeout_seconds": 300,
+    "review_timeout_seconds": 120
   },
   "session": {
     "default_timeout_seconds": 300

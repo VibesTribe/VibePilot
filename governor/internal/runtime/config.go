@@ -157,6 +157,7 @@ type HTTPConfig struct {
 // ExecutionConfig configures default execution timeouts.
 type ExecutionConfig struct {
 	DefaultTimeoutSeconds int `json:"default_timeout_seconds"`
+	ReviewTimeoutSeconds  int `json:"review_timeout_seconds"`  // supervisor review timeout (default 120)
 }
 
 // SessionConfig configures session-level timeouts.
