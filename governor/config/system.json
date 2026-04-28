@@ -64,7 +64,8 @@
     "max_concurrent_total": 4,
     "agent_timeout_seconds": 300,
     "max_tool_turns": 10,
-    "max_retries": 5
+    "max_retries": 5,
+    "repo_sync_interval_seconds": 300
   },
   "concurrency": {
     "limits": {
