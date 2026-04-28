@@ -44,7 +44,8 @@
   },
   "execution": {
     "default_timeout_seconds": 300,
-    "review_timeout_seconds": 120
+    "review_timeout_seconds": 120,
+    "diagnostic_trigger_attempts": 2
   },
   "session": {
     "default_timeout_seconds": 300

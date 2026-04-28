@@ -156,8 +156,9 @@ type HTTPConfig struct {
 
 // ExecutionConfig configures default execution timeouts.
 type ExecutionConfig struct {
-	DefaultTimeoutSeconds int `json:"default_timeout_seconds"`
-	ReviewTimeoutSeconds  int `json:"review_timeout_seconds"`  // supervisor review timeout (default 120)
+	DefaultTimeoutSeconds    int `json:"default_timeout_seconds"`
+	ReviewTimeoutSeconds     int `json:"review_timeout_seconds"`     // supervisor review timeout (default 120)
+	DiagnosticTriggerAttempts int `json:"diagnostic_trigger_attempts"` // attempts before stopping retry (default 2)
 }
 
 // SessionConfig configures session-level timeouts.
@@ -1027,6 +1028,18 @@ func (c *Config) GetMaxRetries() int {
 		return 5 // sensible default
 	}
 	return c.System.Runtime.MaxRetries
+}
+
+// GetDiagnosticTriggerAttempts returns the number of task attempts before
+// the system stops blindly retrying and surfaces the task for diagnosis.
+// Default 2: after 2 failures, stop and figure out WHY.
+func (c *Config) GetDiagnosticTriggerAttempts() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.System == nil || c.System.Execution == nil || c.System.Execution.DiagnosticTriggerAttempts <= 0 {
+		return 2
+	}
+	return c.System.Execution.DiagnosticTriggerAttempts
 }
 
 func (c *Config) GetRepoSyncIntervalSeconds() int {

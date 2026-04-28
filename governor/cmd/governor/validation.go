@@ -162,13 +162,13 @@ func createTasksFromApprovedPlan(ctx context.Context, database db.Database, plan
 		var routingFlag string
 		var routingReason string
 
-		if task.RequiresCodebase || len(task.Dependencies) > 0 {
+		// Only tasks that need direct codebase access MUST be internal.
+		// Web agents can't read local files - they only get prompt context.
+		// Dependencies don't require internal: previous output is in the prompt packet.
+		// Everything else: empty routing_flag = router decides (web first, internal fallback).
+		if task.RequiresCodebase {
 			routingFlag = "internal"
-			if task.RequiresCodebase {
-				routingReason = "requires codebase access"
-			} else {
-				routingReason = fmt.Sprintf("has %d dependencies", len(task.Dependencies))
-			}
+			routingReason = "requires codebase access"
 		}
 
 		// Tasks with no dependencies are immediately available for dispatch.
