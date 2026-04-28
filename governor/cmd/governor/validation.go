@@ -171,7 +171,13 @@ func createTasksFromApprovedPlan(ctx context.Context, database db.Database, plan
 			}
 		}
 
-		status := "pending"
+		// Tasks with no dependencies are immediately available for dispatch.
+		// Tasks with dependencies stay 'pending' until unlock_dependent_tasks
+		// flips them to 'available' when all deps complete.
+		status := "available"
+		if len(task.Dependencies) > 0 {
+			status = "pending"
+		}
 
 		maxAttempts := 3
 		if cfg != nil && cfg.DefaultMaxAttempts > 0 {

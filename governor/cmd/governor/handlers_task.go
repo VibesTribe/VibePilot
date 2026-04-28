@@ -489,7 +489,10 @@ func (h *TaskHandler) executeTask(
 
 	// Build execution result for supervisor review
 	// Commit output to branch and get ACTUAL files from disk
-	actualFiles, _ := h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds(), worktreePath)
+	actualFiles, commitErr := h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds(), worktreePath)
+	if commitErr != nil {
+		log.Printf("[TaskAvailable] WARNING: commitOutput failed for %s: %v — proceeding with parsed files", truncateID(taskID), commitErr)
+	}
 
 	// Build executionResult from actual disk files, not parsed stdout.
 	// This is the truth that supervisor and testers will review.
@@ -666,7 +669,10 @@ func (h *TaskHandler) executeCourierTask(
 	}
 
 	// Commit output to branch and get ACTUAL files from disk
-	actualFiles, _ := h.commitOutput(ctx, branchName, files, output, summary, modelID, taskID, duration.Seconds(), worktreePath)
+	actualFiles, commitErr := h.commitOutput(ctx, branchName, files, output, summary, modelID, taskID, duration.Seconds(), worktreePath)
+	if commitErr != nil {
+		log.Printf("[CourierTask] WARNING: commitOutput failed for %s: %v — proceeding with parsed files", truncateID(taskID), commitErr)
+	}
 
 	// Build the file list from disk scan (truth), falling back to parsed files
 	diskFileList := func() []map[string]any {
@@ -939,7 +945,11 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		reviewStart := time.Now()
 
 		// Run synchronously — supervisor review is fast, no need for pool submission
-		reviewCtx, reviewCancel := context.WithTimeout(ctx, 2*time.Minute)
+		reviewTimeout := 2 * time.Minute
+		if h.cfg != nil && h.cfg.System.Execution != nil && h.cfg.System.Execution.ReviewTimeoutSeconds > 0 {
+			reviewTimeout = time.Duration(h.cfg.System.Execution.ReviewTimeoutSeconds) * time.Second
+		}
+		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
 		reviewInput := map[string]any{
 			"event":       "task_review",
 			"task_packet": taskPacket,

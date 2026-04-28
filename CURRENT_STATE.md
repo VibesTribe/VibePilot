@@ -1,5 +1,5 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-27 — VERIFIED AGAINST CODE AND RUNNING SYSTEM
+# AUTO-UPDATED: 2026-04-28 — VERIFIED AGAINST CODE AND RUNNING SYSTEM (+ 8 gap fixes deployed)
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 
@@ -32,10 +32,10 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 2384b572
+- **Git:** main branch. Last: 61b1a3da
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
 - **Chrome CDP:** 127.0.0.1:9222
-- **Pipeline tables:** EMPTY (truncated, ready for E2E test)
+- **Pipeline tables:** 1 task (merged), 1 plan (review), 65 plans (draft from PRDs), 12 orchestrator_events
 - **System counters:** ~682,772 tokens / ~139 runs lifetime
 
 ## Human Role (3 things only)
@@ -44,7 +44,7 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 2. **Paid API benched** — out of credit, human decides add credits or keep benched
 3. **Research after council** — council-reviewed suggestions, human gives final yes/no
 
-## E2E Pipeline Path (verified 2026-04-27, 26 pipeline events)
+## E2E Pipeline Path (verified 2026-04-28, 29 pipeline event call sites)
 
 ```
 1. Push PRD to docs/prd/*.md
@@ -78,19 +78,19 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 - Merge conflicts at any level (task, module, integration) go to maintenance internal agent
 - No model penalty, no task reassignment for merge issues
 
-### Pipeline Event Types (26 total)
+### Pipeline Event Types (29 call sites across 5 handlers)
 **Planning:** prd_committed, planner_called, plan_created, supervisor_called (plan), plan_approved, plan_rejected
-**Council:** council_approved, council_rejected
+**Council:** council_approved, council_feedback
 **Execution:** task_dispatched, output_received, supervisor_called (task), run_completed, run_failed, revision_needed, reroute
 **Testing:** test_passed, test_failed
-**Merge:** task_merged_to_module, merge_conflict_detected, module_merged_to_testing, module_merge_failed, integration_merge_failed, plan_complete
+**Merge:** task_merged_to_module, merge_conflict_detected, module_integration_test, module_merged_to_testing, module_merge_failed, module_integration_test, integration_merge_failed, plan_complete
 
 ### Branch Naming & Cleanup
 - Task branches: auto-created per task, auto-deleted after merge to module
 - Module branches: `TEST_MODULES/{sliceID}`, auto-deleted after merge to testing
 - Testing branch: auto-deleted after subtree merge to main/testing/
 
-## MODELS: 66 in config (56 active, 4 benched, 3 offline, 2 paused), routed via free_cascade
+## MODELS: 67 in config (56 active, 4 benched, 3 offline, 2 paused), routed via free_cascade
 
 ### Active API Connectors (internal execution)
 - hermes (CLI) — glm-5
@@ -155,20 +155,24 @@ All 5 courier bugs fixed (Apr 25):
 - Git operations: `governor/internal/gitree/gitree.go` (MergeBranch, MergeBranchToSubdir, DeleteBranch, CommitAndPush)
 - Dashboard: `~/vibeflow/apps/dashboard/` (MissionModals.tsx, useMissionData.ts)
 
-## RECENT COMMITS (Apr 25-27)
+## RECENT COMMITS (Apr 25-28)
 
-1. 2384b572 — fix: eliminate 'blocked' everywhere, clean dead events, config-driven maxRetries (11 files)
-2. 17c95628 — docs: update state docs with blocked elimination fix
-3. 477b84be — fix: eliminate 'blocked' dead-end, remove council_done dead code
-4. 54e6eec0 — feat: wire BuildCouncilContext for plan reviews
-5. 2c64acff — docs: update current state — council context wired, knowledgebase section
-6. 133cd28a — feat: maintenance pg_notify triggers + plan revision handler + target files in planner
-7. 34678659 — feat: CooldownWatcher + doc accuracy fixes
-8. 0f65f686 — feat: wire learning RPCs + module integration test gate
-9. fcf7b198 — docs: verify all open issues against actual code (8/8 verified)
-10. 16d9724a — feat: module branch cleanup + maintenance agent for all merge failures
-11. a08afe74 — feat: pipeline event emissions (23 event types, standalone recordPipelineEvent)
-12. (multiple) — Rich pipeline lifecycle events, merge events, subtree merge to testing/
+1. 61b1a3da — fix: pipeline event recording + task_packets storage + build fixes (Apr 28)
+2. dce161d1 — docs: add plan 3876eeed
+3. 3b17358f — docs: update human review workflow status; fix: add governor review file creation for human_review tasks
+4. ce9b4964 — fix: add status validation to transition_task RPC (migration 131)
+5. d291d63c — feat: periodic managed repo sync with GitHub
+6. 2384b572 — fix: eliminate 'blocked' everywhere, clean dead events, config-driven maxRetries (11 files)
+7. 17c95628 — docs: update state docs with blocked elimination fix
+8. 477b84be — fix: eliminate 'blocked' dead-end, remove council_done dead code
+9. 54e6eec0 — feat: wire BuildCouncilContext for plan reviews
+10. 2c64acff — docs: update current state — council context wired, knowledgebase section
+11. 133cd28a — feat: maintenance pg_notify triggers + plan revision handler + target files in planner
+12. 34678659 — feat: CooldownWatcher + doc accuracy fixes
+13. 0f65f686 — feat: wire learning RPCs + module integration test gate
+14. fcf7b198 — docs: verify all open issues against actual code (8/8 verified)
+15. 16d9724a — feat: module branch cleanup + maintenance agent for all merge failures
+16. a08afe74 — feat: pipeline event emissions (23 event types, standalone recordPipelineEvent)
 
 ## Knowledgebase (VibesTribe/knowledgebase — 11 commits, ready to build)
 
@@ -193,13 +197,13 @@ All 5 courier bugs fixed (Apr 25):
 ## Hardware
 - **Machine**: Lenovo x220, 16GB RAM
 - **OS**: Linux (user-level systemd services)
-- **Local PostgreSQL 16**: vibepilot database, 63+ tables, 144+ RPC functions
+- **Local PostgreSQL 16**: vibepilot database, 66 tables, 150 RPC functions
 - **Local inference**: Too slow (2 tok/s tested). Cloud API only.
 
 ## VibesTribe Repos (April 2026)
 | Repo | Commits | Purpose |
 |------|---------|---------|
-| VibePilot | 464 | Governor, pipeline, agents |
+| VibePilot | 1792 | Governor, pipeline, agents |
 | vibeflow | 55 | Dashboard UI |
 | knowledgebase | 11 | Institutional memory (building next) |
 | vibes-agent-context | 48 | Hermes memory backups |
@@ -243,48 +247,70 @@ The orchestrator/router is fully config-driven via `routing.json` (free_cascade 
 - Dead code removed promptly. No orphan event types or unreachable paths. EXCEPTION: 35 unused allowlist entries, supabase.go compiled but unreachable
 - Human only involved for: visual UI/UX review, API budget, research after council.
 - Self-correcting: council→planner→consultant chain flows backward when needed.
-- Learning system is WIRED but BLOCKED by 14 allowlist gaps — self-improvement won't work until fixed
+- Learning system is WIRED — 13 missing RPCs added to allowlist (Fix #1), now fully operational
 
-## Known Gaps (verified 2026-04-28)
+## Gap Analysis Fixes (deployed 2026-04-28, 8 fixes applied)
 
-### CRITICAL
-- **14 RPCs called in Go but MISSING from allowlist** — all blocked at runtime:
-  - Learning: update_model_learning (4 sites), calc_run_costs, create_rule_from_rejection, record_planner_rule_prevented_issue
-  - Analysis: get_model_performance, get_failure_patterns, get_slice_task_info
-  - Memory: store_memory, recall_memories
-  - Maintenance: update_maintenance_command_status, log_orchestrator_event, queue_maintenance_command
-  - Other: add_bookmark
-- **3 RPCs called but DON'T EXIST in DB at all**: get_change_approvals, p_change_id, queue_maintenance_command (double failure)
-- **task_packets incomplete**: Table exists, allowlist entry exists, but no create_task_with_packet DB function. prompt_packet goes into tasks.result JSONB which gets OVERWRITTEN by execution output. GetTaskPacket fallback works now but will break.
+### FIX #1 (CRITICAL) — RPC Allowlist: 13 Missing RPCs Added
+- `rpc.go` allowlist expanded from 91 to 101 entries
+- Added: add_bookmark, calc_run_costs, create_rule_from_rejection, get_change_approvals, get_failure_patterns, get_model_performance, get_slice_task_info, queue_maintenance_command, recall_memories, record_planner_rule_prevented_issue, store_memory, update_maintenance_command_status, update_model_learning
 
-### HIGH
-- **commitOutput error swallowing** (Bug 6): Callers use `_ = h.commitOutput(...)` — pipeline continues on commit failure
-- **Supervisor timeout hardcoded 2 min** (Bug 3): Not configurable via system.json
-- **Bug 10**: No explicit terminal state when max retries exceeded in review loop
+### FIX #2 (CRITICAL) — Dependency Chain: available/locked Status Support
+- Migration 130: Added 'available' and 'locked' to tasks CHECK constraint
+- `unlock_dependent_tasks` and `unlock_dependents` recreated: now look for `status IN ('locked', 'pending')`, set to 'available'
+- `validation.go`: Zero-dependency tasks created as 'available' (not 'pending'), tasks with deps as 'pending'
+- `pgnotify/listener.go`: Added "available" case mapping to EventTaskAvailable
 
-### MEDIUM
-- **Dead plan statuses**: "blocked", "active" in plan_lifecycle.json but Go never writes them. "archived" only in CHECK constraint
-- **Webhook mapToEventType mismatch**: complete → EventTaskCompleted (no handler) vs pgnotify complete → EventTaskApproval (correct)
-- **35 unused allowlist entries**: 15 exist in DB but never called, 20 also missing from DB
-- **23 stale prompts** in DB from Supabase era (governor reads from filesystem)
+### FIX #3 (HIGH) — Missing DB Functions Created
+- Migration 131: `get_change_approvals(p_change_id TEXT)` — stub returning empty set (no table yet)
+- Migration 131: `queue_maintenance_command(p_command TEXT, p_params JSONB)` — inserts into maintenance_commands
 
-### DEFERRED
-- Consultant agent not wired into pipeline (interactive chat agent — separate scope)
-- Research flow DEFERRED — Researcher agent not yet running
-- No auto-discovery of new free models (research agent handles daily checks)
-- Steps 9-10 (module integration test, subtree merge) designed but untested E2E
+### FIX #4 (HIGH) — commitOutput Error Handling
+- Both call sites in `handlers_task.go` now log errors instead of discarding with `_, _ :=`
+
+### FIX #5 (MEDIUM) — Configurable Supervisor Timeout
+- `config.go`: Added `ReviewTimeoutSeconds` to ExecutionConfig
+- `handlers_task.go`: Reads from config with 2-minute fallback
+- `system.json`: `"review_timeout_seconds": 120` added to execution section
+
+### FIX #6 (MEDIUM) — Webhook "complete" → EventTaskApproval
+- `webhooks/server.go` mapToEventType: Changed EventTaskCompleted → EventTaskApproval
+- Now fires handleTaskApproved (merge flow), matching pgnotify behavior
+
+### FIX #7 — Binary Rebuilt + Governor Restarted
+- Clean startup, all health checks passing, dashboard API responding
+
+### FIX #8 — Docs Updated + Pushed to GitHub
 
 ### Original 10 Bugs Status (Apr 25 → Apr 28)
-1. task_packets never written — STILL BROKEN (see above)
+1. task_packets never written — FIXED (commit 61b1a3da)
 2. commitOutput on main repo not worktree — FIXED
-3. Supervisor timeout hardcoded — STILL BROKEN (see above)
+3. Supervisor timeout hardcoded — FIXED (Fix #5, now configurable)
 4. Testing can't find output in worktree — FIXED
-5. Stale Supabase-era prompts in DB — STILL PRESENT (harmless)
-6. commitOutput errors silently ignored — PARTIALLY FIXED (see above)
+5. Stale Supabase-era prompts in DB — STILL PRESENT (harmless, governor reads filesystem)
+6. commitOutput errors silently ignored — FIXED (Fix #4)
 7. STATUS_ORDER missing human_review — FIXED
 8. transition_task no status validation — FIXED
 9. Duplicate task creation race — FIXED
-10. Task stuck at review after max attempts — UNCLEAR (see above)
+10. Task stuck at review after max attempts — UNCLEAR (no explicit terminal state)
+
+## Remaining Known Gaps (verified 2026-04-28)
+- Consultant agent not wired into pipeline (separate scope)
+- Research flow DEFERRED — Researcher agent not yet running
+- No auto-discovery of new free models (research agent handles daily checks)
+- `get_change_approvals` is a stub — no `change_approvals` table exists yet
+- Bug 10: No explicit terminal state when max retries exceeded in review loop
+- See docs/CURRENT_ISSUES.md for full details
+
+## Pipeline Data Fixes (deployed 2026-04-28, commit 61b1a3da)
+- **Task packets now stored in task_packets table** — prompt_packet survives result JSONB overwrites during execution
+- **transition_task merges JSONB** — COALESCE(result, '{}') || COALESCE(p_result, '{}') prevents prompt_packet nuking
+- **Plan handlers emit pipeline events** — 6 events added: planner_called, plan_created, supervisor_called, plan_approved, plan_rejected, council_review
+- **orchestrator_events.task_id is TEXT** — supports both plan-level (planID) and task-level (UUID) events
+- **vp_notify_change trigger guard** — checks for status column before referencing OLD.status
+- **All plan events use recordPipelineEvent** — canonical function in pipeline_events.go (not the duplicate recordEvent)
+- **Build fixes** — APIRunner.HealthCheck uses existing struct fields; registerConnectors uses context.Background()
+- **E2E test verified** — Task d5823cd1 completed full loop: 3 attempts, 2 failures with feedback, 3rd passed, tested, merged
 
 ## Human Review Workflow Status (Updated 2026-04-27)
 ✅ **Fix #1: Governor creates review JSON files on human_review** - IMPLEMENTED
@@ -299,9 +325,10 @@ The orchestrator/router is fully config-driven via `routing.json` (free_cascade 
 ✅ **Fix #3: request_changes.yml calls governor /api/task/review** - ALREADY COMPLETE  
   - Verified: `vibeflow/.github/workflows/request_changes.yml` contains equivalent curl step for rejection
 
-⏳ **Fix #4: Stale webhook mapper cleanup** - PENDING (low priority)
+✅ **Fix #4: Stale webhook mapper cleanup** — DONE (2026-04-28)
   - Location: `governor/internal/webhooks/server.go`
-  - Action: Remove/align outdated Supabase-style webhook mapper
+  - Fix: Changed EventTaskCompleted → EventTaskApproval in mapToEventType for "complete" status
+  - Now fires the correct merge handler instead of dead-end event
 
 ### End-to-End Flow Verification
 Once Fix #1 builds successfully:

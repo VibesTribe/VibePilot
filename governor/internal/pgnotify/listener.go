@@ -162,6 +162,8 @@ func (l *Listener) mapEvent(p notifyPayload) *runtime.Event {
 			return nil
 		}
 		switch {
+		case p.Status == "available":
+			eventType = runtime.EventTaskAvailable
 		case p.Status == "pending" && p.Action == "INSERT":
 			eventType = runtime.EventTaskAvailable
 		case p.Status == "pending" && p.Action == "UPDATE":
