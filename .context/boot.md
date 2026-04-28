@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-27T19:01:09Z | Commit: fcf7b198 | Branch: main
+# Generated: 2026-04-28T19:53:53Z | Commit: dce161d1 | Branch: 
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -171,7 +171,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Codebase Structure (auto-discovered)
 - governor/cmd/cleanup/ (1 files, 1 funcs, 0 types)
 - governor/cmd/encrypt_secret/ (1 files, 1 funcs, 0 types)
-- governor/cmd/governor/ (17 files, 142 funcs, 15 types)
+- governor/cmd/governor/ (17 files, 146 funcs, 15 types)
 - governor/cmd/migrate_vault/ (1 files, 5 funcs, 1 types)
 - governor/cmd/vault_encrypt/ (1 files, 1 funcs, 0 types)
 - governor/internal/connectors/ (2 files, 28 funcs, 9 types)
@@ -184,7 +184,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
 - governor/internal/memory/ (2 files, 19 funcs, 5 types)
 - governor/internal/pgnotify/ (1 files, 4 funcs, 3 types)
-- governor/internal/runtime/ (14 files, 239 funcs, 108 types)
+- governor/internal/runtime/ (15 files, 250 funcs, 110 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 20 funcs, 4 types)
@@ -222,8 +222,8 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Service Info
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
-- Branch: main
-- Commit: fcf7b198
+- Branch: 
+- Commit: dce161d1
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -270,5 +270,5 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 16d9724a
+- **Git:** main branch. Last: 2384b572
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)

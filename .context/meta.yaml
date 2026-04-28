@@ -1,9 +1,9 @@
 # Auto-generated. DO NOT EDIT.
-commit: fcf7b198
-branch: main
-generated: 2026-04-27T19:01:09Z
-boot_md_bytes: 15257
-map_md_bytes: 65732
+commit: dce161d1
+branch: 
+generated: 2026-04-28T19:53:53Z
+boot_md_bytes: 15249
+map_md_bytes: 66505
 has_index_db: true
 has_knowledge_db: true
 indexes:

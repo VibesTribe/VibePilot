@@ -337,18 +337,18 @@ func (r *APIRunner) Run(ctx context.Context, prompt string, timeout int) (string
 	}
 }
 
-// HealthCheck verifies the connector endpoint and API key are valid
-// by sending a minimal request. Implements runtime.HealthChecker.
+// HealthCheck verifies the connector's endpoint and API key are valid
+// by sending a minimal 1-token request. Implements runtime.HealthChecker.
 func (r *APIRunner) HealthCheck(ctx context.Context) error {
 	const healthCheckPrompt = "Reply with exactly: ok"
-	const healthTimeout = 15
+	const healthTimeout = 15 // seconds
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(healthTimeout)*time.Second)
 	defer cancel()
 
 	_, _, _, err := r.Run(ctx, healthCheckPrompt, healthTimeout)
 	if err != nil {
-		return fmt.Errorf("health check failed for %s (%s): %w", r.endpoint, r.provider, err)
+		return fmt.Errorf("health check failed for %s/%s (%s): %w", r.provider, r.model, r.endpoint, err)
 	}
 	return nil
 }

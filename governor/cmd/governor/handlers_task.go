@@ -1469,18 +1469,17 @@ func (h *TaskHandler) recordModelLearning(ctx context.Context, modelID, taskType
 	})
 }
 
-// recordEvent writes to orchestrator_events for the dashboard timeline.
-// The dashboard reads: event_type (maps to type), reason (maps to reasonCode),
-// details JSONB, task_id, model_id, created_at.
-// event_type "failure" marks task quality as "fail" in deriveQualityMap.
-func (h *TaskHandler) recordEvent(ctx context.Context, eventType, taskID, modelID, reason string, details map[string]any) {
+// recordEvent is a standalone function that writes pipeline events to orchestrator_events.
+// Available to ALL handlers (plan, task, council, testing, maintenance) -- not just TaskHandler.
+// The dashboard reads: event_type, reason, details JSONB, task_id, model_id, created_at.
+func recordEvent(ctx context.Context, database db.Database, eventType, taskID, modelID, reason string, details map[string]any) {
 	eventDetails := details
 	if eventDetails == nil {
 		eventDetails = map[string]any{}
 	}
 	eventDetails["model_id"] = modelID
 
-	_, err := h.database.Insert(ctx, "orchestrator_events", map[string]any{
+	_, err := database.Insert(ctx, "orchestrator_events", map[string]any{
 		"event_type": eventType,
 		"task_id":    taskID,
 		"model_id":   modelID,
@@ -1488,8 +1487,13 @@ func (h *TaskHandler) recordEvent(ctx context.Context, eventType, taskID, modelI
 		"details":    eventDetails,
 	})
 	if err != nil {
-		log.Printf("[recordEvent] Failed to write event: %v", err)
+		log.Printf("[recordEvent] Failed to write %s event: %v", eventType, err)
 	}
+}
+
+// recordEvent delegates to the standalone function for backward compat with existing callers.
+func (h *TaskHandler) recordEvent(ctx context.Context, eventType, taskID, modelID, reason string, details map[string]any) {
+	recordEvent(ctx, h.database, eventType, taskID, modelID, reason, details)
 }
 
 func (h *TaskHandler) saveCheckpoint(ctx context.Context, taskID, step string, progress int, output string, files []string) {
