@@ -1,5 +1,5 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-28 — VERIFIED AGAINST CODE AND RUNNING SYSTEM (+ output pipeline fix 4a94a00f)
+# AUTO-UPDATED: 2026-04-29 — VERIFIED AGAINST CODE AND RUNNING SYSTEM (+ cost tracking overhaul)
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 
@@ -32,11 +32,12 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 4a94a00f
+- **Git:** main branch. Last: 670698fd (VibePilot), a0ee1fc82 (Vibeflow)
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
 - **Chrome CDP:** 127.0.0.1:9222
 - **Pipeline tables:** 1 task (merged), 1 plan (review), 65 plans (draft from PRDs), 12 orchestrator_events
-- **System counters:** ~682,772 tokens / ~139 runs lifetime
+- **System counters:** ~689,120 tokens / ~143 runs lifetime
+- **Cost tracking:** Phase 1-4 complete. Every model touch now records task_run rows with cost data.
 
 ## Human Role (3 things only)
 
@@ -155,14 +156,19 @@ All 5 courier bugs fixed (Apr 25):
 - Git operations: `governor/internal/gitree/gitree.go` (MergeBranch, MergeBranchToSubdir, DeleteBranch, CommitAndPush)
 - Dashboard: `~/vibeflow/apps/dashboard/` (MissionModals.tsx, useMissionData.ts)
 
-## RECENT COMMITS (Apr 25-28)
+## RECENT COMMITS (Apr 25-29)
 
-1. 4a94a00f — fix: supervisor sees everything on branch, multi-strategy parser, one prompt template (Apr 28)
-2. b4cf7f1e — fix: 5 fragilities + E2E test + diagnostic ceiling + web-first routing + transition_task SOT (Apr 28)
-3. 61b1a3da — fix: pipeline event recording + task_packets storage + build fixes (Apr 28)
-4. dce161d1 — docs: add plan 3876eeed
-5. 3b17358f — docs: update human review workflow status; fix: add governor review file creation for human_review tasks
-6. ce9b4964 — fix: add status validation to transition_task RPC (migration 131)
+1. 670698fd — chore: update migration 132 with record_internal_run RPC (Apr 29)
+2. e22f1e99 — feat: per-task full cost tracking - Phase 2 (Apr 29)
+3. 6d37581f — feat: cost tracking data foundation - Phase 1 (Apr 29)
+4. c323d640 — feat: analyst agent for diagnostic ceiling (Apr 28)
+5. b347f866 — fix: items 2-7 from gap analysis cleanup (Apr 28)
+6. 4a94a00f — fix: supervisor sees everything on branch, multi-strategy parser, one prompt template (Apr 28)
+7. b4cf7f1e — fix: 5 fragilities + E2E test + diagnostic ceiling + web-first routing + transition_task SOT (Apr 28)
+
+### Vibeflow Commits
+1. a0ee1fc82 — feat: header alerts banner for subscription/credit threshold warnings - Phase 4 (Apr 29)
+2. 7613e19a7 — feat: cost tracking dashboard overhaul - Phase 3 (Apr 29)
 
 ## Knowledgebase (VibesTribe/knowledgebase — 11 commits, ready to build)
 
@@ -181,8 +187,44 @@ All 5 courier bugs fixed (Apr 25):
 - **Groq**: Free tier
 - **Gemini**: 4x free tier (no billing on any project)
 - **NVIDIA NIM**: Free tier
-- **GLM-5 (Hermes layer)**: Z.AI Pro subscription, ends May 1, 2026. NOT renewing at $90/3mo.
-- **Total API cost**: $0/month (all free tiers)
+- **GLM-5 (Hermes layer)**: Z.AI Pro subscription, EXPIRES APR 30, 2026. $45/3mo grandfathered rate DEAD. New price $200/3mo.
+  - 786.6M tokens consumed over 3 months = $1,439.56 at API rates = 3,099% ROI
+  - Decision needed: Z.AI ($200/3mo) vs DeepSeek V4 Flash (~$51/mo) vs DeepSeek V4 Pro (~$160/mo discounted until May 31)
+- **Total project spend**: ~$135 across all platforms over ~6 months
+- **Total API cost going forward**: $0/month (all free tiers) unless GLM-5 replacement chosen
+
+## Cost Tracking System (deployed 2026-04-29)
+
+### Data Foundation (Phase 1, commit 6d37581f)
+- `subscription_history` table: tracks all subscriptions, persists when archived
+- `project_snapshots` table: archive/clear functionality for project totals
+- `task_runs` new columns: `role`, `token_source`, `total_actual_cost_usd`
+- `tasks` new columns: `total_tokens_in`, `total_tokens_out`, `total_cost_usd`, `total_api_equivalent_usd`, `model_count`
+- GLM-5 history seeded: $45, 786.6M tokens, 3,099% ROI
+
+### Per-Task Tracking (Phase 2, commit e22f1e99)
+- `record_internal_run` RPC: creates task_run rows for planner, supervisor, analyst model calls
+- Token estimation for web platforms: ~4 chars/token when API doesn't report counts
+- `aggregate_task_costs` RPC called on task completion to sum all runs into task totals
+- Webhook sites: planner (handlers_plan.go), supervisor (handlers_task.go), analyst (handlers_task.go)
+- Courier result handler estimates tokens from output length when counts are 0
+
+### Dashboard Overhaul (Phase 3, commit 7613e19a7)
+- ROI panel reordered: Project-to-Date → Slices → Models → Subscriptions → Session
+- Subscription History section with archived subscription display
+- Header token pill toggles between "Live" and "Project" mode on click
+- EventTone type expanded with "warning" for alert events
+
+### Alerting (Phase 4, commit a0ee1fc82)
+- Header alerts banner polls `/api/project/alerts` every 60s
+- Shows subscription expiry and credit threshold warnings
+- GLM-5 already flagged: "2 days remaining"
+
+### USD/CAD Converter
+- Present in RoiPanel (MissionModals.tsx): USD | CAD toggle buttons
+- Defaults to 1.36, fetches live rate from governor DB (exchange_rates table) then exchangerate-api.com fallback
+- Every dollar amount in ROI panel converts when toggled
+- Exchange rate in DB: 1.36 USD/CAD, seeded 2026-02-16, source="seed"
 
 ## Hardware
 - **Machine**: Lenovo x220, 16GB RAM
@@ -306,7 +348,10 @@ The task agent works on ONE task, ONE branch, ONE worktree. `git diff --name-onl
 - Stale Supabase-era prompts in DB rows (harmless, governor reads filesystem)
 - CooldownWatcher pollInterval hardcoded 2 min
 - managed_repo.go email hardcoded governor@vibepilot.dev
-- Z.AI Pro subscription expires ~May 1 — GLM-5 will need replacement
+- **GLM-5 Z.AI subscription expires Apr 30** — decision needed on replacement
+- **Debug console.logs in MissionModals.tsx CAD toggle** — need cleanup next session
+- **ROI calculator math** — user says it needs work, positioning changes pending
+- **task_runs was empty before Phase 2** — new wiring needs E2E proof with real task data
 
 ## Pipeline Data Fixes (deployed 2026-04-28, commit 61b1a3da)
 - **Task packets now stored in task_packets table** — prompt_packet survives result JSONB overwrites during execution

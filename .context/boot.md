@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-04-29T06:00:01Z | Commit: e22f1e99 | Branch: main
+# Generated: 2026-04-29T06:48:43Z | Commit: 670698fd | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -223,7 +223,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: e22f1e99
+- Commit: 670698fd
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -243,7 +243,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-28 — VERIFIED AGAINST CODE AND RUNNING SYSTEM (+ output pipeline fix 4a94a00f)
+# AUTO-UPDATED: 2026-04-29 — VERIFIED AGAINST CODE AND RUNNING SYSTEM (+ cost tracking overhaul)
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 ## Three Sources of Truth
@@ -270,5 +270,5 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 4a94a00f
+- **Git:** main branch. Last: 670698fd (VibePilot), a0ee1fc82 (Vibeflow)
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
