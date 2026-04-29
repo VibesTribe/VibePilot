@@ -118,6 +118,8 @@ func main() {
 		MainBranch:        cfg.GetDefaultMergeTarget(),
 		ProtectedBranches: cfg.GetProtectedBranches(),
 		Timeout:           time.Duration(cfg.GetGitTimeoutSeconds()) * time.Second,
+		GitUserEmail:      cfg.GetGitUserEmail(),
+		GitUserName:       cfg.GetGitUserName(),
 	})
 	if err != nil {
 		log.Fatalf("Failed to bootstrap managed repo for %s/%s: %v", repoOwner, repoName, err)

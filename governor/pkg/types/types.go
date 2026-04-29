@@ -8,7 +8,6 @@ type TaskStatus string
 
 const (
 	StatusPending       TaskStatus = "pending"
-	StatusLocked        TaskStatus = "locked"
 	StatusAvailable     TaskStatus = "available"
 	StatusInProgress    TaskStatus = "in_progress"
 	StatusReview        TaskStatus = "review"
@@ -17,8 +16,6 @@ const (
 	StatusApproval      TaskStatus = "approval"
 	StatusMergePending  TaskStatus = "merge_pending"
 	StatusMerged        TaskStatus = "merged"
-	StatusEscalated     TaskStatus = "escalated"
-	StatusAwaitingHuman TaskStatus = "awaiting_human"
 )
 
 type RoutingFlag string
