@@ -172,6 +172,13 @@ var defaultRPCAllowlist = map[string]bool{
 	"get_change_approvals":            true,
 	"queue_maintenance_command":       true,
 	"update_maintenance_command_status": true,
+
+	// Project costs (ROI overhead tracking)
+	"add_project_cost":       true,
+	"update_project_cost":    true,
+	"archive_project_cost":   true,
+	"list_project_costs":     true,
+	"get_project_cost_summary": true,
 }
 
 type RPCAllowlist struct {
