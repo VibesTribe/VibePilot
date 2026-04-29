@@ -140,8 +140,11 @@ var defaultRPCAllowlist = map[string]bool{
 	"record_courier_result":     true,
 	"update_courier_task_run":   true,
 
-	// Cost calculation
-	"calc_run_costs": true,
+	// Cost calculation & ROI (migration 132+)
+	"calc_run_costs":              true,
+	"aggregate_task_costs":        true,
+	"check_subscription_thresholds": true,
+	"create_project_snapshot":     true,
 
 	// Model learning (migration 078+)
 	"update_model_learning": true,

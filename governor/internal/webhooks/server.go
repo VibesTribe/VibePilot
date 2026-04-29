@@ -137,6 +137,9 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/courier/result", s.handleCourierResult)
 	mux.HandleFunc("/api/vault/", s.handleVaultAPI)
 	mux.HandleFunc("/api/task/review", s.handleTaskReview)
+	mux.HandleFunc("/api/project/snapshot", s.handleProjectSnapshot)
+	mux.HandleFunc("/api/project/history", s.handleProjectHistory)
+	mux.HandleFunc("/api/project/alerts", s.handleProjectAlerts)
 
 
 	s.server = &http.Server{
@@ -451,6 +454,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"failure_records", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"maintenance_commands", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"system_counters", nil},
+		{"subscription_history", map[string]any{"order": "created_at.desc", "limit": 100}},
+		{"project_snapshots", map[string]any{"order": "created_at.desc", "limit": 50}},
 	}
 
 	results := make(chan tableResult, len(tables))
@@ -870,4 +875,87 @@ func (s *Server) handleTaskReview(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Invalid action: must be approve or reject", http.StatusBadRequest)
 	}
+}
+
+// handleProjectSnapshot creates a named snapshot of current project state.
+// POST with {"label": "my snapshot"} returns the snapshot data.
+// DELETE with {"id": "uuid"} removes a snapshot.
+func (s *Server) handleProjectSnapshot(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	switch r.Method {
+	case http.MethodPost:
+		var req struct {
+			Label string `json:"label"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if req.Label == "" {
+			req.Label = fmt.Sprintf("snapshot-%s", time.Now().Format("2006-01-02-1504"))
+		}
+		snapID, err := s.db.RPC(ctx, "create_project_snapshot", map[string]any{
+			"p_label": req.Label,
+		})
+		if err != nil {
+			log.Printf("[Project] Snapshot failed: %v", err)
+			http.Error(w, "Failed to create snapshot", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[Project] Snapshot created: %s (%s)", req.Label, snapID)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "id": snapID, "label": req.Label})
+
+	case http.MethodGet:
+		// Return all snapshots
+		data, err := s.db.Query(ctx, "project_snapshots", map[string]any{
+			"order": "created_at.desc",
+			"limit": 50,
+		})
+		if err != nil {
+			http.Error(w, "Failed to query snapshots", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
+
+	default:
+		http.Error(w, "GET or POST only", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleProjectHistory returns archived subscription history.
+func (s *Server) handleProjectHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "GET only", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx := r.Context()
+	data, err := s.db.Query(ctx, "subscription_history", map[string]any{
+		"order": "created_at.desc",
+		"limit": 100,
+	})
+	if err != nil {
+		http.Error(w, "Failed to query history", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+}
+
+// handleProjectAlerts returns current subscription/credit threshold alerts.
+func (s *Server) handleProjectAlerts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "GET only", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx := r.Context()
+	data, err := s.db.RPC(ctx, "check_subscription_thresholds", map[string]any{})
+	if err != nil {
+		http.Error(w, "Failed to check thresholds", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(fmt.Sprintf(`{"alerts": %s}`, data)))
 }
