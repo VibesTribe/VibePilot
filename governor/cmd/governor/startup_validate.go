@@ -91,7 +91,7 @@ func validatePromptsDir(configDir string) int {
 	}
 
 	// Check for essential prompt files
-	essential := []string{"planner.md", "supervisor.md", "task_runner_simple.md"}
+	essential := []string{"planner.md", "supervisor.md", "task_runner_simple.md", "analyst.md"}
 	missing := []string{}
 	for _, f := range essential {
 		if _, err := os.Stat(filepath.Join(promptsDir, f)); err != nil {

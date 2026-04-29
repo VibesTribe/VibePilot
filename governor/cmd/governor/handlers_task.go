@@ -1266,35 +1266,17 @@ func (h *TaskHandler) failTask(ctx context.Context, taskID, modelID, branchName,
 	// After next increment (transition_task increments on pending), total will be currentAttempts+1
 	// Check if we've hit the diagnostic ceiling
 	if currentAttempts+1 >= triggerAttempts {
-		// DIAGNOSTIC CEILING HIT: Stop blind retry.
-		// Surface to human_review with accumulated diagnostic info.
-		failedModels := parseFailedModels(reason)
-		isPromptSuspect := isPromptSuspect(reason)
-
-		diagnosticNotes := fmt.Sprintf(
-			"DIAGNOSTIC: Task hit ceiling after %d attempts. Reason: %s. Failed models: %d. Prompt suspect: %v.",
-			currentAttempts+1, reason, len(failedModels), isPromptSuspect,
-		)
-
-		// Accumulate this model into the exclusion list so the notes are complete
+		// DIAGNOSTIC CEILING HIT: Call analyst agent to reason backwards through failures.
 		accumulateFailedModel(ctx, h.database, taskID, "exec_failed_by", modelID)
-
-		h.database.RPC(ctx, "transition_task", map[string]any{
-			"p_task_id":        taskID,
-			"p_new_status":     "human_review",
-			"p_failure_reason": diagnosticNotes,
-		})
-		log.Printf("[TaskHandler] Task %s hit diagnostic ceiling (%d attempts, trigger=%d): %s → human_review",
-			truncateID(taskID), currentAttempts+1, triggerAttempts, reason)
 
 		recordPipelineEvent(ctx, h.database, "task_diagnostic_ceiling", taskID, modelID, "",
 			map[string]any{
-				"attempts":       currentAttempts + 1,
-				"trigger":        triggerAttempts,
-				"reason":         reason,
-				"failed_models":  len(failedModels),
-				"prompt_suspect": isPromptSuspect,
+				"attempts": currentAttempts + 1,
+				"trigger":  triggerAttempts,
+				"reason":   reason,
 			})
+
+		h.runAnalystDiagnosis(ctx, taskID, modelID, currentAttempts+1, reason)
 		return
 	}
 
@@ -1307,6 +1289,196 @@ func (h *TaskHandler) failTask(ctx context.Context, taskID, modelID, branchName,
 	})
 	log.Printf("[TaskHandler] Task %s failed: %s → pending (attempt %d/%d, excluding model %s)",
 		truncateID(taskID), reason, currentAttempts+1, triggerAttempts, modelID)
+}
+
+// runAnalystDiagnosis calls the analyst agent when a task hits the diagnostic ceiling.
+// The analyst reasons backwards through all failed attempts to identify root cause
+// and routes the task to the right agent with fix instructions.
+func (h *TaskHandler) runAnalystDiagnosis(ctx context.Context, taskID, lastModelID string, attemptCount int, lastReason string) {
+	log.Printf("[Analyst] Task %s hit ceiling (%d attempts). Calling analyst for backwards reasoning.", truncateID(taskID), attemptCount)
+
+	// Gather all context the analyst needs
+	taskData, _ := h.database.Query(ctx, "tasks", map[string]any{
+		"id": taskID,
+	})
+	var tasks []map[string]any
+	var task map[string]any
+	if json.Unmarshal(taskData, &tasks) == nil && len(tasks) > 0 {
+		task = tasks[0]
+	}
+
+	// Get original prompt packet
+	packetData, _ := h.database.Query(ctx, "task_packets", map[string]any{
+		"task_id": taskID,
+		"order":   "version.desc",
+		"limit":   1,
+	})
+	var packets []map[string]any
+	var promptPacket map[string]any
+	if json.Unmarshal(packetData, &packets) == nil && len(packets) > 0 {
+		promptPacket = packets[0]
+	}
+
+	// Get ALL task runs (every attempt with model, result, error)
+	runsData, _ := h.database.Query(ctx, "task_runs", map[string]any{
+		"task_id": taskID,
+		"order":   "started_at.asc",
+	})
+	var taskRuns []map[string]any
+	json.Unmarshal(runsData, &taskRuns)
+
+	// Get pipeline events for this task
+	eventsData, _ := h.database.Query(ctx, "orchestrator_events", map[string]any{
+		"task_id": taskID,
+		"order":   "created_at.asc",
+	})
+	var events []map[string]any
+	json.Unmarshal(eventsData, &events)
+
+	// Build analyst input
+	analystInput := map[string]any{
+		"event":         "diagnostic_analysis",
+		"task":          task,
+		"prompt_packet": promptPacket,
+		"attempts":      taskRuns,
+		"failure_notes": getString(task, "failure_notes"),
+		"events":        events,
+		"last_reason":   lastReason,
+		"attempt_count": attemptCount,
+	}
+
+	// Route to analyst model
+	routingResult, routeErr := h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+		Role:        "analyst",
+		TaskType:    "diagnosis",
+		RoutingFlag: "internal",
+	})
+	if routeErr != nil || routingResult == nil {
+		log.Printf("[Analyst] No model available for analyst diagnosis of %s. Falling back to pending with diagnostic notes.", truncateID(taskID))
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": fmt.Sprintf("ANALYST_UNAVAILABLE: Task stuck after %d attempts. Last reason: %s", attemptCount, lastReason),
+		})
+		return
+	}
+
+	session, sessErr := h.factory.CreateWithConnector(ctx, "analyst", "diagnosis", routingResult.ConnectorID)
+	if sessErr != nil {
+		log.Printf("[Analyst] Session creation failed for %s: %v. Falling back to pending.", truncateID(taskID), sessErr)
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": fmt.Sprintf("ANALYST_SESSION_FAILED: %v", sessErr),
+		})
+		return
+	}
+
+	// Run analyst with generous timeout -- diagnosis needs reasoning time
+	analystCtx, analystCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer analystCancel()
+
+	sessionResult, runErr := session.Run(analystCtx, analystInput)
+	if runErr != nil {
+		log.Printf("[Analyst] Run failed for %s: %v. Falling back to pending.", truncateID(taskID), runErr)
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": fmt.Sprintf("ANALYST_RUN_FAILED: %v", runErr),
+		})
+		return
+	}
+
+	// Parse the analyst's decision from the output
+	analystResult := sessionResult.Output
+
+	// Try to parse as JSON object first
+	decision, parseErr := runtime.ParseAnalystDecision(analystResult)
+	if parseErr != nil {
+		log.Printf("[Analyst] Parse failed for %s: %v. Falling back to pending.", truncateID(taskID), parseErr)
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": fmt.Sprintf("ANALYST_PARSE_FAILED: %s", analystResult[:200]),
+		})
+		return
+	}
+
+	h.routeAnalystDecision(ctx, taskID, decision, sessionResult.AgentID)
+}
+
+// routeAnalystDecision takes the analyst's diagnosis and routes the task accordingly.
+func (h *TaskHandler) routeAnalystDecision(ctx context.Context, taskID string, decision *runtime.AnalystDecision, analystModelID string) {
+	log.Printf("[Analyst] Diagnosis for %s: root_cause=%s, route_to=%s, confidence=%.2f",
+		truncateID(taskID), decision.RootCause, decision.Fix.RouteTo, decision.Confidence)
+	log.Printf("[Analyst] Reasoning: %s", decision.Reasoning)
+
+	// Record the analyst's diagnosis as a pipeline event
+	recordPipelineEvent(ctx, h.database, "analyst_diagnosis", taskID, analystModelID, "",
+		map[string]any{
+			"root_cause":     decision.RootCause,
+			"reasoning":      decision.Reasoning,
+			"what_went_wrong": decision.WhatWentWrong,
+			"route_to":       decision.Fix.RouteTo,
+			"confidence":     decision.Confidence,
+		})
+
+	switch decision.Fix.RouteTo {
+	case "task_runner":
+		// Re-queue with revised prompt additions and excluded models
+		routingReason := fmt.Sprintf("ANALYST: %s. Fix: %s", decision.RootCause, decision.Reasoning)
+		if decision.Fix.RevisedPromptAdditions != "" {
+			routingReason += ". Prompt additions: " + decision.Fix.RevisedPromptAdditions
+		}
+		// Exclude failed models
+		excluded := decision.Fix.ModelExclude
+		if len(excluded) > 0 {
+			for _, m := range excluded {
+				accumulateFailedModel(ctx, h.database, taskID, "analyst_excluded", m)
+			}
+		}
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": routingReason,
+		})
+		log.Printf("[Analyst] Task %s → pending with analyst guidance (root_cause=%s)", truncateID(taskID), decision.RootCause)
+
+	case "planner":
+		// Route back to planner -- task spec needs revision
+		plannerNotes := fmt.Sprintf("ANALYST_ROUTED: Task stuck after failures. Root cause: %s. %s. Suggested fix: %s",
+			decision.RootCause, decision.Reasoning, decision.WhatWentWrong)
+		if decision.Fix.TaskSplitSuggestion != "" {
+			plannerNotes += ". Split suggestion: " + decision.Fix.TaskSplitSuggestion
+		}
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": plannerNotes,
+		})
+		log.Printf("[Analyst] Task %s → pending for planner revision (root_cause=%s)", truncateID(taskID), decision.RootCause)
+
+	case "reroute":
+		// Same task, different model
+		for _, m := range decision.Fix.ModelExclude {
+			accumulateFailedModel(ctx, h.database, taskID, "analyst_excluded", m)
+		}
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": fmt.Sprintf("ANALYST_REROUTE: %s. %s", decision.RootCause, decision.Reasoning),
+		})
+		log.Printf("[Analyst] Task %s → pending for reroute (root_cause=%s)", truncateID(taskID), decision.RootCause)
+
+	default:
+		// Unknown route -- safest path is pending with notes
+		log.Printf("[Analyst] Unknown route_to '%s' for %s. Defaulting to pending with diagnostic notes.", decision.Fix.RouteTo, truncateID(taskID))
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "pending",
+			"p_failure_reason": fmt.Sprintf("ANALYST_DIAGNOSIS: %s. %s", decision.RootCause, decision.Reasoning),
+		})
+	}
 }
 
 func (h *TaskHandler) buildBranchName(sliceID, taskNumber, taskID string) string {
