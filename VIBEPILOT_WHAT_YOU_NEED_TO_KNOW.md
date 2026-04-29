@@ -289,7 +289,11 @@ Fix the Go code that writes to PostgreSQL.
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 6. SUPERVISOR REVIEWS OUTPUT                                │
-│    - Checks output against task prompt + expected output    │
+│    - Sees EVERYTHING on the task branch (git diff main)     │
+│    - Compares original prompt vs actual deliverables        │
+│    - Handles any output type: code, video, images, docs     │
+│    - Binary files shown as [binary file, N bytes]           │
+│    - Model judges quality, not regex                        │
 │    - Approve → testing                                      │
 │    - Reject → back to task runner with feedback             │
 │    - Supervisor owns ALL output review                      │
