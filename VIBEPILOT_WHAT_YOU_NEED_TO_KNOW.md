@@ -30,6 +30,7 @@ A global, massively scalable, multilingual, multimedia social media platform whe
 - **Network:** Phone USB tethered (wifi chip died during repaste), planning ethernet + headless
 - **Architecture:** Config-driven plug-and-play modules, YAML DAG pipeline
 - **Model Strategy:** Cloud free tier cascade across multiple providers. Counts change frequently — see `CURRENT_STATE.md` for verified numbers. Providers include Groq, OpenRouter (free + low-cost), Gemini (4 independent Google Cloud projects = 60 RPM free), NVIDIA NIM. Local inference too slow on this hardware (tested, 2 tok/s).
+- **Cost Tracking System:** Every model touch recorded in task_runs with exact/estimated tokens and cost data. Web platforms estimate ~4 chars/token. Header token pill toggles between Live/Project mode. Subscription history persisted. GLM-5: $45 for 786.6M tokens (3,099% ROI). Decision needed: Z.AI ($200/3mo) vs DeepSeek V4 Flash (~$51/mo) vs DeepSeek V4 Pro (~$160/mo discounted).
 - **Config/DB Sync:** Research findings write to config/models.json AND PostgreSQL atomically via `ResearchActionApplier`. No LLM middleman. Both sources stay in sync automatically.
 - **Dashboard:** https://vibeflow-dashboard.vercel.app/ (sacred, Vercel auto-deploy)
 - **Tunnel:** vibestribe.rocks via cloudflared (sacred, don't touch)
