@@ -19,10 +19,12 @@ import (
 // If it exists, it fetches and hard-resets to main. No shared state with
 // anything else on the system.
 type ManagedRepo struct {
-	gitree     *Gitree
-	repoURL    string // e.g. https://github.com/VibesTribe/VibePilot
-	localPath  string // e.g. /home/vibes/.governor/repos/VibesTribe-VibePilot
-	githubToken string
+	gitree       *Gitree
+	repoURL      string // e.g. https://github.com/VibesTribe/VibePilot
+	localPath    string // e.g. /home/vibes/.governor/repos/VibesTribe-VibePilot
+	githubToken  string
+	gitUserEmail string
+	gitUserName  string
 }
 
 // ManagedRepoConfig configures a self-bootstrapping git repo.
@@ -41,6 +43,9 @@ type ManagedRepoConfig struct {
 	ProtectedBranches []string
 	// Timeout for git operations.
 	Timeout time.Duration
+	// GitUserEmail and GitUserName for commits. Defaults to governor@vibepilot.dev / VibePilot Governor.
+	GitUserEmail string
+	GitUserName  string
 	// WorktreeBasePath is where task worktrees are created.
 	// Defaults to DataDir/worktrees/{owner}-{repo}/.
 	WorktreeBasePath string
@@ -80,7 +85,9 @@ func NewManagedRepo(ctx context.Context, cfg ManagedRepoConfig) (*ManagedRepo, e
 	mr := &ManagedRepo{
 		repoURL:     repoURL,
 		localPath:   localPath,
-		githubToken: cfg.GitHubToken,
+		githubToken:  cfg.GitHubToken,
+		gitUserEmail: cfg.GitUserEmail,
+		gitUserName:  cfg.GitUserName,
 	}
 
 	// Bootstrap: clone if needed, fetch+reset if exists
@@ -290,6 +297,14 @@ func (mr *ManagedRepo) configureAuth(ctx context.Context) {
 	cmd.Run()
 
 	// Configure git user for commits (required for push)
-	exec.CommandContext(ctx, "git", "config", "user.email", "governor@vibepilot.dev").Run()
-	exec.CommandContext(ctx, "git", "config", "user.name", "VibePilot Governor").Run()
+	email := mr.gitUserEmail
+	if email == "" {
+		email = "governor@vibepilot.dev"
+	}
+	name := mr.gitUserName
+	if name == "" {
+		name = "VibePilot Governor"
+	}
+	exec.CommandContext(ctx, "git", "config", "user.email", email).Run()
+	exec.CommandContext(ctx, "git", "config", "user.name", name).Run()
 }

@@ -187,6 +187,8 @@ type GitConfig struct {
 	DataDir            string              `json:"data_dir"`
 	WorktreeBasePath   string              `json:"worktree_base_path"`
 	BranchPrefixes     *BranchPrefixConfig `json:"branch_prefixes"`
+	GitUserEmail       string              `json:"git_user_email"`
+	GitUserName        string              `json:"git_user_name"`
 }
 
 type BranchPrefixConfig struct {
@@ -883,6 +885,20 @@ func (c *Config) GetRemoteName() string {
 		return "origin"
 	}
 	return c.System.Git.RemoteName
+}
+
+func (c *Config) GetGitUserEmail() string {
+	if c.System == nil || c.System.Git.GitUserEmail == "" {
+		return "" // defaults handled in ManagedRepo
+	}
+	return c.System.Git.GitUserEmail
+}
+
+func (c *Config) GetGitUserName() string {
+	if c.System == nil || c.System.Git.GitUserName == "" {
+		return "" // defaults handled in ManagedRepo
+	}
+	return c.System.Git.GitUserName
 }
 
 func (c *Config) GetGitHubOwner() string {
