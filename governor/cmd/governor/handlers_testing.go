@@ -178,6 +178,13 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			}
 		} else {
 			log.Printf("[Testing] Task %s → COMPLETE (testing passed)", truncateID(taskID))
+
+			// Aggregate all task_run costs into the task record
+			if _, err := h.database.RPC(ctx, "aggregate_task_costs", map[string]any{
+				"p_task_id": taskID,
+			}); err != nil {
+				log.Printf("[Testing] Failed to aggregate costs for %s: %v", truncateID(taskID), err)
+			}
 		}
 
 		// Unlock dependents now — task is done (human_review is still "done" from dependency perspective).

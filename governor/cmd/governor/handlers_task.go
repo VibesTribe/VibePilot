@@ -990,6 +990,21 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 	// Compact session for context history
 	h.factory.Compact(ctx, result, taskID)
 
+	// Record supervisor model invocation as a task_run for cost tracking
+	if supervisorModelID != "" {
+		if _, err := h.database.RPC(ctx, "record_internal_run", map[string]any{
+			"p_task_id":      taskID,
+			"p_model_id":     supervisorModelID,
+			"p_role":         "supervisor",
+			"p_status":       "success",
+			"p_tokens_in":    result.TokensIn,
+			"p_tokens_out":   result.TokensOut,
+			"p_token_source": "exact",
+		}); err != nil {
+			log.Printf("[TaskReview] Failed to record supervisor run for %s: %v", truncateID(taskID), err)
+		}
+	}
+
 	decision, parseErr := runtime.ParseSupervisorDecision(result.Output)
 	if parseErr != nil {
 		log.Printf("[TaskReview] Parse error for %s: %v, retrying...", truncateID(taskID), parseErr)
@@ -1387,6 +1402,21 @@ func (h *TaskHandler) runAnalystDiagnosis(ctx context.Context, taskID, lastModel
 			"p_failure_reason": fmt.Sprintf("ANALYST_RUN_FAILED: %v", runErr),
 		})
 		return
+	}
+
+	// Record analyst model invocation as a task_run for cost tracking
+	if routingResult != nil && routingResult.ModelID != "" {
+		if _, err := h.database.RPC(ctx, "record_internal_run", map[string]any{
+			"p_task_id":      taskID,
+			"p_model_id":     routingResult.ModelID,
+			"p_role":         "analyst",
+			"p_status":       "success",
+			"p_tokens_in":    sessionResult.TokensIn,
+			"p_tokens_out":   sessionResult.TokensOut,
+			"p_token_source": "exact",
+		}); err != nil {
+			log.Printf("[Analyst] Failed to record run for %s: %v", truncateID(taskID), err)
+		}
 	}
 
 	// Parse the analyst's decision from the output

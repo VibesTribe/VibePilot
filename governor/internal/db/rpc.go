@@ -145,6 +145,7 @@ var defaultRPCAllowlist = map[string]bool{
 	"aggregate_task_costs":        true,
 	"check_subscription_thresholds": true,
 	"create_project_snapshot":     true,
+	"record_internal_run":         true,
 
 	// Model learning (migration 078+)
 	"update_model_learning": true,

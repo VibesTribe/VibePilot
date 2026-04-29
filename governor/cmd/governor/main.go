@@ -353,6 +353,14 @@ func main() {
 				return fmt.Errorf("parse courier result: %w", err)
 			}
 
+			// Estimate tokens from output if courier didn't report exact counts
+			// (web platforms like ChatGPT/Gemini web don't expose token counts)
+			if record.TokensIn == 0 && record.TokensOut == 0 && len(record.Output) > 0 {
+				// ~4 chars per token for GPT-style tokenizers
+				record.TokensOut = len(record.Output) / 4
+				log.Printf("[CourierResult] Estimated %d output tokens for %s (no exact counts from platform)", record.TokensOut, taskID)
+			}
+
 			// Write to task_runs table
 			resultJSON, _ := json.Marshal(map[string]any{
 				"output":     record.Output,
