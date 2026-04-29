@@ -197,3 +197,46 @@ BEGIN
     RETURN v_snapshot_id;
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- 11. RPC: record_internal_run - records an internal model invocation (planner, supervisor, analyst)
+-- as a task_run with cost calculation. For web platforms, tokens can be estimated from output length.
+CREATE OR REPLACE FUNCTION record_internal_run(
+    p_task_id UUID,
+    p_model_id TEXT,
+    p_role TEXT DEFAULT 'executor',
+    p_status TEXT DEFAULT 'success',
+    p_tokens_in INT DEFAULT 0,
+    p_tokens_out INT DEFAULT 0,
+    p_token_source TEXT DEFAULT 'exact'
+) RETURNS UUID AS $$
+DECLARE
+    v_run_id UUID;
+    v_cost_result JSONB;
+BEGIN
+    INSERT INTO task_runs (
+        task_id, courier, platform, model_id, status, 
+        tokens_in, tokens_out, role, token_source, 
+        started_at, completed_at
+    ) VALUES (
+        p_task_id, 'internal', 'internal', p_model_id, p_status,
+        p_tokens_in, p_tokens_out, p_role, p_token_source,
+        now(), now()
+    ) RETURNING id INTO v_run_id;
+
+    SELECT * INTO v_cost_result FROM calc_run_costs(
+        p_model_id, p_tokens_in, p_tokens_out, 0
+    );
+
+    UPDATE task_runs SET
+        platform_theoretical_cost_usd = COALESCE((v_cost_result->>'theoretical_cost_usd')::DOUBLE PRECISION, 0),
+        total_actual_cost_usd = 0,
+        courier_cost_usd = 0,
+        total_savings_usd = COALESCE((v_cost_result->>'savings_usd')::DOUBLE PRECISION, 0)
+    WHERE id = v_run_id;
+
+    PERFORM increment_lifetime_counters(p_tokens_in + p_tokens_out, 0);
+
+    RETURN v_run_id;
+END;
+$$ LANGUAGE plpgsql;
