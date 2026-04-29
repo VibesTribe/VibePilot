@@ -140,7 +140,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/project/snapshot", s.handleProjectSnapshot)
 	mux.HandleFunc("/api/project/history", s.handleProjectHistory)
 	mux.HandleFunc("/api/project/alerts", s.handleProjectAlerts)
-
+	mux.HandleFunc("/api/project-costs", s.handleProjectCosts)
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
@@ -454,7 +454,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"failure_records", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"maintenance_commands", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"system_counters", nil},
-		{"subscription_history", map[string]any{"order": "created_at.desc", "limit": 100}},
+		{"project_costs", map[string]any{"order": "incurred_at.desc", "limit": 200}},
+		{"subscription_history", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"project_snapshots", map[string]any{"order": "created_at.desc", "limit": 50}},
 	}
 
@@ -958,4 +959,108 @@ func (s *Server) handleProjectAlerts(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(fmt.Sprintf(`{"alerts": %s}`, data)))
+}
+
+// handleProjectCosts handles add/archive of project cost entries
+func (s *Server) handleProjectCosts(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+	ctx := r.Context()
+
+	switch r.Method {
+	case http.MethodPost:
+		var req struct {
+			Action      string  `json:"action"` // "add", "archive", "update"
+			ID          string  `json:"id"`
+			Category    string  `json:"category"`
+			Description string  `json:"description"`
+			AmountUSD   float64 `json:"amount_usd"`
+			Frequency   string  `json:"frequency"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"bad request"}`, http.StatusBadRequest)
+			return
+		}
+
+		switch req.Action {
+		case "add":
+			if req.Description == "" || req.AmountUSD <= 0 {
+				http.Error(w, `{"error":"description and amount_usd required"}`, http.StatusBadRequest)
+				return
+			}
+			if req.Category == "" {
+				req.Category = "other"
+			}
+			if req.Frequency == "" {
+				req.Frequency = "one_time"
+			}
+			result, err := s.db.RPC(ctx, "add_project_cost", map[string]any{
+				"p_category":    req.Category,
+				"p_description": req.Description,
+				"p_amount_usd":  req.AmountUSD,
+				"p_frequency":   req.Frequency,
+			})
+			if err != nil {
+				log.Printf("[ProjectCosts] Add failed: %v", err)
+				http.Error(w, `{"error":"internal"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Write(result)
+
+		case "archive":
+			if req.ID == "" {
+				http.Error(w, `{"error":"id required"}`, http.StatusBadRequest)
+				return
+			}
+			_, err := s.db.RPC(ctx, "archive_project_cost", map[string]any{
+				"p_id": req.ID,
+			})
+			if err != nil {
+				log.Printf("[ProjectCosts] Archive failed: %v", err)
+				http.Error(w, `{"error":"internal"}`, http.StatusInternalServerError)
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]bool{"archived": true})
+
+		case "update":
+			if req.ID == "" {
+				http.Error(w, `{"error":"id required"}`, http.StatusBadRequest)
+				return
+			}
+			params := map[string]any{"p_id": req.ID}
+			if req.Category != "" {
+				params["p_category"] = req.Category
+			}
+			if req.Description != "" {
+				params["p_description"] = req.Description
+			}
+			if req.AmountUSD > 0 {
+				params["p_amount_usd"] = req.AmountUSD
+			}
+			if req.Frequency != "" {
+				params["p_frequency"] = req.Frequency
+			}
+			result, err := s.db.RPC(ctx, "update_project_cost", params)
+			if err != nil {
+				log.Printf("[ProjectCosts] Update failed: %v", err)
+				http.Error(w, `{"error":"internal"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Write(result)
+
+		default:
+			http.Error(w, `{"error":"action must be add, archive, or update"}`, http.StatusBadRequest)
+		}
+
+	default:
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+	}
 }
