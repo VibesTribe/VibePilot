@@ -13,6 +13,74 @@ type Issue struct {
 	Severity    string `json:"severity"`
 }
 
+type AnalystFix struct {
+	RouteTo              string   `json:"route_to"`
+	ModelExclude         []string `json:"model_exclude"`
+	RevisedPromptAdditions string `json:"revised_prompt_additions"`
+	TaskSplitSuggestion  string   `json:"task_split_suggestion"`
+}
+
+type AnalystDecision struct {
+	Action        string      `json:"action"`
+	TaskID        string      `json:"task_id"`
+	RootCause     string      `json:"root_cause"`
+	Reasoning     string      `json:"reasoning"`
+	WhatWentWrong string      `json:"what_went_wrong"`
+	Fix           AnalystFix `json:"fix"`
+	Confidence    float64     `json:"confidence"`
+}
+
+func ParseAnalystDecision(output string) (*AnalystDecision, error) {
+	var d AnalystDecision
+	jsonStr := extractJSON(output)
+	if err := json.Unmarshal([]byte(sanitizeJSON(jsonStr)), &d); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func ParseAnalystDecisionFromMap(data map[string]any) (*AnalystDecision, error) {
+	var d AnalystDecision
+	// Map the fields
+	if v, ok := data["action"].(string); ok {
+		d.Action = v
+	}
+	if v, ok := data["task_id"].(string); ok {
+		d.TaskID = v
+	}
+	if v, ok := data["root_cause"].(string); ok {
+		d.RootCause = v
+	}
+	if v, ok := data["reasoning"].(string); ok {
+		d.Reasoning = v
+	}
+	if v, ok := data["what_went_wrong"].(string); ok {
+		d.WhatWentWrong = v
+	}
+	if v, ok := data["confidence"].(float64); ok {
+		d.Confidence = v
+	}
+	if fixData, ok := data["fix"].(map[string]any); ok {
+		if v, ok := fixData["route_to"].(string); ok {
+			d.Fix.RouteTo = v
+		}
+		if v, ok := fixData["model_exclude"].([]any); ok {
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					d.Fix.ModelExclude = append(d.Fix.ModelExclude, s)
+				}
+			}
+		}
+		if v, ok := fixData["revised_prompt_additions"].(string); ok {
+			d.Fix.RevisedPromptAdditions = v
+		}
+		if v, ok := fixData["task_split_suggestion"].(string); ok {
+			d.Fix.TaskSplitSuggestion = v
+		}
+	}
+	return &d, nil
+}
+
 type SupervisorDecision struct {
 	Action        string `json:"action"`
 	TaskID        string `json:"task_id"`
