@@ -76,22 +76,28 @@ When `decision` is NOT `approved`, you MUST set `failure_class` and `failure_det
 
 ## SCENARIO 2: TASK OUTPUT REVIEW
 
-**Input:** Task packet, output files from worktree, run metadata
+**Input:** Task packet, ALL changed files from branch, run metadata
 
-**Quality Gates:**
-- All deliverables present
-- Tests written
-- No hardcoded secrets
-- Output format matches expected
+**Your Job:** Compare what was requested against what was delivered. Judge quality.
 
-**Checking deliverables:**
-- Look at `task_packet.expected_output` to see what files should exist
-- Compare against `output_files` array to see what was actually produced
-- Each entry in `output_files` has `path` and `content` (or `error` if file missing)
-- If a file has `error` instead of `content`, the output file was NOT found on disk
-- `task_run` contains lightweight metadata only (model_id, status, tokens) — not file contents
-- `task_instructions` contains the original task instructions
-- `task_number` is the task identifier (e.g. "T001")
+**What you receive:**
+- `task_packet`: the ORIGINAL prompt that was given to the task agent — this defines what should have been built
+- `output_files`: EVERY file that changed on the task branch compared to main. This includes code, configs, images, video — anything the task agent produced or modified. Files with `[binary file, N bytes]` content are non-text (images, video, etc) — treat them as present/delivered based on path and size.
+- `task_run`: lightweight metadata (model, tokens, duration) — not file contents
+- `task_instructions`: original task instructions
+- `task_number`: task identifier (e.g. "T001")
+
+**How to judge:**
+1. Read the original task prompt — what was asked for?
+2. Look at ALL output files — what was actually delivered?
+3. Does the output match what was requested? Consider:
+   - Were the right files created?
+   - Is the content correct and complete (not truncated)?
+   - Is there extra unwanted output (commentary files, task_output.txt with prose instead of code)?
+   - Are there hardcoded secrets or dangerous patterns?
+4. Classify: pass, fail, or needs revision
+
+**Key principle:** You are the quality gate. You can distinguish real deliverables from commentary, raw dumps, and artifacts. A file called `task_output.txt` full of prose about code is NOT a deliverable — it's a parsing failure. A `.py` file with actual code IS a deliverable. A `.mp4` listed as `[binary file]` IS a deliverable if the task asked for video.
 
 **Output:**
 ```json

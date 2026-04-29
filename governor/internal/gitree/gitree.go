@@ -899,6 +899,74 @@ func (g *Gitree) ScanBranchFiles(ctx context.Context, branchName string, exclude
 	return files, err
 }
 
+// DiffWorktreeFiles returns only files that differ between main and the worktree's branch.
+// This is the right thing to show a supervisor — not the entire repo, just what changed.
+// Uses git diff --name-only so it handles binary files (images, video) gracefully
+// by listing them without trying to read content.
+func (g *Gitree) DiffWorktreeFiles(ctx context.Context, worktreePath string) ([]DiskFile, error) {
+	if worktreePath == "" {
+		return nil, fmt.Errorf("DiffWorktreeFiles: worktreePath is required")
+	}
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
+	defer cancel()
+
+	// Get list of changed files
+	cmd := g.gitCommandIn(ctx, worktreePath, "diff", "--name-only", g.mainBranch)
+	out, err := cmd.Output()
+	if err != nil {
+		// If main branch doesn't exist as local ref, try origin/main
+		cmd = g.gitCommandIn(ctx, worktreePath, "diff", "--name-only", "origin/"+g.mainBranch)
+		out, err = cmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("DiffWorktreeFiles: git diff failed: %w", err)
+		}
+	}
+
+	changedPaths := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(changedPaths) == 0 || (len(changedPaths) == 1 && changedPaths[0] == "") {
+		log.Printf("[DiffWorktreeFiles] No changed files in %s", worktreePath)
+		return nil, nil
+	}
+
+	var files []DiskFile
+	for _, relPath := range changedPaths {
+		relPath = strings.TrimSpace(relPath)
+		if relPath == "" {
+			continue
+		}
+
+		fullPath := filepath.Join(worktreePath, relPath)
+		info, err := os.Stat(fullPath)
+		if err != nil {
+			// File was deleted or doesn't exist — skip
+			continue
+		}
+
+		// Binary or large files: include path but mark content as [binary]
+		if info.Size() > 2*1024*1024 {
+			files = append(files, DiskFile{
+				Path:    relPath,
+				Content: fmt.Sprintf("[binary file, %d bytes]", info.Size()),
+			})
+			continue
+		}
+
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			log.Printf("[DiffWorktreeFiles] Warning: could not read %s: %v", relPath, err)
+			continue
+		}
+
+		files = append(files, DiskFile{
+			Path:    relPath,
+			Content: string(content),
+		})
+	}
+
+	log.Printf("[DiffWorktreeFiles] Found %d changed files (out of %d diff entries) in %s", len(files), len(changedPaths), worktreePath)
+	return files, nil
+}
+
 // gitCommandIn creates an exec.Cmd for git with the specified working directory.
 // Used for operations in worktrees where commands must run inside the worktree, not the main repo.
 func (g *Gitree) gitCommandIn(ctx context.Context, dir string, args ...string) *exec.Cmd {

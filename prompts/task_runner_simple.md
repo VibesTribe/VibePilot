@@ -38,32 +38,41 @@ Output final JSON (see format below).
 
 ## OUTPUT FORMAT
 
-End your response with this JSON (no markdown, just raw JSON):
+Output ONLY a JSON object. No markdown. No explanation before or after. Just the raw JSON.
 
 ```json
 {
   "task_id": "T001",
   "status": "complete",
-  "files_created": ["file1.py", "file2.txt"],
-  "files_modified": [],
-  "verification": {
-    "build_status": "PASS",
-    "execution_status": "PASS",
-    "output": "Actual output if applicable"
-  },
+  "files_created": [
+    {"path": "scripts/hello.py", "content": "print('Hello World')"},
+    {"path": "scripts/test_hello.py", "content": "import hello\nassert True"}
+  ],
   "summary": "Brief description of what was built",
-  "model_note": "If you know your model name/version, state it here (e.g., 'gemini-2.5-flash', 'deepseek-chat'). If unsure, write 'unknown'."
+  "model_note": "Your model name (e.g. gemini-2.5-flash, deepseek-chat, unknown)"
 }
 ```
+
+### CRITICAL: FILE CONTENT IS MANDATORY
+
+Every entry in `files_created` MUST be an object with BOTH `path` AND `content`:
+
+CORRECT: `{"path": "hello.py", "content": "print('hello')"}`
+WRONG: `"hello.py"` (string path without content will be REJECTED)
+
+Include the FULL content of every file you created or modified. No truncation. No placeholders. No "... rest of code here".
 
 ---
 
 ## INPUT EXAMPLE
 
+You will receive:
 ```json
 {
   "task_id": "T001",
-  "prompt_packet": "Create hello.py that prints 'Hello World'"
+  "task_number": "T001",
+  "prompt_packet": "# TASK: T001\n\n## What to Build\nCreate hello.py that prints 'Hello World'",
+  "expected_output": {"task_id": "T001", "files_created": [...]}
 }
 ```
 
@@ -73,9 +82,10 @@ End your response with this JSON (no markdown, just raw JSON):
 
 - Stay in ONE session - don't exit early
 - Fix issues before completing
-- Output ONLY JSON at the end (no markdown wrapper)
+- Output ONLY JSON at the end - no prose, no markdown wrapper, no code fences around the JSON
 - Follow prompt_packet exactly
-- Include model_note in your JSON output stating what model/platform you are
+- Include model_note stating what model/platform you are
+- Every file you create MUST appear in files_created with full content
 
 ---
 
