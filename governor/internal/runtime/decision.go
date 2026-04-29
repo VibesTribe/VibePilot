@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"encoding/json"
+	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -223,11 +225,60 @@ func ParseInitialReview(output string) (*InitialReviewDecision, error) {
 	return &r, nil
 }
 
+// ParseTaskRunnerOutput extracts files from model output using a multi-strategy cascade:
+//
+//   Strategy 1: Structured JSON with {path, content} file objects
+//   Strategy 2: Code blocks with filename hints (```python:path/to/file.py)
+//   Strategy 3: Bare code blocks with language-only headers (```python, ```go)
+//   Strategy 4: Raw output saved as task_output.txt (handled by caller)
+//
+// After extraction, files with content are validated and deduplicated.
+// Files with empty content are discarded (models returning string paths).
 func ParseTaskRunnerOutput(output string) (*TaskRunnerOutput, error) {
-	var t TaskRunnerOutput
+	cleanOutput := strings.TrimSpace(strings.ReplaceAll(output, "\r", ""))
+
+	// Strategy 1: Try structured JSON extraction
+	result := tryJSONExtraction(cleanOutput)
+	if result != nil && hasFiles(result.Files) {
+		return result, nil
+	}
+
+	// Strategy 2: Code blocks with filename annotations
+	// Matches ```lang:path/to/file.ext or ``` path/to/file.ext or <!-- filename.ext -->
+	codeFiles := extractCodeBlockFiles(cleanOutput)
+	if len(codeFiles) > 0 {
+		summary := extractSummaryFromProse(cleanOutput)
+		return &TaskRunnerOutput{
+			Status:  "complete",
+			Summary: summary,
+			Files:   codeFiles,
+		}, nil
+	}
+
+	// Strategy 1 found JSON but files had no content (string paths).
+	// Return the parsed result with empty files so the caller can handle it.
+	if result != nil {
+		return result, nil
+	}
+
+	// Nothing extractable. Caller handles raw output as task_output.txt.
+	return nil, fmt.Errorf("no structured output or code blocks found in model response")
+}
+
+// tryJSONExtraction attempts to find and parse a JSON object from the output.
+func tryJSONExtraction(output string) *TaskRunnerOutput {
 	jsonStr := extractJSON(output)
-	if err := json.Unmarshal([]byte(jsonStr), &t); err != nil {
-		return nil, err
+	if jsonStr == "" || jsonStr == output {
+		// extractJSON returned the whole output (no JSON found)
+		if !strings.HasPrefix(strings.TrimSpace(output), "{") {
+			return nil
+		}
+	}
+
+	var t TaskRunnerOutput
+	raw := sanitizeJSON(jsonStr)
+	if err := json.Unmarshal([]byte(raw), &t); err != nil {
+		return nil
 	}
 
 	if len(t.FilesRaw) > 0 {
@@ -245,30 +296,272 @@ func ParseTaskRunnerOutput(output string) (*TaskRunnerOutput, error) {
 		}
 	}
 
-	return &t, nil
+	return &t
 }
 
+// parseFilesArray handles multiple file formats models might return:
+//   - [{path: "...", content: "..."}]  (correct, has content)
+//   - ["path1.py", "path2.py"]         (wrong, no content)
 func parseFilesArray(raw json.RawMessage) []File {
 	if len(raw) == 0 {
 		return nil
 	}
 
-	var files []File
-
+	// Try structured files first
 	var objectFiles []File
 	if err := json.Unmarshal(raw, &objectFiles); err == nil {
 		return objectFiles
 	}
 
+	// Try string paths (models that didn't read the format instructions)
 	var stringFiles []string
 	if err := json.Unmarshal(raw, &stringFiles); err == nil {
+		files := make([]File, 0, len(stringFiles))
 		for _, path := range stringFiles {
-			files = append(files, File{Path: path})
+			if path != "" {
+				files = append(files, File{Path: path})
+			}
 		}
 		return files
 	}
 
+	return nil
+}
+
+// hasFiles returns true if any file has both path and content.
+func hasFiles(files []File) bool {
+	for _, f := range files {
+		if f.Path != "" && f.Content != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// extractCodeBlockFiles scans for code blocks and extracts them as files.
+// Priority order for filename detection:
+//   1. ```lang:path/to/file.ext (annotated code block)
+//   2. <!-- filename: path/to/file.ext --> before code block
+//   3. File: path/to/file.ext before code block
+//   4. Bare code blocks with language: infer extension from language
+func extractCodeBlockFiles(output string) []File {
+	var files []File
+	seen := make(map[string]bool)
+
+	// Pattern 1: ```lang:path/to/file.ext
+	annotatedBlock := regexp.MustCompile("(?s)```(?:[a-zA-Z]*[:/])([^\n`]+)\n(.*?)```")
+	for _, match := range annotatedBlock.FindAllStringSubmatch(output, -1) {
+		path := strings.TrimSpace(match[1])
+		content := match[2]
+		if path != "" && content != "" && !seen[path] {
+			seen[path] = true
+			files = append(files, File{Path: path, Content: content})
+		}
+	}
+	if len(files) > 0 {
+		return files
+	}
+
+	// Pattern 2: <!-- filename: path --> or File: path before code block
+	// Look for (File: path or <!-- filename: path -->) followed by ```lang
+	fileAnnotatedBlock := regexp.MustCompile("(?s)(?:File:\\s*|<!--\\s*filename(?:\\s+is)?:\\s*)([^<\n-]+?)\\s*--?>?\\s*\n\\s*```([a-zA-Z]*)\\s*\n(.*?)```")
+	for _, match := range fileAnnotatedBlock.FindAllStringSubmatch(output, -1) {
+		path := strings.TrimSpace(match[1])
+		content := match[3]
+		if path != "" && content != "" && !seen[path] {
+			seen[path] = true
+			files = append(files, File{Path: path, Content: content})
+		}
+	}
+	if len(files) > 0 {
+		return files
+	}
+
+	// Pattern 3: Bare code blocks with language header.
+	// Only use these if we can infer a filename from context or language.
+	// For single-block responses, use a generic name based on language.
+	bareBlocks := regexp.MustCompile("(?s)```([a-zA-Z+]+)\n(.*?)```")
+	matches := bareBlocks.FindAllStringSubmatch(output, -1)
+	if len(matches) == 1 {
+		// Single code block -- try to find a filename in the surrounding text
+		lang := matches[0][1]
+		content := matches[0][2]
+		if filename := findFilenameNearBlock(output, lang); filename != "" && content != "" {
+			return []File{{Path: filename, Content: content}}
+		}
+		// Single block, no filename hint -- use language-based name
+		ext := langToExt(lang)
+		if ext != "" && content != "" {
+			return []File{{Path: "output" + ext, Content: content}}
+		}
+	}
+
+	// Multiple bare blocks: only extract if we can find per-block filenames.
+	// Otherwise we'd create ambiguous output_0.py, output_1.py etc.
+	if len(matches) > 1 {
+		for i, match := range matches {
+			lang := match[1]
+			content := match[2]
+			// Look for filename hints near each block
+			filename := findFilenameForBlock(output, matches, i, lang)
+			if filename != "" && content != "" && !seen[filename] {
+				seen[filename] = true
+				files = append(files, File{Path: filename, Content: content})
+			}
+		}
+		if len(files) > 0 {
+			return files
+		}
+	}
+
 	return files
+}
+
+// findFilenameNearBlock looks for filename hints in the text before a code block.
+func findFilenameNearBlock(output string, lang string) string {
+	ext := langToExt(lang)
+	if ext == "" {
+		return ""
+	}
+	escapedExt := regexp.QuoteMeta(ext)
+	// Look for patterns like "creates hello.py" or "in src/main.go"
+	patterns := []string{
+		`(?:creates?|create|writes?|write|adds?|add|in|to|at)\s+([a-zA-Z0-9_/.-]+` + escapedExt + `)`,
+		`([a-zA-Z0-9_/.-]+` + escapedExt + `)`,
+	}
+	for _, p := range patterns {
+		re := regexp.MustCompile(p)
+		if m := re.FindStringSubmatch(output); len(m) > 1 {
+			return m[1]
+		}
+	}
+	return ""
+}
+
+// findFilenameForBlock tries to find a filename for a specific code block
+// by looking at text between the previous block and this one.
+func findFilenameForBlock(output string, blocks [][]string, idx int, lang string) string {
+	// Find the position of this block in the output
+	blockText := "```" + blocks[idx][1]
+	pos := strings.Index(output, blockText)
+	if pos < 0 {
+		return ""
+	}
+
+	// Look at text before this block (between previous block end and this one)
+	var preceding string
+	if idx == 0 {
+		preceding = output[:pos]
+	} else {
+		prevEnd := strings.Index(output[pos-500:], blockText)
+		if prevEnd > 0 {
+			preceding = output[pos-500 : pos]
+		} else {
+			preceding = output[:pos]
+		}
+	}
+
+	// Search for filename hints in the preceding text
+	ext := langToExt(lang)
+	if ext == "" {
+		return ""
+	}
+	escapedExt := regexp.QuoteMeta(ext)
+	patterns := []string{
+		`(?:creates?|create|writes?|write|adds?|add|in|to|at)\s+([a-zA-Z0-9_/.-]+` + escapedExt + `)`,
+		`([a-zA-Z0-9_/.-]+` + escapedExt + `)`,
+	}
+	for _, p := range patterns {
+		re := regexp.MustCompile(p)
+		// Find the LAST match before the block
+		matches := re.FindAllStringSubmatch(preceding, -1)
+		if len(matches) > 0 {
+			lastMatch := matches[len(matches)-1]
+			if len(lastMatch) > 1 && lastMatch[1] != "" {
+				return lastMatch[1]
+			}
+		}
+	}
+	return ""
+}
+
+// langToExt maps programming language names to file extensions.
+func langToExt(lang string) string {
+	switch strings.ToLower(lang) {
+	case "python", "py":
+		return ".py"
+	case "javascript", "js":
+		return ".js"
+	case "typescript", "ts":
+		return ".ts"
+	case "go":
+		return ".go"
+	case "rust":
+		return ".rs"
+	case "java":
+		return ".java"
+	case "ruby", "rb":
+		return ".rb"
+	case "c":
+		return ".c"
+	case "cpp", "c++":
+		return ".cpp"
+	case "csharp", "c#", "cs":
+		return ".cs"
+	case "swift":
+		return ".swift"
+	case "kotlin", "kt":
+		return ".kt"
+	case "html":
+		return ".html"
+	case "css":
+		return ".css"
+	case "scss":
+		return ".scss"
+	case "sql":
+		return ".sql"
+	case "sh", "bash", "shell":
+		return ".sh"
+	case "yaml", "yml":
+		return ".yaml"
+	case "json":
+		return ".json"
+	case "xml":
+		return ".xml"
+	case "markdown", "md":
+		return ".md"
+	case "dockerfile":
+		return ".dockerfile"
+	case "toml":
+		return ".toml"
+	case "ini", "conf", "config":
+		return ".conf"
+	case "lua":
+		return ".lua"
+	case "r":
+		return ".R"
+	case "perl", "pl":
+		return ".pl"
+	case "php":
+		return ".php"
+	default:
+		return ""
+	}
+}
+
+// extractSummaryFromProse extracts a summary from text that has no JSON.
+// Returns first 500 chars of cleaned prose, or "Task output (unstructured)".
+func extractSummaryFromProse(output string) string {
+	// Remove code blocks for summary
+	cleaned := regexp.MustCompile("(?s)```.*?```").ReplaceAllString(output, "")
+	cleaned = strings.TrimSpace(cleaned)
+	if len(cleaned) > 500 {
+		return cleaned[:500] + "..."
+	}
+	if cleaned != "" {
+		return cleaned
+	}
+	return "Task output (unstructured)"
 }
 
 func extractJSON(output string) string {
@@ -425,7 +718,7 @@ func extractPlanContent(raw string) (planContent string, cleanJSON string) {
 		"\",\n\"total_tasks\"",
 		"\",\n\"status\"",
 		"\"\n}",
-		"\"\n}",
+		"\"\n }",
 	}
 
 	for _, endMarker := range endMarkers {

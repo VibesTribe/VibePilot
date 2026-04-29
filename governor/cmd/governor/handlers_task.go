@@ -832,9 +832,9 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 	// Get context for review (needed regardless of which model runs it)
 	taskPacket, _ := h.database.GetTaskPacket(ctx, taskID)
 
-	// Build a clean review payload from the worktree output files.
-	// We do NOT stuff the entire task_run DB record (which can be 3+MB of repo files)
-	// into the supervisor prompt. Instead, read only the output files from disk.
+	// Build the review payload: show the supervisor EVERYTHING that changed on the branch.
+	// The supervisor is a model — it can judge what's deliverable vs commentary vs extra.
+	// We do NOT pre-filter to only "expected" files. That's the old keyhole approach.
 	var outputFiles []map[string]any
 	var runMeta map[string]any
 	worktreePath := ""
@@ -845,41 +845,25 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		worktreePath = h.cfg.GetRepoPath()
 	}
 
-	// Parse expected_output to find which files to look for
-	var expectedPaths []string
-	if taskPacket != nil && taskPacket.ExpectedOutput != "" {
-		var exp map[string]any
-		if json.Unmarshal([]byte(taskPacket.ExpectedOutput), &exp) == nil {
-			if fc, ok := exp["files_created"].([]any); ok {
-				for _, f := range fc {
-					if s, ok := f.(string); ok {
-						expectedPaths = append(expectedPaths, s)
-					}
-				}
-			}
-		}
+	// Get all files that differ from main — this is the actual output, regardless of format.
+	// Handles code, markdown, images, video — anything the task agent produced.
+	diffFiles, diffErr := h.git.DiffWorktreeFiles(ctx, worktreePath)
+	if diffErr != nil {
+		log.Printf("[TaskReview] Warning: DiffWorktreeFiles failed for %s: %v — falling back to expected_output scan", truncateID(taskID), diffErr)
 	}
-
-	// Read each expected output file from disk
-	for _, relPath := range expectedPaths {
-		fullPath := filepath.Join(worktreePath, relPath)
-		content, err := os.ReadFile(fullPath)
-		if err != nil {
-			log.Printf("[TaskReview] Warning: could not read output file %s: %v", relPath, err)
+	if len(diffFiles) > 0 {
+		for _, f := range diffFiles {
 			outputFiles = append(outputFiles, map[string]any{
-				"path":    relPath,
-				"content": nil,
-				"error":   err.Error(),
+				"path":    f.Path,
+				"content": f.Content,
 			})
-			continue
 		}
-		outputFiles = append(outputFiles, map[string]any{
-			"path":    relPath,
-			"content": string(content),
-		})
+		log.Printf("[TaskReview] Supervisor will see %d changed files from branch for %s", len(outputFiles), truncateID(taskID))
+	} else {
+		log.Printf("[TaskReview] No diff files found for %s — supervisor will review with no output files", truncateID(taskID))
 	}
 
-	// Also get lightweight metadata from the latest task_run (model, tokens, status — NOT the full files)
+	// Get lightweight metadata from the latest task_run (model, tokens, status — NOT the full files)
 	taskRunData, _ := h.database.Query(ctx, "task_runs", map[string]any{
 		"task_id": taskID,
 		"select":  "id,model_id,status,tokens_in,tokens_out,started_at,completed_at",
@@ -893,11 +877,11 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 	}
 	// Build lightweight run metadata (without the bloated result.files)
 	runMeta = map[string]any{
-		"model_id":   getString(latestRun, "model_id"),
-		"status":     getString(latestRun, "status"),
-		"tokens_in":  latestRun["tokens_in"],
-		"tokens_out": latestRun["tokens_out"],
-		"started_at": latestRun["started_at"],
+		"model_id":    getString(latestRun, "model_id"),
+		"status":      getString(latestRun, "status"),
+		"tokens_in":   latestRun["tokens_in"],
+		"tokens_out":  latestRun["tokens_out"],
+		"started_at":  latestRun["started_at"],
 		"completed_at": latestRun["completed_at"],
 	}
 
