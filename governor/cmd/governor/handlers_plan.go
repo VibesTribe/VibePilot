@@ -175,6 +175,18 @@ func handlePlanCreated(
 			usageTracker.RecordUsage(ctx, routingResult.ModelID, result.TokensIn, result.TokensOut)
 			usageTracker.RecordCompletion(ctx, routingResult.ModelID, "planning", time.Since(startTime).Seconds(), true)
 		}
+		// Record planner model invocation as a task_run for cost tracking
+		if _, err := database.RPC(ctx, "record_internal_run", map[string]any{
+			"p_task_id":      planID,
+			"p_model_id":     routingResult.ModelID,
+			"p_role":         "planner",
+			"p_status":       "success",
+			"p_tokens_in":    result.TokensIn,
+			"p_tokens_out":   result.TokensOut,
+			"p_token_source": "exact",
+		}); err != nil {
+			log.Printf("[EventPlanCreated] Failed to record planner run for %s: %v", planID, err)
+		}
 		break // success
 	}
 
