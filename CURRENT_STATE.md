@@ -1,5 +1,5 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-28 — VERIFIED AGAINST CODE AND RUNNING SYSTEM (+ 8 gap fixes deployed)
+# AUTO-UPDATED: 2026-04-28 — VERIFIED AGAINST CODE AND RUNNING SYSTEM (+ output pipeline fix 4a94a00f)
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 
@@ -32,7 +32,7 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 61b1a3da
+- **Git:** main branch. Last: 4a94a00f
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
 - **Chrome CDP:** 127.0.0.1:9222
 - **Pipeline tables:** 1 task (merged), 1 plan (review), 65 plans (draft from PRDs), 12 orchestrator_events
@@ -157,22 +157,12 @@ All 5 courier bugs fixed (Apr 25):
 
 ## RECENT COMMITS (Apr 25-28)
 
-1. 61b1a3da — fix: pipeline event recording + task_packets storage + build fixes (Apr 28)
-2. dce161d1 — docs: add plan 3876eeed
-3. 3b17358f — docs: update human review workflow status; fix: add governor review file creation for human_review tasks
-4. ce9b4964 — fix: add status validation to transition_task RPC (migration 131)
-5. d291d63c — feat: periodic managed repo sync with GitHub
-6. 2384b572 — fix: eliminate 'blocked' everywhere, clean dead events, config-driven maxRetries (11 files)
-7. 17c95628 — docs: update state docs with blocked elimination fix
-8. 477b84be — fix: eliminate 'blocked' dead-end, remove council_done dead code
-9. 54e6eec0 — feat: wire BuildCouncilContext for plan reviews
-10. 2c64acff — docs: update current state — council context wired, knowledgebase section
-11. 133cd28a — feat: maintenance pg_notify triggers + plan revision handler + target files in planner
-12. 34678659 — feat: CooldownWatcher + doc accuracy fixes
-13. 0f65f686 — feat: wire learning RPCs + module integration test gate
-14. fcf7b198 — docs: verify all open issues against actual code (8/8 verified)
-15. 16d9724a — feat: module branch cleanup + maintenance agent for all merge failures
-16. a08afe74 — feat: pipeline event emissions (23 event types, standalone recordPipelineEvent)
+1. 4a94a00f — fix: supervisor sees everything on branch, multi-strategy parser, one prompt template (Apr 28)
+2. b4cf7f1e — fix: 5 fragilities + E2E test + diagnostic ceiling + web-first routing + transition_task SOT (Apr 28)
+3. 61b1a3da — fix: pipeline event recording + task_packets storage + build fixes (Apr 28)
+4. dce161d1 — docs: add plan 3876eeed
+5. 3b17358f — docs: update human review workflow status; fix: add governor review file creation for human_review tasks
+6. ce9b4964 — fix: add status validation to transition_task RPC (migration 131)
 
 ## Knowledgebase (VibesTribe/knowledgebase — 11 commits, ready to build)
 
@@ -295,12 +285,28 @@ The orchestrator/router is fully config-driven via `routing.json` (free_cascade 
 10. Task stuck at review after max attempts — UNCLEAR (no explicit terminal state)
 
 ## Remaining Known Gaps (verified 2026-04-28)
+
+### OUTPUT PIPELINE — FIXED (commit 4a94a00f)
+The perpetual parsing failure problem. Root causes found and fixed:
+1. **Prompt template asked for wrong format** — `task_runner_simple.md` asked for `files_created: ["file1.py"]` (string paths, no content) while parser expected `{path, content}` objects. Template rewritten.
+2. **Dead prompt templates** — `task_runner.md` and `task_runner_consecutive.md` deleted (zero references, only `task_runner_simple.md` was ever used).
+3. **Parser was a binary JSON gate** — `ParseTaskRunnerOutput` returned nil if JSON extraction failed, no fallback. Rewritten as multi-strategy cascade: (1) clean JSON, (2) JSON in code fences, (3) code blocks as individual files, (4) raw text fallback.
+4. **Supervisor was blind** — `handleTaskReview` only read files the PLANNER predicted (keyhole). Now uses `DiffWorktreeFiles` to show supervisor EVERYTHING that changed on the task branch. Supervisor is a model — it can judge deliverable vs commentary vs extra. Let it.
+5. **Supervisor prompt updated** — now says "compare what was requested vs what was delivered, you judge." Handles binary files (video, images) as `[binary file, N bytes]`.
+
+### Architecture insight
+The task agent works on ONE task, ONE branch, ONE worktree. `git diff --name-only main..HEAD` = exactly the task output. No pre-filtering needed. The supervisor sees the diff and the original prompt, judges accordingly. This works for code, video, images, research — anything. The model is the quality gate, not regex.
+
+### Still open
 - Consultant agent not wired into pipeline (separate scope)
 - Research flow DEFERRED — Researcher agent not yet running
 - No auto-discovery of new free models (research agent handles daily checks)
 - `get_change_approvals` is a stub — no `change_approvals` table exists yet
 - Bug 10: No explicit terminal state when max retries exceeded in review loop
-- See docs/CURRENT_ISSUES.md for full details
+- Stale Supabase-era prompts in DB rows (harmless, governor reads filesystem)
+- CooldownWatcher pollInterval hardcoded 2 min
+- managed_repo.go email hardcoded governor@vibepilot.dev
+- Z.AI Pro subscription expires ~May 1 — GLM-5 will need replacement
 
 ## Pipeline Data Fixes (deployed 2026-04-28, commit 61b1a3da)
 - **Task packets now stored in task_packets table** — prompt_packet survives result JSONB overwrites during execution
@@ -310,7 +316,7 @@ The orchestrator/router is fully config-driven via `routing.json` (free_cascade 
 - **vp_notify_change trigger guard** — checks for status column before referencing OLD.status
 - **All plan events use recordPipelineEvent** — canonical function in pipeline_events.go (not the duplicate recordEvent)
 - **Build fixes** — APIRunner.HealthCheck uses existing struct fields; registerConnectors uses context.Background()
-- **E2E test verified** — Task d5823cd1 completed full loop: 3 attempts, 2 failures with feedback, 3rd passed, tested, merged
+- **E2E test verified** — Task d5823cd1 completed full loop: 3 attempts, 2 failures with feedback, 3rd passed, tested, merged. Output pipeline redesigned with supervisor full-view (4a94a00f).
 
 ## Human Review Workflow Status (Updated 2026-04-27)
 ✅ **Fix #1: Governor creates review JSON files on human_review** - IMPLEMENTED
