@@ -1,5 +1,5 @@
 # VibePilot Current Issues
-> Last updated: April 28, 2026 (verified against actual code, DB, and running system)
+> Last updated: April 29, 2026 (verified against actual code, DB, and running system)
 > Previous: April 28, 2026 (gap analysis fixes deployed)
 
 ## Status Summary
@@ -67,10 +67,7 @@
 - Maintenance (7): merge_conflict_detected, task_merged_to_module, module_integration_test, module_merge_failed, module_merged_to_testing, integration_merge_failed, plan_complete
 - Council (2): council_approved, council_feedback
 
----
-
-## Dashboard Issues
-
+---\n\n## Fixed Issues (April 29, 2026 — Cost Tracking Overhaul)\n\n### Phase 1: Data Foundation — COMPLETE (commit 6d37581f)\n- Created subscription_history table to track all subscriptions over time\n- Created project_snapshots table for archive/clear functionality\n- Added role, token_source, total_actual_cost_usd columns to task_runs\n- Added total_tokens_in/out, total_cost_usd, total_api_equivalent_usd, model_count columns to tasks\n- Seeded GLM-5 history: $45 for 786.6M tokens (3,099% ROI)\n- Fixed calc_run_costs(), vp_notify_change(), check_subscription_thresholds(), create_project_snapshot()\n- Added RPC allowlist entries for new cost functions\n- Registered new API endpoints: /api/project/snapshot, /api/project/history, /api/project/alerts\n- Alerts endpoint already returns GLM-5 expiry warning\n\n### Phase 2: Per-Task Full Cost Tracking — COMPLETE (commit e22f1e99)\n- Added record_internal_run RPC to create task_run rows for planner, supervisor, analyst model calls\n- Wire planner (handlers_plan.go): record planner model invocation after successful plan generation\n- Wire supervisor (handlers_task.go): record supervisor model invocation after output review\n- Wire analyst (handlers_task.go): record analyst model invocation after diagnostic review\n- Enhanced courier result handler (main.go): estimate tokens from output length when API doesn't report counts (~4 chars/token)\n- Added aggregate_task_costs call in testing handler on task completion to sum all runs into task totals\n- Built and deployed governor binary with all changes\n\n### Phase 3: Dashboard Overhaul — COMPLETE (commit 7613e19a7)\n- Reordered ROI panel sections: Project-to-Date → Slices → Models → Subscriptions → Session\n- Added SubscriptionHistorySection with archived subscription display\n- Enhanced MissionHeader token pill with click-to-toggle between Live (session) and Project (cumulative) mode\n- Added EventTone=\"warning\" for alert events\n\n### Phase 4: Alerting — COMPLETE (commit a0ee1fc82)\n- Added header alerts banner that polls /api/project/alerts every 60s\n- Shows subscription expiry and credit threshold warnings\n- GLM-5 already flagged: \"2 days remaining\" (expires Apr 30)\n\n### USD/CAD Converter\n- Present in RoiPanel (MissionModals.tsx): USD | CAD toggle buttons\n- Defaults to 1.36, fetches live rate from governor DB (exchange_rates table) then exchangerate-api.com fallback\n- Every dollar amount in ROI panel converts when toggled\n- Exchange rate in DB: 1.36 USD/CAD, seeded 2026-02-16, source=\"seed\"\n\n## Dashboard Issues\n
 ### 1. ROI Popup Needs Work
 **Priority**: P3 (after E2E verified)
 **Impact**: ProjectTracker and SessionTracker deployed but user says "it needs work"
