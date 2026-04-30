@@ -1,0 +1,55 @@
+{
+  "metadata": {
+    "last_verified": "2026-02-18",
+    "source": "Kimi research via official Moonshot docs",
+    "important_notes": [
+      "Rate limits tier-based on cumulative recharge",
+      "Minimum $1 required to activate API",
+      "No true free tier",
+      "CLI subscription exists but pricing unclear"
+    ]
+  },
+  "rate_limits_tiers": {
+    "Tier0": {"recharge_usd": 0, "concurrency": 1, "rpm": 3, "tpm": 500000, "tpd": 1500000},
+    "Tier1": {"recharge_usd": 7, "concurrency": 50, "rpm": 200, "tpm": 2000000, "tpd": null},
+    "Tier2": {"recharge_usd": 3, "concurrency": 100, "rpm": 500, "tpm": 3000000, "tpd": null},
+    "Tier3": {"recharge_usd": 14, "concurrency": 200, "rpm": 5000, "tpm": 3000000, "tpd": null},
+    "Tier4": {"recharge_usd": 140, "concurrency": 400, "rpm": 5000, "tpm": 4000000, "tpd": null},
+    "Tier5": {"recharge_usd": 420, "concurrency": 1000, "rpm": 10000, "tpm": 5000000, "tpd": null}
+  },
+  "models": {
+    "moonshot-v1-8k": {
+      "context_limit": 8192,
+      "input_per_1m_usd": 0.28,
+      "output_per_1m_usd": 1.40
+    },
+    "moonshot-v1-32k": {
+      "context_limit": 32768,
+      "input_per_1m_usd": 0.70,
+      "output_per_1m_usd": 2.80
+    },
+    "moonshot-v1-128k": {
+      "context_limit": 131072,
+      "input_per_1m_usd": 1.40,
+      "output_per_1m_usd": 4.20
+    },
+    "kimi-k2.5": {
+      "context_limit": 262144,
+      "input_per_1m_cache_hit_usd": 0.10,
+      "input_per_1m_no_cache_usd": 0.56,
+      "output_per_1m_usd": 2.94,
+      "features": ["multimodal", "vision", "thinking_mode", "tool_calls", "auto_caching"]
+    }
+  },
+  "kimi_cli": {
+    "description": "Terminal-based coding agent",
+    "subscription": {
+      "note": "Has 'Kimi For Coding' member plan but pricing not publicly documented",
+      "api_usage": "Uses API rate limits based on account tier - no separate unlimited tier"
+    }
+  },
+  "free_trial": {
+    "minimum_recharge_usd": 1,
+    "voucher_bonus": "$5 voucher when cumulative recharge reaches $5"
+  }
+}

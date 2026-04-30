@@ -1,0 +1,200 @@
+# VibePilot Code Pipeline
+# The actual event-driven pipeline mapped from Supabase state transitions.
+# Not a linear DAG -- branches based on supervisor/council decisions.
+
+name: code-pipeline
+description: |
+  Real VibePilot flow: Supabase status transitions drive everything.
+  Supervisor is the primary reviewer. Council only for complex plans or
+  architecture research. Human only for visual QA or architecture changes.
+
+nodes:
+  # ══════════════════════════════════════════════════════════════
+  # FLOW A: PLAN → TASKS
+  # ══════════════════════════════════════════════════════════════
+
+  - id: generate-plan
+    description: "Read PRD, generate task plan"
+    agent:
+      role: planner
+      task: |
+        Read PRD at $PRD_PATH. Generate structured task plan with:
+        task_number, title, description, category, dependencies,
+        expected_output, confidence score. Use slice context for numbering.
+
+  # --- Supervisor reviews plan ---
+  - id: supervisor-plan-review
+    description: "Supervisor reviews plan (all plans go here first)"
+    depends_on: [generate-plan]
+    agent:
+      role: supervisor
+      task: |
+        Review plan from $generate-plan.output against PRD.
+        Decide:
+        - "approved": simple plan (1-2 tasks), you can approve directly
+        - "council_review": complex plan (big feature/project), escalate to council
+        - "needs_revision": plan has issues, send back to planner
+        Most plans should be approved directly. Only escalate genuinely complex ones.
+
+  # --- Planner revision (if supervisor requests) ---
+  - id: plan-revision
+    description: "Planner revises based on feedback"
+    depends_on: [supervisor-plan-review]
+    when: "$supervisor-plan-review.decision == 'needs_revision'"
+    agent:
+      role: planner
+      task: |
+        Supervisor requested revision. Address feedback and regenerate plan.
+        Returns to supervisor-plan-review after revision.
+
+  # --- Council review (only for complex plans) ---
+  - id: council-plan-review
+    description: "Multi-model council reviews complex plan"
+    depends_on: [supervisor-plan-review]
+    when: "$supervisor-plan-review.decision == 'council_review'"
+    agent:
+      role: council
+      task: |
+        Supervisor escalated a complex plan. Review with multiple lenses:
+        user_alignment, architecture, feasibility.
+        Vote: approved / needs_revision.
+        Nothing is ever blocked — all feedback routes back to improve the plan.
+
+  # --- Create tasks from approved plan ---
+  - id: create-tasks
+    description: "Break approved plan into tasks in Supabase"
+    depends_on: [supervisor-plan-review]
+    when: "$supervisor-plan-review.decision == 'approved' || $council-plan-review.consensus == 'approved'"
+    agent:
+      role: orchestrator
+      task: |
+        Take the approved plan. Create task records in Supabase.
+        Each task gets: task_number, title, prompt_packet, expected_output,
+        category, dependencies, slice assignment.
+        Tasks enter "available" status and realtime picks them up.
+
+  # ══════════════════════════════════════════════════════════════
+  # FLOW B: TASK EXECUTION
+  # ══════════════════════════════════════════════════════════════
+
+  - id: execute-task
+    description: "Agent executes task on its own branch"
+    depends_on: [create-tasks]
+    agent:
+      role: internal_cli
+      task: |
+        Execute task from prompt_packet on feature branch.
+        Route to model via connector. Run code, produce files.
+        Security scan output for leaked secrets.
+        Commit files to branch, record task_run, transition to "review".
+
+  # --- Supervisor reviews task output ---
+  - id: supervisor-task-review
+    description: "Supervisor reviews task output"
+    depends_on: [execute-task]
+    agent:
+      role: supervisor
+      task: |
+        Review task output against expected_output from plan.
+        Decide:
+        - "approved": output meets expectations, send to testing
+        - "needs_revision": issues found, send back for re-execution
+        - "council_review": genuinely complex issue (rare for task output)
+        - "reroute": wrong model/connector, try different route
+
+  # --- Task revision loop ---
+  - id: task-revision
+    description: "Re-execute failed task with feedback"
+    depends_on: [supervisor-task-review]
+    when: "$supervisor-task-review.decision == 'needs_revision'"
+    agent:
+      role: internal_cli
+      task: |
+        Supervisor rejected task output. Re-execute with feedback
+        from supervisor incorporated into prompt_packet.
+
+  # --- Testing ---
+  - id: run-tests
+    description: "Run test suite for changed code"
+    depends_on: [supervisor-task-review]
+    when: "$supervisor-task-review.decision == 'approved'"
+    bash:
+      command: "cd $WORKDIR && go test ./... 2>&1"
+
+  - id: evaluate-tests
+    description: "Analyze test results"
+    depends_on: [run-tests]
+    agent:
+      role: tester
+      task: |
+        Analyze test output from $run-tests.output.
+        Pass/fail. Diagnose failures if any. Update metrics.
+
+  # --- Visual testing (UI/UX tasks only) ---
+  - id: visual-test
+    description: "Screenshot and compare visual changes (UI/UX only)"
+    depends_on: [evaluate-tests]
+    when: "$CATEGORY == 'ui-ux'"
+    agent:
+      role: visual-tester
+      task: |
+        Capture screenshots of changed UI components.
+        Compare against baseline. Flag visual regressions.
+
+  - id: human-visual-review
+    description: "Human reviews visual changes (UI/UX only)"
+    depends_on: [visual-test]
+    when: "$visual-test.output == 'changes_detected'"
+    approval:
+      message: "Visual changes detected. Approve UI/UX?"
+      timeout: 3600
+      on_reject: cancel
+
+  # --- Merge ---
+  - id: merge
+    description: "Merge task branch to target"
+    depends_on: [evaluate-tests]
+    when: "$evaluate-tests.output == 'pass'"
+    bash:
+      command: "cd $WORKDIR && git checkout $TARGET_BRANCH && git merge --no-ff $BRANCH_NAME && git push"
+
+  # --- Record outcomes ---
+  - id: record-outcomes
+    description: "Record success/failure for learning"
+    depends_on: [merge]
+    emit:
+      event_type: task_completed
+      payload: "$merge.output"
+
+  # ══════════════════════════════════════════════════════════════
+  # FLOW C: SYSTEM RESEARCH
+  # ══════════════════════════════════════════════════════════════
+
+  - id: research-review
+    description: "Supervisor reviews system research findings"
+    agent:
+      role: supervisor
+      task: |
+        Review system research findings. Decide:
+        - "approved": minor finding (new model, free tier, web AI platform)
+        - "council_review": major finding (architecture change, new pattern)
+        Most research is minor. Only escalate genuine architecture changes.
+
+  - id: council-research-review
+    description: "Council reviews architecture-level research"
+    depends_on: [research-review]
+    when: "$research-review.decision == 'council_review'"
+    agent:
+      role: council
+      task: |
+        Supervisor escalated architecture-level research.
+        Evaluate impact on existing system. Vote: approved / needs_discussion / blocked.
+
+  - id: human-research-review
+    description: "Human reviews council-approved architecture change"
+    depends_on: [council-research-review]
+    when: "$council-research-review.consensus == 'approved'"
+    approval:
+      message: "Council approved architecture change. Review?"
+      timeout: 86400
+      on_reject: skip

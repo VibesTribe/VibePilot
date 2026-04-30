@@ -1,0 +1,31 @@
+[Unit]
+Description=VibePilot Go Governor Service
+Documentation=https://github.com/vibepilot/vibepilot
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vibes
+Group=vibes
+WorkingDirectory=/home/vibes/vibepilot/governor
+
+# Bootstrap keys injected from GitHub Secrets via deploy script
+# NEVER use EnvironmentFile - keys must not be readable from files
+# Required: SUPABASE_URL, SUPABASE_SERVICE_KEY, VAULT_KEY
+
+ExecStart=/home/vibes/vibepilot/governor/governor
+
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=governor
+
+TimeoutStartSec=30
+TimeoutStopSec=30
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

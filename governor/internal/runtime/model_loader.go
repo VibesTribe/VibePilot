@@ -1,0 +1,364 @@
+package runtime
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/vibepilot/governor/internal/db"
+)
+
+type ModelsConfigFile struct {
+	Schema      string         `json:"$schema"`
+	Version     string         `json:"version"`
+	Description string         `json:"description"`
+	Models      []ModelProfile `json:"models"`
+	Defaults    ModelProfile   `json:"defaults"`
+}
+
+type ModelLoader struct {
+	configPath string
+	db         db.Database
+	tracker    *UsageTracker
+}
+
+func NewModelLoader(configPath string, database db.Database, tracker *UsageTracker) *ModelLoader {
+	return &ModelLoader{
+		configPath: configPath,
+		db:         database,
+		tracker:    tracker,
+	}
+}
+
+func (l *ModelLoader) Load(ctx context.Context) error {
+	data, err := os.ReadFile(l.configPath)
+	if err != nil {
+		return fmt.Errorf("read models config: %w", err)
+	}
+
+	var file ModelsConfigFile
+	if err := json.Unmarshal(data, &file); err != nil {
+		return fmt.Errorf("parse models config: %w", err)
+	}
+
+	if l.tracker != nil && file.Defaults.BufferPct > 0 {
+		l.tracker.SetDefaults(file.Defaults)
+	}
+
+	for _, profile := range file.Models {
+		if l.tracker != nil {
+			l.tracker.RegisterModel(profile)
+		}
+
+		// Skip DB sync for models missing required fields
+		if profile.AccessType == "" || profile.Status == "" {
+			log.Printf("[ModelLoader] Skipping DB sync for %s: missing access_type or status", profile.ID)
+			continue
+		}
+
+		if err := l.syncToDatabase(ctx, profile); err != nil {
+			// Log but don't abort — one bad model shouldn't block all others
+			log.Printf("[ModelLoader] Warning: sync model %s to database failed: %v", profile.ID, err)
+		}
+	}
+
+	return nil
+}
+func (l *ModelLoader) syncToDatabase(ctx context.Context, profile ModelProfile) error {
+	rateLimitsJSON, _ := json.Marshal(profile.RateLimits)
+	recoveryJSON, _ := json.Marshal(profile.Recovery)
+	apiPricingJSON, _ := json.Marshal(profile.APIPricing)
+	capabilitiesJSON, _ := json.Marshal(profile.Capabilities)
+	strengthsJSON, _ := json.Marshal(profile.Strengths)
+	weaknessesJSON, _ := json.Marshal(profile.Weaknesses)
+
+	configMap := map[string]interface{}{
+		"recovery":            json.RawMessage(recoveryJSON),
+		"api_pricing":         json.RawMessage(apiPricingJSON),
+		"capabilities":        json.RawMessage(capabilitiesJSON),
+		"throttle_behavior":   string(profile.ThrottleBehavior),
+		"buffer_pct":          profile.BufferPct,
+		"spacing_min_seconds": profile.SpacingMinSecs,
+		"strengths":           json.RawMessage(strengthsJSON),
+		"weaknesses":          json.RawMessage(weaknessesJSON),
+		"notes":               profile.Notes,
+	}
+
+	// Derive platform from access_via (connector name) or fall back to provider
+	// NOTE: platform/courier on models table are historical. A model can use
+	// multiple connectors (e.g. deepseek-chat via deepseek-api OR openrouter).
+	// The connector/platform selection happens at routing time, not model definition.
+	// We only set these for display purposes if the model has a single access_via.
+	platform := ""
+	courier := ""
+	if len(profile.AccessVia) > 0 {
+		platform = profile.AccessVia[0]
+		courier = profile.AccessVia[0]
+	}
+	if platform == "" {
+		platform = profile.Provider
+	}
+	if courier == "" {
+		courier = "api"
+	}
+
+	// Build insert data -- only model-level properties, not connector/platform state
+	insertData := map[string]interface{}{
+		"id":            profile.ID,
+		"name":          profile.Name,
+		"vendor":        profile.Provider,
+		"platform":      platform,  // display hint only, NOT routing
+		"access_type":   profile.AccessType,
+		"context_limit": profile.ContextLimit,
+		"status":        profile.Status,
+		"rate_limits":   json.RawMessage(rateLimitsJSON),
+		"config":        configMap,
+		"strengths":     profile.Strengths,
+		"weaknesses":    profile.Weaknesses,
+		"courier":       courier, // display hint only, NOT routing
+		"rate_limit_requests_per_minute": profile.RateLimits.RequestsPerMinute,
+	}
+	if profile.StatusReason != "" {
+		insertData["status_reason"] = profile.StatusReason
+	}
+	if profile.APIPricing.InputPer1MUsd > 0 {
+		insertData["cost_input_per_1k_usd"] = profile.APIPricing.InputPer1MUsd / 1000.0
+	}
+	if profile.APIPricing.OutputPer1MUsd > 0 {
+		insertData["cost_output_per_1k_usd"] = profile.APIPricing.OutputPer1MUsd / 1000.0
+	}
+
+	_, err := l.db.Insert(ctx, "models", insertData)
+	if err != nil {
+		// Already exists -- update instead
+		updateData := map[string]interface{}{
+			"name":          profile.Name,
+			"vendor":        profile.Provider,
+			"platform":      platform,
+			"access_type":   profile.AccessType,
+			"context_limit": profile.ContextLimit,
+			"status":        profile.Status,
+			"rate_limits":   json.RawMessage(rateLimitsJSON),
+			"config":        configMap,
+			"strengths":     profile.Strengths,
+			"weaknesses":    profile.Weaknesses,
+			"courier":       courier,
+			"rate_limit_requests_per_minute": profile.RateLimits.RequestsPerMinute,
+		}
+		if profile.StatusReason != "" {
+			updateData["status_reason"] = profile.StatusReason
+		}
+		if profile.APIPricing.InputPer1MUsd > 0 {
+			updateData["cost_input_per_1k_usd"] = profile.APIPricing.InputPer1MUsd / 1000.0
+		}
+		if profile.APIPricing.OutputPer1MUsd > 0 {
+			updateData["cost_output_per_1k_usd"] = profile.APIPricing.OutputPer1MUsd / 1000.0
+		}
+
+		_, updateErr := l.db.Update(ctx, "models", profile.ID, updateData)
+		if updateErr != nil {
+			return fmt.Errorf("upsert model %s: insert=%w update=%v", profile.ID, err, updateErr)
+		}
+	} else {
+		log.Printf("[ModelLoader] Created new model %s in Supabase", profile.ID)
+	}
+
+	return nil
+}
+
+func (l *ModelLoader) Reload(ctx context.Context) error {
+	return l.Load(ctx)
+}
+
+func LoadModelsFromConfig(configDir string, database db.Database, tracker *UsageTracker) (*ModelLoader, error) {
+	configPath := filepath.Join(configDir, "models.json")
+
+	loader := NewModelLoader(configPath, database, tracker)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := loader.Load(ctx); err != nil {
+		return nil, err
+	}
+
+	// Load connector shared limits from connectors.json
+	connectorsPath := filepath.Join(configDir, "connectors.json")
+	if tracker != nil {
+		loadConnectorSharedLimits(connectorsPath, tracker)
+		loadWebPlatformLimits(connectorsPath, tracker)
+	}
+
+	return loader, nil
+}
+
+// loadConnectorSharedLimits reads connectors.json and registers any connector
+// that has a "shared_limits" field with the UsageTracker's ConnectorUsageTracker.
+func loadConnectorSharedLimits(connectorsPath string, tracker *UsageTracker) {
+	data, err := os.ReadFile(connectorsPath)
+	if err != nil {
+		return // connectors.json not required
+	}
+
+	var file ConnectorsFile
+	if err := json.Unmarshal(data, &file); err != nil {
+		log.Printf("[ModelLoader] Warning: failed to parse connectors.json for shared limits: %v", err)
+		return
+	}
+
+	registered := 0
+	for _, conn := range file.Connectors {
+		// Only register if at least one shared limit is set
+		if conn.SharedLimits.RequestsPerMinute == nil &&
+			conn.SharedLimits.RequestsPerDay == nil &&
+			conn.SharedLimits.TokensPerMinute == nil &&
+			conn.SharedLimits.TokensPerDay == nil &&
+			conn.SharedLimits.RequestsPerHour == nil {
+			continue
+		}
+
+		tracker.RegisterConnectorSharedLimits(conn.ID, conn.SharedLimits)
+		registered++
+	}
+
+	if registered > 0 {
+		log.Printf("[ModelLoader] Registered shared limits for %d connectors", registered)
+	}
+}
+
+// loadWebPlatformLimits reads connectors.json and registers any web-type connector
+// that has a "limit_schema" field with the UsageTracker's PlatformUsageTracker.
+func loadWebPlatformLimits(connectorsPath string, tracker *UsageTracker) {
+	data, err := os.ReadFile(connectorsPath)
+	if err != nil {
+		return // connectors.json not required
+	}
+
+	var file ConnectorsFile
+	if err := json.Unmarshal(data, &file); err != nil {
+		log.Printf("[ModelLoader] Warning: failed to parse connectors.json for platform limits: %v", err)
+		return
+	}
+
+	registered := 0
+	for _, conn := range file.Connectors {
+		// Only register web destinations with limit_schema
+		if conn.Type != "web" {
+			continue
+		}
+
+		// Only register if at least one limit is set
+		if conn.LimitSchema.MessagesPer3h == nil &&
+			conn.LimitSchema.MessagesPer8h == nil &&
+			conn.LimitSchema.MessagesPerDay == nil &&
+			conn.LimitSchema.MessagesPerSession == nil &&
+			conn.LimitSchema.TokensPerDay == nil &&
+			conn.LimitSchema.SessionsPerDay == nil {
+			continue
+		}
+
+		tracker.RegisterPlatformLimits(conn.ID, conn.LimitSchema)
+		registered++
+	}
+
+	if registered > 0 {
+		log.Printf("[ModelLoader] Registered platform limits for %d web destinations", registered)
+	}
+}
+
+func (l *ModelLoader) GetModel(modelID string) *ModelProfile {
+	if l.tracker == nil {
+		return nil
+	}
+
+	l.tracker.mu.RLock()
+	defer l.tracker.mu.RUnlock()
+
+	if usage, exists := l.tracker.models[modelID]; exists {
+		profile := usage.Profile
+		profile.Learned = usage.Learned
+		return &profile
+	}
+
+	return nil
+}
+
+func (l *ModelLoader) ListModels() []string {
+	if l.tracker == nil {
+		return nil
+	}
+
+	l.tracker.mu.RLock()
+	defer l.tracker.mu.RUnlock()
+
+	ids := make([]string, 0, len(l.tracker.models))
+	for id := range l.tracker.models {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func (l *ModelLoader) GetActiveModels() []string {
+	if l.tracker == nil {
+		return nil
+	}
+
+	l.tracker.mu.RLock()
+	defer l.tracker.mu.RUnlock()
+
+	ids := make([]string, 0)
+	for id, usage := range l.tracker.models {
+		if usage.Profile.Status == "active" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func (l *ModelLoader) GetAvailableModels(ctx context.Context) []string {
+	if l.tracker == nil {
+		return nil
+	}
+
+	l.tracker.mu.RLock()
+	defer l.tracker.mu.RUnlock()
+
+	now := time.Now()
+	ids := make([]string, 0)
+
+	for id, usage := range l.tracker.models {
+		if usage.Profile.Status != "active" {
+			continue
+		}
+
+		if usage.CooldownExpiresAt != nil && usage.CooldownExpiresAt.After(now) {
+			continue
+		}
+
+		ids = append(ids, id)
+	}
+
+	return ids
+}
+
+func (l *ModelLoader) UpdateLearnedData(ctx context.Context, modelID string, learned LearnedData) error {
+	if l.tracker != nil {
+		l.tracker.mu.Lock()
+		if usage, exists := l.tracker.models[modelID]; exists {
+			usage.Learned = learned
+		}
+		l.tracker.mu.Unlock()
+	}
+
+	learnedJSON, _ := json.Marshal(learned)
+
+	_, err := l.db.Update(ctx, "models", modelID, map[string]interface{}{
+		"learned": json.RawMessage(learnedJSON),
+	})
+
+	return err
+}

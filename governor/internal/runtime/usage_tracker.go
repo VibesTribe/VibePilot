@@ -1,0 +1,813 @@
+package runtime
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"sync"
+	"time"
+)
+
+type ThrottleBehavior string
+
+const (
+	ThrottleHardCutoff ThrottleBehavior = "hard_cutoff"
+	ThrottleSlowDown   ThrottleBehavior = "slow_down"
+	ThrottleQueue      ThrottleBehavior = "queue"
+	ThrottleRetryAfter ThrottleBehavior = "retry_after"
+)
+
+type RateLimits struct {
+	RequestsPerMinute  *int `json:"requests_per_minute"`
+	RequestsPerHour    *int `json:"requests_per_hour"`
+	RequestsPerDay     *int `json:"requests_per_day"`
+	TokensPerMinute    *int `json:"tokens_per_minute"`
+	TokensPerDay       *int `json:"tokens_per_day"`
+	MessagesPer3Hours  *int `json:"messages_per_3_hours"`
+	MessagesPerSession *int `json:"messages_per_session"`
+}
+
+type RecoveryConfig struct {
+	OnRateLimit           string `json:"on_rate_limit"`
+	CooldownMinutes       int    `json:"cooldown_minutes"`
+	TimeoutSeconds        int    `json:"timeout_seconds"`
+	HeartbeatIntervalSecs int    `json:"heartbeat_interval_seconds"`
+	OrphanThresholdSecs   int    `json:"orphan_threshold_seconds"`
+	MaxTaskAttempts       int    `json:"max_task_attempts"`
+	ModelFailureThreshold int    `json:"model_failure_threshold"`
+}
+
+type LearnedData struct {
+	AvgTaskDurationSeconds float64            `json:"avg_task_duration_seconds"`
+	FailureRateByType      map[string]float64 `json:"failure_rate_by_type"`
+	OptimalCooldownMinutes float64            `json:"optimal_cooldown_minutes"`
+	BestForTaskTypes       []string           `json:"best_for_task_types"`
+	AvoidForTaskTypes      []string           `json:"avoid_for_task_types"`
+}
+
+type APIPricing struct {
+	InputPer1MUsd       float64 `json:"input_per_1m_usd"`
+	OutputPer1MUsd      float64 `json:"output_per_1m_usd"`
+	InputPer1MCachedUsd float64 `json:"input_per_1m_cached_usd"`
+}
+
+type ModelProfile struct {
+	ID                      string                      `json:"id"`
+	Name                    string                      `json:"name"`
+	Provider                string                      `json:"provider"`
+	AccessType              string                      `json:"access_type"`
+	ContextLimit            int                         `json:"context_limit"`
+	Capabilities            []string                    `json:"capabilities"`
+	AccessVia               []string                    `json:"access_via"`
+	APIKeyRef               string                      `json:"api_key_ref"`
+	Status                  string                      `json:"status"`
+	RateLimits              RateLimits                  `json:"rate_limits"`
+	RateLimitsByConnector   map[string]RateLimits       `json:"rate_limits_by_connector"`
+	ThrottleBehavior        ThrottleBehavior            `json:"throttle_behavior"`
+	BufferPct               int                         `json:"buffer_pct"`
+	SpacingMinSecs          int                         `json:"spacing_min_seconds"`
+	APIPricing              APIPricing                  `json:"api_pricing"`
+	Recovery                RecoveryConfig              `json:"recovery"`
+	Learned                 LearnedData                 `json:"learned"`
+	Strengths               []string                    `json:"strengths"`
+	Weaknesses              []string                    `json:"weaknesses"`
+	Notes                   string                      `json:"notes"`
+	StatusReason            string                      `json:"status_reason"`
+}
+
+type UsageWindow struct {
+	Requests    int       `json:"requests"`
+	Tokens      int       `json:"tokens"`
+	WindowStart time.Time `json:"window_start"`
+	ResetAt     time.Time `json:"reset_at"`
+}
+
+type UsageWindows struct {
+	Minute UsageWindow `json:"minute"`
+	Hour   UsageWindow `json:"hour"`
+	Day    UsageWindow `json:"day"`
+	Week   UsageWindow `json:"week"`
+}
+
+type ModelUsage struct {
+	Profile           ModelProfile `json:"-"`
+	UsageWindows      UsageWindows `json:"usage_windows"`
+	LastRequestAt     time.Time    `json:"last_request_at"`
+	LastRateLimitAt   *time.Time   `json:"last_rate_limit_at"`
+	RateLimitCount    int          `json:"rate_limit_count"`
+	CooldownExpiresAt *time.Time   `json:"cooldown_expires_at"`
+	Learned           LearnedData  `json:"learned"`
+}
+
+type UsageTracker struct {
+	mu               sync.RWMutex
+	models           map[string]*ModelUsage
+	defaults         ModelProfile
+	db               Querier
+	connectorTracker *ConnectorUsageTracker
+	platformTracker  *PlatformUsageTracker
+}
+
+func NewUsageTracker(db Querier) *UsageTracker {
+	return &UsageTracker{
+		models:           make(map[string]*ModelUsage),
+		db:               db,
+		connectorTracker: NewConnectorUsageTracker(80),
+		platformTracker:  NewPlatformUsageTracker(80),
+		defaults: ModelProfile{
+			ThrottleBehavior: ThrottleSlowDown,
+			BufferPct:        80,
+			SpacingMinSecs:   1,
+			Recovery: RecoveryConfig{
+				OnRateLimit:           "cooldown",
+				CooldownMinutes:       30,
+				TimeoutSeconds:        300,
+				HeartbeatIntervalSecs: 30,
+				OrphanThresholdSecs:   300,
+				MaxTaskAttempts:       3,
+				ModelFailureThreshold: 3,
+			},
+		},
+	}
+}
+
+func (t *UsageTracker) SetDefaults(defaults ModelProfile) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.defaults = defaults
+	if defaults.BufferPct > 0 && t.connectorTracker != nil {
+		t.connectorTracker.bufferPct = defaults.BufferPct
+	}
+}
+
+// RegisterConnectorSharedLimits registers shared rate limits for a connector.
+// These limits are aggregated across all models using the connector.
+func (t *UsageTracker) RegisterConnectorSharedLimits(connectorID string, sharedLimits RateLimits) {
+	if t.connectorTracker != nil {
+		t.connectorTracker.RegisterConnector(connectorID, sharedLimits)
+	}
+}
+
+// RegisterPlatformLimits registers free-tier limits for a web platform destination.
+func (t *UsageTracker) RegisterPlatformLimits(platformID string, limits PlatformLimitSchema) {
+	if t.platformTracker != nil {
+		t.platformTracker.RegisterPlatform(platformID, limits)
+	}
+}
+
+// PlatformCanMakeRequest checks whether a web platform has capacity for another request.
+func (t *UsageTracker) PlatformCanMakeRequest(ctx context.Context, platformID string, estimatedTokens int) (bool, time.Duration) {
+	if t.platformTracker == nil {
+		return true, 0
+	}
+	return t.platformTracker.CanMakeRequest(ctx, platformID, estimatedTokens)
+}
+
+// RecordPlatformMessage records a message sent to a web platform destination.
+func (t *UsageTracker) RecordPlatformMessage(ctx context.Context, platformID string, tokensUsed int) {
+	if t.platformTracker != nil {
+		t.platformTracker.RecordMessageSent(ctx, platformID, tokensUsed)
+	}
+}
+
+// GetPlatformTracker returns the underlying PlatformUsageTracker for direct access.
+func (t *UsageTracker) GetPlatformTracker() *PlatformUsageTracker {
+	return t.platformTracker
+}
+
+func (t *UsageTracker) RegisterModel(profile ModelProfile) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	now := time.Now()
+	t.models[profile.ID] = &ModelUsage{
+		Profile: profile,
+		UsageWindows: UsageWindows{
+			Minute: UsageWindow{WindowStart: now, ResetAt: now.Add(time.Minute)},
+			Hour:   UsageWindow{WindowStart: now, ResetAt: now.Add(time.Hour)},
+			Day:    UsageWindow{WindowStart: now, ResetAt: now.Add(24 * time.Hour)},
+			Week:   UsageWindow{WindowStart: now, ResetAt: now.Add(7 * 24 * time.Hour)},
+		},
+	}
+}
+
+type RequestDecision struct {
+	CanProceed bool          `json:"can_proceed"`
+	WaitTime   time.Duration `json:"wait_time"`
+	Reason     string        `json:"reason"`
+	WindowType string        `json:"window_type"`
+}
+
+func (t *UsageTracker) CanMakeRequest(ctx context.Context, modelID string, estimatedTokens int) RequestDecision {
+	return t.CanMakeRequestVia(ctx, modelID, "", estimatedTokens)
+}
+
+// CanMakeRequestVia checks rate limits for a model via a specific connector.
+// If the model has rate_limits_by_connector[connectorID], those limits are used.
+// Otherwise falls back to the model's default rate_limits.
+func (t *UsageTracker) CanMakeRequestVia(ctx context.Context, modelID string, connectorID string, estimatedTokens int) RequestDecision {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	usage, exists := t.models[modelID]
+	if !exists {
+		return RequestDecision{CanProceed: false, Reason: "model not registered"}
+	}
+
+	now := time.Now()
+	profile := usage.Profile
+
+	// Context window check: if estimatedTokens exceeds the model's context_limit,
+	// this model cannot handle the task regardless of rate limit availability.
+	if estimatedTokens > 0 && profile.ContextLimit > 0 && estimatedTokens > profile.ContextLimit {
+		return RequestDecision{
+			CanProceed: false,
+			Reason:     "exceeds_context_limit",
+		}
+	}
+
+	if profile.BufferPct == 0 {
+		profile.BufferPct = t.defaults.BufferPct
+	}
+	buffer := float64(profile.BufferPct) / 100.0
+
+	if usage.CooldownExpiresAt != nil && usage.CooldownExpiresAt.After(now) {
+		return RequestDecision{
+			CanProceed: false,
+			WaitTime:   usage.CooldownExpiresAt.Sub(now),
+			Reason:     "cooldown_active",
+		}
+	}
+
+	t.resetExpiredWindows(usage, now)
+
+	// Use connector-specific limits if available, otherwise model defaults
+	limits := profile.RateLimits
+	if connectorID != "" {
+		if connectorLimits, ok := profile.RateLimitsByConnector[connectorID]; ok {
+			limits = connectorLimits
+		}
+	}
+
+	if limits.RequestsPerMinute != nil {
+		allowed := int(float64(*limits.RequestsPerMinute) * buffer)
+		if usage.UsageWindows.Minute.Requests >= allowed {
+			return RequestDecision{
+				CanProceed: false,
+				WaitTime:   usage.UsageWindows.Minute.ResetAt.Sub(now),
+				Reason:     "minute_limit_reached",
+				WindowType: "minute",
+			}
+		}
+	}
+
+	if limits.RequestsPerHour != nil {
+		allowed := int(float64(*limits.RequestsPerHour) * buffer)
+		if usage.UsageWindows.Hour.Requests >= allowed {
+			return RequestDecision{
+				CanProceed: false,
+				WaitTime:   usage.UsageWindows.Hour.ResetAt.Sub(now),
+				Reason:     "hour_limit_reached",
+				WindowType: "hour",
+			}
+		}
+	}
+
+	if limits.RequestsPerDay != nil {
+		allowed := int(float64(*limits.RequestsPerDay) * buffer)
+		if usage.UsageWindows.Day.Requests >= allowed {
+			return RequestDecision{
+				CanProceed: false,
+				WaitTime:   usage.UsageWindows.Day.ResetAt.Sub(now),
+				Reason:     "day_limit_reached",
+				WindowType: "day",
+			}
+		}
+	}
+
+	if limits.TokensPerDay != nil {
+		allowed := int(float64(*limits.TokensPerDay) * buffer)
+		if usage.UsageWindows.Day.Tokens+estimatedTokens > allowed {
+			return RequestDecision{
+				CanProceed: false,
+				WaitTime:   usage.UsageWindows.Day.ResetAt.Sub(now),
+				Reason:     "token_limit_reached",
+				WindowType: "day",
+			}
+		}
+	}
+
+	if limits.TokensPerMinute != nil {
+		allowed := int(float64(*limits.TokensPerMinute) * buffer)
+		if usage.UsageWindows.Minute.Tokens+estimatedTokens > allowed {
+			return RequestDecision{
+				CanProceed: false,
+				WaitTime:   usage.UsageWindows.Minute.ResetAt.Sub(now),
+				Reason:     "token_minute_limit_reached",
+				WindowType: "minute",
+			}
+		}
+	}
+
+	spacingSecs := profile.SpacingMinSecs
+	if spacingSecs == 0 {
+		spacingSecs = t.defaults.SpacingMinSecs
+	}
+	if spacingSecs > 0 && !usage.LastRequestAt.IsZero() {
+		nextAllowed := usage.LastRequestAt.Add(time.Duration(spacingSecs) * time.Second)
+		if nextAllowed.After(now) {
+			return RequestDecision{
+				CanProceed: false,
+				WaitTime:   nextAllowed.Sub(now),
+				Reason:     "spacing_not_met",
+			}
+		}
+	}
+
+	// Check connector-level shared limits (e.g., Groq org 100K TPD across all models)
+	if t.connectorTracker != nil && connectorID != "" {
+		canProceed, waitTime := t.connectorTracker.CanMakeRequest(ctx, connectorID, estimatedTokens)
+		if !canProceed {
+			return RequestDecision{
+				CanProceed: false,
+				WaitTime:   waitTime,
+				Reason:     "connector_shared_limit_reached",
+				WindowType: "connector",
+			}
+		}
+	}
+
+	return RequestDecision{CanProceed: true}
+}
+
+func (t *UsageTracker) RecordUsage(ctx context.Context, modelID string, tokensIn, tokensOut int) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	usage, exists := t.models[modelID]
+	if !exists {
+		return fmt.Errorf("model %s not registered", modelID)
+	}
+
+	now := time.Now()
+	totalTokens := tokensIn + tokensOut
+
+	t.resetExpiredWindows(usage, now)
+
+	usage.UsageWindows.Minute.Requests++
+	usage.UsageWindows.Minute.Tokens += totalTokens
+
+	usage.UsageWindows.Hour.Requests++
+	usage.UsageWindows.Hour.Tokens += totalTokens
+
+	usage.UsageWindows.Day.Requests++
+	usage.UsageWindows.Day.Tokens += totalTokens
+
+	usage.UsageWindows.Week.Requests++
+	usage.UsageWindows.Week.Tokens += totalTokens
+
+	usage.LastRequestAt = now
+
+	// Record usage on all connectors this model uses (shared limits tracking)
+	if t.connectorTracker != nil {
+		for _, connectorID := range usage.Profile.AccessVia {
+			t.connectorTracker.RecordUsage(ctx, connectorID, tokensIn, tokensOut)
+		}
+	}
+
+	return nil
+}
+
+func (t *UsageTracker) RecordRateLimit(ctx context.Context, modelID string) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	usage, exists := t.models[modelID]
+	if !exists {
+		return fmt.Errorf("model %s not registered", modelID)
+	}
+
+	now := time.Now()
+	usage.LastRateLimitAt = &now
+	usage.RateLimitCount++
+
+	cooldownMins := usage.Profile.Recovery.CooldownMinutes
+	if cooldownMins == 0 {
+		cooldownMins = t.defaults.Recovery.CooldownMinutes
+	}
+
+	if usage.Learned.OptimalCooldownMinutes > 0 {
+		cooldownMins = int(usage.Learned.OptimalCooldownMinutes)
+	}
+
+	cooldownExpiry := now.Add(time.Duration(cooldownMins) * time.Minute)
+	usage.CooldownExpiresAt = &cooldownExpiry
+
+	return nil
+}
+
+// RecordConnectorCooldown puts ALL models on the same connector into cooldown.
+// This handles shared rate limits (e.g., Groq org-level TPD shared across all models).
+func (t *UsageTracker) RecordConnectorCooldown(ctx context.Context, connectorID string, cooldownMins int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	now := time.Now()
+	cooldownExpiry := now.Add(time.Duration(cooldownMins) * time.Minute)
+	affected := 0
+
+	for modelID, usage := range t.models {
+		for _, via := range usage.Profile.AccessVia {
+			if via == connectorID {
+				usage.LastRateLimitAt = &now
+				usage.RateLimitCount++
+				usage.CooldownExpiresAt = &cooldownExpiry
+				affected++
+				log.Printf("[UsageTracker] Connector cooldown: model %s on %s until %v", modelID, connectorID, cooldownExpiry.Format("15:04:05"))
+				break
+			}
+		}
+	}
+
+	if affected > 0 {
+		log.Printf("[UsageTracker] Connector %s rate limit: %d models in cooldown for %d minutes", connectorID, affected, cooldownMins)
+	}
+}
+
+func (t *UsageTracker) RecordCompletion(ctx context.Context, modelID string, taskType string, durationSeconds float64, success bool) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	usage, exists := t.models[modelID]
+	if !exists {
+		return fmt.Errorf("model %s not registered", modelID)
+	}
+
+	if usage.Learned.AvgTaskDurationSeconds == 0 {
+		usage.Learned.AvgTaskDurationSeconds = durationSeconds
+	} else {
+		usage.Learned.AvgTaskDurationSeconds = (usage.Learned.AvgTaskDurationSeconds * 0.9) + (durationSeconds * 0.1)
+	}
+
+	if success {
+		found := false
+		for _, t := range usage.Learned.BestForTaskTypes {
+			if t == taskType {
+				found = true
+				break
+			}
+		}
+		if !found {
+			usage.Learned.BestForTaskTypes = append(usage.Learned.BestForTaskTypes, taskType)
+		}
+	} else {
+		if usage.Learned.FailureRateByType == nil {
+			usage.Learned.FailureRateByType = make(map[string]float64)
+		}
+		usage.Learned.FailureRateByType[taskType] += 1
+
+		if usage.CooldownExpiresAt != nil {
+			learnedCooldown := float64(usage.Profile.Recovery.CooldownMinutes) * 1.5
+			usage.Learned.OptimalCooldownMinutes = learnedCooldown
+		}
+	}
+
+	if usage.CooldownExpiresAt != nil && usage.CooldownExpiresAt.Before(time.Now()) {
+		usage.CooldownExpiresAt = nil
+	}
+
+	return nil
+}
+
+func (t *UsageTracker) resetExpiredWindows(usage *ModelUsage, now time.Time) {
+	if usage.UsageWindows.Minute.ResetAt.Before(now) {
+		usage.UsageWindows.Minute = UsageWindow{
+			WindowStart: now,
+			ResetAt:     now.Add(time.Minute),
+		}
+	}
+	if usage.UsageWindows.Hour.ResetAt.Before(now) {
+		usage.UsageWindows.Hour = UsageWindow{
+			WindowStart: now,
+			ResetAt:     now.Add(time.Hour),
+		}
+	}
+	if usage.UsageWindows.Day.ResetAt.Before(now) {
+		usage.UsageWindows.Day = UsageWindow{
+			WindowStart: now,
+			ResetAt:     now.Add(24 * time.Hour),
+		}
+	}
+	if usage.UsageWindows.Week.ResetAt.Before(now) {
+		usage.UsageWindows.Week = UsageWindow{
+			WindowStart: now,
+			ResetAt:     now.Add(7 * 24 * time.Hour),
+		}
+	}
+}
+
+func (t *UsageTracker) GetModelStatus(modelID string) (map[string]interface{}, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	usage, exists := t.models[modelID]
+	if !exists {
+		return nil, fmt.Errorf("model %s not registered", modelID)
+	}
+
+	status := map[string]interface{}{
+		"id":                usage.Profile.ID,
+		"name":              usage.Profile.Name,
+		"status":            usage.Profile.Status,
+		"throttle_behavior": usage.Profile.ThrottleBehavior,
+		"last_request_at":   usage.LastRequestAt,
+		"rate_limit_count":  usage.RateLimitCount,
+		"usage_windows":     usage.UsageWindows,
+		"learned":           usage.Learned,
+	}
+
+	if usage.CooldownExpiresAt != nil {
+		now := time.Now()
+		if usage.CooldownExpiresAt.After(now) {
+			status["cooldown_active"] = true
+			status["cooldown_expires_at"] = usage.CooldownExpiresAt
+			status["cooldown_remaining_seconds"] = usage.CooldownExpiresAt.Sub(now).Seconds()
+		} else {
+			status["cooldown_active"] = false
+		}
+	}
+
+	return status, nil
+}
+
+func (t *UsageTracker) GetCooldownCountdown(modelID string) (int, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	usage, exists := t.models[modelID]
+	if !exists {
+		return 0, fmt.Errorf("model %s not registered", modelID)
+	}
+
+	if usage.CooldownExpiresAt == nil {
+		return 0, nil
+	}
+
+	now := time.Now()
+	if usage.CooldownExpiresAt.Before(now) {
+		return 0, nil
+	}
+
+	return int(usage.CooldownExpiresAt.Sub(now).Seconds()), nil
+}
+
+func (t *UsageTracker) ExportForDashboard() ([]byte, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	models := make([]map[string]interface{}, 0, len(t.models))
+	for id := range t.models {
+		status, _ := t.GetModelStatus(id)
+		if status != nil {
+			models = append(models, status)
+		}
+	}
+
+	return json.Marshal(models)
+}
+
+func (t *UsageTracker) LoadFromDatabase(ctx context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	// Query models that have persisted usage state
+	data, err := t.db.Query(ctx, "models", map[string]any{
+		"or":   "usage_windows.not.is.null,cooldown_expires_at.not.is.null",
+		"limit": 200,
+	})
+	if err != nil {
+		return fmt.Errorf("query models: %w", err)
+	}
+
+	var rows []map[string]interface{}
+	if err := json.Unmarshal(data, &rows); err != nil {
+		return fmt.Errorf("unmarshal models: %w", err)
+	}
+
+	restored := 0
+	for _, row := range rows {
+		modelID, _ := row["id"].(string)
+		if modelID == "" {
+			continue
+		}
+
+		usage, exists := t.models[modelID]
+		if !exists {
+			continue // model not registered, skip
+		}
+
+		// Restore usage_windows (stored as TEXT containing JSON)
+		if raw, ok := row["usage_windows"]; ok && raw != nil {
+			var windows UsageWindows
+			if str, ok := raw.(string); ok && str != "" {
+				if err := json.Unmarshal([]byte(str), &windows); err != nil {
+					log.Printf("[UsageTracker] Warning: failed to parse usage_windows for %s: %v", modelID, err)
+				} else {
+					usage.UsageWindows = windows
+				}
+			}
+		}
+
+		// Restore cooldown_expires_at (TIMESTAMPTZ)
+		if raw, ok := row["cooldown_expires_at"]; ok && raw != nil {
+			if str, ok := raw.(string); ok && str != "" {
+				cooldownTime, err := parseTime(str)
+				if err != nil {
+					log.Printf("[UsageTracker] Warning: failed to parse cooldown_expires_at for %s: %v", modelID, err)
+				} else {
+					usage.CooldownExpiresAt = &cooldownTime
+				}
+			}
+		}
+
+		// Restore rate_limit_count
+		if raw, ok := row["rate_limit_count"]; ok && raw != nil {
+			switch v := raw.(type) {
+			case float64:
+				usage.RateLimitCount = int(v)
+			case json.Number:
+				n, _ := v.Int64()
+				usage.RateLimitCount = int(n)
+			}
+		}
+
+		// Restore last_rate_limit_at (TIMESTAMPTZ)
+		if raw, ok := row["last_rate_limit_at"]; ok && raw != nil {
+			if str, ok := raw.(string); ok && str != "" {
+				lastRL, err := parseTime(str)
+				if err != nil {
+					log.Printf("[UsageTracker] Warning: failed to parse last_rate_limit_at for %s: %v", modelID, err)
+				} else {
+					usage.LastRateLimitAt = &lastRL
+				}
+			}
+		}
+
+		// Restore learned (stored as TEXT containing JSON)
+		if raw, ok := row["learned"]; ok && raw != nil {
+			var learned LearnedData
+			if str, ok := raw.(string); ok && str != "" {
+				if err := json.Unmarshal([]byte(str), &learned); err != nil {
+					log.Printf("[UsageTracker] Warning: failed to parse learned for %s: %v", modelID, err)
+				} else {
+					usage.Learned = learned
+				}
+			}
+		}
+
+		restored++
+	}
+
+	log.Printf("[UsageTracker] Restored persisted state for %d/%d models from database", restored, len(t.models))
+
+	// Also restore connector and platform usage state
+	if t.connectorTracker != nil {
+		t.connectorTracker.LoadFromDatabase(ctx, t.db)
+	}
+	if t.platformTracker != nil {
+		t.platformTracker.LoadFromDatabase(ctx, t.db)
+	}
+
+	return nil
+}
+
+func (t *UsageTracker) PersistToDatabase(ctx context.Context) {
+	t.mu.RLock()
+	data := make(map[string]*ModelUsage)
+	for id, usage := range t.models {
+		data[id] = usage
+	}
+	t.mu.RUnlock()
+
+	for modelID, usage := range data {
+		windowsJSON, _ := json.Marshal(usage.UsageWindows)
+		learnedJSON, _ := json.Marshal(usage.Learned)
+
+		_, err := t.db.RPC(ctx, "update_model_usage", map[string]any{
+			"p_model_id":            modelID,
+			"p_usage_windows":       string(windowsJSON),
+			"p_cooldown_expires_at": usage.CooldownExpiresAt,
+			"p_last_rate_limit_at":  usage.LastRateLimitAt,
+			"p_rate_limit_count":    usage.RateLimitCount,
+			"p_learned":             string(learnedJSON),
+		})
+		if err != nil {
+			log.Printf("[UsageTracker] Failed to persist model %s: %v", modelID, err)
+		}
+	}
+
+	// Also persist connector and platform usage state
+	if t.connectorTracker != nil {
+		t.connectorTracker.PersistToDatabase(ctx, t.db)
+	}
+	if t.platformTracker != nil {
+		t.platformTracker.PersistToDatabase(ctx, t.db)
+	}
+}
+
+// GetMinuteRequestCount returns the number of requests made to a model in the current minute window.
+// Used by the router for load-balancing across available models.
+func (t *UsageTracker) GetMinuteRequestCount(ctx context.Context, modelID string) int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	usage, exists := t.models[modelID]
+	if !exists {
+		return 0
+	}
+	return usage.UsageWindows.Minute.Requests
+}
+
+// GetModelLearnedScore returns a routing preference score for a model given a task type.
+// Higher = better. Returns 0.5 (neutral) for models with no learned data.
+// Scoring: success on this task type = +0.3, failure history = -0.2 per failure (capped),
+// avoid_for_task_types = -0.5, best_for_task_types = +0.2.
+func (t *UsageTracker) GetModelLearnedScore(modelID string, taskType string) float64 {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	usage, exists := t.models[modelID]
+	if !exists || taskType == "" {
+		return 0.5 // neutral
+	}
+
+	score := 0.5 // baseline
+
+	learned := &usage.Learned
+
+	// Bonus for being best at this task type
+	for _, best := range learned.BestForTaskTypes {
+		if best == taskType {
+			score += 0.2
+			break
+		}
+	}
+
+	// Penalty for being bad at this task type
+	for _, avoid := range learned.AvoidForTaskTypes {
+		if avoid == taskType {
+			score -= 0.5
+			break
+		}
+	}
+
+	// Penalty for failure rate on this task type
+	if learned.FailureRateByType != nil {
+		if failCount, ok := learned.FailureRateByType[taskType]; ok && failCount > 0 {
+			penalty := 0.2 * failCount
+			if penalty > 0.4 {
+				penalty = 0.4
+			}
+			score -= penalty
+		}
+	}
+
+	// Clamp to [0, 1]
+	if score < 0 {
+		score = 0
+	}
+	if score > 1 {
+		score = 1
+	}
+	return score
+}
+
+// GetModelCooldownMinutes returns the configured cooldown minutes for a model.
+func (t *UsageTracker) GetModelCooldownMinutes(modelID string) int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	usage, exists := t.models[modelID]
+	if !exists {
+		return 0
+	}
+	return usage.Profile.Recovery.CooldownMinutes
+}
+
+// parseTime tries multiple timestamp formats to handle data written by
+// different backends (Supabase returns RFC3339, local PG may return Go format).
+func parseTime(s string) (time.Time, error) {
+	// Try RFC3339Nano first (standard format from Supabase/ISO 8601)
+	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+		return t, nil
+	}
+	// Try Go's default Time.String() format: "2006-01-02 15:04:05.999999999 -0700 MST"
+	if t, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", s); err == nil {
+		return t, nil
+	}
+	// Try without fractional seconds
+	if t, err := time.Parse("2006-01-02 15:04:05 -0700 MST", s); err == nil {
+		return t, nil
+	}
+	return time.Time{}, fmt.Errorf("cannot parse timestamp: %q", s)
+}

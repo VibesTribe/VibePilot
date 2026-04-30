@@ -1,0 +1,22 @@
+name: PRD Dispatch
+
+# NOTE: This workflow is intentionally a no-op. PRD processing is handled
+# by the VibePilot governor via GitHub push webhooks. When a file matching
+# docs/prd/*.md is pushed to main, the governor receives the webhook and
+# calls create_plan RPC directly against the local PostgreSQL database.
+# No Supabase or external API calls are needed.
+
+on:
+  push:
+    paths:
+      - 'docs/prd/**.md'
+    branches:
+      - main
+
+jobs:
+  # No-op: governor webhook handles PRD creation
+  acknowledge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Acknowledge PRD push
+        run: echo "PRD push detected. Governor webhook will process via webhooks.vibestribe.rocks"

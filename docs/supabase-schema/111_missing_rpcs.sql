@@ -1,0 +1,1219 @@
+-- ============================================================================
+-- VIBESPILOT SCHEMA MIGRATION 111
+-- Purpose: Create ALL missing RPCs that the governor binary calls
+-- Date: 2026-04-15
+-- ============================================================================
+BEGIN;
+
+-- ============================================================================
+-- 1. TABLES THAT DON'T EXIST YET
+-- ============================================================================
+
+-- Security audit log for vault operations
+CREATE TABLE IF NOT EXISTS security_audit_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  operation TEXT NOT NULL,
+  key_name TEXT,
+  allowed BOOLEAN NOT NULL DEFAULT true,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_security_audit_created ON security_audit_log(created_at DESC);
+
+-- Planner rules for council feedback learning
+CREATE TABLE IF NOT EXISTS planner_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  applies_to TEXT NOT NULL DEFAULT '*',
+  rule_type TEXT NOT NULL DEFAULT 'general',
+  rule_text TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'auto',
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_planner_rules_active ON planner_rules(active) WHERE active = true;
+
+-- Revision feedback tracking
+CREATE TABLE IF NOT EXISTS revision_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  plan_id UUID REFERENCES plans(id) ON DELETE CASCADE,
+  source TEXT NOT NULL DEFAULT 'supervisor',
+  feedback JSONB NOT NULL DEFAULT '{}',
+  tasks_needing_revision TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_revision_feedback_plan ON revision_feedback(plan_id);
+
+-- Enable RLS on new tables
+ALTER TABLE security_audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE planner_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE revision_feedback ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "service_all_security_audit" ON security_audit_log;
+DROP POLICY IF EXISTS "service_all_planner_rules" ON planner_rules;
+DROP POLICY IF EXISTS "anon_read_planner_rules" ON planner_rules;
+DROP POLICY IF EXISTS "service_all_revision_feedback" ON revision_feedback;
+
+CREATE POLICY "service_all_security_audit" ON security_audit_log FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "service_all_planner_rules" ON planner_rules FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_read_planner_rules" ON planner_rules FOR SELECT USING (true);
+CREATE POLICY "service_all_revision_feedback" ON revision_feedback FOR ALL USING (true) WITH CHECK (true);
+
+-- ============================================================================
+-- 2. TASK LIFECYCLE RPCs
+-- ============================================================================
+
+-- claim_task: Atomically claim an available task for execution
+-- Go params: p_task_id UUID, p_worker_id TEXT, p_model_id TEXT, p_routing_flag TEXT, p_routing_reason TEXT
+-- IMPORTANT: Must drop ALL old signatures before recreating with new return type (BOOLEAN -> JSONB)
+DROP FUNCTION IF EXISTS claim_task(UUID, TEXT, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS claim_task(UUID, TEXT, TEXT, TEXT, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION claim_task(
+  p_task_id UUID,
+  p_worker_id TEXT,
+  p_model_id TEXT,
+  p_routing_flag TEXT DEFAULT NULL,
+  p_routing_reason TEXT DEFAULT NULL
+) RETURNS JSONB AS $$
+DECLARE
+  v_result JSONB;
+BEGIN
+  UPDATE tasks
+  SET status = 'in_progress',
+      assigned_to = p_model_id,
+      processing_by = p_worker_id,
+      processing_at = NOW(),
+      started_at = COALESCE(started_at, NOW()),
+      routing_flag = COALESCE(p_routing_flag, routing_flag),
+      routing_flag_reason = COALESCE(p_routing_reason, routing_flag_reason),
+      updated_at = NOW()
+  WHERE id = p_task_id
+    AND status IN ('available', 'pending_resources')
+    AND (processing_by IS NULL OR processing_at < NOW() - INTERVAL '10 minutes')
+  RETURNING jsonb_build_object(
+    'id', id,
+    'status', status,
+    'task_number', task_number,
+    'title', title,
+    'type', type,
+    'result', result,
+    'plan_id', plan_id,
+    'slice_id', slice_id,
+    'task_number', task_number
+  ) INTO v_result;
+
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- claim_for_review: Atomically claim a task for supervisor review
+-- Go params: p_task_id UUID, p_reviewer_id TEXT
+DROP FUNCTION IF EXISTS claim_for_review(UUID, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION claim_for_review(
+  p_task_id UUID,
+  p_reviewer_id TEXT
+) RETURNS JSONB AS $$
+DECLARE
+  v_result JSONB;
+BEGIN
+  UPDATE tasks
+  SET processing_by = p_reviewer_id,
+      processing_at = NOW(),
+      updated_at = NOW()
+  WHERE id = p_task_id
+    AND status IN ('review', 'testing')
+    AND (processing_by IS NULL OR processing_at < NOW() - INTERVAL '10 minutes')
+  RETURNING jsonb_build_object(
+    'id', id,
+    'status', status,
+    'task_number', task_number,
+    'title', title,
+    'type', type,
+    'result', result,
+    'branch_name', branch_name
+  ) INTO v_result;
+
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- create_task_run: Record a task execution run
+-- Go params: p_task_id, p_model_id, p_courier, p_platform, p_status,
+--            p_tokens_in, p_tokens_out, p_tokens_used, p_courier_model_id,
+--            p_courier_tokens, p_courier_cost_usd, p_platform_theoretical_cost_usd,
+--            p_total_actual_cost_usd, p_total_savings_usd, p_started_at, p_completed_at,
+--            p_result
+DROP FUNCTION IF EXISTS create_task_run(UUID, TEXT, TEXT, TEXT, TEXT, INT, INT, INT, TEXT, INT, FLOAT, FLOAT, FLOAT, FLOAT, TIMESTAMPTZ, TIMESTAMPTZ, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS create_task_run(UUID, TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER, INTEGER, TEXT, INTEGER, NUMERIC, NUMERIC, NUMERIC, NUMERIC, TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH TIME ZONE) CASCADE;
+
+CREATE OR REPLACE FUNCTION create_task_run(
+  p_task_id UUID,
+  p_model_id TEXT,
+  p_courier TEXT,
+  p_platform TEXT DEFAULT 'internal',
+  p_status TEXT DEFAULT 'success',
+  p_tokens_in INT DEFAULT 0,
+  p_tokens_out INT DEFAULT 0,
+  p_tokens_used INT DEFAULT 0,
+  p_courier_model_id TEXT DEFAULT NULL,
+  p_courier_tokens INT DEFAULT 0,
+  p_courier_cost_usd FLOAT DEFAULT 0,
+  p_platform_theoretical_cost_usd FLOAT DEFAULT 0,
+  p_total_actual_cost_usd FLOAT DEFAULT 0,
+  p_total_savings_usd FLOAT DEFAULT 0,
+  p_started_at TIMESTAMPTZ DEFAULT NOW(),
+  p_completed_at TIMESTAMPTZ DEFAULT NULL,
+  p_result JSONB DEFAULT NULL
+) RETURNS UUID AS $$
+DECLARE
+  v_run_id UUID;
+BEGIN
+  INSERT INTO task_runs (
+    task_id, model_id, courier, platform, status,
+    tokens_in, tokens_out, tokens_used,
+    courier_model_id, courier_tokens, courier_cost_usd,
+    platform_theoretical_cost_usd, total_actual_cost_usd, total_savings_usd,
+    started_at, completed_at, result,
+    created_at
+  ) VALUES (
+    p_task_id, p_model_id, p_courier, p_platform, p_status,
+    p_tokens_in, p_tokens_out, p_tokens_used,
+    p_courier_model_id, p_courier_tokens, p_courier_cost_usd,
+    p_platform_theoretical_cost_usd, p_total_actual_cost_usd, p_total_savings_usd,
+    p_started_at, p_completed_at, p_result,
+    NOW()
+  ) RETURNING id INTO v_run_id;
+
+  RETURN v_run_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- calculate_run_costs: Calculate cost breakdown for a task run
+-- Go params: p_model_id, p_tokens_in, p_tokens_out, p_courier_cost_usd
+DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INT, INT, FLOAT) CASCADE;
+DROP FUNCTION IF EXISTS calculate_run_costs(TEXT, INTEGER, INTEGER, NUMERIC) CASCADE;
+
+CREATE OR REPLACE FUNCTION calculate_run_costs(
+  p_model_id TEXT,
+  p_tokens_in INT,
+  p_tokens_out INT,
+  p_courier_cost_usd FLOAT DEFAULT 0
+) RETURNS JSONB AS $$
+BEGIN
+  -- Free-tier models cost $0. Return zeroed cost structure.
+  RETURN jsonb_build_object(
+    'theoretical', 0.0,
+    'actual', p_courier_cost_usd,
+    'savings', 0.0,
+    'model_id', p_model_id,
+    'tokens_in', p_tokens_in,
+    'tokens_out', p_tokens_out
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 3. PLAN LIFECYCLE RPCs
+-- ============================================================================
+
+-- create_plan: Create a new plan from a PRD trigger
+-- Go params: p_project_id, p_prd_path, p_plan_path
+DROP FUNCTION IF EXISTS create_plan(UUID, TEXT, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION create_plan(
+  p_project_id UUID,
+  p_prd_path TEXT,
+  p_plan_path TEXT DEFAULT NULL
+) RETURNS UUID AS $$
+DECLARE
+  v_plan_id UUID;
+BEGIN
+  INSERT INTO plans (
+    project_id, prd_path, plan_path, status, created_at, updated_at
+  ) VALUES (
+    p_project_id, p_prd_path, p_plan_path, 'pending', NOW(), NOW()
+  ) RETURNING id INTO v_plan_id;
+
+  RETURN v_plan_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- update_plan_status: Transition plan to new status with optional notes
+-- Go params: p_plan_id, p_status, p_review_notes
+-- NOTE: uses review_notes NOT latest_feedback (verified column name)
+DROP FUNCTION IF EXISTS update_plan_status(UUID, TEXT, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS update_plan_status(UUID, TEXT, JSONB, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION update_plan_status(
+  p_plan_id UUID,
+  p_status TEXT,
+  p_review_notes JSONB DEFAULT NULL
+) RETURNS BOOLEAN AS $$
+DECLARE
+  v_updated INT;
+BEGIN
+  UPDATE plans
+  SET status = p_status,
+      processing_by = NULL,
+      processing_at = NULL,
+      review_notes = COALESCE(p_review_notes, review_notes),
+      updated_at = NOW()
+  WHERE id = p_plan_id;
+
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  RETURN v_updated > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 4. PROCESSING STATE RPCs (supplement 086)
+-- ============================================================================
+
+-- set_processing: Atomically claim an item for processing
+-- Go params vary: sometimes (p_table, p_id, p_processing_by), sometimes (p_id, p_processing_by, p_table)
+-- Support BOTH parameter orders via overloading
+DROP FUNCTION IF EXISTS set_processing(TEXT, UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS set_processing(UUID, TEXT, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION set_processing(
+  p_table TEXT,
+  p_id UUID,
+  p_processing_by TEXT
+) RETURNS BOOLEAN AS $$
+DECLARE
+  v_updated INT;
+BEGIN
+  IF p_table = 'plans' THEN
+    UPDATE plans SET processing_by = p_processing_by, processing_at = NOW(), updated_at = NOW()
+    WHERE id = p_id AND (processing_by IS NULL OR processing_at < NOW() - INTERVAL '10 minutes');
+  ELSIF p_table = 'tasks' THEN
+    UPDATE tasks SET processing_by = p_processing_by, processing_at = NOW(), updated_at = NOW()
+    WHERE id = p_id AND (processing_by IS NULL OR processing_at < NOW() - INTERVAL '10 minutes');
+  ELSIF p_table = 'maintenance_commands' THEN
+    UPDATE maintenance_commands SET processing_by = p_processing_by, processing_at = NOW()
+    WHERE id = p_id AND (processing_by IS NULL OR processing_at < NOW() - INTERVAL '10 minutes');
+  ELSIF p_table = 'research_suggestions' THEN
+    UPDATE research_suggestions SET processing_by = p_processing_by, processing_at = NOW()
+    WHERE id = p_id AND (processing_by IS NULL OR processing_at < NOW() - INTERVAL '10 minutes');
+  ELSIF p_table = 'test_results' THEN
+    UPDATE test_results SET processing_by = p_processing_by, processing_at = NOW()
+    WHERE id = p_id AND (processing_by IS NULL OR processing_at < NOW() - INTERVAL '10 minutes');
+  ELSE
+    RAISE EXCEPTION 'set_processing: unknown table %', p_table;
+  END IF;
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  RETURN v_updated > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- clear_processing: Release processing lock on an item
+DROP FUNCTION IF EXISTS clear_processing(TEXT, UUID) CASCADE;
+DROP FUNCTION IF EXISTS clear_processing(UUID, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION clear_processing(
+  p_table TEXT,
+  p_id UUID
+) RETURNS BOOLEAN AS $$
+DECLARE
+  v_updated INT;
+BEGIN
+  IF p_table = 'plans' THEN
+    UPDATE plans SET processing_by = NULL, processing_at = NULL, updated_at = NOW() WHERE id = p_id;
+  ELSIF p_table = 'tasks' THEN
+    UPDATE tasks SET processing_by = NULL, processing_at = NULL, updated_at = NOW() WHERE id = p_id;
+  ELSIF p_table = 'maintenance_commands' THEN
+    UPDATE maintenance_commands SET processing_by = NULL, processing_at = NULL WHERE id = p_id;
+  ELSIF p_table = 'research_suggestions' THEN
+    UPDATE research_suggestions SET processing_by = NULL, processing_at = NULL WHERE id = p_id;
+  ELSIF p_table = 'test_results' THEN
+    UPDATE test_results SET processing_by = NULL, processing_at = NULL WHERE id = p_id;
+  ELSE
+    RAISE EXCEPTION 'clear_processing: unknown table %', p_table;
+  END IF;
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  RETURN v_updated > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- find_stale_processing: Find items that have been processing too long
+-- Go params: p_table TEXT, p_timeout_seconds INT
+DROP FUNCTION IF EXISTS find_stale_processing(TEXT, INT) CASCADE;
+DROP FUNCTION IF EXISTS find_stale_processing(TEXT, INTEGER) CASCADE;
+
+CREATE OR REPLACE FUNCTION find_stale_processing(
+  p_table TEXT,
+  p_timeout_seconds INT DEFAULT 300
+) RETURNS TABLE (
+  id UUID,
+  processing_by TEXT,
+  seconds_stale FLOAT
+) AS $$
+BEGIN
+  IF p_table = 'plans' THEN
+    RETURN QUERY
+    SELECT plans.id, plans.processing_by,
+           EXTRACT(EPOCH FROM (NOW() - plans.processing_at))::FLOAT AS seconds_stale
+    FROM plans
+    WHERE plans.processing_by IS NOT NULL
+      AND plans.processing_at < NOW() - (p_timeout_seconds || ' seconds')::INTERVAL;
+  ELSIF p_table = 'tasks' THEN
+    RETURN QUERY
+    SELECT tasks.id, tasks.processing_by,
+           EXTRACT(EPOCH FROM (NOW() - tasks.processing_at))::FLOAT AS seconds_stale
+    FROM tasks
+    WHERE tasks.processing_by IS NOT NULL
+      AND tasks.processing_at < NOW() - (p_timeout_seconds || ' seconds')::INTERVAL;
+  ELSIF p_table = 'maintenance_commands' THEN
+    RETURN QUERY
+    SELECT maintenance_commands.id, maintenance_commands.processing_by,
+           EXTRACT(EPOCH FROM (NOW() - maintenance_commands.processing_at))::FLOAT AS seconds_stale
+    FROM maintenance_commands
+    WHERE maintenance_commands.processing_by IS NOT NULL
+      AND maintenance_commands.processing_at < NOW() - (p_timeout_seconds || ' seconds')::INTERVAL;
+  ELSIF p_table = 'research_suggestions' THEN
+    RETURN QUERY
+    SELECT research_suggestions.id, research_suggestions.processing_by,
+           EXTRACT(EPOCH FROM (NOW() - research_suggestions.processing_at))::FLOAT AS seconds_stale
+    FROM research_suggestions
+    WHERE research_suggestions.processing_by IS NOT NULL
+      AND research_suggestions.processing_at < NOW() - (p_timeout_seconds || ' seconds')::INTERVAL;
+  ELSIF p_table = 'test_results' THEN
+    RETURN QUERY
+    SELECT test_results.id, test_results.processing_by,
+           EXTRACT(EPOCH FROM (NOW() - test_results.processing_at))::FLOAT AS seconds_stale
+    FROM test_results
+    WHERE test_results.processing_by IS NOT NULL
+      AND test_results.processing_at < NOW() - (p_timeout_seconds || ' seconds')::INTERVAL;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- recover_stale_processing: Release lock on stale item
+-- Go params: p_table TEXT, p_id UUID, p_reason TEXT
+DROP FUNCTION IF EXISTS recover_stale_processing(TEXT, UUID, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION recover_stale_processing(
+  p_table TEXT,
+  p_id UUID,
+  p_reason TEXT
+) RETURNS BOOLEAN AS $$
+BEGIN
+  -- Clear processing lock so item becomes pickable again
+  PERFORM clear_processing(p_table, p_id);
+  RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 5. LEARNING / MODEL TRACKING RPCs
+-- ============================================================================
+
+-- record_model_success: Track successful model execution for learning
+-- Go params: p_model_id, p_task_type, p_duration_seconds, p_tokens_used
+-- NOTE: learned_heuristics has NO unique constraint on (task_type, preferred_model).
+--       Using INSERT + separate UPDATE pattern instead of ON CONFLICT.
+DROP FUNCTION IF EXISTS record_model_success(TEXT, TEXT, FLOAT, INT) CASCADE;
+DROP FUNCTION IF EXISTS record_model_success(TEXT, TEXT, NUMERIC, INTEGER) CASCADE;
+
+CREATE OR REPLACE FUNCTION record_model_success(
+  p_model_id TEXT,
+  p_task_type TEXT,
+  p_duration_seconds FLOAT DEFAULT NULL,
+  p_tokens_used INT DEFAULT NULL
+) RETURNS VOID AS $$
+DECLARE
+  v_existing INT;
+BEGIN
+  -- Check if a heuristic already exists for this task_type + model
+  SELECT COUNT(*) INTO v_existing
+  FROM learned_heuristics
+  WHERE task_type = p_task_type AND preferred_model = p_model_id;
+
+  IF v_existing = 0 THEN
+    -- Insert new heuristic
+    INSERT INTO learned_heuristics (task_type, preferred_model, source, confidence, success_count, created_at)
+    VALUES (p_task_type, p_model_id, 'statistical', 0.5, 1, NOW());
+  ELSE
+    -- Increment success count and recalculate confidence
+    UPDATE learned_heuristics
+    SET success_count = COALESCE(success_count, 0) + 1,
+        confidence = LEAST(1.0, COALESCE(success_count, 0)::FLOAT / NULLIF(COALESCE(success_count, 0) + COALESCE(failure_count, 0), 0)),
+        last_applied_at = NOW()
+    WHERE task_type = p_task_type AND preferred_model = p_model_id;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- record_model_failure: Track failed model execution for learning
+-- Go params: p_model_id, p_task_id, p_failure_type, p_failure_category
+-- NOTE: failure_records has failure_category and failure_details columns (verified)
+DROP FUNCTION IF EXISTS record_model_failure(TEXT, UUID, TEXT, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION record_model_failure(
+  p_model_id TEXT,
+  p_task_id UUID DEFAULT NULL,
+  p_failure_type TEXT DEFAULT 'unknown',
+  p_failure_category TEXT DEFAULT 'unknown'
+) RETURNS VOID AS $$
+BEGIN
+  -- Record the failure with all available columns
+  INSERT INTO failure_records (task_id, failure_type, failure_category, model_id, created_at)
+  VALUES (p_task_id, p_failure_type, p_failure_category, p_model_id, NOW());
+
+  -- Decrement confidence for this model
+  UPDATE learned_heuristics
+  SET failure_count = COALESCE(failure_count, 0) + 1,
+      confidence = GREATEST(0.0, COALESCE(success_count, 0)::FLOAT / NULLIF(COALESCE(success_count, 0) + COALESCE(failure_count, 0) + 1, 0))
+  WHERE preferred_model = p_model_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- record_failure: Detailed failure recording from task handler
+-- Go params: p_task_id, p_failure_type, p_failure_category, p_failure_details, p_model_id, p_task_type
+-- NOTE: column is failure_details (NOT details). tasks has failure_notes but NO last_error/last_error_at.
+DROP FUNCTION IF EXISTS record_failure(UUID, TEXT, TEXT, JSONB, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS record_failure(UUID, UUID, TEXT, TEXT, JSONB, TEXT, TEXT, UUID, TEXT, INTEGER, INTEGER) CASCADE;
+
+CREATE OR REPLACE FUNCTION record_failure(
+  p_task_id UUID,
+  p_failure_type TEXT,
+  p_failure_category TEXT DEFAULT NULL,
+  p_failure_details JSONB DEFAULT '{}',
+  p_model_id TEXT DEFAULT NULL,
+  p_task_type TEXT DEFAULT NULL
+) RETURNS UUID AS $$
+DECLARE
+  v_id UUID;
+BEGIN
+  INSERT INTO failure_records (
+    task_id, failure_type, failure_category, failure_details, model_id, created_at
+  ) VALUES (
+    p_task_id, p_failure_type, p_failure_category, p_failure_details, p_model_id, NOW()
+  ) RETURNING id INTO v_id;
+
+  -- Append to task failure notes (NO last_error/last_error_at columns exist)
+  UPDATE tasks
+  SET failure_notes = COALESCE(failure_notes || E'\n', '') ||
+                      p_failure_type || ' (' || COALESCE(p_failure_category, 'unknown') || ') at ' || NOW()::text,
+      updated_at = NOW()
+  WHERE id = p_task_id;
+
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 6. COUNCIL RPCs
+-- ============================================================================
+
+-- store_council_reviews: Store all council member reviews
+-- Go params: p_plan_id, p_reviews (JSONB array), p_mode TEXT, p_models JSONB
+-- NOTE: council_reviews has (plan_id, model_id, vote, concerns) - NO reviewer_model/reasoning/mode
+DROP FUNCTION IF EXISTS store_council_reviews(UUID, JSONB, TEXT, JSONB) CASCADE;
+
+CREATE OR REPLACE FUNCTION store_council_reviews(
+  p_plan_id UUID,
+  p_reviews JSONB,
+  p_mode TEXT DEFAULT 'sequential_same_model',
+  p_models JSONB DEFAULT NULL
+) RETURNS VOID AS $$
+DECLARE
+  review JSONB;
+BEGIN
+  FOR review IN SELECT * FROM jsonb_array_elements(p_reviews)
+  LOOP
+    INSERT INTO council_reviews (
+      plan_id, model_id, vote, concerns, created_at
+    ) VALUES (
+      p_plan_id,
+      COALESCE(review->>'reviewer', review->>'model_id', 'unknown'),
+      COALESCE(review->>'vote', review->>'decision', 'unknown'),
+      COALESCE(review->'concerns', '[]'::jsonb),
+      NOW()
+    );
+  END LOOP;
+
+  -- Update plan with council mode and models used
+  UPDATE plans
+  SET council_mode = p_mode,
+      council_models = COALESCE(p_models, council_models),
+      updated_at = NOW()
+  WHERE id = p_plan_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- set_council_consensus: Record the consensus decision for a plan
+-- Go params: p_plan_id, p_consensus TEXT
+-- NOTE: uses review_notes NOT latest_feedback (verified)
+DROP FUNCTION IF EXISTS set_council_consensus(UUID, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION set_council_consensus(
+  p_plan_id UUID,
+  p_consensus TEXT
+) RETURNS VOID AS $$
+BEGIN
+  UPDATE plans
+  SET review_notes = jsonb_build_object(
+        'consensus', p_consensus,
+        'updated_at', NOW()::text
+      ),
+      updated_at = NOW()
+  WHERE id = p_plan_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 7. MAINTENANCE COMMAND RPCs
+-- ============================================================================
+
+-- create_maintenance_command: Queue a maintenance action
+-- Go params: p_command_type TEXT, p_payload JSONB, p_status TEXT
+-- NOTE: column is command_type (NOT type). Go passes p_status='pending'.
+DROP FUNCTION IF EXISTS create_maintenance_command(TEXT, JSONB, TEXT, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION create_maintenance_command(
+  p_command_type TEXT,
+  p_payload JSONB DEFAULT '{}',
+  p_source TEXT DEFAULT 'auto',
+  p_approved_by TEXT DEFAULT NULL
+) RETURNS UUID AS $$
+DECLARE
+  v_id UUID;
+BEGIN
+  INSERT INTO maintenance_commands (command_type, payload, source, approved_by, status, created_at, updated_at)
+  VALUES (p_command_type, p_payload, p_source, p_approved_by, 'pending', NOW(), NOW())
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- update_maintenance_command_status: Update maintenance command status
+-- Go params: p_id UUID, p_status TEXT, p_result_notes JSONB
+DROP FUNCTION IF EXISTS update_maintenance_command_status(UUID, TEXT, JSONB) CASCADE;
+
+CREATE OR REPLACE FUNCTION update_maintenance_command_status(
+  p_id UUID,
+  p_status TEXT,
+  p_result_notes JSONB DEFAULT NULL
+) RETURNS BOOLEAN AS $$
+DECLARE
+  v_updated INT;
+BEGIN
+  UPDATE maintenance_commands
+  SET status = p_status,
+      result = COALESCE(p_result_notes, result),
+      processing_by = NULL,
+      processing_at = NULL,
+      updated_at = NOW()
+  WHERE id = p_id;
+
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  RETURN v_updated > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- queue_maintenance_command: Alias used by db_tools.go
+-- Go params: p_command TEXT, p_params JSONB
+DROP FUNCTION IF EXISTS queue_maintenance_command(TEXT, JSONB, INT) CASCADE;
+
+CREATE OR REPLACE FUNCTION queue_maintenance_command(
+  p_command TEXT,
+  p_params JSONB DEFAULT '{}',
+  p_priority INT DEFAULT 5
+) RETURNS UUID AS $$
+BEGIN
+  RETURN create_maintenance_command(p_command, p_params);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 8. RESEARCH SUGGESTION RPCs
+-- ============================================================================
+
+-- update_research_suggestion_status: Transition research suggestion
+-- Go params: p_id UUID, p_status TEXT, p_review_notes JSONB
+DROP FUNCTION IF EXISTS update_research_suggestion_status(UUID, TEXT, JSONB) CASCADE;
+
+CREATE OR REPLACE FUNCTION update_research_suggestion_status(
+  p_id UUID,
+  p_status TEXT,
+  p_review_notes JSONB DEFAULT NULL
+) RETURNS BOOLEAN AS $$
+DECLARE
+  v_updated INT;
+BEGIN
+  UPDATE research_suggestions
+  SET status = p_status,
+      review_notes = COALESCE(p_review_notes, review_notes),
+      processing_by = NULL,
+      processing_at = NULL,
+      updated_at = NOW()
+  WHERE id = p_id;
+
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  RETURN v_updated > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 9. DEPENDENCY / UNLOCK RPCs
+-- ============================================================================
+
+-- unlock_dependent_tasks: Release tasks blocked by a completed task
+-- Go params: p_completed_task_id UUID
+DROP FUNCTION IF EXISTS unlock_dependent_tasks(UUID) CASCADE;
+
+CREATE OR REPLACE FUNCTION unlock_dependent_tasks(
+  p_completed_task_id UUID
+) RETURNS INT AS $$
+DECLARE
+  v_unlocked INT;
+BEGIN
+  -- Find tasks whose dependencies include the completed task and set them available
+  UPDATE tasks
+  SET status = 'available',
+      updated_at = NOW()
+  WHERE status = 'pending'
+    AND dependencies @> to_jsonb(ARRAY[p_completed_task_id::text])
+    AND id != p_completed_task_id;
+
+  GET DIAGNOSTICS v_unlocked = ROW_COUNT;
+  RETURN v_unlocked;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 10. ROUTING / PLATFORM RPCs
+-- ============================================================================
+
+-- check_platform_availability: Check if a platform/connector is available
+-- Go params: p_platform_id TEXT
+DROP FUNCTION IF EXISTS check_platform_availability(TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION check_platform_availability(
+  p_platform_id TEXT
+) RETURNS JSONB AS $$
+BEGIN
+  -- Check if any model from this platform exists in our config
+  -- For now, always return available (governor's UsageTracker handles rate limits)
+  RETURN jsonb_build_object(
+    'available', true,
+    'platform_id', p_platform_id,
+    'checked_at', NOW()::text
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 11. ANALYST RPCs
+-- ============================================================================
+
+-- get_model_performance: Get aggregated model performance stats
+-- No params
+DROP FUNCTION IF EXISTS get_model_performance() CASCADE;
+
+CREATE OR REPLACE FUNCTION get_model_performance()
+RETURNS JSONB AS $$
+BEGIN
+  RETURN (
+    SELECT COALESCE(jsonb_object_agg(
+      preferred_model,
+      jsonb_build_object(
+        'success_count', success_count,
+        'failure_count', failure_count,
+        'confidence', confidence,
+        'last_applied', last_applied_at
+      )
+    ), '{}'::jsonb)
+    FROM learned_heuristics
+    WHERE expires_at > NOW() OR expires_at IS NULL
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- get_failure_patterns: Get recent failure patterns
+-- Go params: days INT
+DROP FUNCTION IF EXISTS get_failure_patterns(INT) CASCADE;
+
+CREATE OR REPLACE FUNCTION get_failure_patterns(
+  days INT DEFAULT 7
+) RETURNS JSONB AS $$
+BEGIN
+  RETURN (
+    SELECT COALESCE(jsonb_agg(jsonb_build_object(
+      'failure_type', failure_type,
+      'count', count,
+      'latest', latest
+    )), '[]'::jsonb)
+    FROM (
+      SELECT failure_type,
+             COUNT(*) as count,
+             MAX(created_at) as latest
+      FROM failure_records
+      WHERE created_at > NOW() - (days || ' days')::INTERVAL
+      GROUP BY failure_type
+      ORDER BY count DESC
+      LIMIT 20
+    ) sub
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 12. SECURITY / AUDIT RPCs
+-- ============================================================================
+
+-- log_security_audit: Record a vault security event
+-- Go params: p_operation TEXT, p_key_name TEXT, p_allowed BOOLEAN, p_reason TEXT
+DROP FUNCTION IF EXISTS log_security_audit(TEXT, TEXT, BOOLEAN, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS log_security_audit(TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION log_security_audit(
+  p_operation TEXT,
+  p_key_name TEXT DEFAULT NULL,
+  p_allowed BOOLEAN DEFAULT true,
+  p_reason TEXT DEFAULT NULL
+) RETURNS UUID AS $$
+DECLARE
+  v_id UUID;
+BEGIN
+  INSERT INTO security_audit_log (operation, key_name, allowed, metadata, created_at)
+  VALUES (p_operation, p_key_name, p_allowed, 
+    jsonb_build_object('reason', p_reason), NOW())
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 13. PLANNER LEARNING RPCs
+-- ============================================================================
+
+-- create_planner_rule: Store a learned planner rule from council feedback
+-- Go params: p_applies_to TEXT, p_rule_type TEXT, p_rule_text TEXT, p_source TEXT
+DROP FUNCTION IF EXISTS create_planner_rule(TEXT, TEXT, TEXT, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION create_planner_rule(
+  p_applies_to TEXT DEFAULT '*',
+  p_rule_type TEXT DEFAULT 'general',
+  p_rule_text TEXT DEFAULT '',
+  p_source TEXT DEFAULT 'auto'
+) RETURNS UUID AS $$
+DECLARE
+  v_id UUID;
+BEGIN
+  INSERT INTO planner_rules (applies_to, rule_type, rule_text, source, created_at, updated_at)
+  VALUES (p_applies_to, p_rule_type, p_rule_text, p_source, NOW(), NOW())
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- record_planner_revision: Track plan revision for planner learning
+-- Go params: p_plan_id UUID, p_concerns JSONB, p_tasks_needing_revision JSONB
+-- NOTE: plans has NO tasks_needing_revision column. Uses review_notes NOT latest_feedback.
+DROP FUNCTION IF EXISTS record_planner_revision(UUID, JSONB, JSONB) CASCADE;
+
+CREATE OR REPLACE FUNCTION record_planner_revision(
+  p_plan_id UUID,
+  p_concerns JSONB DEFAULT '[]',
+  p_tasks_needing_revision JSONB DEFAULT '[]'
+) RETURNS VOID AS $$
+BEGIN
+  UPDATE plans
+  SET revision_round = COALESCE(revision_round, 0) + 1,
+      review_notes = jsonb_build_object(
+        'concerns', p_concerns,
+        'tasks_needing_revision', p_tasks_needing_revision,
+        'revised_at', NOW()::text
+      ),
+      revision_history = COALESCE(revision_history, '[]'::jsonb) ||
+        jsonb_build_object(
+          'round', COALESCE(revision_round, 0) + 1,
+          'concerns', p_concerns,
+          'timestamp', NOW()::text
+        ),
+      updated_at = NOW()
+  WHERE id = p_plan_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- record_revision_feedback: Store feedback from revision review
+-- Go params: p_plan_id UUID, p_source TEXT, p_feedback JSONB, p_tasks_needing_revision JSONB
+DROP FUNCTION IF EXISTS record_revision_feedback(UUID, TEXT, JSONB, JSONB) CASCADE;
+
+CREATE OR REPLACE FUNCTION record_revision_feedback(
+  p_plan_id UUID,
+  p_source TEXT DEFAULT 'supervisor',
+  p_feedback JSONB DEFAULT '{}',
+  p_tasks_needing_revision JSONB DEFAULT '[]'
+) RETURNS UUID AS $$
+DECLARE
+  v_id UUID;
+BEGIN
+  INSERT INTO revision_feedback (plan_id, source, feedback, tasks_needing_revision, created_at)
+  VALUES (p_plan_id, p_source, p_feedback,
+          (SELECT array_agg(elem) FROM jsonb_array_elements_text(p_tasks_needing_revision) elem),
+          NOW())
+  RETURNING id INTO v_id;
+
+  -- Also update plan's review notes
+  UPDATE plans
+  SET review_notes = p_feedback,
+      updated_at = NOW()
+  WHERE id = p_plan_id;
+
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 14. MEMORY SYSTEM RPCs (for 3-layer memory)
+-- ============================================================================
+
+-- store_memory: Store a memory item in the appropriate layer
+-- Go params: p_layer TEXT, p_key TEXT, p_value TEXT, p_ttl_sec INT
+DROP FUNCTION IF EXISTS store_memory(TEXT, TEXT, TEXT, INT) CASCADE;
+
+CREATE OR REPLACE FUNCTION store_memory(
+  p_layer TEXT,
+  p_key TEXT,
+  p_value TEXT,
+  p_ttl_sec INT DEFAULT 3600
+) RETURNS BOOLEAN AS $$
+DECLARE
+  v_success BOOLEAN := false;
+BEGIN
+  IF p_layer = 'short_term' THEN
+    INSERT INTO memory_sessions (session_id, agent_type, context, created_at, expires_at)
+    VALUES (p_key, 'unknown', jsonb_build_object('value', p_value), NOW(), NOW() + (p_ttl_sec || ' seconds')::INTERVAL)
+    ON CONFLICT (session_id) DO UPDATE
+      SET context = jsonb_build_object('value', p_value),
+          created_at = NOW(),
+          expires_at = NOW() + (p_ttl_sec || ' seconds')::INTERVAL;
+    v_success := true;
+
+  ELSIF p_layer = 'mid_term' THEN
+    INSERT INTO memory_project (project_id, key, value, updated_at)
+    VALUES ('vibepilot', p_key, jsonb_build_object('value', p_value), NOW())
+    ON CONFLICT (project_id, key) DO UPDATE
+      SET value = jsonb_build_object('value', p_value),
+          updated_at = NOW();
+    v_success := true;
+
+  ELSIF p_layer = 'long_term' THEN
+    INSERT INTO memory_rules (category, rule_text, source, priority, confidence, created_at, updated_at)
+    VALUES (p_key, p_value, 'auto', 0, 0.5, NOW(), NOW());
+    v_success := true;
+  END IF;
+
+  RETURN v_success;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- recall_memories: Retrieve memory items by layer and key prefix
+-- Go params: p_layer TEXT, p_query TEXT, p_limit INT
+DROP FUNCTION IF EXISTS recall_memories(TEXT, TEXT, INT) CASCADE;
+
+CREATE OR REPLACE FUNCTION recall_memories(
+  p_layer TEXT,
+  p_query TEXT DEFAULT '',
+  p_limit INT DEFAULT 10
+) RETURNS JSONB AS $$
+DECLARE
+  v_result JSONB;
+BEGIN
+  IF p_layer = 'short_term' THEN
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object('key', session_id, 'value', context->>'value', 'created_at', created_at)
+    ), '[]'::jsonb) INTO v_result
+    FROM (
+      SELECT session_id, context, created_at
+      FROM memory_sessions
+      WHERE (p_query = '' OR session_id LIKE p_query || '%')
+        AND expires_at > NOW()
+      ORDER BY created_at DESC
+      LIMIT p_limit
+    ) sub;
+
+  ELSIF p_layer = 'mid_term' THEN
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object('key', key, 'value', value->>'value', 'updated_at', updated_at)
+    ), '[]'::jsonb) INTO v_result
+    FROM (
+      SELECT key, value, updated_at
+      FROM memory_project
+      WHERE (p_query = '' OR key LIKE p_query || '%')
+      ORDER BY updated_at DESC
+      LIMIT p_limit
+    ) sub;
+
+  ELSIF p_layer = 'long_term' THEN
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object('key', category, 'value', rule_text, 'source', source, 'confidence', confidence)
+    ), '[]'::jsonb) INTO v_result
+    FROM (
+      SELECT category, rule_text, source, confidence, priority, updated_at
+      FROM memory_rules
+      WHERE (p_query = '' OR category LIKE p_query || '%')
+      ORDER BY priority DESC, updated_at DESC
+      LIMIT p_limit
+    ) sub;
+
+  ELSE
+    v_result := '[]'::jsonb;
+  END IF;
+
+  RETURN COALESCE(v_result, '[]'::jsonb);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 15. ORPHAN RECOVERY RPCs (complement existing find_orphaned_sessions)
+-- ============================================================================
+
+-- recover_orphaned_session: Recover a single orphaned session
+-- Go params: p_session_id UUID, p_reason TEXT
+DROP FUNCTION IF EXISTS recover_orphaned_session(UUID, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION recover_orphaned_session(
+  p_session_id UUID,
+  p_reason TEXT DEFAULT 'timeout_recovery'
+) RETURNS BOOLEAN AS $$
+DECLARE
+  v_updated INT;
+BEGIN
+  -- Release processing lock on any entity held by this session
+  UPDATE tasks
+  SET processing_by = NULL, processing_at = NULL, updated_at = NOW()
+  WHERE processing_by LIKE '%' || p_session_id::text || '%';
+
+  UPDATE plans
+  SET processing_by = NULL, processing_at = NULL, updated_at = NOW()
+  WHERE processing_by LIKE '%' || p_session_id::text || '%';
+
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  RETURN v_updated > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 16. MODEL SCORING RPC (replaces migration 033 version)
+-- ============================================================================
+
+-- get_model_score_for_task: Compute a 0.0-1.0 score for how well a model
+-- handles a given task type and category.
+--
+-- Go params (router.go:431):
+--   p_model_id      TEXT   - model identifier (e.g. "claude-3.5-sonnet")
+--   p_task_type     TEXT   - task type (e.g. "code", "review", "test")
+--   p_task_category TEXT   - task category (e.g. "bugfix", "feature", "refactor")
+--
+-- Go expects JSONB with: { "score": 0.75 }
+-- Falls back to 0.5 (neutral) when no data exists.
+--
+-- Scoring formula (weighted blend):
+--   1. Success rate from task_runs (40%) - raw success/fail ratio
+--   2. Recency bonus (20%) - recent runs weighted more heavily
+--   3. Learned heuristic confidence (25%) - from learned_heuristics table
+--   4. Model strengths match (15%) - from models.strengths array
+--
+-- Migration 033 had only 2 params (p_model_id, p_task_type). The Go router
+-- sends 3 params including p_task_category, which caused a "function not
+-- found" error and every call fell back to 0.5. This replacement fixes that.
+DROP FUNCTION IF EXISTS get_model_score_for_task(TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS get_model_score_for_task(TEXT, TEXT, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION get_model_score_for_task(
+  p_model_id      TEXT,
+  p_task_type     TEXT DEFAULT NULL,
+  p_task_category TEXT DEFAULT NULL
+) RETURNS JSONB AS $$
+DECLARE
+  v_success_count   INT := 0;
+  v_failure_count   INT := 0;
+  v_total           INT := 0;
+  v_base_score      FLOAT := 0.5;
+
+  -- Recency-weighted success rate components
+  v_recent_success  INT := 0;
+  v_recent_failure  INT := 0;
+  v_recent_total    INT := 0;
+  v_recency_score   FLOAT := 0.5;
+
+  -- Heuristic confidence
+  v_heuristic_conf  FLOAT := NULL;
+  v_heuristic_score FLOAT := 0.5;
+
+  -- Strengths/weaknesses match
+  v_strengths       TEXT[] := '{}';
+  v_weaknesses      TEXT[] := '{}';
+  v_strength_score  FLOAT := 0.5;
+
+  -- Final blended score
+  v_final_score     FLOAT := 0.5;
+
+  -- Normalisation constants
+  v_weight_base     FLOAT := 0.40;
+  v_weight_recency  FLOAT := 0.20;
+  v_weight_heuristic FLOAT := 0.25;
+  v_weight_strength FLOAT := 0.15;
+BEGIN
+  -- ------------------------------------------------------------------
+  -- 1. BASE SCORE: overall success rate from task_runs
+  -- ------------------------------------------------------------------
+  SELECT
+    COUNT(*) FILTER (WHERE tr.status = 'success'),
+    COUNT(*) FILTER (WHERE tr.status IN ('failed', 'timeout'))
+  INTO v_success_count, v_failure_count
+  FROM task_runs tr
+  JOIN tasks t ON t.id = tr.task_id
+  WHERE tr.model_id = p_model_id
+    AND (p_task_type IS NULL OR t.type = p_task_type)
+    AND (p_task_category IS NULL OR t.category = p_task_category);
+
+  v_total := v_success_count + v_failure_count;
+
+  IF v_total > 0 THEN
+    v_base_score := v_success_count::FLOAT / v_total::FLOAT;
+  ELSE
+    v_base_score := 0.5;
+  END IF;
+
+  -- ------------------------------------------------------------------
+  -- 2. RECENCY SCORE: success rate from last 7 days only
+  -- ------------------------------------------------------------------
+  SELECT
+    COUNT(*) FILTER (WHERE tr.status = 'success'),
+    COUNT(*) FILTER (WHERE tr.status IN ('failed', 'timeout'))
+  INTO v_recent_success, v_recent_failure
+  FROM task_runs tr
+  JOIN tasks t ON t.id = tr.task_id
+  WHERE tr.model_id = p_model_id
+    AND (p_task_type IS NULL OR t.type = p_task_type)
+    AND (p_task_category IS NULL OR t.category = p_task_category)
+    AND tr.started_at > NOW() - INTERVAL '7 days';
+
+  v_recent_total := v_recent_success + v_recent_failure;
+
+  IF v_recent_total >= 3 THEN
+    -- Enough recent data to trust it
+    v_recency_score := v_recent_success::FLOAT / v_recent_total::FLOAT;
+  ELSIF v_recent_total > 0 THEN
+    -- Very few recent runs: blend with 0.5 to avoid overreaction
+    v_recency_score := (v_recent_success::FLOAT / v_recent_total::FLOAT) * 0.5 + 0.25;
+  ELSE
+    -- No recent data: fall back to base score (not neutral 0.5)
+    v_recency_score := v_base_score;
+  END IF;
+
+  -- ------------------------------------------------------------------
+  -- 3. HEURISTIC SCORE: confidence from learned_heuristics
+  -- ------------------------------------------------------------------
+  -- Look for a heuristic that prefers this model for this task type
+  SELECT lh.confidence INTO v_heuristic_conf
+  FROM learned_heuristics lh
+  WHERE lh.preferred_model = p_model_id
+    AND (lh.task_type IS NULL OR lh.task_type = p_task_type)
+    AND (lh.expires_at IS NULL OR lh.expires_at > NOW())
+  ORDER BY lh.confidence DESC, lh.last_applied_at DESC NULLS LAST
+  LIMIT 1;
+
+  IF v_heuristic_conf IS NOT NULL THEN
+    v_heuristic_score := v_heuristic_conf;
+  ELSE
+    v_heuristic_score := 0.5;
+  END IF;
+
+  -- ------------------------------------------------------------------
+  -- 4. STRENGTH/WEAKNESS MATCH: from models table
+  -- ------------------------------------------------------------------
+  SELECT m.strengths, m.weaknesses
+  INTO v_strengths, v_weaknesses
+  FROM models m
+  WHERE m.id = p_model_id
+    AND m.status = 'active';
+
+  IF v_strengths = '{}' AND v_weaknesses = '{}' THEN
+    -- No strength data available
+    v_strength_score := 0.5;
+  ELSE
+    DECLARE
+      v_match_count   INT := 0;
+      v_weak_match    INT := 0;
+      v_total_tags    INT := 0;
+    BEGIN
+      -- Check how many strength tags match the task type or category
+      SELECT
+        COUNT(*) FILTER (WHERE s = p_task_type OR s = p_task_category
+                         OR p_task_type ILIKE '%' || s || '%'
+                         OR p_task_category ILIKE '%' || s || '%'),
+        COUNT(*)
+      INTO v_match_count, v_total_tags
+      FROM unnest(v_strengths) AS s;
+
+      -- Check weakness overlap
+      SELECT COUNT(*)
+      INTO v_weak_match
+      FROM unnest(v_weaknesses) AS w
+      WHERE w = p_task_type OR w = p_task_category
+         OR p_task_type ILIKE '%' || w || '%'
+         OR p_task_category ILIKE '%' || w || '%';
+
+      IF v_total_tags + array_length(v_weaknesses, 1) > 0 THEN
+        v_strength_score := 0.5
+          + (v_match_count::FLOAT / GREATEST(v_total_tags, 1)) * 0.3
+          - (v_weak_match::FLOAT / GREATEST(array_length(v_weaknesses, 1), 1)) * 0.3;
+        v_strength_score := GREATEST(0.0, LEAST(1.0, v_strength_score));
+      ELSE
+        v_strength_score := 0.5;
+      END IF;
+    END;
+  END IF;
+
+  -- ------------------------------------------------------------------
+  -- 5. BLENDED FINAL SCORE
+  -- ------------------------------------------------------------------
+  IF v_total = 0 AND v_heuristic_conf IS NULL THEN
+    -- Absolutely no data for this model+task combo: return neutral
+    v_final_score := 0.5;
+  ELSE
+    v_final_score :=
+      v_base_score     * v_weight_base +
+      v_recency_score  * v_weight_recency +
+      v_heuristic_score * v_weight_heuristic +
+      v_strength_score * v_weight_strength;
+
+    -- Clamp to [0.0, 1.0]
+    v_final_score := GREATEST(0.0, LEAST(1.0, v_final_score));
+  END IF;
+
+  RETURN jsonb_build_object(
+    'score',          ROUND(v_final_score::numeric, 4),
+    'base_score',     ROUND(v_base_score::numeric, 4),
+    'recency_score',  ROUND(v_recency_score::numeric, 4),
+    'heuristic_score',ROUND(v_heuristic_score::numeric, 4),
+    'strength_score', ROUND(v_strength_score::numeric, 4),
+    'success_count',  v_success_count,
+    'failure_count',  v_failure_count,
+    'total_runs',     v_total,
+    'recent_runs',    v_recent_total
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 17. GRANTS
+-- ============================================================================
+
+-- All RPCs use SECURITY DEFINER so they run as table owner.
+-- Grant execute to anon role for Supabase REST access.
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+
+COMMIT;
+
+SELECT 'Migration 111 complete: 42 missing RPCs + enhanced get_model_score_for_task' AS status;

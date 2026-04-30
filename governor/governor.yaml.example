@@ -1,0 +1,36 @@
+# VibePilot Governor Configuration
+# Version: 2.0
+
+governor:
+  poll_interval: 15s
+  max_concurrent: 3
+  stuck_timeout: 10m
+  max_per_module: 8
+
+supabase:
+  url: ${SUPABASE_URL}
+  service_key: ${SUPABASE_SERVICE_KEY}
+
+github:
+  token: ${GITHUB_TOKEN}
+  owner: your-github-username
+  repo: vibepilot
+  workflow: courier.yml
+
+courier:
+  enabled: false
+  max_in_flight: 3
+  stagger: 30s
+  callback_url: http://your-server:8080/webhook/courier
+  webhook_secret: ${COURIER_WEBHOOK_SECRET}
+  driver_model: gemini-2.0-flash
+
+server:
+  addr: :8080
+  dashboard_dist: ./dist
+
+security:
+  allowed_hosts:
+    - api.supabase.co
+    - api.github.com
+    - generativelanguage.googleapis.com

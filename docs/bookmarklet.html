@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VibePilot Bookmarklet</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: #0a0a0a;
+  color: #e0e0e0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.container {
+  max-width: 520px;
+  padding: 40px;
+  text-align: center;
+}
+h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #fff;
+}
+.sub {
+  color: #888;
+  font-size: 0.95rem;
+  margin-bottom: 32px;
+}
+.bookmarklet-btn {
+  display: inline-block;
+  padding: 14px 28px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: grab;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+  user-select: none;
+}
+.bookmarklet-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+}
+.bookmarklet-btn:active {
+  cursor: grabbing;
+}
+.steps {
+  margin-top: 36px;
+  text-align: left;
+}
+.steps h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #aaa;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.steps ol {
+  padding-left: 20px;
+  line-height: 1.8;
+  color: #999;
+  font-size: 0.9rem;
+}
+.steps ol li::marker {
+  color: #6366f1;
+}
+.test-section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #222;
+}
+.test-section h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #aaa;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+#test-result {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  display: none;
+}
+#test-result.ok { display: block; background: #1a2e1a; color: #4ade80; }
+#test-result.err { display: block; background: #2e1a1a; color: #f87171; }
+.url-config {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #222;
+  text-align: left;
+}
+.url-config label {
+  display: block;
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 6px;
+}
+.url-config input {
+  width: 100%;
+  padding: 10px 12px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  font-family: monospace;
+}
+.url-config input:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧭 VibePilot Research</h1>
+  <p class="sub">Bookmark anything for the researcher to investigate</p>
+
+  <a id="bookmarklet-link" href="#" class="bookmarklet-btn" onclick="event.preventDefault();">
+    ✈️ Save to VibePilot
+  </a>
+
+  <div class="steps">
+    <h2>Install</h2>
+    <ol>
+      <li>Drag the button above to your bookmarks bar</li>
+      <li>That's it. Click it on any page to bookmark</li>
+      <li>Works on any computer, any browser</li>
+    </ol>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Connection</h2>
+    <button onclick="testConnection()" style="padding:8px 16px;background:#1a1a2e;border:1px solid #333;border-radius:8px;color:#aaa;cursor:pointer;font-size:0.85rem;">Test API endpoint</button>
+    <div id="test-result"></div>
+  </div>
+
+  <div class="url-config">
+    <label for="api-url">Governor API URL</label>
+    <input id="api-url" type="text" placeholder="http://localhost:8080" />
+  </div>
+</div>
+
+<script>
+const DEFAULT_URL = 'http://localhost:8080';
+
+function getApiUrl() {
+  const stored = localStorage.getItem('vp_api_url');
+  if (stored) return stored;
+  return DEFAULT_URL;
+}
+
+function setApiUrl(url) {
+  localStorage.setItem('vp_api_url', url);
+  updateBookmarklet();
+}
+
+function buildBookmarkletCode(apiUrl) {
+  return `javascript:void(function(){var s=document.createElement('div');s.id='vp-overlay';s.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:999999;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';var m=document.createElement('div');m.style.cssText='background:#1a1a2e;border:1px solid #333;border-radius:16px;padding:24px;width:380px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.5);';m.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span style="font-size:1.4rem">🧭</span><span style="color:#fff;font-size:1rem;font-weight:600">VibePilot Research</span></div><input id="vp-title" value="'+document.title.replace(/"/g,'&quot;')+'" style="width:100%;padding:8px 10px;background:#0a0a1a;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box" /><textarea id="vp-note" placeholder="Optional note..." style="width:100%;padding:8px 10px;background:#0a0a1a;border:1px solid #333;border-radius:8px;color:#e0e0e0;font-size:0.85rem;height:60px;resize:none;margin-bottom:16px;box-sizing:border-box;font-family:inherit"></textarea><div style="display:flex;gap:8px;justify-content:flex-end"><button id="vp-cancel" style="padding:8px 16px;background:transparent;border:1px solid #333;border-radius:8px;color:#888;cursor:pointer;font-size:0.85rem">Cancel</button><button id="vp-save" style="padding:8px 16px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:0.85rem;font-weight:600">Save</button></div>';s.appendChild(m);document.body.appendChild(s);s.addEventListener('click',function(e){if(e.target===s){s.remove()}});m.querySelector('#vp-cancel').onclick=function(){s.remove()};m.querySelector('#vp-save').onclick=function(){var b=m.querySelector('#vp-save');b.textContent='Saving...';b.disabled=true;fetch('${apiUrl}/api/bookmarks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:location.href,title:document.getElementById('vp-title').value,note:document.getElementById('vp-note').value})}).then(function(r){if(r.ok){s.innerHTML='<div style="text-align:center;color:#4ade80;font-size:1.2rem">✓ Saved</div>';setTimeout(function(){s.remove()},800)}else{b.textContent='Error';b.disabled=false}}).catch(function(){b.textContent='Error';b.disabled=false})}})()`;
+}
+
+function updateBookmarklet() {
+  const url = getApiUrl();
+  const link = document.getElementById('bookmarklet-link');
+  link.href = buildBookmarkletCode(url);
+}
+
+function testConnection() {
+  const url = getApiUrl();
+  const result = document.getElementById('test-result');
+  result.className = '';
+  result.style.display = 'block';
+  result.textContent = 'Testing...';
+  result.style.color = '#888';
+
+  fetch(url + '/status')
+    .then(r => r.json())
+    .then(data => {
+      result.className = 'ok';
+      result.textContent = '✓ Connected to Governor v' + (data.version || '?') + ' (uptime: ' + Math.round(data.uptime_seconds || 0) + 's)';
+    })
+    .catch(err => {
+      result.className = 'err';
+      result.textContent = '✗ Could not reach ' + url + ' — is the governor running?';
+    });
+}
+
+// Init
+const urlInput = document.getElementById('api-url');
+urlInput.value = getApiUrl();
+urlInput.addEventListener('change', function() {
+  setApiUrl(this.value.trim().replace(/\/$/, ''));
+});
+
+updateBookmarklet();
+</script>
+</body>
+</html>

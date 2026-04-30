@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Task Packet",
+  "description": "The atomic unit of work in VibePilot. Passed from orchestrator to runner.",
+  "type": "object",
+  "required": ["task_id", "title", "objectives", "deliverables", "prompt"],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^[A-Z][0-9]-T[0-9]{3}$",
+      "description": "Phase-Task pattern, e.g. P1-T001, P2-T042",
+      "examples": ["P1-T001", "P2-T015", "P3-T103"]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 5,
+      "description": "Clear, actionable task title"
+    },
+    "objectives": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "What this task must accomplish"
+    },
+    "deliverables": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Files, artifacts, or outputs to produce"
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 50,
+      "description": "Full instructions for the executing agent"
+    },
+    "context": {
+      "type": "string",
+      "description": "WHY this task exists, relevant background"
+    },
+    "output_format": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["code", "text", "json", "markdown", "files"],
+          "description": "Expected output type"
+        },
+        "language": {
+          "type": "string",
+          "description": "For code outputs: python, typescript, etc."
+        },
+        "schema_ref": {
+          "type": "string",
+          "description": "For JSON outputs: reference to schema"
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "max_tokens": { "type": "integer" },
+        "timeout_seconds": { "type": "integer" },
+        "no_attachments": { "type": "boolean" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

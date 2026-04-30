@@ -1,0 +1,90 @@
+#!/bin/bash
+# Governor wrapper - ensures only one instance runs
+# Usage: ./governor-wrapper [start|stop|status|restart]
+# Paths derived from script location -- works on any machine
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+GOVERNOR_BIN="$REPO_DIR/governor/governor"
+PID_FILE="/tmp/governor.pid"
+LOG_FILE="/tmp/governor.out"
+
+get_pid() {
+    if [ -f "$PID_FILE" ]; then
+        local pid=$(cat "$PID_FILE" 2>/dev/null)
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            echo "$pid"
+            return
+        fi
+    fi
+    pgrep -f "$GOVERNOR_BIN" 2>/dev/null
+}
+
+is_running() {
+    local pid=$(get_pid)
+    [ -n "$pid" ]
+}
+
+kill_all_governors() {
+    pkill -9 -f "$GOVERNOR_BIN" 2>/dev/null
+    rm -f "$PID_FILE"
+}
+
+start() {
+    if is_running; then
+        echo "Governor already running (PID: $(get_pid))"
+        return 1
+    fi
+
+    kill_all_governors 2>/dev/null
+
+    echo "Starting governor..."
+    cd "$(dirname "$GOVERNOR_BIN")"
+    nohup "$GOVERNOR_BIN" >> "$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+    sleep 1
+
+    if is_running; then
+        echo "Governor started (PID: $(get_pid))"
+    else
+        echo "Failed to start governor. Check $LOG_FILE"
+        return 1
+    fi
+}
+
+stop() {
+    local pid=$(get_pid)
+    if [ -n "$pid" ]; then
+        echo "Stopping governor (PID: $pid)..."
+        kill "$pid" 2>/dev/null
+        sleep 2
+    fi
+
+    if is_running; then
+        echo "Force killing..."
+        kill_all_governors
+    fi
+
+    echo "Governor stopped"
+}
+
+status() {
+    if is_running; then
+        local pid=$(get_pid)
+        local mem=$(ps -p $pid -o rss= 2>/dev/null | awk '{printf "%.0f MB", $1/1024}')
+        local start=$(ps -p $pid -o lstart= 2>/dev/null | xargs)
+        echo "Governor running (PID: $pid, started: $start, memory: $mem)"
+        return 0
+    else
+        echo "Governor not running"
+        return 1
+    fi
+}
+
+case "${1:-start}" in
+    start)   start ;;
+    stop)    stop ;;
+    status)  status ;;
+    restart) stop; sleep 1; start ;;
+    *)       echo "Usage: $0 {start|stop|status|restart}"; exit 1 ;;
+esac

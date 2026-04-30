@@ -1,0 +1,152 @@
+{
+  "version": "1.0",
+  "description": "Maintenance command configuration. Defines allowed git operations and validation rules.",
+  "last_updated": "2026-02-19",
+  
+  "allowed_commands": {
+    "create_branch": {
+      "description": "Create a new git branch",
+      "required_payload_fields": ["branch_name"],
+      "optional_payload_fields": ["base_branch"],
+      "default_base_branch": "main",
+      "branch_name_pattern": "^(task|T|module)/[a-z0-9-]+$",
+      "examples": [
+        {"branch_name": "task/T001-user-auth", "base_branch": "main"},
+        {"branch_name": "module/user-auth", "base_branch": "main"}
+      ]
+    },
+    
+    "commit_code": {
+      "description": "Commit code files to a branch",
+      "required_payload_fields": ["branch", "files"],
+      "optional_payload_fields": ["message", "author"],
+      "default_message": "Auto-commit by VibePilot",
+      "files_format": [
+        {"path": "string", "content": "string"}
+      ],
+      "examples": [
+        {
+          "branch": "task/T001",
+          "files": [
+            {"path": "src/auth.py", "content": "..."},
+            {"path": "tests/test_auth.py", "content": "..."}
+          ],
+          "message": "Add user authentication"
+        }
+      ]
+    },
+    
+    "commit_changes": {
+      "description": "Commit all changed files in working directory (for runners that write directly)",
+      "required_payload_fields": ["branch"],
+      "optional_payload_fields": ["message", "add_all"],
+      "default_message": "Auto-commit by VibePilot",
+      "default_add_all": true,
+      "examples": [
+        {"branch": "task/T001", "message": "Complete T001"},
+        {"branch": "task/T001", "add_all": true}
+      ]
+    },
+    
+    "merge_branch": {
+      "description": "Merge source branch into target branch",
+      "required_payload_fields": ["source", "target"],
+      "optional_payload_fields": ["delete_source", "create_target_if_missing"],
+      "allowed_source_patterns": [
+        "^task/",
+        "^T[0-9]+",
+        "^module/"
+      ],
+      "allowed_target_patterns": [
+        "^module/",
+        "^main$"
+      ],
+      "requires_human_approval_for": ["main"],
+      "examples": [
+        {"source": "task/T001", "target": "module/user-auth", "delete_source": true},
+        {"source": "module/user-auth", "target": "main", "delete_source": false}
+      ]
+    },
+    
+    "delete_branch": {
+      "description": "Delete a git branch",
+      "required_payload_fields": ["branch_name"],
+      "optional_payload_fields": ["force"],
+      "protected_branches": ["main", "master"],
+      "examples": [
+        {"branch_name": "task/T001"},
+        {"branch_name": "module/user-auth"}
+      ]
+    },
+    
+    "tag_release": {
+      "description": "Create a git tag for release",
+      "required_payload_fields": ["tag", "target"],
+      "optional_payload_fields": ["message", "annotated"],
+      "tag_pattern": "^[a-z0-9-]+-v[0-9]+$",
+      "requires_human_approval": true,
+      "examples": [
+        {"tag": "module-user-auth-v1", "target": "main", "message": "User auth module v1"}
+      ]
+    }
+  },
+  
+  "security": {
+    "forbidden_patterns": [
+      "force",
+      "push --force",
+      "reset --hard",
+      "rm -rf",
+      "checkout -f",
+      "clean -fd"
+    ],
+    "protected_operations": {
+      "merge_to_main": {
+        "requires_human_approval": true,
+        "description": "Merging to main branch requires explicit human approval"
+      },
+      "tag_release": {
+        "requires_human_approval": true,
+        "description": "Creating tags requires explicit human approval"
+      },
+      "force_operations": {
+        "allowed": false,
+        "description": "Force operations are never allowed"
+      }
+    },
+    "branch_protection": {
+      "main": {
+        "allow_deletion": false,
+        "allow_force_push": false,
+        "require_approval": true
+      },
+      "master": {
+        "allow_deletion": false,
+        "allow_force_push": false,
+        "require_approval": true
+      }
+    }
+  },
+  
+  "retry_policy": {
+    "max_retries": 3,
+    "retry_delay_seconds": 5,
+    "retryable_errors": [
+      "network_error",
+      "timeout",
+      "lock_error"
+    ],
+    "non_retryable_errors": [
+      "invalid_branch",
+      "merge_conflict",
+      "permission_denied",
+      "branch_not_found"
+    ]
+  },
+  
+  "logging": {
+    "log_all_commands": true,
+    "log_command_output": true,
+    "retain_logs_days": 90
+  }
+}

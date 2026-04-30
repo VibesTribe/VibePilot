@@ -1,0 +1,102 @@
+# Python virtual environment
+venv/
+env/
+.venv/
+.env/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test scripts (messy slate) - through keep integration tests in tests/
+test_*.py
+!tests/test_*.py
+universal_test.py
+diagnostic.py
+inspector.py
+list_models.py
+
+# Temporary files
+*.tmp
+*.bak
+
+# Go binaries
+governor/governor
+governor/governor.yaml
+
+# Supabase migrations - keep specific files
+!docs/supabase-schema/081_fix_duplicate_create_task_functions.sql
+.context/
+governor/cleanup

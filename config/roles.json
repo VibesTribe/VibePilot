@@ -1,0 +1,198 @@
+{
+  "version": "2.0",
+  "description": "WHAT job is being done. Roles are job definitions. Model and destination assigned by orchestrator at runtime.",
+  "last_updated": "2026-02-17",
+
+  "roles": [
+    {
+      "id": "vibes",
+      "name": "Vibes",
+      "description": "Human consultation and project intelligence. Primary interface to VibePilot.",
+      "requires_destination_type": ["api"],
+      "requires_model_capability": ["text", "code"],
+      "default_destination": "gemini-api",
+      "default_model": "gemini-2.0-flash",
+      "tools": ["supabase_query", "web_search", "file_read", "voice_stt", "voice_tts"],
+      "prompt": "prompts/vibes.md",
+      "channels": ["voice", "text", "email"],
+      "notes": "Sits above orchestrator. Human's primary interface."
+    },
+    {
+      "id": "orchestrator",
+      "name": "Orchestrator",
+      "description": "Strategic task routing. Routes based on availability, performance, costs. Gets smarter over time.",
+      "requires_destination_type": ["api"],
+      "requires_model_capability": ["text"],
+      "default_destination": "gemini-api",
+      "default_model": "gemini-2.0-flash",
+      "tools": ["supabase_query", "supabase_write"],
+      "prompt": "prompts/orchestrator.md",
+      "notes": "Strategic brain. Works with Researcher for continuous improvement."
+    },
+    {
+      "id": "researcher",
+      "name": "Researcher",
+      "description": "Monitors new models, platforms, approaches. Feeds intelligence to Orchestrator.",
+      "requires_destination_type": ["api"],
+      "requires_model_capability": ["text", "web_search"],
+      "default_destination": "gemini-api",
+      "default_model": "gemini-2.0-flash",
+      "tools": ["web_search"],
+      "prompt": "prompts/researcher.md",
+      "notes": "How VibePilot evolves. Weekly briefings to Vibes."
+    },
+    {
+      "id": "consultant",
+      "name": "Consultant",
+      "description": "Interactive PRD generation. Works with human to clarify vision and produce PRD.",
+      "requires_destination_type": ["api", "web"],
+      "requires_model_capability": ["text", "code"],
+      "default_destination": "gemini-api",
+      "default_model": "gemini-2.0-flash",
+      "tools": ["web_search"],
+      "prompt": "prompts/consultant.md",
+      "notes": "Starts every project. Can use courier for free tier access."
+    },
+    {
+      "id": "planner",
+      "name": "Planner",
+      "description": "Task breakdown and dependency mapping. Takes PRD and produces executable task graph.",
+      "requires_destination_type": ["cli"],
+      "requires_model_capability": ["text", "code"],
+      "default_destination": "kimi",
+      "default_model": "kimi-internal",
+      "tools": ["file_read", "git"],
+      "prompt": "prompts/planner.md",
+      "notes": "Needs codebase access for accurate planning."
+    },
+    {
+      "id": "council",
+      "name": "Council",
+      "description": "Multi-perspective review. Architecture, security, maintenance perspectives.",
+      "requires_destination_type": ["api", "web"],
+      "requires_model_capability": ["text", "code"],
+      "default_destination": "gemini-api",
+      "default_model": "gemini-2.0-flash",
+      "tools": ["file_read", "web_search"],
+      "prompt": "prompts/council.md",
+      "notes": "Can approve, reject, or request changes."
+    },
+    {
+      "id": "supervisor",
+      "name": "Supervisor",
+      "description": "Quality gate and merge control. Verifies output, handles pass/fail.",
+      "requires_destination_type": ["api"],
+      "requires_model_capability": ["text", "code"],
+      "default_destination": "gemini-api",
+      "default_model": "gemini-2.0-flash",
+      "tools": ["supabase_query", "supabase_write", "git"],
+      "prompt": "prompts/supervisor.md",
+      "notes": "Quality gate. Orchestrator routes, Supervisor validates."
+    },
+    {
+      "id": "courier",
+      "name": "Courier",
+      "description": "Web platform execution via browser automation. Returns result + chat_url.",
+      "requires_destination_type": ["web"],
+      "requires_model_capability": ["text", "browser_control"],
+      "requires_tool": ["browser"],
+      "driver_model": "dynamic",
+      "driver_model_capability": "browser_control",
+      "default_driver_model": "gemini-2.0-flash",
+      "prompt": "prompts/courier.md",
+      "returns": ["output", "chat_url", "tokens_used"],
+      "notes": "No codebase access. Only receives task packet. TWO models involved: driver (browser-use) + destination (web platform)."
+    },
+    {
+      "id": "internal_cli",
+      "name": "Internal CLI",
+      "description": "CLI-based execution with full codebase access.",
+      "requires_destination_type": ["cli"],
+      "requires_model_capability": ["text", "code"],
+      "default_destination": "opencode",
+      "default_model": "glm-5",
+      "tools": ["cli", "file_read", "file_write", "git"],
+      "prompt": "prompts/internal_cli.md",
+      "notes": "For dependency-heavy tasks requiring codebase context."
+    },
+    {
+      "id": "internal_api",
+      "name": "Internal API",
+      "description": "API-based execution. Has codebase access. Use sparingly.",
+      "requires_destination_type": ["api"],
+      "requires_model_capability": ["text", "code"],
+      "default_destination": "gemini-api",
+      "default_model": "gemini-2.0-flash",
+      "tools": ["file_read", "file_write"],
+      "prompt": "prompts/internal_api.md",
+      "notes": "API costs money. Gemini API is free. DeepSeek has credit."
+    },
+    {
+      "id": "tester_code",
+      "name": "Code Tester",
+      "description": "Runs tests, lint, typecheck on generated code.",
+      "requires_destination_type": ["cli"],
+      "requires_model_capability": ["code"],
+      "default_destination": "opencode",
+      "default_model": "glm-5",
+      "tools": ["cli", "file_read"],
+      "prompt": "prompts/tester_code.md",
+      "notes": "Uses OpenCode subscription. Fast and capable."
+    },
+    {
+      "id": "tester_visual",
+      "name": "Visual Tester",
+      "description": "Visual regression testing for UI. Uses browser automation to capture screenshots, compare to baseline, detect diffs.",
+      "requires_destination_type": ["web"],
+      "requires_model_capability": ["text", "vision", "browser_control"],
+      "requires_tool": ["browser"],
+      "driver_model": "dynamic",
+      "driver_model_capability": "browser_control",
+      "default_driver_model": "gemini-2.0-flash",
+      "target_destination": "our_app",
+      "prompt": "prompts/tester_visual.md",
+      "returns": ["diff_report", "pass_fail", "screenshots"],
+      "notes": "Courier's sibling. Both use browser-use, but visual tester tests OUR app, not external platforms. Human review required for visual decisions."
+    },
+    {
+      "id": "maintenance",
+      "name": "Maintenance",
+      "description": "ONLY role that touches system files. Implements after Council + Supervisor approval.",
+      "requires_destination_type": ["cli"],
+      "requires_model_capability": ["text", "code"],
+      "default_destination": "opencode",
+      "default_model": "glm-5",
+      "tools": ["cli", "file_read", "file_write", "git"],
+      "prompt": "prompts/maintenance.md",
+      "approval_required": true,
+      "notes": "No approval = no change. Researcher suggests, Maintenance implements."
+    }
+  ],
+
+  "routing_rules": {
+    "internal_tasks": {
+      "routing_flag": "internal",
+      "allowed_roles": ["internal_cli", "internal_api", "tester_code", "maintenance"],
+      "forbidden_roles": ["courier"]
+    },
+    "web_tasks": {
+      "routing_flag": "web",
+      "allowed_roles": ["courier", "internal_cli", "internal_api"],
+      "preferred_role": "courier"
+    },
+    "mcp_tasks": {
+      "routing_flag": "mcp",
+      "allowed_roles": ["internal_cli"],
+      "notes": "Routes to user's connected IDE via MCP"
+    }
+  },
+
+  "notes": [
+    "Roles define WHAT job, not WHO does it or WHERE.",
+    "Orchestrator assigns: role + destination + model at runtime.",
+    "Courier is unique: needs BOTH a driver model (browser-use) AND a web destination.",
+    "Visual Tester is Courier's sibling: same browser automation, but tests OUR app not external platforms.",
+    "All defaults are suggestions. Orchestrator can override based on availability/costs.",
+    "Subscription tracking lives in destinations.json, not here."
+  ]
+}

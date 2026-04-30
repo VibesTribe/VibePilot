@@ -1,0 +1,45 @@
+{
+  "provider": "DeepSeek",
+  "research_date": "2026-02-18",
+  "rate_limits": {
+    "type": "dynamic_throttling",
+    "description": "No fixed rate limits. DeepSeek uses dynamic throttling based on system load and account history.",
+    "rpm_limits": "No explicit RPM limits - throttled dynamically",
+    "tpm_limits": "No explicit TPM limits - throttled dynamically",
+    "concurrent_requests": "Limited by dynamic throttling",
+    "notes": [
+      "New accounts may have more restrictive initial throttling",
+      "Limits increase over time with consistent usage and payment history",
+      "May receive 429 errors during high system load"
+    ]
+  },
+  "pricing": {
+    "free_tier": {
+      "description": "5 million free tokens upon account creation",
+      "amount": "5,000,000 tokens",
+      "expires": "Does not expire"
+    },
+    "cache_pricing": {
+      "description": "Discounted pricing for cached tokens (input tokens that have been seen before)",
+      "discount_rate": "50% of standard input price for cache hits"
+    },
+    "models": {
+      "deepseek-chat": {
+        "input_price_per_1m": 0.27,
+        "output_price_per_1m": 1.10,
+        "currency": "USD"
+      },
+      "deepseek-reasoner": {
+        "input_price_per_1m": 0.55,
+        "output_price_per_1m": 2.19,
+        "currency": "USD"
+      }
+    }
+  },
+  "activation": {
+    "minimum_deposit": "No minimum deposit required for free tier",
+    "payment_method_required": false
+  },
+  "documentation_url": "https://platform.deepseek.com/",
+  "notes": "DeepSeek is known for competitive pricing and high-quality reasoning capabilities. Dynamic throttling requires careful error handling and retry logic in production applications."
+}

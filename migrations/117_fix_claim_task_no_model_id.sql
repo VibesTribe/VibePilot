@@ -1,0 +1,26 @@
+DROP FUNCTION IF EXISTS claim_task(UUID, TEXT, TEXT, TEXT, TEXT) CASCADE;
+CREATE OR REPLACE FUNCTION claim_task(
+  p_task_id UUID,
+  p_worker_id TEXT DEFAULT NULL,
+  p_model_id TEXT DEFAULT NULL,
+  p_routing_flag TEXT DEFAULT NULL,
+  p_routing_reason TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+  v_updated INT;
+BEGIN
+  UPDATE tasks
+  SET status = 'in_progress',
+      processing_by = p_worker_id,
+      processing_at = NOW(),
+      updated_at = NOW()
+  WHERE id = p_task_id AND status = 'available' AND processing_by IS NULL;
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  RETURN v_updated > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO service_role;

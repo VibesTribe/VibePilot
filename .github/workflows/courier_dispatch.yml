@@ -1,0 +1,68 @@
+name: Courier Task
+
+on:
+  repository_dispatch:
+    types: [courier_task]
+
+jobs:
+  courier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install --quiet browser-use playwright
+          playwright install chromium --with-deps
+
+      - name: Checkout repo (for courier script)
+        uses: actions/checkout@v4
+
+      - name: Run courier task
+        env:
+          TASK_ID: ${{ github.event.client_payload.task_id }}
+          PROMPT: ${{ github.event.client_payload.prompt }}
+          BRANCH_NAME: ${{ github.event.client_payload.branch_name }}
+          LLM_PROVIDER: ${{ github.event.client_payload.llm_provider }}
+          LLM_MODEL: ${{ github.event.client_payload.llm_model }}
+          LLM_API_KEY: ${{ github.event.client_payload.llm_api_key }}
+          WEB_PLATFORM_URL: ${{ github.event.client_payload.web_platform_url }}
+          GOVERNOR_API_URL: ${{ github.event.client_payload.governor_api_url }}
+        run: python scripts/courier_run.py
+
+      - name: Report failure
+        if: failure()
+        env:
+          TASK_ID: ${{ github.event.client_payload.task_id }}
+          GOVERNOR_API_URL: ${{ github.event.client_payload.governor_api_url }}
+          ERROR_MSG: "Courier GitHub Action failed"
+        run: |
+          python -c "
+          import os, json, urllib.request
+          task_id = os.environ['TASK_ID']
+          governor_url = os.environ.get('GOVERNOR_API_URL', '')
+          if governor_url:
+              data = json.dumps({
+                  'task_id': task_id,
+                  'status': 'failed',
+                  'error': os.environ.get('ERROR_MSG', 'Workflow failed'),
+                  'tokens_in': 0,
+                  'tokens_out': 0,
+              }).encode()
+              req = urllib.request.Request(f'{governor_url}/api/courier/result', data=data, method='POST')
+              req.add_header('Content-Type', 'application/json')
+              try:
+                  urllib.request.urlopen(req, timeout=15)
+                  print(f'Reported failure to governor for task {task_id}')
+              except Exception as e:
+                  print(f'Failed to report to governor: {e}')
+          else:
+              print(f'No governor URL, cannot report failure for task {task_id}')
+          "

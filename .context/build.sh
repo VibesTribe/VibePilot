@@ -1,0 +1,191 @@
+#!/bin/bash
+# .context/build.sh - Generate compressed knowledge layer for VibePilot
+# ZERO HARDCODING. Everything auto-discovered from repo structure.
+# Run: bash .context/build.sh
+# If tools missing: bash .context/tools/install.sh first
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CTX_DIR="$REPO_ROOT/.context"
+COMMIT=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BRANCH=$(git -C "$REPO_ROOT" branch --show-current 2>/dev/null || echo "unknown")
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+mkdir -p "$CTX_DIR"
+
+echo "[.context] Building knowledge layer at $COMMIT..."
+
+HAS_LEAN_CTX=true
+HAS_MUNCH=true
+command -v lean-ctx >/dev/null 2>&1 || HAS_LEAN_CTX=false
+command -v jcodemunch-mcp >/dev/null 2>&1 || HAS_MUNCH=false
+
+# ============================================================
+# 1. map.md
+# ============================================================
+if [ "$HAS_LEAN_CTX" = true ]; then
+    echo "[.context] Generating map.md..."
+    MAP_CONTENT="# VibePilot Code Map\n# Generated: $TIMESTAMP | Commit: $COMMIT\n# Auto-generated. Run build.sh to regenerate.\n\n"
+    for f in $(find "$REPO_ROOT/governor" -name "*.go" -not -name "*_test.go" | sort); do
+        rel="${f#$REPO_ROOT/}"
+        CHUNK=$(lean-ctx read "$f" -m map 2>/dev/null | grep -v "^\[" | grep -v "tok saved")
+        MAP_CONTENT="${MAP_CONTENT}## $rel\n${CHUNK}\n\n"
+    done
+    echo -e "$MAP_CONTENT" > "$CTX_DIR/map.md"
+    echo "[.context] map.md: $(wc -c < "$CTX_DIR/map.md") bytes"
+else
+    echo "[.context] SKIP map.md (lean-ctx not found). Run .context/tools/install.sh"
+fi
+
+# ============================================================
+# 2. index.db (jCodeMunch - code symbols)
+# ============================================================
+if [ "$HAS_MUNCH" = true ]; then
+    echo "[.context] Generating index.db (jCodeMunch)..."
+    jcodemunch-mcp index "$REPO_ROOT" >/dev/null 2>&1 || true
+    MUNCH_DB=$(ls -t ~/.code-index/local-VibePilot-*.db 2>/dev/null | head -1)
+    if [ -n "$MUNCH_DB" ]; then
+        cp "$MUNCH_DB" "$CTX_DIR/index.db"
+        echo "[.context] index.db: $(du -sh "$CTX_DIR/index.db" | cut -f1)"
+    else
+        echo "[.context] SKIP index.db (jCodeMunch index failed)"
+    fi
+else
+    echo "[.context] SKIP index.db (jCodeMunch not found). Run .context/tools/install.sh"
+fi
+
+# ============================================================
+# 2b. knowledge.db (unified rules+prompts+configs+docs)
+# ============================================================
+echo "[.context] Generating knowledge.db..."
+python3 "$CTX_DIR/tools/build-knowledge-db.py" "$REPO_ROOT" 2>/dev/null
+if [ -f "$CTX_DIR/knowledge.db" ]; then
+    echo "[.context] knowledge.db: $(du -sh "$CTX_DIR/knowledge.db" | cut -f1)"
+else
+    echo "[.context] SKIP knowledge.db (build failed)"
+fi
+
+# ============================================================
+# 3. boot.md - FULLY AUTO-GENERATED
+# ============================================================
+echo "[.context] Generating boot.md..."
+
+# Build each section as a variable, then assemble
+
+SECTION_TREE=""
+for d in $(find "$REPO_ROOT/governor" -type d -not -path "*/.*" | sort); do
+    go_count=$(find "$d" -maxdepth 1 -name "*.go" -not -name "*_test.go" 2>/dev/null | wc -l)
+    if [ "$go_count" -gt 0 ]; then
+        rel="${d#$REPO_ROOT/}"
+        func_count=$(grep -rh "^func " "$d" 2>/dev/null | wc -l)
+        type_count=$(grep -rh "^type " "$d" 2>/dev/null | wc -l)
+        SECTION_TREE="${SECTION_TREE}- ${rel}/ (${go_count} files, ${func_count} funcs, ${type_count} types)\n"
+    fi
+done
+
+SECTION_CONFIG_JSON=""
+for f in $(find "$REPO_ROOT/config" -name "*.json" -not -path "*/schemas/*" -not -path "*/templates/*" 2>/dev/null | sort); do
+    rel="${f#$REPO_ROOT/}"
+    desc=$(bash "$CTX_DIR/tools/json-desc.sh" "$f" 2>/dev/null || echo "(json)")
+    SECTION_CONFIG_JSON="${SECTION_CONFIG_JSON}  ${rel} - ${desc}\\n"
+done
+
+SECTION_CONFIG_PROMPTS=""
+for f in $(find "$REPO_ROOT/config/prompts" -name "*.md" -not -name "README.md" 2>/dev/null | sort); do
+    rel="${f#$REPO_ROOT/}"
+    head_line=$(grep -m1 "^#" "$f" 2>/dev/null | sed "s/^#* //" || echo "")
+    [ -z "$head_line" ] && head_line=$(head -1 "$f")
+    SECTION_CONFIG_PROMPTS="${SECTION_CONFIG_PROMPTS}  ${rel} - ${head_line}\n"
+done
+
+SECTION_CONSTRAINTS=""
+if [ -f "$CTX_DIR/tools/tier0-static.md" ]; then
+    SECTION_CONSTRAINTS=$(cat "$CTX_DIR/tools/tier0-static.md")
+fi
+
+SECTION_STATUS=""
+if [ -f "$REPO_ROOT/CURRENT_STATE.md" ]; then
+    SECTION_STATUS=$(grep -v "^$" "$REPO_ROOT/CURRENT_STATE.md" | head -30)
+fi
+
+# Assemble boot.md -- Tier 0 FIRST, details after
+cat > "$CTX_DIR/boot.md" << BOOT_EOF
+# VibePilot Bootstrap
+# Generated: $TIMESTAMP | Commit: $COMMIT | Branch: $BRANCH
+# AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
+# Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
+
+$(echo "$SECTION_CONSTRAINTS")
+
+## What Is VibePilot
+Sovereign AI execution engine. Transforms PRDs -> production code via multi-agent orchestration.
+Runtime: Go binary (governor). Event-driven via Supabase.
+
+## Codebase Structure (auto-discovered)
+$(echo -e "$SECTION_TREE")
+## Config: JSON (auto-discovered)
+$(echo -e "$SECTION_CONFIG_JSON")
+## Config: Prompt Templates (auto-discovered)
+$(echo -e "$SECTION_CONFIG_PROMPTS")
+
+## Service Info
+- Service: vibepilot-governor (systemd --user)
+- Logs: journalctl --user -u vibepilot-governor
+- Branch: $BRANCH
+- Commit: $COMMIT
+
+## How To Use .context/
+1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
+2. map.md = all function signatures, compressed (~12K tokens)
+3. index.db = jCodeMunch SQLite: code symbols, imports, call graph
+   sqlite3 .context/index.db ".tables"  (see what's indexed)
+4. knowledge.db = THE key file. Unified SQLite with:
+   - rules table: 36 rules, priority-ranked (critical/high/medium), deduplicated
+   - prompts table: 30 prompt templates across all directories
+   - configs table: 15 config files with purpose + key fields
+   - docs table: ~3000 documentation sections, full-text searchable
+   Quick queries:
+   sqlite3 .context/knowledge.db "SELECT title FROM rules WHERE priority='critical'"
+   sqlite3 .context/knowledge.db "SELECT name,role FROM prompts WHERE name LIKE '%supervisor%'"
+   sqlite3 .context/knowledge.db "SELECT title,file_path FROM docs WHERE title LIKE '%vault%'"
+5. Raw source = for implementation details only
+
+## Current Status (from CURRENT_STATE.md)
+$(echo "$SECTION_STATUS")
+BOOT_EOF
+
+BOOT_BYTES=$(wc -c < "$CTX_DIR/boot.md")
+echo "[.context] boot.md: $BOOT_BYTES bytes (~$((BOOT_BYTES / 4)) tokens)"
+
+# ============================================================
+# 4. meta.yaml
+# ============================================================
+MAP_BYTES=0
+[ -f "$CTX_DIR/map.md" ] && MAP_BYTES=$(wc -c < "$CTX_DIR/map.md")
+cat > "$CTX_DIR/meta.yaml" << META_EOF
+# Auto-generated. DO NOT EDIT.
+commit: $COMMIT
+branch: $BRANCH
+generated: $TIMESTAMP
+boot_md_bytes: $BOOT_BYTES
+map_md_bytes: $MAP_BYTES
+has_index_db: $([ -f "$CTX_DIR/index.db" ] && echo true || echo false)
+has_knowledge_db: $([ -f "$CTX_DIR/knowledge.db" ] && echo true || echo false)
+indexes:
+  code: jCodeMunch SQLite - symbols, imports, call graph, AST
+  knowledge: Unified SQLite - rules, prompts, configs, docs sections
+  code_map: lean-ctx map mode - compressed function signatures
+tools:
+  lean_ctx: "$([ "$HAS_LEAN_CTX" = true ] && lean-ctx --version 2>/dev/null || echo "MISSING - run .context/tools/install.sh")"
+  jcodemunch: "$([ "$HAS_MUNCH" = true ] && echo "installed" || echo "MISSING - run .context/tools/install.sh")"
+META_EOF
+
+echo ""
+echo "[.context] Done! Generated files:"
+ls -lh "$CTX_DIR/" | grep -v total | grep -E "\.(md|yaml|db|gz)$"
+echo "[.context] Total: $(du -sh "$CTX_DIR/" | cut -f1)"
+
+# Hint about committing
+CHANGED=$(git -C "$REPO_ROOT" status --porcelain .context/ 2>/dev/null | grep -v "^??" | wc -l)
+if [ "$CHANGED" -gt 0 ]; then
+    echo "[.context] $CHANGED tracked files changed. Suggest: git add .context/ && git commit -m 'chore: update .context'"
+fi

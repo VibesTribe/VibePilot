@@ -1,0 +1,649 @@
+{
+  "version": "3.0",
+  "description": "Web platforms and API models for VibePilot routing. Updated April 8, 2026 with verified OpenRouter data.",
+  "last_updated": "2026-04-08",
+  "updated_by": "Hermes Agent (GLM-5.1)",
+
+  "platforms": [
+    {
+      "id": "qwen",
+      "name": "Qwen (3.6 Plus)",
+      "url": "https://chat.qwen.ai",
+      "new_chat_url": "https://chat.qwen.ai",
+      "provider": "alibaba",
+      "models": ["qwen3.6-plus", "qwen3.5-27b", "qwen3-235b-a22b"],
+      "status": "active",
+      "usable": true,
+      "openrouter_id": "qwen/qwen3.6-plus",
+
+      "free_tier": {
+        "model": "qwen3.6-plus",
+        "available_on_openrouter": true,
+        "openrouter_free_id": "qwen/qwen3.6-plus:free",
+        "rate_limits": {
+          "web_messages_per_day": "30-50 (flagship), higher for smaller",
+          "openrouter_free": "rate_limited, generous"
+        },
+        "context_limit": 1000000,
+        "notes": "FREE tier on OpenRouter. 6.27T weekly tokens, #1 most used model. Web chat at chat.qwen.ai, email signup, no Chinese phone needed."
+      },
+
+      "auth": {
+        "methods": ["email", "github", "google"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "international_access": true,
+        "notes": "qwen.ai accepts international email. Tongyi (tongyi.aliyun.com) requires Chinese phone -- use qwen.ai instead."
+      },
+
+      "api_pricing": {
+        "qwen3.6-plus": {
+          "openrouter_input_per_1m": 0.325,
+          "openrouter_output_per_1m": 1.95,
+          "openrouter_input_per_1m_over_256k": 1.30,
+          "openrouter_output_per_1m_over_256k": 3.90,
+          "dashscope_input_per_1m": 0.50,
+          "dashscope_output_per_1m": 3.00,
+          "context_limit": 1000000,
+          "max_output": 65500
+        },
+        "qwen3.5-9b": {
+          "openrouter_input_per_1m": 0.05,
+          "openrouter_output_per_1m": 0.15,
+          "context_limit": 256000,
+          "notes": "Multimodal (text+vision), cheap"
+        },
+        "qwen3-235b-a22b": {
+          "openrouter_input_per_1m": 0.38,
+          "openrouter_output_per_1m": 1.50,
+          "context_limit": 128000,
+          "notes": "MoE, 235B total/22B active, thinking mode"
+        }
+      },
+
+      "capabilities": ["text", "code", "vision", "file_upload", "web_search", "agent_tool_use", "mcp"],
+      "strengths": ["coding", "agentic_coding", "vibe_coding", "3d_scenes", "games", "reasoning", "long_context"],
+      "benchmarks": {
+        "swe_bench_verified": 78.8,
+        "notes": "SWE-bench 78.8, top-tier agentic coding, 119 languages"
+      },
+      "notes": "#1 on OpenRouter weekly. Released Apr 2, 2026. Hybrid linear attention + sparse MoE. Best free coding model available. Apache 2.0 open weights for smaller sizes."
+    },
+
+    {
+      "id": "minimax-m27",
+      "name": "MiniMax M2.7",
+      "url": "https://hailuoai.com",
+      "new_chat_url": "https://hailuoai.com",
+      "provider": "minimax",
+      "models": ["minimax-m2.7"],
+      "status": "active",
+      "usable": true,
+      "openrouter_id": "minimax/minimax-m2.7",
+
+      "free_tier": {
+        "available_on_openrouter": false,
+        "web_chat_available": true,
+        "rate_limits": {
+          "web_messages_per_day": "unknown, needs testing"
+        },
+        "context_limit": 205000,
+        "notes": "Web at hailuoai.com. May require Chinese phone for web. API available via OpenRouter."
+      },
+
+      "auth": {
+        "methods": ["email"],
+        "gmail_ok": "unknown",
+        "phone_required": "unknown -- previously required Chinese phone, may have changed",
+        "international_access": "partial -- OpenRouter works, web may be restricted",
+        "notes": "Use OpenRouter for reliable international access. Web access needs testing."
+      },
+
+      "api_pricing": {
+        "minimax-m2.7": {
+          "openrouter_input_per_1m": 0.30,
+          "openrouter_output_per_1m": 1.20,
+          "context_limit": 205000
+        }
+      },
+
+      "capabilities": ["text", "code", "file_generation", "multi_agent", "debugging", "financial_modeling"],
+      "strengths": ["autonomous_agents", "live_debugging", "root_cause_analysis", "multi_agent_collaboration", "office_docs"],
+      "benchmarks": {
+        "swe_pro": 56.2,
+        "terminal_bench_2": 57.0,
+        "gdpval_aa_elo": 1495
+      },
+      "notes": "Released Mar 18, 2026. Designed for autonomous real-world productivity. Multi-agent collaboration built in. #6 on OpenRouter weekly. Strong for VibePilot agent workflows."
+    },
+
+    {
+      "id": "minimax-m25",
+      "name": "MiniMax M2.5",
+      "url": "https://hailuoai.com",
+      "new_chat_url": "https://hailuoai.com",
+      "provider": "minimax",
+      "models": ["minimax-m2.5"],
+      "status": "active",
+      "usable": true,
+      "openrouter_id": "minimax/minimax-m2.5",
+
+      "free_tier": {
+        "available_on_openrouter": true,
+        "openrouter_free_id": "minimax/minimax-m2.5:free",
+        "rate_limits": {
+          "openrouter_free": "rate_limited, generous"
+        },
+        "context_limit": 197000,
+        "notes": "FREE tier on OpenRouter. 987B weekly tokens."
+      },
+
+      "auth": {
+        "methods": ["email"],
+        "gmail_ok": "unknown",
+        "phone_required": "unknown",
+        "international_access": "via OpenRouter"
+      },
+
+      "api_pricing": {
+        "minimax-m2.5": {
+          "openrouter_input_per_1m": 0.118,
+          "openrouter_output_per_1m": 0.99,
+          "context_limit": 197000
+        }
+      },
+
+      "capabilities": ["text", "code", "file_generation", "web_browsing", "office_docs"],
+      "strengths": ["coding", "real_world_productivity", "office_docs", "browse_comp", "token_efficient"],
+      "benchmarks": {
+        "swe_bench_verified": 80.2,
+        "multi_swe_bench": 51.3,
+        "browse_comp": 76.3
+      },
+      "notes": "Released Feb 12, 2026. SWE-bench 80.2% -- very strong for coding. FREE on OpenRouter. More token-efficient than M2.7. Office doc generation. #9 on OpenRouter weekly."
+    },
+
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "url": "https://chat.deepseek.com",
+      "new_chat_url": "https://chat.deepseek.com",
+      "provider": "deepseek",
+      "models": ["deepseek-v3.2", "deepseek-r1"],
+      "status": "active",
+      "usable": true,
+      "openrouter_id": "deepseek/deepseek-v3.2",
+
+      "free_tier": {
+        "model": "deepseek-chat",
+        "web_chat_available": true,
+        "rate_limits": {
+          "messages_per_day": "generous, appears unlimited",
+          "conversation_limit": "64K tokens per conversation, then new chat required"
+        },
+        "context_limit": 128000,
+        "notes": "Most generous free web tier. No daily message cap found."
+      },
+
+      "auth": {
+        "methods": ["email", "phone"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "international_access": true,
+        "notes": "Email signup works with Gmail. Phone optional."
+      },
+
+      "api_pricing": {
+        "deepseek-v3.2": {
+          "openrouter_input_per_1m": 0.28,
+          "openrouter_input_per_1m_cached": 0.028,
+          "openrouter_output_per_1m": 0.42,
+          "context_limit": 128000,
+          "notes": "Cache hits 90% cheaper. #4 on OpenRouter weekly."
+        },
+        "deepseek-r1": {
+          "openrouter_input_per_1m": 0.28,
+          "openrouter_input_per_1m_cached": 0.028,
+          "openrouter_output_per_1m": 0.42,
+          "context_limit": 128000,
+          "notes": "Reasoning model, chain-of-thought"
+        }
+      },
+
+      "capabilities": ["text", "code", "file_upload", "reasoning", "chain_of_thought"],
+      "strengths": ["coding", "reasoning", "extremely_cheap_api", "high_volume", "cache_efficiency"],
+      "benchmarks": {
+        "notes": "Workhorse model. Best price/performance ratio. 1.2T weekly tokens on OpenRouter."
+      },
+      "notes": "CHEAPEST quality API. R1 for reasoning tasks. Cache hits at $0.028/M input -- absurdly cheap. Web chat generous and free."
+    },
+
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "url": "https://gemini.google.com",
+      "new_chat_url": "https://gemini.google.com/app",
+      "provider": "google",
+      "models": ["gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.5-pro"],
+      "status": "active",
+      "usable": true,
+      "openrouter_id": "google/gemini-3-flash-preview",
+
+      "free_tier": {
+        "model": "gemini-2.5-flash",
+        "web_chat_available": true,
+        "rate_limits": {
+          "requests_per_minute": 15,
+          "requests_per_day": 1500,
+          "tokens_per_day": 1000000
+        },
+        "context_limit": 1000000,
+        "notes": "BEST free web tier for context: 1M tokens/day, 1M context window. Google AI Studio free API tier also generous."
+      },
+
+      "auth": {
+        "methods": ["google"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "international_access": true,
+        "notes": "Google account (Gmail) required"
+      },
+
+      "api_pricing": {
+        "gemini-3-flash-preview": {
+          "openrouter_input_per_1m": "check current",
+          "openrouter_output_per_1m": "check current",
+          "context_limit": 1000000,
+          "notes": "#10 on OpenRouter weekly. Preview, pricing may change."
+        },
+        "gemini-2.5-flash": {
+          "google_input_per_1m": 0.30,
+          "google_output_per_1m": 2.50,
+          "context_limit": 1000000,
+          "notes": "Free API tier via Google AI Studio"
+        },
+        "gemini-2.5-pro": {
+          "google_input_per_1m": 1.25,
+          "google_output_per_1m": 10.00,
+          "context_limit": 2000000
+        }
+      },
+
+      "capabilities": ["text", "code", "vision", "audio", "video", "file_upload", "web_search", "native_audio_input"],
+      "strengths": ["long_context", "multimodal", "vision", "audio_understanding", "free_api_tier"],
+      "notes": "1M context window unmatched. Free API tier via AI Studio. Native audio input. Gemini 3 Flash Preview now available. #10 weekly."
+    },
+
+    {
+      "id": "mimo",
+      "name": "MiMo-V2-Pro",
+      "url": "unknown",
+      "new_chat_url": "unknown",
+      "provider": "xiaomi",
+      "models": ["mimo-v2-pro"],
+      "status": "active",
+      "usable": true,
+      "openrouter_id": "xiaomi/mimo-v2-pro",
+
+      "free_tier": {
+        "available_on_openrouter": false,
+        "web_chat_available": "unknown",
+        "context_limit": "unknown",
+        "notes": "1.76T weekly tokens on OpenRouter, #2 most used. Web interface URL unknown. Needs research."
+      },
+
+      "auth": {
+        "methods": ["unknown"],
+        "gmail_ok": "unknown",
+        "phone_required": "unknown",
+        "international_access": "via OpenRouter",
+        "notes": "Xiaomi model. Access via OpenRouter confirmed. Direct web access needs research."
+      },
+
+      "api_pricing": {
+        "mimo-v2-pro": {
+          "openrouter_pricing": "check openrouter.ai/xiaomi/mimo-v2-pro for current pricing",
+          "notes": "Surging model, #2 weekly usage. Needs detailed pricing research."
+        }
+      },
+
+      "capabilities": ["text", "code"],
+      "strengths": ["high_usage", "rising_fast"],
+      "notes": "Xiaomi's AI model. #2 on OpenRouter weekly with 1.76T tokens. Surging fast. Access details need research -- new entrant."
+    },
+
+    {
+      "id": "stepfun",
+      "name": "Step 3.5 Flash",
+      "url": "unknown",
+      "new_chat_url": "unknown",
+      "provider": "stepfun",
+      "models": ["step-3.5-flash"],
+      "status": "active",
+      "usable": true,
+      "openrouter_id": "stepfun/step-3.5-flash",
+
+      "free_tier": {
+        "available_on_openrouter": true,
+        "openrouter_free_id": "stepfun/step-3.5-flash:free",
+        "context_limit": "unknown",
+        "notes": "FREE tier on OpenRouter. 1.25T weekly tokens, #3 most used."
+      },
+
+      "auth": {
+        "methods": ["unknown"],
+        "gmail_ok": "unknown",
+        "phone_required": "unknown",
+        "international_access": "via OpenRouter",
+        "notes": "StepFun model. Free on OpenRouter. Direct web access needs research."
+      },
+
+      "api_pricing": {
+        "step-3.5-flash": {
+          "openrouter_free": true,
+          "notes": "Free tier available on OpenRouter. 1.25T weekly tokens."
+        }
+      },
+
+      "capabilities": ["text", "code"],
+      "strengths": ["free", "high_volume"],
+      "notes": "StepFun's latest. #3 on OpenRouter weekly with 1.25T tokens. FREE tier. Needs detailed capability research."
+    },
+
+    {
+      "id": "claude",
+      "name": "Claude",
+      "url": "https://claude.ai",
+      "new_chat_url": "https://claude.ai/new",
+      "provider": "anthropic",
+      "models": ["claude-sonnet-4.6", "claude-opus-4.6", "claude-haiku-4.5"],
+      "status": "active",
+      "usable": true,
+      "openrouter_id": "anthropic/claude-sonnet-4.6",
+
+      "free_tier": {
+        "model": "claude-sonnet-4.6",
+        "web_chat_available": true,
+        "rate_limits": {
+          "messages_per_day_approx": "10-20",
+          "reset_period_hours": "5-8"
+        },
+        "context_limit": 200000
+      },
+
+      "auth": {
+        "methods": ["google", "email"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "international_access": true
+      },
+
+      "api_pricing": {
+        "claude-haiku-4.5": {
+          "openrouter_input_per_1m": 1.00,
+          "openrouter_output_per_1m": 5.00,
+          "context_limit": 200000
+        },
+        "claude-sonnet-4.6": {
+          "openrouter_input_per_1m": 3.00,
+          "openrouter_output_per_1m": 15.00,
+          "context_limit": 200000,
+          "notes": "#7 on OpenRouter weekly. 1.04T tokens."
+        },
+        "claude-opus-4.6": {
+          "openrouter_input_per_1m": 15.00,
+          "openrouter_output_per_1m": 75.00,
+          "context_limit": 200000,
+          "notes": "#8 weekly but EXTREMELY expensive. BURNED $14 in 10 min. Use only when explicitly chosen, never as default."
+        }
+      },
+
+      "capabilities": ["text", "code", "vision", "file_upload", "web_search", "artifacts"],
+      "strengths": ["coding", "reasoning", "honesty", "long_context"],
+      "notes": "Good for coding quality. EXPENSIVE on API -- never default to Opus. Sonnet reasonable for important tasks only."
+    },
+
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "url": "https://chat.openai.com",
+      "new_chat_url": "https://chat.openai.com/?model=auto",
+      "provider": "openai",
+      "models": ["gpt-4o-mini", "gpt-4o"],
+      "status": "active",
+      "usable": true,
+
+      "free_tier": {
+        "model": "gpt-4o-mini",
+        "rate_limits": {
+          "messages_per_3_hours": 10,
+          "gpt4o_messages_per_3_hours": "limited"
+        },
+        "context_limit": 128000,
+        "attachment_penalty": "Attachments may reduce limits to ~1/10th"
+      },
+
+      "auth": {
+        "methods": ["google", "microsoft", "apple", "email"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "international_access": true
+      },
+
+      "api_pricing": {
+        "gpt-4o-mini": {
+          "input_per_1m": 0.15,
+          "output_per_1m": 0.60,
+          "context_limit": 128000
+        },
+        "gpt-4o": {
+          "input_per_1m": 2.50,
+          "output_per_1m": 10.00,
+          "context_limit": 128000
+        }
+      },
+
+      "capabilities": ["text", "code", "vision", "file_upload", "web_search", "data_analysis"],
+      "strengths": ["reasoning", "coding", "general_tasks"],
+      "notes": "Tight free tier limits (10/3h). Use sparingly. Attachments kill limits."
+    },
+
+    {
+      "id": "copilot",
+      "name": "Microsoft Copilot",
+      "url": "https://copilot.microsoft.com",
+      "new_chat_url": "https://copilot.microsoft.com",
+      "provider": "microsoft",
+      "models": ["gpt-4o"],
+      "status": "active",
+      "usable": true,
+
+      "free_tier": {
+        "model": "gpt-4o",
+        "rate_limits": {
+          "messages_per_session": 30,
+          "sessions_per_day": "unlimited"
+        },
+        "context_limit": 128000,
+        "notes": "Free GPT-4o access. Session resets = fresh limits."
+      },
+
+      "auth": {
+        "methods": ["microsoft", "google"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "international_access": true
+      },
+
+      "api_pricing": {
+        "gpt-4o": {
+          "input_per_1m": 2.50,
+          "output_per_1m": 10.00,
+          "context_limit": 128000,
+          "notes": "Via Azure OpenAI"
+        }
+      },
+
+      "capabilities": ["text", "code", "vision", "image_generation", "web_search"],
+      "strengths": ["free_gpt4_access", "web_search", "image_generation"],
+      "notes": "Free GPT-4o access. Unlimited sessions = effectively unlimited with session rotation."
+    },
+
+    {
+      "id": "perplexity",
+      "name": "Perplexity",
+      "url": "https://perplexity.ai",
+      "new_chat_url": "https://perplexity.ai",
+      "provider": "perplexity",
+      "models": ["various"],
+      "status": "active",
+      "usable": true,
+
+      "free_tier": {
+        "rate_limits": {
+          "quick_searches": "unlimited",
+          "pro_searches_per_day": 5,
+          "deep_searches_per_day": 1
+        },
+        "notes": "Unlimited quick searches for basic Q&A. 5 Pro/day for advanced."
+      },
+
+      "auth": {
+        "methods": ["email", "google", "apple"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "international_access": true
+      },
+
+      "api_pricing": {
+        "notes": "Search-focused, not for code generation"
+      },
+
+      "capabilities": ["text", "web_search", "citations"],
+      "strengths": ["research", "web_search", "citations", "information_retrieval"],
+      "notes": "Best for research tasks. Unlimited quick searches. Not suitable for coding."
+    },
+
+    {
+      "id": "huggingchat",
+      "name": "HuggingChat",
+      "url": "https://huggingface.co/chat",
+      "new_chat_url": "https://huggingface.co/chat",
+      "provider": "huggingface",
+      "models": ["llama", "qwen", "mistral", "128+_open_models"],
+      "status": "active",
+      "usable": true,
+
+      "free_tier": {
+        "rate_limits": {
+          "guest_requests_per_day": 10,
+          "registered_users": "higher limits"
+        }
+      },
+
+      "auth": {
+        "methods": ["email", "github", "google", "huggingface"],
+        "gmail_ok": true,
+        "phone_required": false,
+        "international_access": true,
+        "notes": "No login required for basic use"
+      },
+
+      "api_pricing": {
+        "notes": "Many models free via Inference API"
+      },
+
+      "capabilities": ["text", "code", "vision", "file_upload", "open_source_models"],
+      "strengths": ["open_source", "model_variety", "no_vendor_lockin"],
+      "notes": "128+ open source models. Good for testing different models. Low guest limits, register for more."
+    }
+  ],
+
+  "unusable_platforms": [
+    {
+      "id": "kimi",
+      "name": "Kimi",
+      "url": "https://kimi.moonshot.cn",
+      "reason": "Requires Chinese phone number"
+    },
+    {
+      "id": "glm-cn",
+      "name": "GLM (chatglm.cn)",
+      "url": "https://chatglm.cn",
+      "reason": "Requires Chinese phone number. Use z.ai for international access instead."
+    },
+    {
+      "id": "tongyi",
+      "name": "Tongyi (Qwen China)",
+      "url": "https://tongyi.aliyun.com",
+      "reason": "Requires Alipay or Chinese phone. Use chat.qwen.ai for international access instead."
+    }
+  ],
+
+  "routing_hints": {
+    "coding": ["qwen", "deepseek", "claude", "minimax-m25"],
+    "agentic_work": ["minimax-m27", "qwen", "deepseek"],
+    "long_documents": ["gemini", "claude", "qwen"],
+    "research": ["perplexity", "copilot", "gemini"],
+    "reasoning": ["deepseek-r1", "claude", "qwen"],
+    "vision": ["gemini", "chatgpt", "claude", "qwen"],
+    "general": ["qwen", "deepseek", "chatgpt", "copilot"],
+    "free_bulk": ["qwen-free", "minimax-m25-free", "stepfun-free", "deepseek-web"],
+    "audio": ["gemini"],
+    "no_auth_required": ["huggingchat"]
+  },
+
+  "cost_tiers": {
+    "tier_0_free_local": {
+      "description": "ABANDONED - x220 too weak for local inference (AVX-only, ~6 tok/s max with 1B models)",
+      "cost": 0,
+      "use_for": [],
+      "notes": "Not viable. Cloud-only strategy. GitHub+Supabase for disaster recovery."
+    },
+    "tier_1_free_web": {
+      "description": "Courier agents via Browser Use to free web AI platforms",
+      "cost": 0,
+      "platforms": ["qwen-free", "deepseek-web", "minimax-m25-free", "stepfun-free", "gemini-free", "copilot-free"],
+      "use_for": ["coding", "reasoning", "general"],
+      "notes": "Primary strategy. Zero cost. Orchestrator rotates based on availability."
+    },
+    "tier_2_cheap_api": {
+      "description": "Pay-per-token API fallback",
+      "cost": "pennies per task",
+      "platforms": ["deepseek-api", "qwen3.5-9b-api"],
+      "use_for": ["routine_tasks", "formatting", "agent_communication"],
+      "max_cost_per_task": 0.01,
+      "notes": "DeepSeek cached at $0.028/M input. Qwen 3.5 9B at $0.05/M. Emergency backup only."
+    },
+    "tier_3_quality_api": {
+      "description": "Quality API for critical pipeline steps",
+      "cost": "$0.01-0.10 per task",
+      "platforms": ["qwen3.6-plus-api", "minimax-m27-api", "deepseek-r1-api"],
+      "use_for": ["prd_review", "qc_gates", "security_checks"],
+      "max_cost_per_task": 0.10,
+      "notes": "Only for important pipeline steps. Qwen 3.6 Plus at $0.325/M, MiniMax M2.7 at $0.30/M."
+    },
+    "tier_4_premium": {
+      "description": "Premium models, explicit choice only",
+      "cost": "expensive",
+      "platforms": ["claude-sonnet", "claude-opus", "gpt-4o"],
+      "use_for": "NEVER default",
+      "notes": "MUST be explicitly chosen by human. NEVER auto-route here. Claude Opus burned $14 in 10 min."
+    }
+  },
+
+  "limit_policy": {
+    "pause_at_percent": 80,
+    "description": "Pause platform usage when reaching 80% of limits. Resume after reset period.",
+    "fallback_cascade": [
+      "qwen-free (OpenRouter)",
+      "minimax-m25-free (OpenRouter)",
+      "stepfun-free (OpenRouter)",
+      "deepseek-web (unlimited)",
+      "copilot (unlimited sessions)",
+      "gemini-web (100/day)",
+      "perplexity-quick (unlimited)",
+      "huggingchat (registered)"
+    ]
+  }
+}

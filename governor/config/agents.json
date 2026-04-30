@@ -1,0 +1,18 @@
+{
+  "$schema": "./schemas/agents.schema.json",
+  "version": "2.3",
+  "description": "Agent configurations. Empty model field = use cascade routing from routing.json free_cascade strategy. context_policy: full_map=entire codebase, file_tree=section headers only, targeted=specific task files only, none=no codebase context.",
+  "agents": [
+    {"id":"consultant","name":"Consultant","model":"","prompt":"consultant.md","capabilities":["web_access","file_access","interactive"],"default_connector":"","description":"Human entry point","context_policy":"file_tree"},
+    {"id":"planner","name":"Planner","model":"","prompt":"planner.md","capabilities":["file_access"],"default_connector":"","description":"Breaks PRD into tasks","context_policy":"full_map"},
+    {"id":"supervisor","name":"Supervisor","model":"","prompt":"supervisor.md","capabilities":["file_access"],"default_connector":"","description":"Quality gate","context_policy":"file_tree"},
+    {"id":"council","name":"Council","model":"","prompt":"council.md","capabilities":["file_access","web_access"],"default_connector":"","description":"Deep review","context_policy":"council"},
+    {"id":"orchestrator","name":"Vibes","model":"","prompt":"orchestrator.md","capabilities":[],"default_connector":"","description":"Human interface","context_policy":"file_tree"},
+    {"id":"maintenance","name":"Maintenance","model":"","prompt":"maintenance.md","capabilities":["git_access","file_access","sandbox_execution"],"default_connector":"","description":"Code changes","context_policy":"file_tree"},
+    {"id":"researcher","name":"Researcher","model":"","prompt":"system_researcher.md","capabilities":["web_access"],"default_connector":"","description":"System improvements","context_policy":"file_tree"},
+    {"id":"tester","name":"Tester","model":"","prompt":"testers.md","capabilities":["file_access","sandbox_execution"],"default_connector":"","description":"Code validation","context_policy":"file_tree"},
+    {"id":"watcher","name":"Watcher","model":"","prompt":"watcher.md","capabilities":[],"default_connector":"","description":"Safety monitor","context_policy":"none"},
+    {"id":"task_runner","name":"Task Runner","model":"","prompt":"task_runner_simple.md","capabilities":["file_access"],"default_connector":"","description":"Executes tasks in one session","context_policy":"targeted"},
+    {"id":"analyst","name":"Analyst","model":"","prompt":"analyst.md","capabilities":[],"default_connector":"","description":"Diagnoses stuck tasks via backwards reasoning","context_policy":"none"}
+  ]
+}
