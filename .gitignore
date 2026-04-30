@@ -100,3 +100,5 @@ governor/governor.yaml
 !docs/supabase-schema/081_fix_duplicate_create_task_functions.sql
 .context/
 governor/cleanup
+graphify-out/
+governor/bin/
