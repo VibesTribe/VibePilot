@@ -1,8 +1,15 @@
 # Auto-generated. DO NOT EDIT.
+<<<<<<< HEAD
 commit: 83ee6a76
 branch: 
 generated: 2026-04-30T03:47:54Z
 boot_md_bytes: 15310
+=======
+commit: 22212860
+branch: main
+generated: 2026-04-30T03:45:41Z
+boot_md_bytes: 15318
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
 map_md_bytes: 67435
 has_index_db: true
 has_knowledge_db: true

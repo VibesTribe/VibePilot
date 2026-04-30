@@ -1,5 +1,9 @@
 # VibePilot Bootstrap
+<<<<<<< HEAD
 # Generated: 2026-04-30T03:47:54Z | Commit: 83ee6a76 | Branch: 
+=======
+# Generated: 2026-04-30T03:45:41Z | Commit: 22212860 | Branch: main
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -222,8 +226,13 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Service Info
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
+<<<<<<< HEAD
 - Branch: 
 - Commit: 83ee6a76
+=======
+- Branch: main
+- Commit: 22212860
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)

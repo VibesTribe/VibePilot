@@ -1,22 +1,34 @@
 # VibePilot Code Map
+<<<<<<< HEAD
 # Generated: 2026-04-30T03:47:54Z | Commit: 83ee6a76
+=======
+# Generated: 2026-04-30T03:45:41Z | Commit: 22212860
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
 # Auto-generated. Run build.sh to regenerate.
 
 ## governor/cmd/cleanup/main.go
 main.go [68L]
+<<<<<<< HEAD
   deps: fmt, syscall, log, os/signal, context, time, github.com/vibepilot/governor/internal/db, os
+=======
+  deps: github.com/vibepilot/governor/internal/db, log, fmt, os, syscall, time, context, os/signal
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     fn main()
 
 ## governor/cmd/encrypt_secret/main.go
 main.go [26L]
-  deps: github.com/vibepilot/governor/internal/vault, fmt, os
+  deps: fmt, os, github.com/vibepilot/governor/internal/vault
   API:
     fn main()
 
 ## governor/cmd/governor/adapters.go
 adapters.go [36L]
+<<<<<<< HEAD
   deps: github.com/vibepilot/governor/internal/core, encoding/json, context, github.com/vibepilot/governor/internal/db
+=======
+  deps: encoding/json, github.com/vibepilot/governor/internal/core, github.com/vibepilot/governor/internal/db, context
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     cl dbCheckpointAdapter
       fn ⊛ RPC(ctx context.Context, fn string, args map[string]any) → (json.RawMessage, error)
@@ -26,13 +38,21 @@ adapters.go [36L]
 
 ## governor/cmd/governor/content_fetcher.go
 content_fetcher.go [48L]
+<<<<<<< HEAD
   deps: os, path/filepath, fmt, context, io, log, net/http
+=======
+  deps: path/filepath, os, context, log, fmt, io, net/http
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     fn fetchContent(ctx context.Context, repoPath, filePath string) → ([]byte, error)
 
 ## governor/cmd/governor/handlers_council.go
 handlers_council.go [522L]
+<<<<<<< HEAD
   deps: github.com/vibepilot/governor/internal/gitree, github.com/vibepilot/governor/internal/runtime, encoding/json, log, sync, os, context, errors, github.com/vibepilot/governor/internal/db, fmt, time
+=======
+  deps: errors, github.com/vibepilot/governor/internal/gitree, github.com/vibepilot/governor/internal/runtime, sync, os, time, context, encoding/json, fmt, github.com/vibepilot/governor/internal/db, log
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewCouncilHandler
   API:
     cl ⊛ CouncilHandler
@@ -43,7 +63,11 @@ handlers_council.go [522L]
 
 ## governor/cmd/governor/handlers_maint.go
 handlers_maint.go [664L]
+<<<<<<< HEAD
   deps: encoding/json, time, log, github.com/vibepilot/governor/internal/gitree, strings, context, fmt, os/exec, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/db
+=======
+  deps: time, encoding/json, log, github.com/vibepilot/governor/internal/gitree, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/runtime, strings, context, fmt, os/exec
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewMaintenanceHandler
   API:
     cl ⊛ MaintenanceHandler
@@ -54,7 +78,11 @@ handlers_maint.go [664L]
 
 ## governor/cmd/governor/handlers_plan.go
 handlers_plan.go [711L]
+<<<<<<< HEAD
   deps: time, context, encoding/json, os, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/gitree, fmt, log, github.com/vibepilot/governor/internal/db, path/filepath
+=======
+  deps: github.com/vibepilot/governor/internal/gitree, fmt, encoding/json, context, log, time, path/filepath, github.com/vibepilot/governor/internal/runtime, os, github.com/vibepilot/governor/internal/db
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     fn setupPlanHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database db.Database, cfg *runtime.Config, connRouter *runtime.Router, git *gitree.Gitree, usageTracker *runtime.UsageTracker, )
     fn handlePlanCreated(ctx context.Context, factory *runtime.SessionFactory, pool *runtime.AgentPool, database db.Database, cfg *runtime.Config, connRouter *runtime.Router, git *gitree.Gitree, usageTracker *runtime.UsageTracker, event runtime.Event, )
@@ -64,7 +92,11 @@ handlers_plan.go [711L]
 
 ## governor/cmd/governor/handlers_research.go
 handlers_research.go [463L]
+<<<<<<< HEAD
   deps: time, fmt, encoding/json, sync, log, github.com/vibepilot/governor/internal/db, context, github.com/vibepilot/governor/internal/runtime
+=======
+  deps: github.com/vibepilot/governor/internal/db, time, fmt, log, github.com/vibepilot/governor/internal/runtime, encoding/json, context, sync
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewResearchHandler
   API:
     cl ⊛ ResearchHandler
@@ -74,7 +106,11 @@ handlers_research.go [463L]
 
 ## governor/cmd/governor/handlers_task.go
 handlers_task.go [1908L]
+<<<<<<< HEAD
   deps: time, context, encoding/json, fmt, log, strings, path/filepath, github.com/vibepilot/governor/internal/core, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/gitree, github.com/vibepilot/governor/internal/runtime, os, github.com/vibepilot/governor/internal/security, github.com/vibepilot/governor/internal/connectors
+=======
+  deps: path/filepath, github.com/vibepilot/governor/internal/runtime, time, github.com/vibepilot/governor/internal/connectors, encoding/json, os, strings, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/core, context, github.com/vibepilot/governor/internal/gitree, log, github.com/vibepilot/governor/internal/security, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewTaskHandler
   API:
     cl ⊛ TaskHandler
@@ -90,7 +126,11 @@ handlers_task.go [1908L]
 
 ## governor/cmd/governor/handlers_testing.go
 handlers_testing.go [1233L]
+<<<<<<< HEAD
   deps: github.com/vibepilot/governor/internal/gitree, github.com/vibepilot/governor/internal/runtime, log, github.com/vibepilot/governor/internal/db, time, os/exec, bytes, fmt, context, path/filepath, strings, os, encoding/json
+=======
+  deps: strings, bytes, log, os/exec, os, time, context, fmt, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/gitree, path/filepath, encoding/json, github.com/vibepilot/governor/internal/runtime
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewTestingHandler
   API:
     cl ⊛ TestingHandler
@@ -103,7 +143,11 @@ handlers_testing.go [1233L]
 
 ## governor/cmd/governor/helpers.go
 helpers.go [213L]
+<<<<<<< HEAD
   deps: encoding/json, github.com/vibepilot/governor/internal/db, strings, context, log
+=======
+  deps: context, encoding/json, log, strings, github.com/vibepilot/governor/internal/db
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     fn getString(m map[string]any, key string) → string
     fn getStringOr(m map[string]any, key, def string) → string
@@ -119,13 +163,21 @@ helpers.go [213L]
 
 ## governor/cmd/governor/helpers_record.go
 helpers_record.go [48L]
+<<<<<<< HEAD
   deps: github.com/vibepilot/governor/internal/db, fmt, encoding/json, context, github.com/vibepilot/governor/internal/runtime
+=======
+  deps: github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/runtime, context, encoding/json, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     fn fetchRecord(ctx context.Context, database db.Database, event runtime.Event) → (map[string]any, error)
 
 ## governor/cmd/governor/main.go
 main.go [709L]
+<<<<<<< HEAD
   deps: github.com/vibepilot/governor/internal/mcp, github.com/vibepilot/governor/internal/dag, encoding/json, github.com/vibepilot/governor/internal/vault, fmt, syscall, github.com/vibepilot/governor/internal/security, github.com/vibepilot/governor/internal/webhooks, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/connectors, path/filepath, os/signal, github.com/vibepilot/governor/internal/runtime, context, github.com/vibepilot/governor/internal/gitree, github.com/vibepilot/governor/internal/core, os, log, github.com/vibepilot/governor/internal/pgnotify, github.com/vibepilot/governor/internal/tools, github.com/vibepilot/governor/internal/memory, time
+=======
+  deps: context, os/signal, fmt, syscall, github.com/vibepilot/governor/internal/pgnotify, github.com/vibepilot/governor/internal/security, github.com/vibepilot/governor/internal/core, github.com/vibepilot/governor/internal/tools, github.com/vibepilot/governor/internal/connectors, github.com/vibepilot/governor/internal/dag, os, github.com/vibepilot/governor/internal/mcp, github.com/vibepilot/governor/internal/runtime, time, github.com/vibepilot/governor/internal/webhooks, github.com/vibepilot/governor/internal/memory, github.com/vibepilot/governor/internal/db, path/filepath, github.com/vibepilot/governor/internal/gitree, github.com/vibepilot/governor/internal/vault, encoding/json, log
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     fn main()
     fn getConfigDir() → string
@@ -142,7 +194,11 @@ pipeline_events.go [43L]
 
 ## governor/cmd/governor/recovery.go
 recovery.go [443L]
+<<<<<<< HEAD
   deps: context, fmt, github.com/vibepilot/governor/internal/db, encoding/json, log, time, github.com/vibepilot/governor/internal/core, github.com/vibepilot/governor/internal/runtime
+=======
+  deps: fmt, github.com/vibepilot/governor/internal/core, time, log, context, github.com/vibepilot/governor/internal/db, encoding/json, github.com/vibepilot/governor/internal/runtime
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     fn getRecoveryConfig(cfg *runtime.Config) → RecoveryConfig
     fn runStartupRecovery(ctx context.Context, database db.Database, cfg RecoveryConfig)
@@ -156,7 +212,11 @@ recovery.go [443L]
 
 ## governor/cmd/governor/smoke.go
 smoke.go [252L]
+<<<<<<< HEAD
   deps: time, os, log, net/http, io, bytes, encoding/json, fmt
+=======
+  deps: encoding/json, bytes, io, log, net/http, os, time, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     fn runSmokeTest(dbURL, dbKey string)
     cl stageCheck
@@ -170,7 +230,11 @@ smoke.go [252L]
 
 ## governor/cmd/governor/startup_validate.go
 startup_validate.go [503L]
+<<<<<<< HEAD
   deps: fmt, os, path/filepath, os/exec, strings, log, time, encoding/json, context
+=======
+  deps: os, strings, path/filepath, context, os/exec, log, encoding/json, fmt, time
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     fn startupValidate(configDir string, database interface {
 	RPC(ctx context.Context, name string, params map[string]interface{}) ([]byte, error)
@@ -208,7 +272,11 @@ types.go [7L]
 
 ## governor/cmd/governor/validation.go
 validation.go [474L]
+<<<<<<< HEAD
   deps: github.com/vibepilot/governor/internal/runtime, context, strings, regexp, encoding/json, strconv, log, fmt, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/gitree
+=======
+  deps: strings, fmt, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/db, log, encoding/json, strconv, github.com/vibepilot/governor/internal/gitree, regexp, context
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     cl ⊛ TaskData
     cl ⊛ ValidationError
@@ -224,7 +292,11 @@ validation.go [474L]
 
 ## governor/cmd/migrate_vault/main.go
 main.go [200L]
+<<<<<<< HEAD
   deps: crypto/cipher, crypto/aes, fmt, encoding/json, crypto/rand, io, os, net/http, golang.org/x/crypto/pbkdf2, crypto/sha256, bytes, encoding/base64, log
+=======
+  deps: crypto/cipher, crypto/aes, net/http, encoding/base64, io, os, crypto/sha256, encoding/json, log, fmt, crypto/rand, golang.org/x/crypto/pbkdf2, bytes
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     fn main()
     cl ⊛ Secret
@@ -235,13 +307,21 @@ main.go [200L]
 
 ## governor/cmd/vault_encrypt/main.go
 main.go [27L]
+<<<<<<< HEAD
   deps: log, github.com/vibepilot/governor/internal/vault, os, fmt
+=======
+  deps: github.com/vibepilot/governor/internal/vault, fmt, os, log
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     fn main()
 
 ## governor/internal/connectors/courier.go
 courier.go [267L]
+<<<<<<< HEAD
   deps: sync, time, net/http, context, fmt, encoding/json, bytes, io
+=======
+  deps: context, time, encoding/json, bytes, net/http, sync, io, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewCourierRunner
   API:
     if ⊛ CourierDB
@@ -256,7 +336,11 @@ courier.go [267L]
 
 ## governor/internal/connectors/runners.go
 runners.go [513L]
+<<<<<<< HEAD
   deps: github.com/vibepilot/governor/internal/runtime, io, github.com/vibepilot/governor/internal/vault, net/http, context, encoding/json, bufio, strings, os/exec, bytes, fmt, time
+=======
+  deps: bytes, encoding/json, net/http, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/vault, strings, fmt, time, bufio, io, os/exec, context
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewCLIRunner, NewCLIRunnerWithArgs, NewCLIRunnerWithWorkDir, NewAPIRunner, NewAPIRunnerFromConfig, NewVaultAdapter
   API:
     if ⊛ SecretProvider
@@ -282,7 +366,11 @@ runners.go [513L]
 
 ## governor/internal/core/analyst.go
 analyst.go [116L]
+<<<<<<< HEAD
   deps: fmt, time, context, encoding/json
+=======
+  deps: context, encoding/json, time, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewAnalyst
   API:
     cl ⊛ Analyst
@@ -293,7 +381,11 @@ analyst.go [116L]
 
 ## governor/internal/core/checkpoint.go
 checkpoint.go [143L]
+<<<<<<< HEAD
   deps: encoding/json, fmt, time, context
+=======
+  deps: encoding/json, fmt, context, time
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewCheckpointManager, NewMemoryCheckpointStorage, NewDBCheckpointStorage
   API:
     cl ⊛ CheckpointManager
@@ -317,7 +409,11 @@ checkpoint.go [143L]
 
 ## governor/internal/core/state.go
 state.go [299L]
+<<<<<<< HEAD
   deps: context, encoding/json, sync, time, fmt
+=======
+  deps: time, fmt, sync, context, encoding/json
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewStateMachine
   API:
     cl ⊛ SystemState
@@ -349,7 +445,11 @@ state.go [299L]
 
 ## governor/internal/core/test_runner.go
 test_runner.go [296L]
+<<<<<<< HEAD
   deps: encoding/json, strings, time, fmt, context, os, os/exec, path/filepath
+=======
+  deps: fmt, time, os, path/filepath, os/exec, encoding/json, context, strings
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewTestRunner
   API:
     cl ⊛ TestRunner
@@ -363,7 +463,11 @@ test_runner.go [296L]
 
 ## governor/internal/dag/engine.go
 engine.go [233L]
+<<<<<<< HEAD
   deps: sync, context, log, fmt, time, strings
+=======
+  deps: strings, sync, context, log, fmt, time
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewEngine
   API:
     cl ⊛ NodeOutput
@@ -405,13 +509,21 @@ workflow.go [212L]
 
 ## governor/internal/db/interface.go
 interface.go [40L]
+<<<<<<< HEAD
   deps: time, context, encoding/json
+=======
+  deps: context, encoding/json, time
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
     if ⊛ Database
 
 ## governor/internal/db/postgres.go
 postgres.go [685L]
+<<<<<<< HEAD
   deps: encoding/json, strings, github.com/jackc/pgx/v5/pgxpool, strconv, fmt, time, encoding/binary, context, github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/pgtype
+=======
+  deps: strings, github.com/jackc/pgx/v5, fmt, encoding/json, context, encoding/binary, time, github.com/jackc/pgx/v5/pgxpool, github.com/jackc/pgx/v5/pgtype, strconv
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewPostgres
   API:
     cl ⊛ PostgresDB
@@ -454,7 +566,11 @@ rpc.go [273L]
 
 ## governor/internal/db/state.go
 state.go [86L]
+<<<<<<< HEAD
   deps: encoding/json, time, context, fmt
+=======
+  deps: context, fmt, time, encoding/json
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
       fn ⊛ RecordStateTransition(ctx context.Context, entityType string, entityID string, fromState string, toState string, reason string, metadata map[string]any) → error
       fn ⊛ RecordPerformanceMetric(ctx context.Context, metricType string, entityID string, duration time.Duration, success bool, metadata map[string]any) → error
@@ -463,7 +579,11 @@ state.go [86L]
 
 ## governor/internal/db/supabase.go
 supabase.go [285L]
+<<<<<<< HEAD
   deps: bytes, io, regexp, net/http, strings, time, net/url, encoding/json, context, fmt
+=======
+  deps: encoding/json, context, bytes, regexp, strings, time, fmt, net/url, io, net/http
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: New, NewWithConfig
   API:
     fn isValidTableName(name string) → bool
@@ -488,7 +608,11 @@ supabase.go [285L]
 
 ## governor/internal/gitree/gitree.go
 gitree.go [976L]
+<<<<<<< HEAD
   deps: strings, path/filepath, regexp, encoding/json, log, time, context, os/exec, os, fmt, bytes
+=======
+  deps: time, fmt, os/exec, path/filepath, regexp, log, strings, context, os, encoding/json, bytes
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: New
   API:
     fn isValidBranchName(name string) → bool
@@ -516,7 +640,11 @@ gitree.go [976L]
 
 ## governor/internal/gitree/managed_repo.go
 managed_repo.go [310L]
+<<<<<<< HEAD
   deps: path/filepath, fmt, time, strings, log, context, os, os/exec
+=======
+  deps: time, context, os/exec, strings, path/filepath, log, fmt, os
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewManagedRepo
   API:
     cl ⊛ ManagedRepo
@@ -531,7 +659,11 @@ managed_repo.go [310L]
 
 ## governor/internal/gitree/worktree.go
 worktree.go [416L]
+<<<<<<< HEAD
   deps: os, path/filepath, fmt, context, strings, log, regexp, time
+=======
+  deps: os, fmt, time, log, strings, regexp, context, path/filepath
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewWorktreeManager, TaskBranchName
   API:
     cl ⊛ WorktreeManager
@@ -557,7 +689,11 @@ hello.go [6L]
 
 ## governor/internal/maintenance/maintenance.go
 maintenance.go [346L]
+<<<<<<< HEAD
   deps: os, strings, github.com/vibepilot/governor/internal/gitree, fmt, path/filepath, github.com/vibepilot/governor/internal/db, log, context, github.com/vibepilot/governor/pkg/types
+=======
+  deps: log, os, fmt, github.com/vibepilot/governor/internal/db, path/filepath, strings, github.com/vibepilot/governor/pkg/types, github.com/vibepilot/governor/internal/gitree, context
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: New
   API:
     ty ⊛ RiskLevel
@@ -576,7 +712,11 @@ maintenance.go [346L]
 
 ## governor/internal/maintenance/sandbox.go
 sandbox.go [165L]
+<<<<<<< HEAD
   deps: io, os/exec, os, path/filepath, fmt, time, context, log
+=======
+  deps: time, context, log, path/filepath, os/exec, os, io, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
       fn ⊛ CreateSandbox() → (string, error)
       fn ⊛ ApplyToSandbox(sandboxPath string, change *Change) → error
@@ -589,7 +729,11 @@ sandbox.go [165L]
 
 ## governor/internal/maintenance/validation.go
 validation.go [248L]
+<<<<<<< HEAD
   deps: encoding/json, strings, time, fmt, os, log, path/filepath
+=======
+  deps: fmt, os, strings, time, path/filepath, encoding/json, log
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   API:
       fn ⊛ Backup(target string) → (string, error)
       fn ⊛ Rollback(backupPath, target string) → error
@@ -603,7 +747,11 @@ validation.go [248L]
 
 ## governor/internal/mcp/executor.go
 executor.go [44L]
+<<<<<<< HEAD
   deps: fmt, github.com/vibepilot/governor/internal/runtime, encoding/json, context
+=======
+  deps: github.com/vibepilot/governor/internal/runtime, encoding/json, context, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewMCPToolExecutor
   API:
     cl ⊛ MCPToolExecutor
@@ -613,7 +761,11 @@ executor.go [44L]
 
 ## governor/internal/mcp/governor_server.go
 governor_server.go [211L]
+<<<<<<< HEAD
   deps: encoding/json, fmt, log, context, github.com/mark3labs/mcp-go/mcp, strconv, github.com/mark3labs/mcp-go/server, github.com/vibepilot/governor/internal/runtime, os
+=======
+  deps: github.com/mark3labs/mcp-go/mcp, github.com/mark3labs/mcp-go/server, fmt, context, os, strconv, encoding/json, log, github.com/vibepilot/governor/internal/runtime
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewGovernorServer
   API:
     cl ⊛ GovernorServer
@@ -624,7 +776,11 @@ governor_server.go [211L]
 
 ## governor/internal/mcp/registry.go
 registry.go [253L]
+<<<<<<< HEAD
   deps: fmt, sync, time, github.com/mark3labs/mcp-go/client, github.com/mark3labs/mcp-go/client/transport, github.com/mark3labs/mcp-go/mcp, context, encoding/json, github.com/vibepilot/governor/internal/runtime, log
+=======
+  deps: github.com/vibepilot/governor/internal/runtime, github.com/mark3labs/mcp-go/client/transport, sync, encoding/json, context, log, fmt, time, github.com/mark3labs/mcp-go/client, github.com/mark3labs/mcp-go/mcp
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewRegistry
   API:
     cl ⊛ ToolBinding
@@ -640,7 +796,11 @@ registry.go [253L]
 
 ## governor/internal/memory/compactor.go
 compactor.go [248L]
+<<<<<<< HEAD
   deps: context, github.com/vibepilot/governor/internal/runtime, fmt, strings, time, encoding/json, github.com/vibepilot/governor/internal/db
+=======
+  deps: context, time, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/db, strings, encoding/json, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewCompactor
   API:
     cl ⊛ SessionSummary
@@ -653,7 +813,11 @@ compactor.go [248L]
 
 ## governor/internal/memory/service.go
 service.go [302L]
+<<<<<<< HEAD
   deps: context, time, fmt, encoding/json, github.com/vibepilot/governor/internal/db
+=======
+  deps: context, encoding/json, fmt, time, github.com/vibepilot/governor/internal/db
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: New
   API:
     cl ⊛ Config
@@ -671,7 +835,11 @@ service.go [302L]
 
 ## governor/internal/pgnotify/listener.go
 listener.go [246L]
+<<<<<<< HEAD
   deps: context, log, github.com/vibepilot/governor/internal/runtime, encoding/json, time, github.com/jackc/pgx/v5, fmt
+=======
+  deps: time, github.com/jackc/pgx/v5, context, log, github.com/vibepilot/governor/internal/runtime, encoding/json, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewListener
   API:
     if ⊛ SSEBroadcaster
@@ -682,7 +850,11 @@ listener.go [246L]
 
 ## governor/internal/runtime/config.go
 config.go [1388L]
+<<<<<<< HEAD
   deps: context, fmt, log, encoding/json, os, path/filepath, sync
+=======
+  deps: log, os, path/filepath, context, sync, encoding/json, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: DefaultCodeMapConfig, LoadConfig
   API:
     cl ⊛ SystemConfig
@@ -817,7 +989,11 @@ config.go [1388L]
 
 ## governor/internal/runtime/connector_tracker.go
 connector_tracker.go [283L]
+<<<<<<< HEAD
   deps: sync, log, encoding/json, context, time
+=======
+  deps: encoding/json, log, context, sync, time
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewConnectorUsageTracker
   API:
     cl ⊛ ConnectorProfile
@@ -833,7 +1009,11 @@ connector_tracker.go [283L]
 
 ## governor/internal/runtime/context_builder.go
 context_builder.go [355L]
+<<<<<<< HEAD
   deps: context, encoding/json, fmt, time, strings, path/filepath, sync, os
+=======
+  deps: fmt, sync, context, encoding/json, os, strings, time, path/filepath
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewContextBuilder
   API:
     if ⊛ RPCQuerier
@@ -855,7 +1035,11 @@ context_builder.go [355L]
 
 ## governor/internal/runtime/cooldown_watcher.go
 cooldown_watcher.go [223L]
+<<<<<<< HEAD
   deps: sync, log, context, time
+=======
+  deps: sync, context, time, log
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewCooldownWatcher
   API:
     cl ⊛ CooldownWatcher
@@ -874,7 +1058,11 @@ decision_escape_fix.go [16L]
 
 ## governor/internal/runtime/decision.go
 decision.go [805L]
+<<<<<<< HEAD
   deps: regexp, encoding/json, strings, fmt
+=======
+  deps: strings, encoding/json, regexp, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: ParseAnalystDecision, ParseAnalystDecisionFromMap, ParseResearchReview, ParseSupervisorDecision, ParseCouncilVote, ParsePlannerOutput, ParseTestResults, ParseInitialReview, ParseTaskRunnerOutput, CategorizeFailure
   API:
     cl ⊛ Issue
@@ -915,7 +1103,11 @@ decision.go [805L]
 
 ## governor/internal/runtime/events.go
 events.go [129L]
+<<<<<<< HEAD
   deps: context, encoding/json, sync, time, log
+=======
+  deps: log, time, sync, context, encoding/json
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewEventRouter
   API:
     ty ⊛ EventType
@@ -935,7 +1127,11 @@ events.go [129L]
 
 ## governor/internal/runtime/model_loader.go
 model_loader.go [364L]
+<<<<<<< HEAD
   deps: github.com/vibepilot/governor/internal/db, encoding/json, path/filepath, time, fmt, log, context, os
+=======
+  deps: fmt, path/filepath, encoding/json, log, context, github.com/vibepilot/governor/internal/db, os, time
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewModelLoader, LoadModelsFromConfig
   API:
     cl ⊛ ModelsConfigFile
@@ -954,7 +1150,11 @@ model_loader.go [364L]
 
 ## governor/internal/runtime/parallel.go
 parallel.go [230L]
+<<<<<<< HEAD
   deps: sync, fmt, sync/atomic, log, context
+=======
+  deps: context, fmt, sync/atomic, log, sync
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewAgentPool, NewAgentPoolWithConcurrency
   API:
     cl ⊛ AgentPool
@@ -972,7 +1172,11 @@ parallel.go [230L]
 
 ## governor/internal/runtime/platform_tracker.go
 platform_tracker.go [361L]
+<<<<<<< HEAD
   deps: context, encoding/json, sync, time, log
+=======
+  deps: log, context, encoding/json, time, sync
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewPlatformUsageTracker
   API:
     cl ⊛ PlatformProfile
@@ -990,7 +1194,11 @@ platform_tracker.go [361L]
 
 ## governor/internal/runtime/research_action.go
 research_action.go [561L]
+<<<<<<< HEAD
   deps: sync, encoding/json, path/filepath, context, github.com/vibepilot/governor/internal/db, log, fmt, os
+=======
+  deps: fmt, os, path/filepath, log, sync, github.com/vibepilot/governor/internal/db, encoding/json, context
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewResearchActionApplier
   API:
     cl ⊛ ResearchActionApplier
@@ -1003,7 +1211,11 @@ research_action.go [561L]
 
 ## governor/internal/runtime/router.go
 router.go [808L]
+<<<<<<< HEAD
   deps: encoding/json, log, sync/atomic, sort, github.com/vibepilot/governor/internal/db, context
+=======
+  deps: context, sync/atomic, github.com/vibepilot/governor/internal/db, encoding/json, log, sort
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: EstimateTokens, NewRouter
   API:
     fn ⊛ EstimateTokens(content string, role string) → int
@@ -1025,7 +1237,11 @@ router.go [808L]
 
 ## governor/internal/runtime/session.go
 session.go [281L]
+<<<<<<< HEAD
   deps: encoding/json, context, time, strings, fmt
+=======
+  deps: strings, fmt, context, encoding/json, time
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: WithTimeout, NewSession, NewSessionFactory
   API:
     if ⊛ ConnectorRunner
@@ -1051,7 +1267,11 @@ session.go [281L]
 
 ## governor/internal/runtime/tools.go
 tools.go [136L]
+<<<<<<< HEAD
   deps: encoding/json, fmt, context
+=======
+  deps: context, encoding/json, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewToolRegistry
   API:
     cl ⊛ ToolResult
@@ -1067,7 +1287,11 @@ tools.go [136L]
 
 ## governor/internal/runtime/usage_tracker.go
 usage_tracker.go [813L]
+<<<<<<< HEAD
   deps: context, encoding/json, fmt, log, sync, time
+=======
+  deps: fmt, log, sync, context, time, encoding/json
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewUsageTracker
   API:
     ty ⊛ ThrottleBehavior
@@ -1142,7 +1366,11 @@ db_tools.go [238L]
 
 ## governor/internal/tools/file_tools.go
 file_tools.go [177L]
+<<<<<<< HEAD
   deps: context, encoding/json, fmt, os, path/filepath, strings
+=======
+  deps: encoding/json, context, path/filepath, strings, os, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewFileReadTool, NewFileWriteTool, NewFileDeleteTool
   API:
     cl ⊛ FileReadTool
@@ -1157,7 +1385,11 @@ file_tools.go [177L]
 
 ## governor/internal/tools/git_tools.go
 git_tools.go [185L]
+<<<<<<< HEAD
   deps: context, fmt, encoding/json, github.com/vibepilot/governor/internal/gitree
+=======
+  deps: context, github.com/vibepilot/governor/internal/gitree, encoding/json, fmt
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewGitCreateBranchTool, NewGitReadBranchTool, NewGitCommitTool, NewGitMergeTool, NewGitDeleteBranchTool, NewGitClearBranchTool
   API:
     cl ⊛ GitCreateBranchTool
@@ -1181,7 +1413,11 @@ git_tools.go [185L]
 
 ## governor/internal/tools/registry.go
 registry.go [94L]
+<<<<<<< HEAD
   deps: github.com/vibepilot/governor/internal/vault, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/db, net/http, time, github.com/vibepilot/governor/internal/gitree
+=======
+  deps: time, net/http, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/vault, github.com/vibepilot/governor/internal/gitree
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: RegisterAll
   API:
     cl ⊛ Dependencies
@@ -1190,7 +1426,11 @@ registry.go [94L]
 
 ## governor/internal/tools/sandbox_tools.go
 sandbox_tools.go [245L]
+<<<<<<< HEAD
   deps: os, time, os/exec, context, strings, fmt, bytes, path/filepath, encoding/json
+=======
+  deps: strings, bytes, path/filepath, context, encoding/json, fmt, os, time, os/exec
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewSandboxTestTool, NewSandboxTestToolWithConfig, NewRunLintTool, NewRunLintToolWithTimeout, NewRunTypecheckTool, NewRunTypecheckToolWithTimeout
   API:
     cl ⊛ SandboxTestTool
@@ -1209,7 +1449,11 @@ sandbox_tools.go [245L]
 
 ## governor/internal/tools/vault_tools.go
 vault_tools.go [41L]
+<<<<<<< HEAD
   deps: context, encoding/json, github.com/vibepilot/governor/internal/vault, fmt
+=======
+  deps: context, encoding/json, fmt, github.com/vibepilot/governor/internal/vault
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewVaultGetTool
   API:
     cl ⊛ VaultGetTool
@@ -1218,7 +1462,11 @@ vault_tools.go [41L]
 
 ## governor/internal/tools/web_tools.go
 web_tools.go [231L]
+<<<<<<< HEAD
   deps: context, encoding/json, io, fmt, github.com/vibepilot/governor/internal/runtime, net/http, strings, net/url
+=======
+  deps: net/url, github.com/vibepilot/governor/internal/runtime, context, fmt, encoding/json, net/http, strings, io
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewWebSearchTool, NewWebFetchTool
   API:
     cl ⊛ WebSearchTool
@@ -1230,7 +1478,11 @@ web_tools.go [231L]
 
 ## governor/internal/vault/vault.go
 vault.go [506L]
+<<<<<<< HEAD
   deps: os, crypto/cipher, io, crypto/aes, log, context, time, fmt, crypto/sha256, sync, github.com/vibepilot/governor/internal/db, encoding/json, encoding/base64, crypto/rand, golang.org/x/crypto/pbkdf2
+=======
+  deps: crypto/sha256, time, crypto/aes, context, crypto/rand, sync, github.com/vibepilot/governor/internal/db, golang.org/x/crypto/pbkdf2, log, io, encoding/json, encoding/base64, fmt, crypto/cipher, os
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: New, NewWithoutAudit, Encrypt, GetEnvOrVault
   API:
     cl ⊛ Vault
@@ -1257,7 +1509,11 @@ vault.go [506L]
 
 ## governor/internal/webhooks/github.go
 github.go [149L]
+<<<<<<< HEAD
   deps: github.com/vibepilot/governor/internal/db, context, strings, encoding/json, log
+=======
+  deps: context, github.com/vibepilot/governor/internal/db, strings, log, encoding/json
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewGitHubWebhookHandler
   API:
     cl ⊛ GitHubWebhookHandler
@@ -1268,7 +1524,11 @@ github.go [149L]
 
 ## governor/internal/webhooks/server.go
 server.go [1066L]
+<<<<<<< HEAD
   deps: encoding/hex, crypto/hmac, log, crypto/sha256, encoding/json, strings, net/http, io, time, github.com/vibepilot/governor/internal/runtime, fmt, context
+=======
+  deps: crypto/sha256, github.com/vibepilot/governor/internal/runtime, encoding/hex, fmt, log, net/http, io, time, strings, encoding/json, context, crypto/hmac
+>>>>>>> 153ba1e6 (fix: remove all Nemotron models from routing cascade - causes hangs/vibe-loops)
   exports: NewServer, GetWebhookURL
   API:
     ty ⊛ CourierResultFunc
