@@ -132,6 +132,7 @@ func (h *GitHubWebhookHandler) createPlanForPRD(ctx context.Context, prdPath str
 }
 
 func (h *GitHubWebhookHandler) prdExists(ctx context.Context, prdPath string) (bool, error) {
+	// Check plans table first
 	result, err := h.db.Query(ctx, "plans", map[string]any{
 		"prd_path": prdPath,
 		"limit":    1,
@@ -145,5 +146,26 @@ func (h *GitHubWebhookHandler) prdExists(ctx context.Context, prdPath string) (b
 		return false, err
 	}
 
-	return len(plans) > 0, nil
+	if len(plans) > 0 {
+		return true, nil
+	}
+
+	// Also check orchestrator_events for existing prd_committed — prevents
+	// duplicate events when a force-push or rebase causes git to list old
+	// PRD files as "added" again
+	events, err := h.db.Query(ctx, "orchestrator_events", map[string]any{
+		"event_type": "prd_committed",
+		"task_id":    prdPath,
+		"limit":      1,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	var existing []map[string]any
+	if err := json.Unmarshal(events, &existing); err != nil {
+		return false, err
+	}
+
+	return len(existing) > 0, nil
 }

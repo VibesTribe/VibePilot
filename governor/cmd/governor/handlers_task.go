@@ -321,16 +321,10 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	h.saveCheckpoint(ctx, taskID, "execution_start", 0, "", nil)
 	runStart := time.Now()
 
-	// Transition to in_progress so dashboard shows execution state
-	// and recovery can find stuck tasks
-	h.database.RPC(ctx, "transition_task", map[string]any{
-		"p_task_id":    taskID,
-		"p_new_status": "in_progress",
-	})
-	h.database.Update(ctx, "tasks", taskID, map[string]any{
-		"assigned_to": modelID,
-	})
-
+	// NOTE: claim_task already set status=in_progress and assigned_to.
+	// Do NOT call transition_task here — it clears processing_by=NULL,
+	// which creates a race window where a duplicate event can re-claim
+	// the same task. Only update fields that claim_task didn't set.
 	// Record dispatch event for timeline
 	recordPipelineEvent(ctx, h.database, "task_dispatched", taskID, modelID, "",
 		map[string]any{
