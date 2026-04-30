@@ -665,8 +665,8 @@ Dashboard ROI panel → reads tasks + task_runs + subscription_history
 
 ### Tables
 - `task_runs`: per-invocation records with `role`, `token_source`, `total_actual_cost_usd`
-- `tasks`: aggregated totals `total_tokens_in`, `total_tokens_out`, `total_cost_usd`, `model_count`
-- `subscription_history`: tracks all subscriptions over time, persists when archived
+- `tasks`: aggregated totals `total_tokens_in`, `total_tokens_out`, `total_cost_usd`, `total_api_cost_usd`
+- `subscription_history`: tracks all subscriptions (provider, model_id, cost_usd, tokens_consumed, api_equivalent_cost_usd, roi_percentage), persists when archived
 - `project_snapshots`: archive/clear functionality for project totals
 
 ### Token Estimation
