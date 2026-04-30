@@ -1,18 +1,56 @@
 # VibePilot Current Issues
-> Last updated: April 30, 2026 (verified against actual code, DB, and running system)
-> Previous: April 29, 2026 (cost tracking + ROI dashboard fixes)
+> Last updated: April 30, 2026 — 03:55 UTC
+> Previous: April 30, 2026 (cost tracking + ROI dashboard fixes)
 
 ## Status Summary
 
 | Category | Open | Fixed | Deferred |
 |----------|------|-------|----------|
+| Courier routing | 0 | 2 (Apr 30) | 0 |
+| Race conditions | 0 | 2 (Apr 30) | 0 |
 | Dashboard display | 0 | 13 (token/ROI fixes Apr 30) | 0 |
 | Pipeline data | 0 | 8 | 0 |
 | Pipeline events | 0 | 21+ | 0 |
-| Race conditions | 0 | 2 (Apr 30) | 0 |
 | Token tracking | 0 | 4 (Apr 30) | 0 |
 | Model management | 0 | 3 (Apr 30) | 0 |
+| Config warnings | 2 | 0 | 0 |
 | Research/council | 0 | 2 | 2 |
+
+---
+
+## Open Issues
+
+### Config Warning: routing.json References Dead Models
+**Priority**: P2
+**What**: `routing.json` strategy `free_cascade` references `qwen/qwen3-coder-480b-a35b:free` and `minimax/m2.5:free` which don't exist in models.json.
+**Effect**: Governor starts in DEGRADED mode with 2 validation errors. Routing works but the cascade can't reach those entries.
+**Fix needed**: Remove dead model references from routing.json, or add the models to models.json.
+
+### Stale PRD References in Plans Table
+**Priority**: P3
+**What**: 66 plans in the `plans` table reference PRD files that were cleaned up or never persisted. Governor logs "Failed to fetch PRD" on startup for each.
+**Effect**: Noisy startup logs. Plans with missing PRDs can't be reprocessed.
+**Fix needed**: Either clean up stale plans or accept the noise. Not blocking.
+
+---
+
+## Fixed Issues (April 30, 2026 — Courier routing fix)
+
+### Courier Routing: claim_task Never Matched 'available' Tasks — FIXED
+**Priority**: P0 → FIXED
+**What happened**: Router correctly selected web routing (connector=gemini-api-courier, model=gemini-2.5-flash-lite, destination=chatgpt-web). claim_task returned false every time. After 5 model retries, task fell through to internal execution. Zero tasks ever had `routing_flag='web'`.
+**Root cause**: Migration 130 added `available` as a status for zero-dependency tasks. `claim_task` RPC only matched `WHERE status = 'pending'`. Tasks with no dependencies sat at `available`, never claimable.
+**Fix**: Migration 133 recreates `claim_task` with `WHERE status IN ('pending', 'available')`. Dependency check still guards -- tasks with unmet deps remain `locked` or `pending`.
+**Files**: `docs/supabase-schema/133_fix_claim_task_for_available.sql`
+**Commit**: 84441bdc
+
+### Courier Routing: Handler Overrode Router's RoutingFlag — FIXED
+**Priority**: P0 → FIXED
+**What happened**: Router returned `RoutingFlag: "web"`. Handler at line 234 ignored it and called `deriveRoutingFlag(connConfig)`. Since `gemini-api-courier` is `type=api`, it derived `"internal"`. Courier dispatch check on line 338 (`if routingFlag == "web"`) would always fail.
+**Root cause**: `deriveRoutingFlag` looked at the connector fueling the model, not the destination platform. The connector is API (Gemini powers the task) but the destination is web (chatgpt-web). These are different things.
+**Fix**: Use `routingResult.RoutingFlag` when explicitly set by the router. Only fall back to `deriveRoutingFlag()` when empty. Also removed redundant `transition_task` call that cleared `processing_by=NULL` (race condition fix from earlier commit, now in same code path).
+**Files**: `governor/cmd/governor/handlers_task.go`
+**Commit**: e62d960a
 
 ---
 
@@ -20,59 +58,39 @@
 
 ### Race Condition: Task Double-Dispatch — FIXED
 **Priority**: P0 → FIXED
-**What happened**: Two task_dispatched events for same task, 86ms apart. Same model dispatched twice.
-**Root cause**: `claim_task` atomically sets `status=in_progress, processing_by=worker_id`. Then `handleTaskAvailable` called `transition_task` which reset `processing_by=NULL`. Second event arrived, `claim_task` saw `processing_by IS NULL`, claimed again.
-**Fix**: Removed redundant `transition_task` call after `claim_task`. The claim already handles status and assignment atomically.
-**Files**: governor/cmd/governor/handlers_task.go
+**Root cause**: `claim_task` atomically sets `processing_by`. Then handler called `transition_task` which reset it to NULL. Second event arrived, claim succeeded again.
+**Fix**: Removed redundant `transition_task` call after `claim_task`.
 **Commit**: 66d4d373
 
 ### PRD Webhook Flood (66 duplicate events) — FIXED
 **Priority**: P0 → FIXED
-**What happened**: Force-push/rebase caused git to list all old PRD files as "added". 66 duplicate prd_committed events fired.
 **Root cause**: `prdExists` only checked `plans` table. Old test PRDs never had plans, so all passed through.
-**Fix**: `prdExists` now also checks `orchestrator_events` for existing `prd_committed` events. Dedup at the source.
-**Files**: governor/internal/webhooks/github.go
+**Fix**: `prdExists` now also checks `orchestrator_events`.
 **Commit**: 66d4d373
 
 ### Dashboard: Token Count Only Showed Run Tokens — FIXED
-**Priority**: P1 → FIXED
-**What happened**: Header "Now 2,667" only counted executor run tokens. Ignored task-level totals and subscription tokens.
-**Fix**: `calculateMetrics` now takes `max(runTokens, taskTokens)`. VibePilotTask interface updated with `total_tokens_in/out` fields.
-**Files**: vibeflow/apps/dashboard/lib/vibepilotAdapter.ts
+**Fix**: `calculateMetrics` now takes `max(runTokens, taskTokens)`.
 **Commit**: 2b973a432
 
 ### Dashboard: ROI Totals Excluded Subscription Savings — FIXED
-**Priority**: P1 → FIXED
-**What happened**: Header ROI showed $0. `roi.totals` only summed pipeline run costs, not subscription savings.
-**Fix**: Totals now include subscription data: `total_savings_usd += (api_equivalent - prorated)` for all subscriptions.
-**Files**: vibeflow/apps/dashboard/lib/vibepilotAdapter.ts
+**Fix**: Totals now include subscription data.
 **Commit**: 577d4f8f5
 
 ### Dashboard: Plan-Stage Runs Orphaned from Tasks — FIXED
-**Priority**: P1 → FIXED
-**What happened**: Planner/plan_reviewer runs recorded with planID as task_id. Dashboard adapter only looked up by task ID. Those tokens were invisible.
-**Fix**: Adapter builds `planToTask` map from `tasks.plan_id`. Plan-stage runs get attributed to the correct task.
-**Files**: vibeflow/apps/dashboard/lib/vibepilotAdapter.ts
+**Fix**: Adapter builds `planToTask` map from `tasks.plan_id`.
 **Commit**: 82c0e1103
 
 ### Plan-Level Supervisor Tokens Never Recorded — FIXED
-**Priority**: P1 → FIXED
-**What happened**: Plan review supervisor ran model calls but never wrote tokens to `task_runs`. Tokens lost.
-**Fix**: Added `record_internal_run` call with role="plan_reviewer" after plan supervisor succeeds.
-**Files**: governor/cmd/governor/handlers_plan.go
+**Fix**: Added `record_internal_run` call with role="plan_reviewer".
 **Commit**: 66d4d373
 
 ### Models Config: Nemotron Still Present — FIXED
-**Priority**: P1 → FIXED
-**What happened**: 6 Nemotron models in models.json even after removing from routing. Governor could route to them.
-**Fix**: Removed all 6 Nemotron + 2 dead Ling models. Fixed providers (Groq-native models had provider="meta"). Added missing rate limits.
-**Files**: governor/config/models.json (58 models, no Nemotron)
+**Fix**: Removed all 6 Nemotron + 2 dead Ling models.
 **Commit**: 484cf5ea
 
 ### Daily Model Health Check — NEW
-**Priority**: P1 → DONE
-**What it does**: Daily cron at 6 AM. Checks Gemini/Groq/OpenRouter APIs. Health-checks all cascade models. Updates rate limits from provider data. Reports new free models. Writes health_report.json.
-**Files**: governor/scripts/daily_model_health.py
+**What**: Daily cron at 6 AM. Checks APIs, health-checks models, updates rate limits.
+**Files**: `governor/scripts/daily_model_health.py`
 **Commit**: 484cf5ea
 
 ---
@@ -80,22 +98,15 @@
 ## Fixed Issues (April 29, 2026)
 
 ### E2E Pipeline Test — PASSED
-**Priority**: P0 → DONE
-**What happened**: PRD `e2e-hello-world.md` pushed. Full autonomous pipeline completed: planner → supervisor → dispatch → executor → supervisor review → testing → merge. 12 orchestrator_events recorded. Analyst agent wired for stuck tasks.
+PRD `e2e-hello-world.md` pushed. Full autonomous pipeline completed. 12 orchestrator_events recorded.
 **Commit**: 22212860
 
-### Dashboard Fixes (Apr 29, 10 fixes)
-- Owner mapping: use raw `assigned_to` without `agent.` prefix
-- Token counting: sum ALL runs per task, not just latest
-- Log popup CSS: reduced pseudo-elements to 88px
-- Event sorting via useMemo
+### Dashboard Fixes (10 fixes)
+Owner mapping, token counting, log popup CSS, event sorting.
 **Commits**: d2a791e30, 11e6b9818, e6c644471 through f75d8f9c2
 
-### Cost Tracking 4-Phase Overhaul (Apr 29)
-- Phase 1: subscription_history table, task_runs cost columns
-- Phase 2: record_internal_run for planner/supervisor/analyst
-- Phase 3: Dashboard ROI panel overhaul
-- Phase 4: Alerting for subscription thresholds
+### Cost Tracking 4-Phase Overhaul
+subscription_history, record_internal_run, ROI panel, alerting.
 **Commits**: 6d37581f, e22f1e99, 7613e19a7
 
 ---
@@ -141,15 +152,16 @@ All pipeline stages now record tokens to task_runs via `record_internal_run`:
 | Consultant | `consultant` | Wired, ready when consultant agent exists |
 | Researcher | — | Future stage |
 
-Token lifecycle per task: planner + plan_reviewer (via plan_id) + executor + supervisor (per attempt, accumulates on retry). Adapter maps plan_id → task_id.
-
 ---
 
 ## Build Priority (REMAINING)
 
 | Priority | Issue | Effort | What's Needed |
 |----------|-------|--------|---------------|
-| P1 | Courier agent testing (browser-based execution) | Medium | Test browser-use courier dispatch |
+| P1 | Courier E2E test (verify web routing works end-to-end) | Medium | Push a PRD, verify routing_flag='web' lands in DB |
+| P1 | Clean dead model refs from routing.json | Trivial | Remove qwen3-coder-480b and minimax-m2.5 |
+| P2 | Clean stale plans from DB | Trivial | DELETE plans with missing PRDs |
 | P2 | Research agent + knowledgebase | Medium | Build researcher, wire knowledgebase |
 | P3 | Stale Supabase-era prompts in DB | Trivial | DELETE FROM prompts |
 | P3 | Dead code cleanup | Low | Remove old Python orchestrator refs |
+| P3 | jcodemunch transport error | Low | Debug MCP connection on startup |
