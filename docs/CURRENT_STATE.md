@@ -187,7 +187,7 @@ All timeouts read from system.json (fallbacks only when config is nil):
 | Table | Rows |
 |-------|------|
 | models | 67 |
-| plans | 66 |
+| plans | 1 (e2e-hello-world, review) |
 | tasks | 1 (T001, merged) |
 | task_runs | 3 |
 | orchestrator_events | 78 |
@@ -211,10 +211,9 @@ All timeouts read from system.json (fallbacks only when config is nil):
 - **Local inference**: Too slow (2 tok/s tested). Cloud API only.
 
 ## Known Issues (non-blocking)
-1. **Stale PRD references in plans table** -- 66 plans reference PRD files that no longer exist on disk. Governor logs "Failed to fetch PRD" on startup for each. Non-blocking but noisy.
-2. **jcodemunch transport error** -- CodeMap refresh fails on startup (pre-existing, graceful fallback to existing map.md).
-3. **routing.json references dead models** -- `free_cascade` strategy references `qwen/qwen3-coder-480b-a35b:free` and `minimax/m2.5:free` which don't exist in models.json. Governor starts in DEGRADED mode with 2 validation errors.
-4. **SSE wired but not E2E tested with live dashboard** -- code compiles, wiring verified, not tested with running governor + live browser.
+1. **jcodemunch transport error** -- CodeMap refresh fails on startup (pre-existing, graceful fallback to existing map.md).
+2. **SSE wired but not E2E tested with live dashboard** -- code compiles, wiring verified, not tested with running governor + live browser.
+3. **4 models reference inactive connectors** -- deepseek-chat, deepseek-reasoner, meta/llama-3.3-70b-instruct, moonshotai/kimi-k2-instruct reference deepseek-api or nvidia-api which are not active. Warnings only, not errors.
 
 ## Key Architecture Docs
 | Doc | Purpose |

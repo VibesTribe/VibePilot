@@ -7,30 +7,31 @@
 | Category | Open | Fixed | Deferred |
 |----------|------|-------|----------|
 | Courier routing | 0 | 2 (Apr 30) | 0 |
+| Config cleanup | 0 | 2 (Apr 30) | 0 |
 | Race conditions | 0 | 2 (Apr 30) | 0 |
 | Dashboard display | 0 | 13 (token/ROI fixes Apr 30) | 0 |
 | Pipeline data | 0 | 8 | 0 |
 | Pipeline events | 0 | 21+ | 0 |
 | Token tracking | 0 | 4 (Apr 30) | 0 |
 | Model management | 0 | 3 (Apr 30) | 0 |
-| Config warnings | 2 | 0 | 0 |
 | Research/council | 0 | 2 | 2 |
 
 ---
 
-## Open Issues
+## Fixed Issues (April 30, 2026 — Config cleanup)
 
-### Config Warning: routing.json References Dead Models
-**Priority**: P2
-**What**: `routing.json` strategy `free_cascade` references `qwen/qwen3-coder-480b-a35b:free` and `minimax/m2.5:free` which don't exist in models.json.
-**Effect**: Governor starts in DEGRADED mode with 2 validation errors. Routing works but the cascade can't reach those entries.
-**Fix needed**: Remove dead model references from routing.json, or add the models to models.json.
+### routing.json Dead Model References — FIXED
+**Priority**: P2 → FIXED
+**What**: `routing.json` strategy `free_cascade` referenced `qwen/qwen3-coder-480b-a35b:free` (actual ID: `qwen/qwen3-coder:free`) and `minimax/m2.5:free` (actual ID: `minimax/minimax-m2.5`).
+**Effect**: Governor started in DEGRADED mode with 2 validation errors.
+**Fix**: Corrected both model IDs to match models.json.
+**Commit**: 130746cc
 
-### Stale PRD References in Plans Table
-**Priority**: P3
-**What**: 66 plans in the `plans` table reference PRD files that were cleaned up or never persisted. Governor logs "Failed to fetch PRD" on startup for each.
-**Effect**: Noisy startup logs. Plans with missing PRDs can't be reprocessed.
-**Fix needed**: Either clean up stale plans or accept the noise. Not blocking.
+### Stale Draft Plans Cleaned — FIXED
+**Priority**: P3 → FIXED
+**What**: 65 draft plans in DB referenced test PRD files that were deleted during cleanup. Governor logged "Failed to fetch PRD" for each on startup.
+**Fix**: Deleted 65 stale drafts. 1 valid plan remains (e2e-hello-world.md, status=review).
+**Commit**: DB cleanup (not committed, operational)
 
 ---
 
@@ -159,8 +160,6 @@ All pipeline stages now record tokens to task_runs via `record_internal_run`:
 | Priority | Issue | Effort | What's Needed |
 |----------|-------|--------|---------------|
 | P1 | Courier E2E test (verify web routing works end-to-end) | Medium | Push a PRD, verify routing_flag='web' lands in DB |
-| P1 | Clean dead model refs from routing.json | Trivial | Remove qwen3-coder-480b and minimax-m2.5 |
-| P2 | Clean stale plans from DB | Trivial | DELETE plans with missing PRDs |
 | P2 | Research agent + knowledgebase | Medium | Build researcher, wire knowledgebase |
 | P3 | Stale Supabase-era prompts in DB | Trivial | DELETE FROM prompts |
 | P3 | Dead code cleanup | Low | Remove old Python orchestrator refs |
