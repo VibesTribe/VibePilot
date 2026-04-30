@@ -1,0 +1,134 @@
+{
+  "timestamp": "2026-04-30T06:27:16.595578+00:00",
+  "providers": {
+    "google": {
+      "status": "ok",
+      "models": 46
+    },
+    "groq": {
+      "status": "ok",
+      "models": 16
+    },
+    "openrouter": {
+      "status": "ok",
+      "models": 368,
+      "free": 32
+    }
+  },
+  "health_checks": {
+    "gemini-2.5-flash-lite": {
+      "alive": true,
+      "status": "ok",
+      "provider": "google"
+    },
+    "gemini-3.1-flash-lite-preview": {
+      "alive": true,
+      "status": "ok",
+      "provider": "google"
+    },
+    "gemini-3-flash-preview": {
+      "alive": true,
+      "status": "ok",
+      "provider": "google"
+    },
+    "gemini-2.5-flash": {
+      "alive": true,
+      "status": "ok",
+      "provider": "google"
+    },
+    "qwen/qwen3-next-80b-a3b-instruct:free": {
+      "alive": true,
+      "status": "rate_limited_but_alive",
+      "provider": "alibaba"
+    },
+    "openrouter/free": {
+      "alive": true,
+      "status": "ok",
+      "provider": "openrouter"
+    },
+    "meta-llama/llama-4-scout-17b-16e-instruct": {
+      "alive": true,
+      "status": "ok",
+      "provider": "groq"
+    },
+    "llama-3.3-70b-versatile": {
+      "alive": false,
+      "status": "HTTP 400: {\"error\":{\"message\":\"llama-3.3-70b-versatile is not a valid model ID\",\"code\":400},\"user_id\":\"user_2tah8DKI9w82OcpvvhpZxxOMG3Z\"}",
+      "provider": "meta"
+    },
+    "groq/compound": {
+      "alive": true,
+      "status": "ok",
+      "provider": "groq"
+    },
+    "openai/gpt-oss-120b": {
+      "alive": true,
+      "status": "ok",
+      "provider": "groq"
+    },
+    "groq/compound-mini": {
+      "alive": true,
+      "status": "ok",
+      "provider": "groq"
+    },
+    "llama-3.1-8b-instant": {
+      "alive": false,
+      "status": "HTTP 400: {\"error\":{\"message\":\"llama-3.1-8b-instant is not a valid model ID\",\"code\":400},\"user_id\":\"user_2tah8DKI9w82OcpvvhpZxxOMG3Z\"}",
+      "provider": "meta"
+    },
+    "meta/llama-3.3-70b-instruct": {
+      "alive": false,
+      "status": "HTTP 400: {\"error\":{\"message\":\"meta/llama-3.3-70b-instruct is not a valid model ID\",\"code\":400},\"user_id\":\"user_2tah8DKI9w82OcpvvhpZxxOMG3Z\"}",
+      "provider": "nvidia"
+    },
+    "google/gemma-4-26b-a4b-it:free": {
+      "alive": false,
+      "status": "HTTP 404: ",
+      "provider": "google"
+    },
+    "google/gemma-3-27b-it:free": {
+      "alive": false,
+      "status": "HTTP 404: ",
+      "provider": "google"
+    },
+    "deepseek-chat": {
+      "alive": null,
+      "status": "skip",
+      "provider": "deepseek"
+    },
+    "glm-5": {
+      "alive": null,
+      "status": "skip",
+      "provider": "zhipu"
+    }
+  },
+  "changes": [
+    {
+      "action": "new_free_models",
+      "count": 60,
+      "models": [
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-001",
+        "gemini-2.0-flash-lite-001",
+        "gemini-2.0-flash-lite",
+        "gemini-2.5-flash-preview-tts",
+        "gemini-2.5-pro-preview-tts",
+        "gemma-3-1b-it",
+        "gemma-3-4b-it",
+        "gemma-3-12b-it",
+        "gemma-3-27b-it",
+        "gemma-3n-e4b-it",
+        "gemma-3n-e2b-it",
+        "gemma-4-26b-a4b-it",
+        "gemma-4-31b-it",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-pro-latest",
+        "gemini-2.5-flash-image",
+        "gemini-3-pro-preview",
+        "gemini-3.1-pro-preview"
+      ]
+    }
+  ],
+  "warnings": []
+}
