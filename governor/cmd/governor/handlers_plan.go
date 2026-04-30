@@ -435,6 +435,23 @@ func runPlanReview(
 		break // success
 	}
 
+	// Record plan-level supervisor model invocation as a task_run for cost tracking
+	if usageTracker != nil {
+		usageTracker.RecordUsage(ctx, routingResult.ModelID, result.TokensIn, result.TokensOut)
+		usageTracker.RecordCompletion(ctx, routingResult.ModelID, "plan_review", time.Since(startTime).Seconds(), true)
+	}
+	if _, err := database.RPC(ctx, "record_internal_run", map[string]any{
+		"p_task_id":      planID,
+		"p_model_id":     routingResult.ModelID,
+		"p_role":         "plan_reviewer",
+		"p_status":       "success",
+		"p_tokens_in":    result.TokensIn,
+		"p_tokens_out":   result.TokensOut,
+		"p_token_source": "exact",
+	}); err != nil {
+		log.Printf("[PlanReview] Failed to record supervisor run for %s: %v", planID, err)
+	}
+
 	review, err := runtime.ParseInitialReview(result.Output)
 	if err != nil {
 		log.Printf("[PlanReview] Failed to parse supervisor output: %v, retrying...", err)
