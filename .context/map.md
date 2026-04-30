@@ -1,22 +1,22 @@
 # VibePilot Code Map
-# Generated: 2026-04-30T04:50:10Z | Commit: 66d4d373
+# Generated: 2026-04-30T06:28:33Z | Commit: ed6036e1
 # Auto-generated. Run build.sh to regenerate.
 
 ## governor/cmd/cleanup/main.go
 main.go [68L]
-  deps: context, os, time, os/signal, github.com/vibepilot/governor/internal/db, syscall, fmt, log
+  deps: time, os/signal, os, context, fmt, log, syscall, github.com/vibepilot/governor/internal/db
   API:
     fn main()
 
 ## governor/cmd/encrypt_secret/main.go
 main.go [26L]
-  deps: fmt, os, github.com/vibepilot/governor/internal/vault
+  deps: os, github.com/vibepilot/governor/internal/vault, fmt
   API:
     fn main()
 
 ## governor/cmd/governor/adapters.go
 adapters.go [36L]
-  deps: github.com/vibepilot/governor/internal/core, context, github.com/vibepilot/governor/internal/db, encoding/json
+  deps: encoding/json, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/core, context
   API:
     cl dbCheckpointAdapter
       fn ⊛ RPC(ctx context.Context, fn string, args map[string]any) → (json.RawMessage, error)
@@ -26,13 +26,13 @@ adapters.go [36L]
 
 ## governor/cmd/governor/content_fetcher.go
 content_fetcher.go [48L]
-  deps: os, context, path/filepath, fmt, io, log, net/http
+  deps: path/filepath, fmt, log, io, net/http, context, os
   API:
     fn fetchContent(ctx context.Context, repoPath, filePath string) → ([]byte, error)
 
 ## governor/cmd/governor/handlers_council.go
 handlers_council.go [522L]
-  deps: fmt, log, errors, os, context, time, encoding/json, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/runtime, sync, github.com/vibepilot/governor/internal/gitree
+  deps: github.com/vibepilot/governor/internal/runtime, errors, sync, github.com/vibepilot/governor/internal/gitree, context, encoding/json, log, os, fmt, time, github.com/vibepilot/governor/internal/db
   exports: NewCouncilHandler
   API:
     cl ⊛ CouncilHandler
@@ -43,7 +43,7 @@ handlers_council.go [522L]
 
 ## governor/cmd/governor/handlers_maint.go
 handlers_maint.go [664L]
-  deps: github.com/vibepilot/governor/internal/gitree, log, os/exec, encoding/json, strings, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/db, time, fmt, context
+  deps: github.com/vibepilot/governor/internal/db, time, log, context, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/gitree, strings, encoding/json, os/exec, fmt
   exports: NewMaintenanceHandler
   API:
     cl ⊛ MaintenanceHandler
@@ -54,7 +54,7 @@ handlers_maint.go [664L]
 
 ## governor/cmd/governor/handlers_plan.go
 handlers_plan.go [728L]
-  deps: encoding/json, time, github.com/vibepilot/governor/internal/runtime, path/filepath, os, github.com/vibepilot/governor/internal/gitree, fmt, github.com/vibepilot/governor/internal/db, context, log
+  deps: github.com/vibepilot/governor/internal/db, context, fmt, github.com/vibepilot/governor/internal/runtime, log, encoding/json, path/filepath, os, time, github.com/vibepilot/governor/internal/gitree
   API:
     fn setupPlanHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database db.Database, cfg *runtime.Config, connRouter *runtime.Router, git *gitree.Gitree, usageTracker *runtime.UsageTracker, )
     fn handlePlanCreated(ctx context.Context, factory *runtime.SessionFactory, pool *runtime.AgentPool, database db.Database, cfg *runtime.Config, connRouter *runtime.Router, git *gitree.Gitree, usageTracker *runtime.UsageTracker, event runtime.Event, )
@@ -64,7 +64,7 @@ handlers_plan.go [728L]
 
 ## governor/cmd/governor/handlers_research.go
 handlers_research.go [463L]
-  deps: sync, time, fmt, github.com/vibepilot/governor/internal/db, encoding/json, context, log, github.com/vibepilot/governor/internal/runtime
+  deps: sync, context, time, fmt, log, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/runtime, encoding/json
   exports: NewResearchHandler
   API:
     cl ⊛ ResearchHandler
@@ -74,7 +74,7 @@ handlers_research.go [463L]
 
 ## governor/cmd/governor/handlers_task.go
 handlers_task.go [1902L]
-  deps: github.com/vibepilot/governor/internal/runtime, time, log, github.com/vibepilot/governor/internal/security, github.com/vibepilot/governor/internal/gitree, fmt, encoding/json, context, github.com/vibepilot/governor/internal/core, os, strings, github.com/vibepilot/governor/internal/connectors, path/filepath, github.com/vibepilot/governor/internal/db
+  deps: strings, encoding/json, github.com/vibepilot/governor/internal/connectors, github.com/vibepilot/governor/internal/core, os, github.com/vibepilot/governor/internal/db, path/filepath, context, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/gitree, github.com/vibepilot/governor/internal/security, time, fmt, log
   exports: NewTaskHandler
   API:
     cl ⊛ TaskHandler
@@ -90,7 +90,7 @@ handlers_task.go [1902L]
 
 ## governor/cmd/governor/handlers_testing.go
 handlers_testing.go [1233L]
-  deps: encoding/json, fmt, log, path/filepath, time, context, os, strings, github.com/vibepilot/governor/internal/runtime, bytes, github.com/vibepilot/governor/internal/gitree, os/exec, github.com/vibepilot/governor/internal/db
+  deps: os, path/filepath, encoding/json, strings, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/db, bytes, context, time, log, os/exec, fmt, github.com/vibepilot/governor/internal/gitree
   exports: NewTestingHandler
   API:
     cl ⊛ TestingHandler
@@ -103,7 +103,7 @@ handlers_testing.go [1233L]
 
 ## governor/cmd/governor/helpers.go
 helpers.go [213L]
-  deps: context, strings, encoding/json, log, github.com/vibepilot/governor/internal/db
+  deps: log, strings, context, encoding/json, github.com/vibepilot/governor/internal/db
   API:
     fn getString(m map[string]any, key string) → string
     fn getStringOr(m map[string]any, key, def string) → string
@@ -119,13 +119,13 @@ helpers.go [213L]
 
 ## governor/cmd/governor/helpers_record.go
 helpers_record.go [48L]
-  deps: github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/runtime, context, encoding/json, fmt
+  deps: context, fmt, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/runtime, encoding/json
   API:
     fn fetchRecord(ctx context.Context, database db.Database, event runtime.Event) → (map[string]any, error)
 
 ## governor/cmd/governor/main.go
 main.go [709L]
-  deps: time, path/filepath, github.com/vibepilot/governor/internal/mcp, github.com/vibepilot/governor/internal/pgnotify, github.com/vibepilot/governor/internal/security, os, github.com/vibepilot/governor/internal/connectors, github.com/vibepilot/governor/internal/tools, context, encoding/json, github.com/vibepilot/governor/internal/webhooks, syscall, github.com/vibepilot/governor/internal/gitree, os/signal, fmt, github.com/vibepilot/governor/internal/core, github.com/vibepilot/governor/internal/memory, github.com/vibepilot/governor/internal/dag, github.com/vibepilot/governor/internal/vault, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/db, log
+  deps: syscall, os, github.com/vibepilot/governor/internal/db, encoding/json, github.com/vibepilot/governor/internal/dag, github.com/vibepilot/governor/internal/security, github.com/vibepilot/governor/internal/vault, path/filepath, os/signal, github.com/vibepilot/governor/internal/mcp, github.com/vibepilot/governor/internal/core, github.com/vibepilot/governor/internal/tools, github.com/vibepilot/governor/internal/connectors, time, fmt, github.com/vibepilot/governor/internal/pgnotify, github.com/vibepilot/governor/internal/webhooks, github.com/vibepilot/governor/internal/memory, log, github.com/vibepilot/governor/internal/runtime, context, github.com/vibepilot/governor/internal/gitree
   API:
     fn main()
     fn getConfigDir() → string
@@ -136,13 +136,13 @@ main.go [709L]
 
 ## governor/cmd/governor/pipeline_events.go
 pipeline_events.go [43L]
-  deps: context, log, github.com/vibepilot/governor/internal/db
+  deps: log, github.com/vibepilot/governor/internal/db, context
   API:
     fn recordPipelineEvent(ctx context.Context, database db.Database, eventType, taskID, modelID, reason string, details map[string]any)
 
 ## governor/cmd/governor/recovery.go
 recovery.go [443L]
-  deps: encoding/json, github.com/vibepilot/governor/internal/core, time, fmt, github.com/vibepilot/governor/internal/runtime, log, context, github.com/vibepilot/governor/internal/db
+  deps: context, log, github.com/vibepilot/governor/internal/runtime, encoding/json, time, fmt, github.com/vibepilot/governor/internal/core, github.com/vibepilot/governor/internal/db
   API:
     fn getRecoveryConfig(cfg *runtime.Config) → RecoveryConfig
     fn runStartupRecovery(ctx context.Context, database db.Database, cfg RecoveryConfig)
@@ -156,7 +156,7 @@ recovery.go [443L]
 
 ## governor/cmd/governor/smoke.go
 smoke.go [252L]
-  deps: time, fmt, encoding/json, log, net/http, os, bytes, io
+  deps: io, time, os, bytes, log, net/http, encoding/json, fmt
   API:
     fn runSmokeTest(dbURL, dbKey string)
     cl stageCheck
@@ -170,7 +170,7 @@ smoke.go [252L]
 
 ## governor/cmd/governor/startup_validate.go
 startup_validate.go [503L]
-  deps: strings, context, os/exec, time, log, os, encoding/json, path/filepath, fmt
+  deps: path/filepath, log, time, encoding/json, os/exec, context, strings, fmt, os
   API:
     fn startupValidate(configDir string, database interface {
 	RPC(ctx context.Context, name string, params map[string]interface{}) ([]byte, error)
@@ -208,7 +208,7 @@ types.go [7L]
 
 ## governor/cmd/governor/validation.go
 validation.go [474L]
-  deps: context, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/gitree, log, regexp, strings, encoding/json, github.com/vibepilot/governor/internal/db, strconv, fmt
+  deps: fmt, context, log, strconv, strings, github.com/vibepilot/governor/internal/db, encoding/json, regexp, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/gitree
   API:
     cl ⊛ TaskData
     cl ⊛ ValidationError
@@ -224,7 +224,7 @@ validation.go [474L]
 
 ## governor/cmd/migrate_vault/main.go
 main.go [200L]
-  deps: crypto/cipher, encoding/base64, io, net/http, os, crypto/rand, golang.org/x/crypto/pbkdf2, fmt, log, bytes, crypto/sha256, crypto/aes, encoding/json
+  deps: os, golang.org/x/crypto/pbkdf2, crypto/cipher, crypto/sha256, crypto/rand, encoding/json, bytes, crypto/aes, fmt, encoding/base64, io, log, net/http
   API:
     fn main()
     cl ⊛ Secret
@@ -235,13 +235,13 @@ main.go [200L]
 
 ## governor/cmd/vault_encrypt/main.go
 main.go [27L]
-  deps: fmt, log, os, github.com/vibepilot/governor/internal/vault
+  deps: github.com/vibepilot/governor/internal/vault, os, fmt, log
   API:
     fn main()
 
 ## governor/internal/connectors/courier.go
 courier.go [267L]
-  deps: bytes, io, time, context, fmt, sync, encoding/json, net/http
+  deps: io, fmt, encoding/json, bytes, context, net/http, sync, time
   exports: NewCourierRunner
   API:
     if ⊛ CourierDB
@@ -256,7 +256,7 @@ courier.go [267L]
 
 ## governor/internal/connectors/runners.go
 runners.go [513L]
-  deps: encoding/json, strings, github.com/vibepilot/governor/internal/vault, net/http, context, time, os/exec, github.com/vibepilot/governor/internal/runtime, fmt, bufio, io, bytes
+  deps: bufio, fmt, strings, context, bytes, github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/vault, os/exec, time, net/http, io, encoding/json
   exports: NewCLIRunner, NewCLIRunnerWithArgs, NewCLIRunnerWithWorkDir, NewAPIRunner, NewAPIRunnerFromConfig, NewVaultAdapter
   API:
     if ⊛ SecretProvider
@@ -282,7 +282,7 @@ runners.go [513L]
 
 ## governor/internal/core/analyst.go
 analyst.go [116L]
-  deps: encoding/json, context, fmt, time
+  deps: time, encoding/json, context, fmt
   exports: NewAnalyst
   API:
     cl ⊛ Analyst
@@ -317,7 +317,7 @@ checkpoint.go [143L]
 
 ## governor/internal/core/state.go
 state.go [299L]
-  deps: encoding/json, time, fmt, context, sync
+  deps: encoding/json, context, time, sync, fmt
   exports: NewStateMachine
   API:
     cl ⊛ SystemState
@@ -349,7 +349,7 @@ state.go [299L]
 
 ## governor/internal/core/test_runner.go
 test_runner.go [296L]
-  deps: path/filepath, time, fmt, os, os/exec, encoding/json, context, strings
+  deps: path/filepath, os, fmt, context, os/exec, encoding/json, strings, time
   exports: NewTestRunner
   API:
     cl ⊛ TestRunner
@@ -363,7 +363,7 @@ test_runner.go [296L]
 
 ## governor/internal/dag/engine.go
 engine.go [233L]
-  deps: context, strings, sync, fmt, log, time
+  deps: time, fmt, sync, strings, context, log
   exports: NewEngine
   API:
     cl ⊛ NodeOutput
@@ -375,7 +375,7 @@ engine.go [233L]
 
 ## governor/internal/dag/registry.go
 registry.go [123L]
-  deps: sync, os, fmt, path/filepath
+  deps: os, fmt, path/filepath, sync
   exports: NewRegistry
   API:
     cl ⊛ Registry
@@ -387,7 +387,7 @@ registry.go [123L]
 
 ## governor/internal/dag/workflow.go
 workflow.go [212L]
-  deps: fmt, gopkg.in/yaml.v3
+  deps: gopkg.in/yaml.v3, fmt
   exports: LoadWorkflow, TopologicalLayers
   API:
     cl ⊛ Workflow
@@ -411,7 +411,7 @@ interface.go [40L]
 
 ## governor/internal/db/postgres.go
 postgres.go [685L]
-  deps: github.com/jackc/pgx/v5, time, strconv, encoding/json, strings, context, github.com/jackc/pgx/v5/pgtype, encoding/binary, fmt, github.com/jackc/pgx/v5/pgxpool
+  deps: fmt, time, strconv, encoding/json, context, github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/pgtype, github.com/jackc/pgx/v5/pgxpool, strings, encoding/binary
   exports: NewPostgres
   API:
     cl ⊛ PostgresDB
@@ -438,7 +438,7 @@ postgres.go [685L]
 
 ## governor/internal/db/rpc.go
 rpc.go [273L]
-  deps: encoding/json, context, sync, fmt
+  deps: sync, context, fmt, encoding/json
   exports: NewRPCAllowlist, ParseRPCCall
   API:
     cl ⊛ RPCAllowlist
@@ -454,7 +454,7 @@ rpc.go [273L]
 
 ## governor/internal/db/state.go
 state.go [86L]
-  deps: time, context, encoding/json, fmt
+  deps: context, encoding/json, fmt, time
   API:
       fn ⊛ RecordStateTransition(ctx context.Context, entityType string, entityID string, fromState string, toState string, reason string, metadata map[string]any) → error
       fn ⊛ RecordPerformanceMetric(ctx context.Context, metricType string, entityID string, duration time.Duration, success bool, metadata map[string]any) → error
@@ -463,7 +463,7 @@ state.go [86L]
 
 ## governor/internal/db/supabase.go
 supabase.go [285L]
-  deps: time, fmt, strings, regexp, net/http, encoding/json, bytes, net/url, io, context
+  deps: bytes, io, fmt, context, regexp, strings, net/http, time, net/url, encoding/json
   exports: New, NewWithConfig
   API:
     fn isValidTableName(name string) → bool
@@ -488,7 +488,7 @@ supabase.go [285L]
 
 ## governor/internal/gitree/gitree.go
 gitree.go [976L]
-  deps: time, regexp, fmt, log, os, encoding/json, bytes, path/filepath, context, os/exec, strings
+  deps: bytes, fmt, os, encoding/json, log, path/filepath, context, strings, os/exec, regexp, time
   exports: New
   API:
     fn isValidBranchName(name string) → bool
@@ -516,7 +516,7 @@ gitree.go [976L]
 
 ## governor/internal/gitree/managed_repo.go
 managed_repo.go [310L]
-  deps: log, strings, time, os, context, os/exec, path/filepath, fmt
+  deps: context, os, time, strings, log, path/filepath, os/exec, fmt
   exports: NewManagedRepo
   API:
     cl ⊛ ManagedRepo
@@ -531,7 +531,7 @@ managed_repo.go [310L]
 
 ## governor/internal/gitree/worktree.go
 worktree.go [416L]
-  deps: context, path/filepath, os, fmt, strings, log, time, regexp
+  deps: path/filepath, context, time, strings, log, regexp, fmt, os
   exports: NewWorktreeManager, TaskBranchName
   API:
     cl ⊛ WorktreeManager
@@ -557,7 +557,7 @@ hello.go [6L]
 
 ## governor/internal/maintenance/maintenance.go
 maintenance.go [346L]
-  deps: github.com/vibepilot/governor/internal/db, fmt, context, github.com/vibepilot/governor/internal/gitree, github.com/vibepilot/governor/pkg/types, path/filepath, os, log, strings
+  deps: strings, os, fmt, path/filepath, github.com/vibepilot/governor/internal/db, context, github.com/vibepilot/governor/pkg/types, log, github.com/vibepilot/governor/internal/gitree
   exports: New
   API:
     ty ⊛ RiskLevel
@@ -576,7 +576,7 @@ maintenance.go [346L]
 
 ## governor/internal/maintenance/sandbox.go
 sandbox.go [165L]
-  deps: os/exec, io, path/filepath, os, log, context, fmt, time
+  deps: path/filepath, context, log, os/exec, fmt, os, io, time
   API:
       fn ⊛ CreateSandbox() → (string, error)
       fn ⊛ ApplyToSandbox(sandboxPath string, change *Change) → error
@@ -589,7 +589,7 @@ sandbox.go [165L]
 
 ## governor/internal/maintenance/validation.go
 validation.go [248L]
-  deps: strings, path/filepath, os, encoding/json, log, fmt, time
+  deps: encoding/json, log, os, path/filepath, strings, fmt, time
   API:
       fn ⊛ Backup(target string) → (string, error)
       fn ⊛ Rollback(backupPath, target string) → error
@@ -603,7 +603,7 @@ validation.go [248L]
 
 ## governor/internal/mcp/executor.go
 executor.go [44L]
-  deps: encoding/json, fmt, github.com/vibepilot/governor/internal/runtime, context
+  deps: encoding/json, fmt, context, github.com/vibepilot/governor/internal/runtime
   exports: NewMCPToolExecutor
   API:
     cl ⊛ MCPToolExecutor
@@ -613,7 +613,7 @@ executor.go [44L]
 
 ## governor/internal/mcp/governor_server.go
 governor_server.go [211L]
-  deps: encoding/json, github.com/mark3labs/mcp-go/mcp, os, context, github.com/mark3labs/mcp-go/server, log, github.com/vibepilot/governor/internal/runtime, fmt, strconv
+  deps: strconv, fmt, github.com/vibepilot/governor/internal/runtime, encoding/json, log, github.com/mark3labs/mcp-go/mcp, context, github.com/mark3labs/mcp-go/server, os
   exports: NewGovernorServer
   API:
     cl ⊛ GovernorServer
@@ -624,7 +624,7 @@ governor_server.go [211L]
 
 ## governor/internal/mcp/registry.go
 registry.go [253L]
-  deps: encoding/json, fmt, github.com/vibepilot/governor/internal/runtime, context, github.com/mark3labs/mcp-go/client, time, log, github.com/mark3labs/mcp-go/client/transport, sync, github.com/mark3labs/mcp-go/mcp
+  deps: log, github.com/mark3labs/mcp-go/client, github.com/mark3labs/mcp-go/mcp, context, encoding/json, time, github.com/mark3labs/mcp-go/client/transport, github.com/vibepilot/governor/internal/runtime, fmt, sync
   exports: NewRegistry
   API:
     cl ⊛ ToolBinding
@@ -640,7 +640,7 @@ registry.go [253L]
 
 ## governor/internal/memory/compactor.go
 compactor.go [248L]
-  deps: encoding/json, context, time, github.com/vibepilot/governor/internal/db, fmt, strings, github.com/vibepilot/governor/internal/runtime
+  deps: time, context, encoding/json, github.com/vibepilot/governor/internal/db, fmt, strings, github.com/vibepilot/governor/internal/runtime
   exports: NewCompactor
   API:
     cl ⊛ SessionSummary
@@ -653,7 +653,7 @@ compactor.go [248L]
 
 ## governor/internal/memory/service.go
 service.go [302L]
-  deps: github.com/vibepilot/governor/internal/db, context, time, fmt, encoding/json
+  deps: time, github.com/vibepilot/governor/internal/db, fmt, encoding/json, context
   exports: New
   API:
     cl ⊛ Config
@@ -671,7 +671,7 @@ service.go [302L]
 
 ## governor/internal/pgnotify/listener.go
 listener.go [246L]
-  deps: encoding/json, context, github.com/vibepilot/governor/internal/runtime, time, log, fmt, github.com/jackc/pgx/v5
+  deps: encoding/json, log, time, context, fmt, github.com/jackc/pgx/v5, github.com/vibepilot/governor/internal/runtime
   exports: NewListener
   API:
     if ⊛ SSEBroadcaster
@@ -682,7 +682,7 @@ listener.go [246L]
 
 ## governor/internal/runtime/config.go
 config.go [1388L]
-  deps: context, path/filepath, os, log, sync, fmt, encoding/json
+  deps: encoding/json, sync, os, context, fmt, log, path/filepath
   exports: DefaultCodeMapConfig, LoadConfig
   API:
     cl ⊛ SystemConfig
@@ -817,7 +817,7 @@ config.go [1388L]
 
 ## governor/internal/runtime/connector_tracker.go
 connector_tracker.go [283L]
-  deps: encoding/json, context, log, sync, time
+  deps: sync, time, encoding/json, context, log
   exports: NewConnectorUsageTracker
   API:
     cl ⊛ ConnectorProfile
@@ -833,7 +833,7 @@ connector_tracker.go [283L]
 
 ## governor/internal/runtime/context_builder.go
 context_builder.go [355L]
-  deps: os, fmt, sync, path/filepath, time, context, encoding/json, strings
+  deps: path/filepath, strings, os, encoding/json, fmt, sync, context, time
   exports: NewContextBuilder
   API:
     if ⊛ RPCQuerier
@@ -855,7 +855,7 @@ context_builder.go [355L]
 
 ## governor/internal/runtime/cooldown_watcher.go
 cooldown_watcher.go [223L]
-  deps: sync, context, time, log
+  deps: time, log, sync, context
   exports: NewCooldownWatcher
   API:
     cl ⊛ CooldownWatcher
@@ -874,7 +874,7 @@ decision_escape_fix.go [16L]
 
 ## governor/internal/runtime/decision.go
 decision.go [805L]
-  deps: fmt, regexp, strings, encoding/json
+  deps: encoding/json, fmt, regexp, strings
   exports: ParseAnalystDecision, ParseAnalystDecisionFromMap, ParseResearchReview, ParseSupervisorDecision, ParseCouncilVote, ParsePlannerOutput, ParseTestResults, ParseInitialReview, ParseTaskRunnerOutput, CategorizeFailure
   API:
     cl ⊛ Issue
@@ -915,7 +915,7 @@ decision.go [805L]
 
 ## governor/internal/runtime/events.go
 events.go [129L]
-  deps: context, time, encoding/json, sync, log
+  deps: time, sync, log, context, encoding/json
   exports: NewEventRouter
   API:
     ty ⊛ EventType
@@ -935,7 +935,7 @@ events.go [129L]
 
 ## governor/internal/runtime/model_loader.go
 model_loader.go [364L]
-  deps: github.com/vibepilot/governor/internal/db, time, context, path/filepath, os, fmt, encoding/json, log
+  deps: log, encoding/json, context, fmt, os, github.com/vibepilot/governor/internal/db, time, path/filepath
   exports: NewModelLoader, LoadModelsFromConfig
   API:
     cl ⊛ ModelsConfigFile
@@ -954,7 +954,7 @@ model_loader.go [364L]
 
 ## governor/internal/runtime/parallel.go
 parallel.go [230L]
-  deps: sync/atomic, sync, log, fmt, context
+  deps: sync/atomic, context, log, fmt, sync
   exports: NewAgentPool, NewAgentPoolWithConcurrency
   API:
     cl ⊛ AgentPool
@@ -972,7 +972,7 @@ parallel.go [230L]
 
 ## governor/internal/runtime/platform_tracker.go
 platform_tracker.go [361L]
-  deps: sync, time, encoding/json, log, context
+  deps: encoding/json, sync, context, time, log
   exports: NewPlatformUsageTracker
   API:
     cl ⊛ PlatformProfile
@@ -990,7 +990,7 @@ platform_tracker.go [361L]
 
 ## governor/internal/runtime/research_action.go
 research_action.go [561L]
-  deps: github.com/vibepilot/governor/internal/db, encoding/json, sync, fmt, os, context, path/filepath, log
+  deps: encoding/json, os, fmt, path/filepath, log, context, sync, github.com/vibepilot/governor/internal/db
   exports: NewResearchActionApplier
   API:
     cl ⊛ ResearchActionApplier
@@ -1003,7 +1003,7 @@ research_action.go [561L]
 
 ## governor/internal/runtime/router.go
 router.go [808L]
-  deps: context, sync/atomic, github.com/vibepilot/governor/internal/db, encoding/json, log, sort
+  deps: encoding/json, sync/atomic, github.com/vibepilot/governor/internal/db, context, log, sort
   exports: EstimateTokens, NewRouter
   API:
     fn ⊛ EstimateTokens(content string, role string) → int
@@ -1025,7 +1025,7 @@ router.go [808L]
 
 ## governor/internal/runtime/session.go
 session.go [281L]
-  deps: time, strings, encoding/json, context, fmt
+  deps: context, strings, encoding/json, fmt, time
   exports: WithTimeout, NewSession, NewSessionFactory
   API:
     if ⊛ ConnectorRunner
@@ -1067,7 +1067,7 @@ tools.go [136L]
 
 ## governor/internal/runtime/usage_tracker.go
 usage_tracker.go [813L]
-  deps: fmt, log, time, encoding/json, sync, context
+  deps: context, sync, time, encoding/json, fmt, log
   exports: NewUsageTracker
   API:
     ty ⊛ ThrottleBehavior
@@ -1107,7 +1107,7 @@ usage_tracker.go [813L]
 
 ## governor/internal/security/leak_detector.go
 leak_detector.go [69L]
-  deps: regexp, log
+  deps: log, regexp
   exports: NewLeakDetector
   API:
     cl ⊛ LeakWarning
@@ -1119,7 +1119,7 @@ leak_detector.go [69L]
 
 ## governor/internal/tools/db_tools.go
 db_tools.go [238L]
-  deps: github.com/vibepilot/governor/internal/db, encoding/json, fmt, context, regexp
+  deps: encoding/json, github.com/vibepilot/governor/internal/db, context, regexp, fmt
   exports: NewDBQueryTool, NewDBUpdateTool, NewDBInsertTool, NewDBRPCTool, NewMaintenanceCommandTool
   API:
     fn sanitizeFilterValue(val interface{}) → string
@@ -1142,7 +1142,7 @@ db_tools.go [238L]
 
 ## governor/internal/tools/file_tools.go
 file_tools.go [177L]
-  deps: strings, fmt, os, encoding/json, context, path/filepath
+  deps: encoding/json, strings, fmt, os, path/filepath, context
   exports: NewFileReadTool, NewFileWriteTool, NewFileDeleteTool
   API:
     cl ⊛ FileReadTool
@@ -1157,7 +1157,7 @@ file_tools.go [177L]
 
 ## governor/internal/tools/git_tools.go
 git_tools.go [185L]
-  deps: encoding/json, fmt, context, github.com/vibepilot/governor/internal/gitree
+  deps: encoding/json, context, fmt, github.com/vibepilot/governor/internal/gitree
   exports: NewGitCreateBranchTool, NewGitReadBranchTool, NewGitCommitTool, NewGitMergeTool, NewGitDeleteBranchTool, NewGitClearBranchTool
   API:
     cl ⊛ GitCreateBranchTool
@@ -1181,7 +1181,7 @@ git_tools.go [185L]
 
 ## governor/internal/tools/registry.go
 registry.go [94L]
-  deps: github.com/vibepilot/governor/internal/gitree, net/http, github.com/vibepilot/governor/internal/db, github.com/vibepilot/governor/internal/vault, github.com/vibepilot/governor/internal/runtime, time
+  deps: github.com/vibepilot/governor/internal/runtime, github.com/vibepilot/governor/internal/db, time, github.com/vibepilot/governor/internal/gitree, net/http, github.com/vibepilot/governor/internal/vault
   exports: RegisterAll
   API:
     cl ⊛ Dependencies
@@ -1190,7 +1190,7 @@ registry.go [94L]
 
 ## governor/internal/tools/sandbox_tools.go
 sandbox_tools.go [245L]
-  deps: bytes, os, strings, context, time, os/exec, encoding/json, fmt, path/filepath
+  deps: os/exec, fmt, time, os, context, path/filepath, strings, encoding/json, bytes
   exports: NewSandboxTestTool, NewSandboxTestToolWithConfig, NewRunLintTool, NewRunLintToolWithTimeout, NewRunTypecheckTool, NewRunTypecheckToolWithTimeout
   API:
     cl ⊛ SandboxTestTool
@@ -1209,7 +1209,7 @@ sandbox_tools.go [245L]
 
 ## governor/internal/tools/vault_tools.go
 vault_tools.go [41L]
-  deps: context, encoding/json, github.com/vibepilot/governor/internal/vault, fmt
+  deps: encoding/json, context, fmt, github.com/vibepilot/governor/internal/vault
   exports: NewVaultGetTool
   API:
     cl ⊛ VaultGetTool
@@ -1218,7 +1218,7 @@ vault_tools.go [41L]
 
 ## governor/internal/tools/web_tools.go
 web_tools.go [231L]
-  deps: strings, net/url, io, fmt, net/http, github.com/vibepilot/governor/internal/runtime, encoding/json, context
+  deps: io, net/url, encoding/json, github.com/vibepilot/governor/internal/runtime, strings, context, net/http, fmt
   exports: NewWebSearchTool, NewWebFetchTool
   API:
     cl ⊛ WebSearchTool
@@ -1230,7 +1230,7 @@ web_tools.go [231L]
 
 ## governor/internal/vault/vault.go
 vault.go [506L]
-  deps: encoding/json, crypto/cipher, crypto/sha256, encoding/base64, log, github.com/vibepilot/governor/internal/db, time, golang.org/x/crypto/pbkdf2, crypto/aes, context, fmt, crypto/rand, sync, io, os
+  deps: crypto/cipher, fmt, io, sync, golang.org/x/crypto/pbkdf2, crypto/aes, log, time, context, encoding/base64, os, encoding/json, github.com/vibepilot/governor/internal/db, crypto/rand, crypto/sha256
   exports: New, NewWithoutAudit, Encrypt, GetEnvOrVault
   API:
     cl ⊛ Vault
@@ -1257,7 +1257,7 @@ vault.go [506L]
 
 ## governor/internal/webhooks/github.go
 github.go [171L]
-  deps: strings, github.com/vibepilot/governor/internal/db, context, encoding/json, log
+  deps: context, strings, encoding/json, github.com/vibepilot/governor/internal/db, log
   exports: NewGitHubWebhookHandler
   API:
     cl ⊛ GitHubWebhookHandler
@@ -1268,7 +1268,7 @@ github.go [171L]
 
 ## governor/internal/webhooks/server.go
 server.go [1066L]
-  deps: io, github.com/vibepilot/governor/internal/runtime, fmt, net/http, strings, crypto/sha256, crypto/hmac, encoding/hex, time, context, encoding/json, log
+  deps: crypto/hmac, encoding/hex, fmt, io, strings, time, log, context, net/http, github.com/vibepilot/governor/internal/runtime, encoding/json, crypto/sha256
   exports: NewServer, GetWebhookURL
   API:
     ty ⊛ CourierResultFunc

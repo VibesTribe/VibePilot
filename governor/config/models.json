@@ -4,6 +4,1260 @@
   "description": "Model profiles with rate limits, costs, and recovery config. Source of truth synced to Supabase.",
   "models": [
     {
+      "id": "gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "provider": "google",
+      "context_limit": 1000000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "instruction"
+      ],
+      "access_via": [
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general"
+      ],
+      "status": "active",
+      "buffer_pct": 80,
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000,
+        "tokens_per_day": null
+      },
+      "context_length": 1048576
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "name": "Gemini 2.5 Pro (Web)",
+      "vendor": "google",
+      "context_limit": 1000000,
+      "status": "active",
+      "access_type": "web",
+      "access_via": [
+        "gemini-web"
+      ],
+      "rate_limits": {
+        "requests_per_minute": 5,
+        "requests_per_day": 25,
+        "tokens_per_minute": 250000,
+        "limit_type": "verified_api_docs",
+        "limit_source": "Google AI docs: 2.5 Pro Preview 5 RPM/250K TPM/25 RPD",
+        "tokens_per_day": null
+      },
+      "buffer_pct": 80,
+      "spacing_min_seconds": 12,
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10
+      },
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "strengths": [
+        "reasoning",
+        "1M context",
+        "code"
+      ],
+      "weaknesses": [
+        "web-only",
+        "5 RPM web limit"
+      ],
+      "notes": "Browser Use courier via gemini-web connector. 5 RPM, 100 RPD free tier.",
+      "provider": "google",
+      "context_length": 1048576
+    },
+    {
+      "id": "gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash Lite (Courier)",
+      "provider": "google",
+      "access_type": "api",
+      "context_limit": 1000000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general"
+      ],
+      "api_key_ref": "GEMINI_COURIER_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 5,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "stable",
+        "high_throughput",
+        "long_context",
+        "multimodal"
+      ],
+      "weaknesses": [
+        "lite_model"
+      ],
+      "notes": "Stable workhorse for high-throughput courier tasks. 1000 RPD free-tier. Safest choice.",
+      "courier": true,
+      "context_length": 1048576
+    },
+    {
+      "id": "gemini-3-flash-preview",
+      "name": "Gemini 3 Flash Preview (Visual QA / Brain)",
+      "provider": "google",
+      "access_type": "api",
+      "context_limit": 1000000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general"
+      ],
+      "api_key_ref": "GEMINI_VISUAL_TESTER_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 5,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "strong_reasoning",
+        "code_generation",
+        "visual_qa",
+        "preview_features"
+      ],
+      "weaknesses": [
+        "preview_mode",
+        "may_change"
+      ],
+      "notes": "Best available on free tier for code/visual QA. 3.1-pro-preview requires billing. 3-flash is free and capable.",
+      "context_length": 1048576
+    },
+    {
+      "id": "gemini-3.1-flash-lite-preview",
+      "name": "Gemini 3.1 Flash Lite Preview (Researcher)",
+      "provider": "google",
+      "access_type": "api",
+      "context_limit": 1000000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general"
+      ],
+      "api_key_ref": "GEMINI_RESEARCHER_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 5,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "best_intelligence",
+        "long_context",
+        "multimodal",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "preview_mode",
+        "may_change"
+      ],
+      "notes": "Best intelligence for daily system researcher. Smarter than 2.5 but in preview mode.",
+      "context_length": 1048576
+    },
+    {
+      "id": "tencent/hy3-preview:free",
+      "name": "Tencent Hy3 Preview (OpenRouter Free)",
+      "provider": "tencent",
+      "access_type": "api",
+      "context_limit": 262144,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "262K context",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "preview_model",
+        "openrouter_rate_limits",
+        "unknown_quality"
+      ],
+      "notes": "Tencent Hy3 preview. Free on OpenRouter.",
+      "courier": false,
+      "context_length": 262144
+    },
+    {
+      "id": "google/gemma-4-26b-a4b-it:free",
+      "name": "Gemma 4 26B MoE (OpenRouter Free)",
+      "provider": "google",
+      "access_type": "api",
+      "context_limit": 262144,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "vision",
+        "efficient_moe",
+        "large_context",
+        "courier_fuel"
+      ],
+      "weaknesses": [
+        "openrouter_rate_limits",
+        "smaller_than_31b"
+      ],
+      "notes": "MoE variant, efficient. Free on OpenRouter. Courier fuel model.",
+      "courier": true,
+      "context_length": 262144
+    },
+    {
+      "id": "google/gemma-4-31b-it",
+      "name": "Gemma 4 31B (OpenRouter)",
+      "vendor": "google",
+      "context_limit": 262000,
+      "status": "active",
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_pricing": {
+        "input_per_1m_usd": 0.13,
+        "output_per_1m_usd": 0.38
+      },
+      "strengths": [
+        "vision",
+        "balanced",
+        "large_context",
+        "courier_fuel"
+      ],
+      "weaknesses": [
+        "openrouter_rate_limits",
+        "quality_varies"
+      ],
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200,
+        "tokens_per_minute": null,
+        "tokens_per_day": null
+      },
+      "access_type": "api",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix.",
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "courier": true,
+      "provider": "openrouter",
+      "context_length": 262144
+    },
+    {
+      "id": "minimax/minimax-m2.5",
+      "name": "MiniMax M2.5 (OpenRouter)",
+      "vendor": "minimax",
+      "context_limit": 131072,
+      "status": "active",
+      "access_type": "api",
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0.0,
+        "output_per_1m_usd": 0.0
+      },
+      "strengths": [
+        "general",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "free tier rate limits"
+      ],
+      "notes": "OpenRouter free tier. 20 RPM, 200 RPD. Use :free suffix.",
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tool_calling"
+      ],
+      "provider": "openrouter",
+      "context_length": 196608
+    },
+    {
+      "id": "openrouter/free",
+      "name": "OpenRouter Free Router",
+      "provider": "openrouter",
+      "access_type": "api",
+      "context_limit": 200000,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tool_calling",
+        "vision",
+        "multimodal"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "auto_routes_to_best_free_model",
+        "supports_tool_calling",
+        "supports_vision",
+        "supports_structured_output",
+        "always_has_fallback"
+      ],
+      "weaknesses": [
+        "non_deterministic_model_selection",
+        "openrouter_rate_limits"
+      ],
+      "notes": "OpenRouter free auto-router. Selects best available free model for each request based on required features. Always use as fallback.",
+      "courier": true,
+      "context_length": 200000
+    },
+    {
+      "id": "qwen/qwen3-next-80b-a3b-instruct:free",
+      "name": "Qwen3 Next 80B A3B (OpenRouter Free)",
+      "provider": "alibaba",
+      "access_type": "api",
+      "context_limit": 262144,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "reasoning",
+        "262K context",
+        "code",
+        "tool_calling"
+      ],
+      "weaknesses": [
+        "openrouter_rate_limits"
+      ],
+      "notes": "MoE 80B model, strong reasoning. Free on OpenRouter.",
+      "courier": false,
+      "context_length": 262144
+    },
+    {
+      "id": "openai/gpt-oss-120b",
+      "name": "GPT-OSS 120B (Groq)",
+      "provider": "groq",
+      "access_type": "api",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "groq-api",
+        "openrouter-api"
+      ],
+      "api_key_ref": "GROQ_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200,
+        "tokens_per_minute": 12000,
+        "tokens_per_day": 100000
+      },
+      "throttle_behavior": "wait_and_retry",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 2,
+      "api_pricing": {
+        "input_per_1m_usd": 0.59,
+        "output_per_1m_usd": 0.79
+      },
+      "recovery": {
+        "on_rate_limit": "wait_and_retry",
+        "cooldown_minutes": 2,
+        "timeout_seconds": 120
+      },
+      "learned": {},
+      "strengths": [
+        "reasoning",
+        "code",
+        "instruction_following"
+      ],
+      "weaknesses": [],
+      "notes": "Groq free tier (unverified limits). Using conservative TPD=100K until actual limits confirmed from API headers.",
+      "rate_limits_by_connector": {
+        "groq-api": {
+          "requests_per_minute": 30,
+          "requests_per_day": 14400,
+          "tokens_per_minute": 12000,
+          "tokens_per_day": 100000
+        },
+        "openrouter-api": {
+          "requests_per_minute": 20,
+          "requests_per_day": 200
+        }
+      },
+      "context_length": 131072
+    },
+    {
+      "id": "openai/gpt-oss-20b:free",
+      "name": "GPT-OSS 20B (Free via OpenRouter)",
+      "vendor": "openai",
+      "access_type": "api",
+      "context_limit": 131072,
+      "capabilities": [
+        "text",
+        "reasoning",
+        "code"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "openai_quality",
+        "fast",
+        "code"
+      ],
+      "weaknesses": [
+        "smaller_than_120b"
+      ],
+      "notes": "Free on OpenRouter. OpenAI open-source 20B. Companion to the 120B variant on Groq.",
+      "provider": "openrouter",
+      "context_length": 131072
+    },
+    {
+      "id": "z-ai/glm-4.5-air",
+      "name": "GLM 4.5 Air (OpenRouter)",
+      "vendor": "zhipu",
+      "context_limit": 131000,
+      "status": "active",
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_pricing": {
+        "input_per_1m_usd": 0.1,
+        "output_per_1m_usd": 0.3
+      },
+      "strengths": [
+        "fast",
+        "free GLM access",
+        "free on openrouter"
+      ],
+      "weaknesses": [
+        "20 RPM rate limit"
+      ],
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200,
+        "tokens_per_minute": null,
+        "tokens_per_day": null
+      },
+      "access_type": "api",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix.",
+      "capabilities": [
+        "code",
+        "reasoning",
+        "tool_calling"
+      ],
+      "provider": "openrouter",
+      "context_length": 131072
+    },
+    {
+      "id": "qwen/qwen3-coder:free",
+      "name": "Qwen3 Coder (Free)",
+      "vendor": "alibaba",
+      "access_type": "api",
+      "context_limit": 262000,
+      "capabilities": [
+        "text",
+        "code",
+        "reasoning",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "code_specialist",
+        "huge_context",
+        "reasoning"
+      ],
+      "weaknesses": [
+        "narrow_focus"
+      ],
+      "notes": "Free on OpenRouter. Code specialist with 262K context. Best free coding model.",
+      "courier": true,
+      "provider": "openrouter",
+      "context_length": 262000
+    },
+    {
+      "id": "bytedance/ui-tars-1.5-7b",
+      "name": "UI-TARS 1.5 7B (GUI Specialist)",
+      "provider": "bytedance",
+      "access_type": "api",
+      "context_limit": 32768,
+      "capabilities": [
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "offline",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0.1,
+        "output_per_1m_usd": 0.2
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "gui_automation",
+        "courier_fuel",
+        "ultra_cheap",
+        "purpose_built"
+      ],
+      "weaknesses": [
+        "small_model",
+        "less_reasoning",
+        "tiny_context"
+      ],
+      "notes": "Purpose-built for GUI automation. Ultra-cheap. Ideal courier fuel for browser navigation.",
+      "courier": true,
+      "status_reason": "no_longer_free_on_openrouter",
+      "context_length": 128000
+    },
+    {
+      "id": "google/gemma-3n-e2b-it:free",
+      "name": "Gemma 3n 2B IT (Free)",
+      "vendor": "google",
+      "access_type": "api",
+      "context_limit": 8000,
+      "capabilities": [
+        "text",
+        "vision",
+        "multimodal"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "ultra_fast",
+        "vision",
+        "low_resource"
+      ],
+      "weaknesses": [
+        "tiny_model",
+        "tiny_context"
+      ],
+      "notes": "Free on OpenRouter. Newest Gemma 3n line. Ultra-lightweight. Mobile-class.",
+      "provider": "openrouter",
+      "context_length": 8192
+    },
+    {
+      "id": "google/gemma-3n-e4b-it:free",
+      "name": "Gemma 3n 4B IT (Free)",
+      "vendor": "google",
+      "access_type": "api",
+      "context_limit": 8000,
+      "capabilities": [
+        "text",
+        "vision",
+        "multimodal",
+        "audio"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "fast",
+        "vision",
+        "audio",
+        "low_resource"
+      ],
+      "weaknesses": [
+        "small_model",
+        "tiny_context"
+      ],
+      "notes": "Free on OpenRouter. Newest Gemma 3n with audio+vision. Mobile-optimized.",
+      "provider": "openrouter",
+      "context_length": 8192
+    },
+    {
+      "id": "google/gemma-3-4b-it:free",
+      "name": "Gemma 3 4B IT (Free)",
+      "vendor": "google",
+      "access_type": "api",
+      "context_limit": 33000,
+      "capabilities": [
+        "text",
+        "vision",
+        "multimodal",
+        "structured_output",
+        "function_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "vision",
+        "structured_output",
+        "multilingual"
+      ],
+      "weaknesses": [
+        "small_model",
+        "short_context"
+      ],
+      "notes": "Free on OpenRouter. Smallest Gemma 3 with vision + structured output. Courier fuel.",
+      "provider": "openrouter",
+      "context_length": 32768
+    },
+    {
+      "id": "google/gemma-3-12b-it:free",
+      "name": "Gemma 3 12B IT (Free)",
+      "vendor": "google",
+      "access_type": "api",
+      "context_limit": 33000,
+      "capabilities": [
+        "text",
+        "vision",
+        "multimodal",
+        "structured_output",
+        "function_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "vision",
+        "reasoning",
+        "structured_output",
+        "multilingual"
+      ],
+      "weaknesses": [
+        "medium_model",
+        "short_context"
+      ],
+      "notes": "Free on OpenRouter. Mid-size Gemma 3 with vision. Best quality/size ratio in free tier.",
+      "courier": true,
+      "provider": "openrouter",
+      "context_length": 32768
+    },
+    {
+      "id": "google/gemma-3-27b-it:free",
+      "name": "Gemma 3 27B (OpenRouter Free)",
+      "provider": "google",
+      "access_type": "api",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "reasoning",
+        "vision",
+        "multimodal",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_hour": 200,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300,
+        "heartbeat_interval_seconds": 30,
+        "orphan_threshold_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "vision",
+        "balanced",
+        "courier_fuel"
+      ],
+      "weaknesses": [
+        "previous_gen",
+        "openrouter_rate_limits"
+      ],
+      "notes": "Previous gen Gemma. Free on OpenRouter. Courier fuel model.",
+      "courier": true,
+      "context_length": 131072
+    },
+    {
+      "id": "meta-llama/llama-3.3-70b-instruct:free",
+      "name": "Llama 3.3 70B Instruct (Free)",
+      "vendor": "meta",
+      "access_type": "api",
+      "context_limit": 65536,
+      "capabilities": [
+        "text",
+        "reasoning",
+        "code",
+        "multilingual",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "large_model",
+        "reasoning",
+        "code",
+        "instruction_following",
+        "multilingual"
+      ],
+      "weaknesses": [
+        "medium_context"
+      ],
+      "notes": "Free on OpenRouter. 70B params - best free quality available. Flagship-level.",
+      "courier": true,
+      "provider": "openrouter",
+      "context_length": 65536
+    },
+    {
+      "id": "meta-llama/llama-3.2-3b-instruct:free",
+      "name": "Llama 3.2 3B Instruct (Free)",
+      "vendor": "meta",
+      "access_type": "api",
+      "context_limit": 131000,
+      "capabilities": [
+        "text",
+        "reasoning",
+        "multilingual"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 3,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 5,
+        "timeout_seconds": 120
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "fast",
+        "multilingual",
+        "instruction_following"
+      ],
+      "weaknesses": [
+        "small_model",
+        "limited_reasoning"
+      ],
+      "notes": "Free on OpenRouter. Good for simple/fast tasks.",
+      "provider": "openrouter",
+      "context_length": 131072
+    },
+    {
+      "id": "nousresearch/hermes-3-llama-3.1-405b:free",
+      "name": "Hermes 3 Llama 3.1 405B (Free)",
+      "vendor": "nousresearch",
+      "access_type": "api",
+      "context_limit": 131072,
+      "capabilities": [
+        "text",
+        "reasoning",
+        "code",
+        "tool_calling"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "api_key_ref": "OPENROUTER_API_KEY",
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "throttle_behavior": "queue",
+      "buffer_pct": 80,
+      "spacing_min_seconds": 5,
+      "api_pricing": {
+        "input_per_1m_usd": 0,
+        "output_per_1m_usd": 0
+      },
+      "recovery": {
+        "on_rate_limit": "cooldown",
+        "cooldown_minutes": 10,
+        "timeout_seconds": 300
+      },
+      "learned": {
+        "avg_task_duration_seconds": null,
+        "failure_rate_by_type": {},
+        "optimal_cooldown_minutes": null,
+        "best_for_task_types": [],
+        "avoid_for_task_types": []
+      },
+      "strengths": [
+        "largest_free_model",
+        "reasoning",
+        "code",
+        "long_context",
+        "tool_calling"
+      ],
+      "weaknesses": [
+        "slow_response",
+        "may_queue"
+      ],
+      "notes": "Free on OpenRouter. 405B params - largest free model. Slow but excellent quality.",
+      "courier": true,
+      "provider": "openrouter",
+      "context_length": 131072
+    },
+    {
       "id": "glm-5",
       "name": "GLM-5 (Z.AI)",
       "provider": "zhipu",
@@ -58,174 +1312,6 @@
       "notes": "Subscription via OpenCode. Throttles by slowing down, not hard cutoff.",
       "courier": false,
       "spacing_min_seconds": 20
-    },
-    {
-      "id": "gemini-2.5-flash-lite",
-      "name": "Gemini 2.5 Flash Lite (Courier)",
-      "provider": "google",
-      "access_type": "api",
-      "context_limit": 1000000,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "access_via": [
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general"
-      ],
-      "api_key_ref": "GEMINI_COURIER_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1000
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 5,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "stable",
-        "high_throughput",
-        "long_context",
-        "multimodal"
-      ],
-      "weaknesses": [
-        "lite_model"
-      ],
-      "notes": "Stable workhorse for high-throughput courier tasks. 1000 RPD free-tier. Safest choice.",
-      "courier": true
-    },
-    {
-      "id": "gemini-3.1-flash-lite-preview",
-      "name": "Gemini 3.1 Flash Lite Preview (Researcher)",
-      "provider": "google",
-      "access_type": "api",
-      "context_limit": 1000000,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "access_via": [
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general"
-      ],
-      "api_key_ref": "GEMINI_RESEARCHER_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 5,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "best_intelligence",
-        "long_context",
-        "multimodal",
-        "reasoning"
-      ],
-      "weaknesses": [
-        "preview_mode",
-        "may_change"
-      ],
-      "notes": "Best intelligence for daily system researcher. Smarter than 2.5 but in preview mode."
-    },
-    {
-      "id": "gemini-3-flash-preview",
-      "name": "Gemini 3 Flash Preview (Visual QA / Brain)",
-      "provider": "google",
-      "access_type": "api",
-      "context_limit": 1000000,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "access_via": [
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general"
-      ],
-      "api_key_ref": "GEMINI_VISUAL_TESTER_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 5,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "strong_reasoning",
-        "code_generation",
-        "visual_qa",
-        "preview_features"
-      ],
-      "weaknesses": [
-        "preview_mode",
-        "may_change"
-      ],
-      "notes": "Best available on free tier for code/visual QA. 3.1-pro-preview requires billing. 3-flash is free and capable."
     },
     {
       "id": "deepseek-chat",
@@ -345,9 +1431,9 @@
       ],
       "status": "benched",
       "rate_limits": {
-        "requests_per_minute": null,
+        "requests_per_minute": 3,
         "requests_per_hour": null,
-        "requests_per_day": null,
+        "requests_per_day": 100,
         "tokens_per_day": null,
         "messages_per_3_hours": 10
       },
@@ -398,10 +1484,11 @@
       ],
       "status": "benched",
       "rate_limits": {
-        "requests_per_minute": null,
+        "requests_per_minute": 1,
         "messages_per_day": 20,
         "limit_type": "dynamic_context_dependent",
-        "limit_source": "Anthropic: ~10-20/day rolling. Shorter conversations = more."
+        "limit_source": "Anthropic: ~10-20/day rolling. Shorter conversations = more.",
+        "requests_per_day": 10
       },
       "throttle_behavior": "queue",
       "buffer_pct": 80,
@@ -539,7 +1626,7 @@
     {
       "id": "llama-3.3-70b-versatile",
       "name": "Llama 3.3 70B (Groq)",
-      "provider": "meta",
+      "provider": "groq",
       "access_type": "api",
       "context_limit": 128000,
       "capabilities": [
@@ -555,7 +1642,7 @@
       "rate_limits": {
         "requests_per_minute": 30,
         "requests_per_hour": null,
-        "requests_per_day": 1000,
+        "requests_per_day": 14400,
         "tokens_per_minute": 12000,
         "tokens_per_day": 100000
       },
@@ -594,7 +1681,7 @@
     {
       "id": "llama-3.1-8b-instant",
       "name": "Llama 3.1 8B Instant (Groq)",
-      "provider": "meta",
+      "provider": "groq",
       "access_type": "api",
       "context_limit": 128000,
       "capabilities": [
@@ -752,61 +1839,6 @@
       "status_reason": "no_longer_free_on_openrouter"
     },
     {
-      "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-      "name": "Nemotron Ultra 253B (NVIDIA)",
-      "provider": "nvidia",
-      "access_type": "api",
-      "context_limit": 128000,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tools"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "api_key_ref": "NVIDIA_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 40,
-        "requests_per_day": 500,
-        "tokens_per_minute": 8000,
-        "tokens_per_day": 100000
-      },
-      "throttle_behavior": "hard_cutoff",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 2.0,
-        "output_per_1m_usd": 6.0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "complex_reasoning",
-        "code",
-        "large_model"
-      ],
-      "weaknesses": [
-        "slower_than_groq",
-        "lower_rate_limits"
-      ],
-      "notes": "NVIDIA NIM free tier: 40 RPM flat, 1000 credits total (token-based consumption), 4096 max output tokens. Credits are shared across all NIM models.",
-      "courier": false
-    },
-    {
       "id": "meta/llama-3.3-70b-instruct",
       "name": "Llama 3.3 70B Instruct (NVIDIA)",
       "provider": "nvidia",
@@ -940,61 +1972,6 @@
       "courier": true
     },
     {
-      "id": "openai/gpt-oss-120b",
-      "name": "GPT-OSS 120B (Groq)",
-      "provider": "groq",
-      "access_type": "api",
-      "context_limit": 131072,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "access_via": [
-        "groq-api",
-        "openrouter-api"
-      ],
-      "api_key_ref": "GROQ_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 30,
-        "requests_per_day": 14400,
-        "tokens_per_minute": 12000,
-        "tokens_per_day": 100000
-      },
-      "throttle_behavior": "wait_and_retry",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 2,
-      "api_pricing": {
-        "input_per_1m_usd": 0.59,
-        "output_per_1m_usd": 0.79
-      },
-      "recovery": {
-        "on_rate_limit": "wait_and_retry",
-        "cooldown_minutes": 2,
-        "timeout_seconds": 120
-      },
-      "learned": {},
-      "strengths": [
-        "reasoning",
-        "code",
-        "instruction_following"
-      ],
-      "weaknesses": [],
-      "notes": "Groq free tier (unverified limits). Using conservative TPD=100K until actual limits confirmed from API headers.",
-      "rate_limits_by_connector": {
-        "groq-api": {
-          "requests_per_minute": 30,
-          "requests_per_day": 14400,
-          "tokens_per_minute": 12000,
-          "tokens_per_day": 100000
-        },
-        "openrouter-api": {
-          "requests_per_minute": 20,
-          "requests_per_day": 200
-        }
-      }
-    },
-    {
       "id": "groq/compound",
       "name": "Groq Compound (Groq)",
       "provider": "groq",
@@ -1095,257 +2072,13 @@
       ],
       "weaknesses": [],
       "status_reason": "No API access. Only available via OpenRouter free tier which is minimax-m2.5.",
-      "access_type": "api"
-    },
-    {
-      "id": "nvidia/nemotron-3-super-120b",
-      "name": "Nemotron 3 Super 120B (OpenRouter)",
-      "vendor": "nvidia",
-      "context_limit": 262000,
-      "status": "offline",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0.1,
-        "output_per_1m_usd": 0.1
-      },
-      "strengths": [
-        "reasoning",
-        "262K context",
-        "free on openrouter"
-      ],
-      "weaknesses": [
-        "20 RPM rate limit"
-      ],
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200,
-        "tokens_per_minute": null,
-        "tokens_per_day": null
-      },
       "access_type": "api",
+      "provider": "openrouter",
       "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix.",
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tool_calling"
-      ],
-      "status_reason": "no_longer_free_on_openrouter"
-    },
-    {
-      "id": "google/gemma-4-31b-it",
-      "name": "Gemma 4 31B (OpenRouter)",
-      "vendor": "google",
-      "context_limit": 262000,
-      "status": "active",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0.13,
-        "output_per_1m_usd": 0.38
-      },
-      "strengths": [
-        "vision",
-        "balanced",
-        "large_context",
-        "courier_fuel"
-      ],
-      "weaknesses": [
-        "openrouter_rate_limits",
-        "quality_varies"
-      ],
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200,
-        "tokens_per_minute": null,
-        "tokens_per_day": null
-      },
-      "access_type": "api",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix.",
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "courier": true
-    },
-    {
-      "id": "z-ai/glm-4.5-air",
-      "name": "GLM 4.5 Air (OpenRouter)",
-      "vendor": "zhipu",
-      "context_limit": 131000,
-      "status": "active",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0.1,
-        "output_per_1m_usd": 0.3
-      },
-      "strengths": [
-        "fast",
-        "free GLM access",
-        "free on openrouter"
-      ],
-      "weaknesses": [
-        "20 RPM rate limit"
-      ],
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200,
-        "tokens_per_minute": null,
-        "tokens_per_day": null
-      },
-      "access_type": "api",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix.",
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tool_calling"
-      ]
-    },
-    {
-      "id": "minimax/minimax-m2.5",
-      "name": "MiniMax M2.5 (OpenRouter)",
-      "vendor": "minimax",
-      "context_limit": 131072,
-      "status": "active",
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
       "rate_limits": {
         "requests_per_minute": 20,
         "requests_per_day": 200
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
-      },
-      "strengths": [
-        "general",
-        "reasoning"
-      ],
-      "weaknesses": [
-        "free tier rate limits"
-      ],
-      "notes": "OpenRouter free tier. 20 RPM, 200 RPD. Use :free suffix.",
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tool_calling"
-      ]
-    },
-    {
-      "id": "nvidia/nemotron-3-super-120b-a12b",
-      "name": "Nemotron 3 Super 120B (OpenRouter)",
-      "vendor": "nvidia",
-      "context_limit": 262144,
-      "status": "active",
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0.0,
-        "output_per_1m_usd": 0.0
-      },
-      "strengths": [
-        "large model",
-        "reasoning"
-      ],
-      "weaknesses": [
-        "free tier rate limits"
-      ],
-      "notes": "OpenRouter free tier. 20 RPM, 200 RPD. Use :free suffix.",
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tool_calling"
-      ]
-    },
-    {
-      "id": "gemini-2.5-pro",
-      "name": "Gemini 2.5 Pro (Web)",
-      "vendor": "google",
-      "context_limit": 1000000,
-      "status": "active",
-      "access_type": "web",
-      "access_via": [
-        "gemini-web"
-      ],
-      "rate_limits": {
-        "requests_per_minute": 5,
-        "requests_per_day": 25,
-        "tokens_per_minute": 250000,
-        "limit_type": "verified_api_docs",
-        "limit_source": "Google AI docs: 2.5 Pro Preview 5 RPM/250K TPM/25 RPD"
-      },
-      "buffer_pct": 80,
-      "spacing_min_seconds": 12,
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10
-      },
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "strengths": [
-        "reasoning",
-        "1M context",
-        "code"
-      ],
-      "weaknesses": [
-        "web-only",
-        "5 RPM web limit"
-      ],
-      "notes": "Browser Use courier via gemini-web connector. 5 RPM, 100 RPD free tier."
+      }
     },
     {
       "id": "deepseek-r1",
@@ -1381,7 +2114,8 @@
         "web-only",
         "slow reasoning"
       ],
-      "notes": "Browser Use courier. Available on deepseek-web and notegpt-web."
+      "notes": "Browser Use courier. Available on deepseek-web and notegpt-web.",
+      "provider": "openrouter"
     },
     {
       "id": "deepseek-v3",
@@ -1415,7 +2149,8 @@
       "weaknesses": [
         "web-only"
       ],
-      "notes": "Browser Use courier via notegpt-web connector."
+      "notes": "Browser Use courier via notegpt-web connector.",
+      "provider": "openrouter"
     },
     {
       "id": "qwen-3.6-plus",
@@ -1449,7 +2184,8 @@
       "weaknesses": [
         "web-only"
       ],
-      "notes": "Web-only via browser use. Verified serving Qwen3.6-Plus on chat.qwen.ai (April 2026)."
+      "notes": "Web-only via browser use. Verified serving Qwen3.6-Plus on chat.qwen.ai (April 2026).",
+      "provider": "openrouter"
     },
     {
       "id": "qwen-2.5",
@@ -1483,7 +2219,8 @@
         "web-only",
         "older model"
       ],
-      "notes": "Web-only via browser use. Available on chat.qwen.ai as selectable model."
+      "notes": "Web-only via browser use. Available on chat.qwen.ai as selectable model.",
+      "provider": "openrouter"
     },
     {
       "id": "mistral-large",
@@ -1517,7 +2254,8 @@
         "web-only",
         "rate limited"
       ],
-      "notes": "Browser Use courier via mistral-web connector."
+      "notes": "Browser Use courier via mistral-web connector.",
+      "provider": "openrouter"
     },
     {
       "id": "codestral",
@@ -1550,7 +2288,8 @@
       "weaknesses": [
         "web-only"
       ],
-      "notes": "Browser Use courier via mistral-web connector. Coding specialist."
+      "notes": "Browser Use courier via mistral-web connector. Coding specialist.",
+      "provider": "openrouter"
     },
     {
       "id": "pixtral",
@@ -1583,748 +2322,8 @@
       "weaknesses": [
         "web-only"
       ],
-      "notes": "Browser Use courier via mistral-web connector. Vision/multimodal."
-    },
-    {
-      "id": "google/gemma-4-26b-a4b-it:free",
-      "name": "Gemma 4 26B MoE (OpenRouter Free)",
-      "provider": "google",
-      "access_type": "api",
-      "context_limit": 262144,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_hour": 200,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "vision",
-        "efficient_moe",
-        "large_context",
-        "courier_fuel"
-      ],
-      "weaknesses": [
-        "openrouter_rate_limits",
-        "smaller_than_31b"
-      ],
-      "notes": "MoE variant, efficient. Free on OpenRouter. Courier fuel model.",
-      "courier": true
-    },
-    {
-      "id": "nvidia/nemotron-nano-12b-v2-vl:free",
-      "name": "Nemotron Nano 12B VL (OpenRouter Free)",
-      "provider": "nvidia",
-      "access_type": "api",
-      "context_limit": 128000,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_hour": 200,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "vision",
-        "video",
-        "small_fast",
-        "courier_fuel"
-      ],
-      "weaknesses": [
-        "smaller_model",
-        "openrouter_rate_limits"
-      ],
-      "notes": "Video+image vision. Free on OpenRouter. Courier fuel model.",
-      "courier": true
-    },
-    {
-      "id": "google/gemma-3-27b-it:free",
-      "name": "Gemma 3 27B (OpenRouter Free)",
-      "provider": "google",
-      "access_type": "api",
-      "context_limit": 131072,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_hour": 200,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "vision",
-        "balanced",
-        "courier_fuel"
-      ],
-      "weaknesses": [
-        "previous_gen",
-        "openrouter_rate_limits"
-      ],
-      "notes": "Previous gen Gemma. Free on OpenRouter. Courier fuel model.",
-      "courier": true
-    },
-    {
-      "id": "bytedance/ui-tars-1.5-7b",
-      "name": "UI-TARS 1.5 7B (GUI Specialist)",
-      "provider": "bytedance",
-      "access_type": "api",
-      "context_limit": 32768,
-      "capabilities": [
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "offline",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_hour": 200,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0.1,
-        "output_per_1m_usd": 0.2
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "gui_automation",
-        "courier_fuel",
-        "ultra_cheap",
-        "purpose_built"
-      ],
-      "weaknesses": [
-        "small_model",
-        "less_reasoning",
-        "tiny_context"
-      ],
-      "notes": "Purpose-built for GUI automation. Ultra-cheap. Ideal courier fuel for browser navigation.",
-      "courier": true,
-      "status_reason": "no_longer_free_on_openrouter"
-    },
-    {
-      "id": "meta-llama/llama-3.2-3b-instruct:free",
-      "name": "Llama 3.2 3B Instruct (Free)",
-      "vendor": "meta",
-      "access_type": "api",
-      "context_limit": 131000,
-      "capabilities": [
-        "text",
-        "reasoning",
-        "multilingual"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "fast",
-        "multilingual",
-        "instruction_following"
-      ],
-      "weaknesses": [
-        "small_model",
-        "limited_reasoning"
-      ],
-      "notes": "Free on OpenRouter. Good for simple/fast tasks."
-    },
-    {
-      "id": "google/gemma-3-4b-it:free",
-      "name": "Gemma 3 4B IT (Free)",
-      "vendor": "google",
-      "access_type": "api",
-      "context_limit": 33000,
-      "capabilities": [
-        "text",
-        "vision",
-        "multimodal",
-        "structured_output",
-        "function_calling"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "vision",
-        "structured_output",
-        "multilingual"
-      ],
-      "weaknesses": [
-        "small_model",
-        "short_context"
-      ],
-      "notes": "Free on OpenRouter. Smallest Gemma 3 with vision + structured output. Courier fuel."
-    },
-    {
-      "id": "google/gemma-3-12b-it:free",
-      "name": "Gemma 3 12B IT (Free)",
-      "vendor": "google",
-      "access_type": "api",
-      "context_limit": 33000,
-      "capabilities": [
-        "text",
-        "vision",
-        "multimodal",
-        "structured_output",
-        "function_calling"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "vision",
-        "reasoning",
-        "structured_output",
-        "multilingual"
-      ],
-      "weaknesses": [
-        "medium_model",
-        "short_context"
-      ],
-      "notes": "Free on OpenRouter. Mid-size Gemma 3 with vision. Best quality/size ratio in free tier.",
-      "courier": true
-    },
-    {
-      "id": "google/gemma-3n-e2b-it:free",
-      "name": "Gemma 3n 2B IT (Free)",
-      "vendor": "google",
-      "access_type": "api",
-      "context_limit": 8000,
-      "capabilities": [
-        "text",
-        "vision",
-        "multimodal"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "ultra_fast",
-        "vision",
-        "low_resource"
-      ],
-      "weaknesses": [
-        "tiny_model",
-        "tiny_context"
-      ],
-      "notes": "Free on OpenRouter. Newest Gemma 3n line. Ultra-lightweight. Mobile-class."
-    },
-    {
-      "id": "google/gemma-3n-e4b-it:free",
-      "name": "Gemma 3n 4B IT (Free)",
-      "vendor": "google",
-      "access_type": "api",
-      "context_limit": 8000,
-      "capabilities": [
-        "text",
-        "vision",
-        "multimodal",
-        "audio"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "fast",
-        "vision",
-        "audio",
-        "low_resource"
-      ],
-      "weaknesses": [
-        "small_model",
-        "tiny_context"
-      ],
-      "notes": "Free on OpenRouter. Newest Gemma 3n with audio+vision. Mobile-optimized."
-    },
-    {
-      "id": "meta-llama/llama-3.3-70b-instruct:free",
-      "name": "Llama 3.3 70B Instruct (Free)",
-      "vendor": "meta",
-      "access_type": "api",
-      "context_limit": 65536,
-      "capabilities": [
-        "text",
-        "reasoning",
-        "code",
-        "multilingual",
-        "tool_calling"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "large_model",
-        "reasoning",
-        "code",
-        "instruction_following",
-        "multilingual"
-      ],
-      "weaknesses": [
-        "medium_context"
-      ],
-      "notes": "Free on OpenRouter. 70B params - best free quality available. Flagship-level.",
-      "courier": true
-    },
-    {
-      "id": "nousresearch/hermes-3-llama-3.1-405b:free",
-      "name": "Hermes 3 Llama 3.1 405B (Free)",
-      "vendor": "nousresearch",
-      "access_type": "api",
-      "context_limit": 131072,
-      "capabilities": [
-        "text",
-        "reasoning",
-        "code",
-        "tool_calling"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 5,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "largest_free_model",
-        "reasoning",
-        "code",
-        "long_context",
-        "tool_calling"
-      ],
-      "weaknesses": [
-        "slow_response",
-        "may_queue"
-      ],
-      "notes": "Free on OpenRouter. 405B params - largest free model. Slow but excellent quality.",
-      "courier": true
-    },
-    {
-      "id": "qwen/qwen3-coder:free",
-      "name": "Qwen3 Coder (Free)",
-      "vendor": "alibaba",
-      "access_type": "api",
-      "context_limit": 262000,
-      "capabilities": [
-        "text",
-        "code",
-        "reasoning",
-        "tool_calling"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "code_specialist",
-        "huge_context",
-        "reasoning"
-      ],
-      "weaknesses": [
-        "narrow_focus"
-      ],
-      "notes": "Free on OpenRouter. Code specialist with 262K context. Best free coding model.",
-      "courier": true
-    },
-    {
-      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
-      "name": "Nemotron 3 Nano 30B (Free)",
-      "vendor": "nvidia",
-      "access_type": "api",
-      "context_limit": 256000,
-      "capabilities": [
-        "text",
-        "reasoning"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "huge_context",
-        "fast",
-        "efficient"
-      ],
-      "weaknesses": [
-        "sparse_model"
-      ],
-      "notes": "Free on OpenRouter. MoE 30B (3B active). 256K context. Fast and efficient."
-    },
-    {
-      "id": "openai/gpt-oss-20b:free",
-      "name": "GPT-OSS 20B (Free via OpenRouter)",
-      "vendor": "openai",
-      "access_type": "api",
-      "context_limit": 131072,
-      "capabilities": [
-        "text",
-        "reasoning",
-        "code"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 5,
-        "timeout_seconds": 120
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "openai_quality",
-        "fast",
-        "code"
-      ],
-      "weaknesses": [
-        "smaller_than_120b"
-      ],
-      "notes": "Free on OpenRouter. OpenAI open-source 20B. Companion to the 120B variant on Groq."
+      "notes": "Browser Use courier via mistral-web connector. Vision/multimodal.",
+      "provider": "openrouter"
     },
     {
       "id": "kimi-k2.6-instant",
@@ -2395,8 +2394,8 @@
       ],
       "status": "active",
       "rate_limits": {
-        "requests_per_minute": null,
-        "requests_per_day": null,
+        "requests_per_minute": 60,
+        "requests_per_day": 1000,
         "limit_type": "unlimited_mostly",
         "limit_source": "HuggingFace: community-driven, mostly unlimited"
       },
@@ -2572,8 +2571,8 @@
       ],
       "status": "active",
       "rate_limits": {
-        "requests_per_minute": null,
-        "requests_per_day": null,
+        "requests_per_minute": 3,
+        "requests_per_day": 50,
         "limit_type": "unknown",
         "limit_source": "No published limits. Wrapper service."
       },
@@ -2734,345 +2733,6 @@
       ],
       "notes": "System Researcher primary platform. Best for sourcing GitHub repos, API docs, live data. 5 Pro searches/day, unlimited basic. Google SSO. Citations make it ideal for research verification.",
       "status_reason": null
-    },
-    {
-      "id": "gemini-2.5-flash",
-      "name": "Gemini 2.5 Flash",
-      "provider": "google",
-      "context_limit": 1000000,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "instruction"
-      ],
-      "access_via": [
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "openrouter/free",
-      "name": "OpenRouter Free Router",
-      "provider": "openrouter",
-      "access_type": "api",
-      "context_limit": 200000,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tool_calling",
-        "vision",
-        "multimodal"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "auto_routes_to_best_free_model",
-        "supports_tool_calling",
-        "supports_vision",
-        "supports_structured_output",
-        "always_has_fallback"
-      ],
-      "weaknesses": [
-        "non_deterministic_model_selection",
-        "openrouter_rate_limits"
-      ],
-      "notes": "OpenRouter free auto-router. Selects best available free model for each request based on required features. Always use as fallback.",
-      "courier": true
-    },
-    {
-      "id": "qwen/qwen3-next-80b-a3b-instruct:free",
-      "name": "Qwen3 Next 80B A3B (OpenRouter Free)",
-      "provider": "alibaba",
-      "access_type": "api",
-      "context_limit": 262144,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tool_calling"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_hour": 200,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "reasoning",
-        "262K context",
-        "code",
-        "tool_calling"
-      ],
-      "weaknesses": [
-        "openrouter_rate_limits"
-      ],
-      "notes": "MoE 80B model, strong reasoning. Free on OpenRouter.",
-      "courier": false
-    },
-    {
-      "id": "nvidia/nemotron-nano-9b-v2:free",
-      "name": "Nemotron Nano 9B V2 (OpenRouter Free)",
-      "provider": "nvidia",
-      "access_type": "api",
-      "context_limit": 128000,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tool_calling"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_hour": 200,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "reasoning",
-        "128K context",
-        "efficient"
-      ],
-      "weaknesses": [
-        "small_model",
-        "openrouter_rate_limits"
-      ],
-      "notes": "Efficient small model. Free on OpenRouter.",
-      "courier": false
-    },
-    {
-      "id": "inclusionai/ling-2.6-1t:free",
-      "name": "Ling 2.6 1T (OpenRouter Free)",
-      "provider": "inclusionai",
-      "access_type": "api",
-      "context_limit": 262144,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_hour": 200,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "1T_parameters",
-        "262K context",
-        "reasoning"
-      ],
-      "weaknesses": [
-        "openrouter_rate_limits",
-        "unknown_quality"
-      ],
-      "notes": "1T parameter model from inclusionAI. Free on OpenRouter.",
-      "courier": false
-    },
-    {
-      "id": "inclusionai/ling-2.6-flash:free",
-      "name": "Ling 2.6 Flash (OpenRouter Free)",
-      "provider": "inclusionai",
-      "access_type": "api",
-      "context_limit": 262144,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_hour": 200,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "262K context",
-        "fast",
-        "reasoning"
-      ],
-      "weaknesses": [
-        "openrouter_rate_limits"
-      ],
-      "notes": "Flash variant of Ling 2.6. Free on OpenRouter.",
-      "courier": true
-    },
-    {
-      "id": "tencent/hy3-preview:free",
-      "name": "Tencent Hy3 Preview (OpenRouter Free)",
-      "provider": "tencent",
-      "access_type": "api",
-      "context_limit": 262144,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_hour": 200,
-        "requests_per_day": 200
-      },
-      "throttle_behavior": "queue",
-      "buffer_pct": 80,
-      "spacing_min_seconds": 3,
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "recovery": {
-        "on_rate_limit": "cooldown",
-        "cooldown_minutes": 10,
-        "timeout_seconds": 300,
-        "heartbeat_interval_seconds": 30,
-        "orphan_threshold_seconds": 300
-      },
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null,
-        "best_for_task_types": [],
-        "avoid_for_task_types": []
-      },
-      "strengths": [
-        "262K context",
-        "reasoning"
-      ],
-      "weaknesses": [
-        "preview_model",
-        "openrouter_rate_limits",
-        "unknown_quality"
-      ],
-      "notes": "Tencent Hy3 preview. Free on OpenRouter.",
-      "courier": false
     },
     {
       "id": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
@@ -3241,5 +2901,6 @@
       "model_failure_threshold": 3
     },
     "spacing_min_seconds": 1
-  }
+  },
+  "last_health_check": "2026-04-30T06:27:16.595578+00:00"
 }
