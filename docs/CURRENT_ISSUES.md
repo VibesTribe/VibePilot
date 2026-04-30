@@ -1,262 +1,155 @@
 # VibePilot Current Issues
-> Last updated: April 29, 2026 (verified against actual code, DB, and running system)
-> Previous: April 28, 2026 (gap analysis fixes deployed)
+> Last updated: April 30, 2026 (verified against actual code, DB, and running system)
+> Previous: April 29, 2026 (cost tracking + ROI dashboard fixes)
 
 ## Status Summary
 
 | Category | Open | Fixed | Deferred |
 |----------|------|-------|----------|
-| Dashboard | 1 | 10 (ROI calc fixes Apr 29) | 0 |
-| Pipeline data | 0 | 6 | 0 |
+| Dashboard display | 0 | 13 (token/ROI fixes Apr 30) | 0 |
+| Pipeline data | 0 | 8 | 0 |
 | Pipeline events | 0 | 21+ | 0 |
-| Gap analysis | 0 | 8 | 0 |
+| Race conditions | 0 | 2 (Apr 30) | 0 |
+| Token tracking | 0 | 4 (Apr 30) | 0 |
+| Model management | 0 | 3 (Apr 30) | 0 |
 | Research/council | 0 | 2 | 2 |
 
 ---
 
-## Fixed Issues (April 28, 2026 — gap analysis, 8 fixes deployed and verified)
+## Fixed Issues (April 30, 2026 — Race conditions, tokens, model management)
 
-### Gap Analysis — 8 fixes deployed against running system
+### Race Condition: Task Double-Dispatch — FIXED
+**Priority**: P0 → FIXED
+**What happened**: Two task_dispatched events for same task, 86ms apart. Same model dispatched twice.
+**Root cause**: `claim_task` atomically sets `status=in_progress, processing_by=worker_id`. Then `handleTaskAvailable` called `transition_task` which reset `processing_by=NULL`. Second event arrived, `claim_task` saw `processing_by IS NULL`, claimed again.
+**Fix**: Removed redundant `transition_task` call after `claim_task`. The claim already handles status and assignment atomically.
+**Files**: governor/cmd/governor/handlers_task.go
+**Commit**: 66d4d373
 
-| # | Priority | Issue | Root Cause | Fix |
-|---|----------|-------|------------|-----|
-| 1 | CRITICAL | 13 RPCs called in Go but missing from allowlist | rpc.go had 91 entries, Go code calls 13 more | Added all 13: add_bookmark, calc_run_costs, create_rule_from_rejection, get_change_approvals, get_failure_patterns, get_model_performance, get_slice_task_info, queue_maintenance_command, recall_memories, record_planner_rule_prevented_issue, store_memory, update_maintenance_command_status, update_model_learning. Allowlist now 101 entries. |
-| 2 | CRITICAL | Dependency chain: 'available'/'locked' statuses rejected by DB | tasks CHECK constraint only had original statuses. unlock_dependent_tasks looked for 'pending' only | Migration 130: added 'available' and 'locked' to CHECK. Recreated unlock_dependent_tasks/unlock_dependents to look for `status IN ('locked','pending')` and set to 'available'. validation.go: zero-dep tasks start as 'available', dep tasks as 'pending'. pgnotify listener: added "available" case → EventTaskAvailable |
-| 3 | HIGH | get_change_approvals and queue_maintenance_command RPCs called but didn't exist in DB | Functions never created during Supabase→local migration | Migration 131: created get_change_approvals (stub, no table yet) and queue_maintenance_command (inserts into maintenance_commands) |
-| 4 | HIGH | commitOutput errors silently discarded | Both call sites used `_, _ := h.commitOutput(...)` | Changed to capture error and log warning at both sites (internal task ~line 488, courier task ~line 665) |
-| 5 | MEDIUM | Supervisor review timeout hardcoded at 2 minutes | Not configurable via system.json | Added ReviewTimeoutSeconds to ExecutionConfig in config.go. handlers_task.go reads from config with 2-minute fallback. system.json: `"review_timeout_seconds": 120` |
-| 6 | MEDIUM | Webhook "complete" status mapped to dead event | mapToEventType returned EventTaskCompleted (no handler). pgnotify correctly used EventTaskApproval | Changed webhook mapping from EventTaskCompleted → EventTaskApproval. Now fires handleTaskApproved (merge flow) |
-| 7 | INFRA | Binary stale after fixes | Source changed but binary not rebuilt | Rebuilt binary, killed old process, systemd Restart=always respawned with new binary. All health checks passing. |
-| 8 | DOCS | CURRENT_STATE.md and CURRENT_ISSUES.md outdated | Docs reflected pre-fix state | Updated both docs with fix details, bug status, remaining gaps. Pushed to GitHub. |
+### PRD Webhook Flood (66 duplicate events) — FIXED
+**Priority**: P0 → FIXED
+**What happened**: Force-push/rebase caused git to list all old PRD files as "added". 66 duplicate prd_committed events fired.
+**Root cause**: `prdExists` only checked `plans` table. Old test PRDs never had plans, so all passed through.
+**Fix**: `prdExists` now also checks `orchestrator_events` for existing `prd_committed` events. Dedup at the source.
+**Files**: governor/internal/webhooks/github.go
+**Commit**: 66d4d373
 
-**Verification**: All 13 new RPCs confirmed in binary via `strings`. CHECK constraint confirmed via direct psql query. DB functions confirmed via `pg_proc` query. Governor /status returns healthy. Dashboard /api/dashboard returns valid JSON.
-
-**Original 10 bugs (Apr 25 → Apr 28 final status)**:
-1. task_packets never written — FIXED (commit 61b1a3da)
-2. commitOutput on main repo not worktree — FIXED
-3. Supervisor timeout hardcoded — FIXED (Fix #5)
-4. Testing can't find output in worktree — FIXED
-5. Stale Supabase-era prompts in DB — STILL PRESENT (harmless)
-6. commitOutput errors silently ignored — FIXED (Fix #4)
-7. STATUS_ORDER missing human_review — FIXED
-8. transition_task no status validation — FIXED
-9. Duplicate task creation race — FIXED
-10. Task stuck at review after max attempts — FIXED (analyst agent, commit c323d640: backwards reasoning diagnosis at diagnostic_trigger_attempts ceiling)
-
----
-
-## Fixed Issues (April 28, 2026 — commit 61b1a3da)
-
-### Pipeline Data Layer — 6 fixes deployed and verified
-
-| # | Issue | Root Cause | Fix |
-|---|-------|------------|-----|
-| 1 | Prompt packet lost during execution | transition_task COALESCE replaced entire result JSONB | Changed to `result = COALESCE(result,'{}')::jsonb || COALESCE(p_result,'{}')::jsonb` (merge, not replace) |
-| 2 | Prompt packet never in task_packets table | createTasksFromApprovedPlan stuffed prompt_packet into tasks.result JSONB only | Added INSERT into task_packets table after each task creation (survives result overwrites) |
-| 3 | Plan handlers never wrote events | recordEvent was a TaskHandler-only method; plan handlers are standalone functions | Extracted standalone recordEvent; then unified to use existing recordPipelineEvent from pipeline_events.go |
-| 4 | orchestrator_events.task_id was UUID | Plan-level events use planID (not UUID); INSERT failed | Changed column to TEXT: `ALTER TABLE orchestrator_events ALTER COLUMN task_id TYPE TEXT` |
-| 5 | vp_notify_change trigger broke on tables without status column | Trigger blindly referenced OLD.status | Added guard: checks information_schema for status column before referencing |
-| 6 | Build broken: APIRunner.HealthCheck + registerConnectors | HealthCheck referenced missing connectorID field; registerConnectors used undefined ctx | Fixed: HealthCheck uses provider/model/endpoint; added context.Background() |
-
-**E2E proof**: Task d5823cd1 completed full quality harness loop: 3 attempts, 2 failures with supervisor feedback, 3rd attempt passed, tested, merged. 12 orchestrator_events recorded correctly.
-
-**Event call sites verified**: 29 recordPipelineEvent calls across 5 handlers:
-- Plan (6): planner_called, plan_created, supervisor_called, plan_approved, plan_rejected, council_review
-- Task (7): task_dispatched, output_received, supervisor_called, run_completed, run_failed, revision_needed, reroute
-- Testing (5): test_passed, test_failed, module_merge_failed, module_merged_to_testing, plan_complete
-- Maintenance (7): merge_conflict_detected, task_merged_to_module, module_integration_test, module_merge_failed, module_merged_to_testing, integration_merge_failed, plan_complete
-- Council (2): council_approved, council_feedback
-
----\n\n## Fixed Issues (April 29, 2026 — Cost Tracking Overhaul)\n\n### Phase 1: Data Foundation — COMPLETE (commit 6d37581f)\n- Created subscription_history table to track all subscriptions over time\n- Created project_snapshots table for archive/clear functionality\n- Added role, token_source, total_actual_cost_usd columns to task_runs\n- Added total_tokens_in/out, total_cost_usd, total_api_equivalent_usd, model_count columns to tasks\n- Seeded GLM-5 history: $45 for 786.6M tokens (3,099% ROI)\n- Fixed calc_run_costs(), vp_notify_change(), check_subscription_thresholds(), create_project_snapshot()\n- Added RPC allowlist entries for new cost functions\n- Registered new API endpoints: /api/project/snapshot, /api/project/history, /api/project/alerts\n- Alerts endpoint already returns GLM-5 expiry warning\n\n### Phase 2: Per-Task Full Cost Tracking — COMPLETE (commit e22f1e99)\n- Added record_internal_run RPC to create task_run rows for planner, supervisor, analyst model calls\n- Wire planner (handlers_plan.go): record planner model invocation after successful plan generation\n- Wire supervisor (handlers_task.go): record supervisor model invocation after output review\n- Wire analyst (handlers_task.go): record analyst model invocation after diagnostic review\n- Enhanced courier result handler (main.go): estimate tokens from output length when API doesn't report counts (~4 chars/token)\n- Added aggregate_task_costs call in testing handler on task completion to sum all runs into task totals\n- Built and deployed governor binary with all changes\n\n### Phase 3: Dashboard Overhaul — COMPLETE (commit 7613e19a7)\n- Reordered ROI panel sections: Project-to-Date → Slices → Models → Subscriptions → Session\n- Added SubscriptionHistorySection with archived subscription display\n- Enhanced MissionHeader token pill with click-to-toggle between Live (session) and Project (cumulative) mode\n- Added EventTone=\"warning\" for alert events\n\n### Phase 4: Alerting — COMPLETE (commit a0ee1fc82)\n- Added header alerts banner that polls /api/project/alerts every 60s\n- Shows subscription expiry and credit threshold warnings\n- GLM-5 already flagged: \"2 days remaining\" (expires Apr 30)\n\n### USD/CAD Converter\n- Present in RoiPanel (MissionModals.tsx): USD | CAD toggle buttons\n- Defaults to 1.36, fetches live rate from governor DB (exchange_rates table) then exchangerate-api.com fallback\n- Every dollar amount in ROI panel converts when toggled\n- Exchange rate in DB: 1.36 USD/CAD, seeded 2026-02-16, source=\"seed\"\n\n## Dashboard Issues\n
-### 1. ROI Calculator Needs Real Data Verification
-**Priority**: P1 (after E2E test)
-**Impact**: 10 dashboard fixes deployed Apr 29 (subscription_history wiring, token display, formatting, visibility). All showing correctly with seeded GLM-5 data. Needs real task_runs from E2E to verify full calculation chain.
-**Status**: Ready for E2E verification
-**Commits**: e6c644471 through f75d8f9c2 (vibeflow, Apr 29)
-
----
-
-## Fixed Issues (April 27, 2026 — commit 133cd28a)
-
-### 2. Task Packets — Target Files — FIXED
-**Priority**: P2 → FIXED
-**What was the problem**: Planner prompt never asked the model to include "Target Files" in task output, so validation.go always parsed empty TargetFiles. Task agents got zero code context.
-**What was done**: Added "Target Files" as required field in planner prompt task template, example output, and constraints. Now every task must list the files it will create/modify, feeding BuildTargetedContext().
-**Files**: prompts/planner.md, cmd/governor/validation.go (already parses **Target Files:**)
-
-### 3. Planner — Context FULLY WIRED
-**Priority**: P2 → FIXED (was already wired, just untested)
-**What's done**:
-  - `BuildPlannerContext()` called for `full_map` policy agents (planner)
-  - Queries `get_slice_task_info`, `get_supervisor_rules`, `get_problem_solution`, `get_heuristic`
-  - Includes MCP tool listings
-  - Includes full `.context/map.md` (64KB, 1281 lines of compressed function signatures)
-  - `.context/` auto-regenerated via git post-checkout hook (fires on git pull, git reset)
-**What's untested**:
-  - E2E verification that planner uses the code map correctly
-**Files**: context_builder.go:157-237, session.go:155-175, .git/hooks/post-checkout
-**Verified**: 2026-04-27 against Go code
-
----
-
-## Fixed Issues (April 27, 2026 — commit 133cd28a)
-
-### 11. Maintenance Commands Never Processed — FIXED
-**Priority**: P0 → FIXED (showstopper)
-**What was the problem**: maintenance_commands and research_suggestions tables had no pg_notify triggers. When handlers created maintenance commands (e.g., for merge conflicts), no event fired, so handleMaintenanceCommand never ran. Merge conflicts sat forever.
-**What was done**:
-  - Added `notify_maintenance_commands` trigger on maintenance_commands table
-  - Added `notify_research_suggestions` trigger on research_suggestions table
-  - Filtered listener.go to only fire EventMaintenanceCmd for status=pending (prevents infinite re-trigger after completion)
-  - Added handler guard in handlers_maint.go against non-pending commands
-**Files**: listener.go, handlers_maint.go, DB triggers
-
-### 12. Plan Revisions Never Re-Triggered — FIXED
-**Priority**: P0 → FIXED (showstopper)
-**What was the problem**: When supervisor rejected a plan (status → revision_needed), EventRevisionNeeded fired but no handler was registered. Rejected plans sat in revision_needed forever.
-**What was done**: Added handlePlanRevisionNeeded handler that:
-  - Re-runs planner with supervisor feedback (latest_feedback, tasks_needing_revision)
-  - Includes existing plan content so planner revises rather than starts from scratch
-  - Increments revision_round via increment_revision_round RPC
-  - Max 3 revision rounds, then sets plan to "error"
-  - On success, sets plan to "review" (re-triggers supervisor re-review)
-  - Full cascade retry (5 attempts) with model health tracking
-**Files**: handlers_plan.go, setupPlanHandlers registration
-
----
-
-## Fixed Issues (April 27, 2026 — commit 0f65f686)
-
-### 3.5. Cooldown Expiry Re-verification — FIXED
-**Priority**: Infrastructure → FIXED
-**What was the problem**: When a model's cooldown timer expired (e.g., after a rate limit), the router blindly assumed "timer done = model fine." A model with a dead API key or a deprecated endpoint would cycle forever: cooldown expires → router tries → fails → new cooldown → repeat.
-**What was done**: Added `CooldownWatcher` — a background goroutine that polls every 2 minutes for models whose cooldown recently expired, probes each via its connector's HealthCheck(), and either confirms healthy or extends cooldown. Tracks which expirys have been probed to avoid re-checking. Staggers probes (2s between) to avoid hitting rate limits. Persists state to DB after probe failures.
-**Files**: runtime/cooldown_watcher.go, cmd/governor/main.go (wired after LoadFromDatabase)
-
-### 4. Module-Level Integration Test — FIXED
-**Priority**: P2 → FIXED
-**What was done**: Added `runModuleIntegrationTest()` to MaintenanceHandler. Before merging module branch to testing, runs `go build ./...` on the module branch. If build fails, creates maintenance command instead of merging broken code. Records `module_integration_test` pipeline event.
-**Files**: handlers_maint.go:580-632
-
-### 5. Supervisor Rules Not Created from Rejections — FIXED
-**Priority**: P3 → FIXED
-**What was done**: Added `record_supervisor_rule` call in both "fail" and "needs_revision" cases of `handleTaskReview()`. Also added `create_rule_from_rejection` call in "needs_revision" case to create planner learning rules from rejection patterns.
-**Files**: handlers_task.go (fail case ~line 1090, needs_revision case ~line 1148)
-
-### 6. Tester Rules Never Created — FIXED
-**Priority**: P3 → FIXED
-**What was done**: Created `create_tester_rule` DB function (was whitelisted in Go but never existed in DB). Wired call in `handleTaskTesting()` test failure path. Creates rule from test output pattern so future runs can catch similar issues.
-**DB function**: `create_tester_rule(p_applies_to, p_test_type, p_test_command, p_trigger_pattern, ...)`
-**Files**: handlers_testing.go ~line 207
-
-### 7. Heuristics Never Recorded from Task Outcomes — FIXED
-**Priority**: P3 → FIXED
-**What was done**: Created `upsert_heuristic` DB function. Wired call in `recordSuccess()` — on every task success, records that the model succeeded at this task type, boosting confidence for future routing.
-**DB function**: `upsert_heuristic(p_task_type, p_condition, p_action, p_preferred_model, ...)`
-**Files**: handlers_task.go:1419-1427
-
-### 8. Problem-Solutions Never Recorded — FIXED
-**Priority**: P3 → FIXED
-**What was done**: Wired `record_solution_on_success` call in `recordSuccess()`. When a task succeeds after previous failures, records the model that solved it as a solution for that failure pattern.
-**Files**: handlers_task.go:1428-1433
-
-### 9. Code Map Staleness — FIXED
-**Priority**: Infrastructure → FIXED
-**What was done**: Added git post-checkout hook that runs `.context/build.sh` in background when HEAD changes. Also regenerated map.md from commit 952e2898 to current 0f65f686.
-**Files**: .git/hooks/post-checkout
-
-### 10. Missing DB Functions — FIXED
-**Priority**: Infrastructure → FIXED
-**What was done**: Created 3 DB functions that were whitelisted in Go rpc.go but never existed in PostgreSQL:
-- `create_tester_rule()` — idempotent, deduplicates by trigger_pattern + applies_to
-- `record_tester_rule_hit()` — increments caught_bugs or false_positives
-- `upsert_heuristic()` — creates new or boosts confidence on existing
-
----
-
-## Fixed Issues (April 27, 2026 — commit 54e6eec0)
-
-### 19. Council Context Never Provided — FIXED
+### Dashboard: Token Count Only Showed Run Tokens — FIXED
 **Priority**: P1 → FIXED
-**What was the problem**: BuildCouncilContext existed in context_builder.go but was never called. Council agents had `context_policy: file_tree` which only gave them a bare file tree — no instructions to verify plan references, no verification guidance.
-**What was done**: Added `council` context_policy case in session.go that calls BuildCouncilContext (with fallback to BuildBaseContext on error). Changed council agent's context_policy from `file_tree` to `council` in agents.json. Council members now get file tree + plan reference verification instructions.
-**Files**: session.go, agents.json
+**What happened**: Header "Now 2,667" only counted executor run tokens. Ignored task-level totals and subscription tokens.
+**Fix**: `calculateMetrics` now takes `max(runTokens, taskTokens)`. VibePilotTask interface updated with `total_tokens_in/out` fields.
+**Files**: vibeflow/apps/dashboard/lib/vibepilotAdapter.ts
+**Commit**: 2b973a432
 
-### 20. "Blocked" Council Consensus Created Dead-End — FIXED
+### Dashboard: ROI Totals Excluded Subscription Savings — FIXED
 **Priority**: P1 → FIXED
-**What was the problem**: When council consensus was "blocked", plan status was set to "blocked" and sat forever with no handler. Also `council_done` event type was defined/mapped but never emitted and had no handler — pure dead code (53 lines). `council_rejected` event name was misleading since nothing is rejected, only feedback given.
-**What was done**: "blocked" consensus now routes to revision_needed with full council feedback (same path as revision_needed). Removed handleCouncilDone function, EventCouncilDone constant, and all council_done mappings from pgnotify listener, server.go, and handler registration. Renamed council_rejected → council_feedback in timeline events. Updated pipeline YAML to remove "blocked" vote option.
-**Files**: handlers_council.go, events.go, listener.go, server.go, code-pipeline.yaml
-**Commit**: 477b84be
+**What happened**: Header ROI showed $0. `roi.totals` only summed pipeline run costs, not subscription savings.
+**Fix**: Totals now include subscription data: `total_savings_usd += (api_equivalent - prorated)` for all subscriptions.
+**Files**: vibeflow/apps/dashboard/lib/vibepilotAdapter.ts
+**Commit**: 577d4f8f5
+
+### Dashboard: Plan-Stage Runs Orphaned from Tasks — FIXED
+**Priority**: P1 → FIXED
+**What happened**: Planner/plan_reviewer runs recorded with planID as task_id. Dashboard adapter only looked up by task ID. Those tokens were invisible.
+**Fix**: Adapter builds `planToTask` map from `tasks.plan_id`. Plan-stage runs get attributed to the correct task.
+**Files**: vibeflow/apps/dashboard/lib/vibepilotAdapter.ts
+**Commit**: 82c0e1103
+
+### Plan-Level Supervisor Tokens Never Recorded — FIXED
+**Priority**: P1 → FIXED
+**What happened**: Plan review supervisor ran model calls but never wrote tokens to `task_runs`. Tokens lost.
+**Fix**: Added `record_internal_run` call with role="plan_reviewer" after plan supervisor succeeds.
+**Files**: governor/cmd/governor/handlers_plan.go
+**Commit**: 66d4d373
+
+### Models Config: Nemotron Still Present — FIXED
+**Priority**: P1 → FIXED
+**What happened**: 6 Nemotron models in models.json even after removing from routing. Governor could route to them.
+**Fix**: Removed all 6 Nemotron + 2 dead Ling models. Fixed providers (Groq-native models had provider="meta"). Added missing rate limits.
+**Files**: governor/config/models.json (58 models, no Nemotron)
+**Commit**: 484cf5ea
+
+### Daily Model Health Check — NEW
+**Priority**: P1 → DONE
+**What it does**: Daily cron at 6 AM. Checks Gemini/Groq/OpenRouter APIs. Health-checks all cascade models. Updates rate limits from provider data. Reports new free models. Writes health_report.json.
+**Files**: governor/scripts/daily_model_health.py
+**Commit**: 484cf5ea
 
 ---
 
-## Deferred Issues (awaiting knowledgebase build)
+## Fixed Issues (April 29, 2026)
 
-### 21. Research Flow — DEFERRED
-**Priority**: P2 (blocked on knowledgebase repo being operational)
-**What's needed**: Researcher agent runs via GitHub Actions cron (2x daily), deposits reports to knowledgebase repo (VibesTribe/knowledgebase). Supervisor auto-approves simple model/platform additions. Council reviews complex ones. Feedback appended to report. Human reviews via knowledgebase link. Implementation in vibepilot task branches. All findings become institutional memory in Postgres.
-**Why deferred**: Knowledgebase repo exists (11 commits) but not yet operational. Researcher agent hasn't run yet. Full flow requires knowledgebase schema, sources.txt, and dashboard DOCS button wiring.
+### E2E Pipeline Test — PASSED
+**Priority**: P0 → DONE
+**What happened**: PRD `e2e-hello-world.md` pushed. Full autonomous pipeline completed: planner → supervisor → dispatch → executor → supervisor review → testing → merge. 12 orchestrator_events recorded. Analyst agent wired for stuck tasks.
+**Commit**: 22212860
 
-### 22. Council for Research — DEFERRED
+### Dashboard Fixes (Apr 29, 10 fixes)
+- Owner mapping: use raw `assigned_to` without `agent.` prefix
+- Token counting: sum ALL runs per task, not just latest
+- Log popup CSS: reduced pseudo-elements to 88px
+- Event sorting via useMemo
+**Commits**: d2a791e30, 11e6b9818, e6c644471 through f75d8f9c2
+
+### Cost Tracking 4-Phase Overhaul (Apr 29)
+- Phase 1: subscription_history table, task_runs cost columns
+- Phase 2: record_internal_run for planner/supervisor/analyst
+- Phase 3: Dashboard ROI panel overhaul
+- Phase 4: Alerting for subscription thresholds
+**Commits**: 6d37581f, e22f1e99, 7613e19a7
+
+---
+
+## Fixed Issues (April 28, 2026 — gap analysis, 8 fixes)
+
+| # | Issue | Fix |
+|---|-------|-----|
+| 1 | 13 RPCs called in Go but missing from allowlist | Added all 13 to rpc.go |
+| 2 | Dependency chain: 'available'/'locked' statuses rejected | Migration 130 added to CHECK constraint |
+| 3 | get_change_approvals and queue_maintenance_command didn't exist | Migration 131 created them |
+| 4 | commitOutput errors silently discarded | Changed to log warning |
+| 5 | Supervisor review timeout hardcoded | Configurable from system.json |
+| 6 | Webhook "complete" mapped to dead event | Fixed mapping to EventTaskApproval |
+| 7 | Binary stale after fixes | Rebuilt + restarted |
+| 8 | CURRENT_ISSUES.md outdated | Updated docs |
+
+---
+
+## Deferred Issues
+
+### Research Flow — DEFERRED
 **Priority**: P2 (blocked on knowledgebase)
-**What's needed**: Council reads research reports FROM knowledgebase repo, gives feedback per point, feedback appended to same doc, report+feedback goes to human via knowledgebase link. New research+feedback instantly added to knowledgebase.
-**Why deferred**: Same blocker as #21.
+**Status**: Knowledgebase repo exists but not operational. Researcher agent not built yet.
+
+### Council for Research — DEFERRED
+**Priority**: P2 (blocked on knowledgebase)
 
 ---
 
-## Fixed Issues (April 27, 2026 — commit 2384b572)
+## Token Tracking Status (as of April 30)
 
-### 21. "Blocked" Eliminated System-Wide — FIXED
-**Priority**: P1 → FIXED
-**What was the problem**: "Blocked" consensus existed in council handler, research handler, consensus functions, council prompt, and pgnotify/server mappings. All created dead-end states where tasks/plans sat forever. Nothing should ever be blocked — feedback should always route to the right agent.
-**What was done**: 
-- determineConsensus in council and research handlers only returns approved/revision_needed
-- "Blocked" vote in council prompt replaced with STRONG REVISION_NEEDED
-- BLOCKED votes counted as revision_needed in vote alignment tracking
-- Dead "blocked" pgnotify and server.go mappings removed
-- Research handler "blocked→rejected" dead-end removed
-- 5 dead event types removed (EventPlanBlocked, EventHumanQuery, EventPRDIncomplete, EventPlanError, EventCouncilComplete)
-- EventTaskEscalated removed (nothing escalates to human for code)
-- maxRetries hardcoded in 6 locations → config-driven via system.json
-**Files**: handlers_council.go, handlers_research.go, handlers_task.go, handlers_plan.go, events.go, state.go, listener.go, server.go, config.go, system.json, council.md
-**Commit**: 2384b572
+All pipeline stages now record tokens to task_runs via `record_internal_run`:
 
-| # | Issue | Fix | Commit |
-|---|-------|-----|--------|
-| 1 | Pipeline events showed raw types (broken_output) | 26 semantic event types with human-readable labels | a08afe74+ |
-| 2 | Module branches never deleted after merge | Added DeleteBranch after module-to-testing merge | 16d9724a |
-| 3 | Testing branch never deleted after merge | Added DeleteBranch after testing-to-main merge | 16d9724a |
-| 4 | Module merge failures had no recovery | Maintenance agent dispatches on module merge failure | 16d9724a |
-| 5 | Integration merge failures had no recovery | Maintenance agent dispatches on integration merge failure | 16d9724a |
-| 6 | Task merge conflicts reassigned to model | Maintenance agent handles merge conflicts, no model penalty | pre-existing |
-| 7 | SSE E2E tested | Working with live dashboard | Apr 24 |
-| 8 | Courier writes to local PG | governor API endpoint replaces Supabase | Apr 23 |
-| 9 | Dashboard polling | SSE EventSource replaces polling | Apr 23 |
-| 10 | Pipeline timeline shows meaningless events | Full 26-event lifecycle with readable labels | Apr 27 |
-| 11 | Task packets had zero codebase context | ContextBuilder wired, planner prompt requires Target Files | 133cd28a |
-| 12 | Planner had no codebase context | BuildPlannerContext wired for full_map policy | 0f65f686 |
-| 13 | Learning RPCs never called | All 5 learning RPCs wired into handlers | 0f65f686 |
-| 14 | 3 DB functions missing | create_tester_rule, record_tester_rule_hit, upsert_heuristic | 0f65f686 |
-| 15 | No module integration test | go build gate before module-to-testing merge | 0f65f686 |
-| 16 | Code map goes stale | git post-checkout hook auto-regenerates | 0f65f686 |
-| 17 | Maintenance commands never processed | Added pg_notify triggers + status filter | 133cd28a |
-| 18 | Plan revisions never re-triggered | handlePlanRevisionNeeded handler with max 3 rounds | 133cd28a |
-| 19 | Council never got proper context | BuildCouncilContext wired via council policy | 54e6eec0 |
-| 20 | "Blocked" council consensus = dead-end | Blocked routes to revision_needed, council_done dead code removed | 477b84be |
-| 21 | "Blocked" everywhere + dead events + hardcoded maxRetries | System-wide elimination, 5 dead events removed, config-driven | 2384b572 |
+| Stage | role in task_runs | Status |
+|-------|------------------|--------|
+| Planner | `planner` | Records via record_internal_run |
+| Plan Reviewer | `plan_reviewer` | Records via record_internal_run |
+| Executor | `executor` | Courier creates run, updates with tokens |
+| Task Supervisor | `supervisor` | Records via record_internal_run |
+| Analyst | `analyst` | Records via record_internal_run |
+| Council | — | Not tracked yet (future stage) |
+| Consultant | `consultant` | Wired, ready when consultant agent exists |
+| Researcher | — | Future stage |
 
-## Non-Issues (log noise only)
-
-- jcodemunch CodeMap refresh transport error on startup — graceful fallback to existing map.md
+Token lifecycle per task: planner + plan_reviewer (via plan_id) + executor + supervisor (per attempt, accumulates on retry). Adapter maps plan_id → task_id.
 
 ---
 
-## Fix Priority Order (REMAINING only)
+## Build Priority (REMAINING)
 
 | Priority | Issue | Effort | What's Needed |
 |----------|-------|--------|---------------|
-| P0 | E2E test to verify all fixes + cost tracking + output pipeline | Low | Push PRD, monitor all 29 event types + learning RPCs + cost data |
-| P1 | ROI calculator verification with real task data | Low | Run E2E, verify task_runs populate ROI panel correctly |
-| P2 | Task context E2E verification | Low | Run E2E, check if planner outputs target_files |
-| P3 | Stale Supabase-era prompts in DB | Trivial | DELETE FROM prompts (governor reads filesystem) |
+| P1 | Courier agent testing (browser-based execution) | Medium | Test browser-use courier dispatch |
+| P2 | Research agent + knowledgebase | Medium | Build researcher, wire knowledgebase |
+| P3 | Stale Supabase-era prompts in DB | Trivial | DELETE FROM prompts |
+| P3 | Dead code cleanup | Low | Remove old Python orchestrator refs |

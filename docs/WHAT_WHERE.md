@@ -2,21 +2,19 @@
 
 Quick reference for navigating the project. Update when structure changes.
 
+> Last updated: April 30, 2026
+
 ---
 
-## Running VibePilot
+## Architecture
 
-```bash
-# Always use venv Python
-cd ~/vibepilot
-./venv/bin/python <script>
+VibePilot is a Go binary (governor) backed by local PostgreSQL. No Python runtime. No Supabase. The governor handles the entire pipeline: webhook → plan → dispatch → execute → review → test → merge.
 
-# Example: Run orchestrator
-./venv/bin/python core/orchestrator.py
+**Two copies of the repo:**
+- `~/VibePilot/` — Development copy. Edit here, git push from here.
+- `~/vibepilot/` — Running copy. Binary lives here. Systemd service reads from here.
 
-# Example: Run tests
-./venv/bin/python -m pytest tests/
-```
+Both must stay synced on `main` branch.
 
 ---
 
@@ -24,97 +22,47 @@ cd ~/vibepilot
 
 | Directory | What's There |
 |-----------|--------------|
-| `config/` | JSON config files (models, roles, destinations, routing) |
-| `core/` | Orchestrator, config_loader, telemetry |
-| `runners/` | Contract runners (kimi, deepseek, gemini, courier) |
-| `agents/` | Agent implementations (supervisor, council, etc) |
-| `scripts/` | Utility scripts (sync, backup, migrations) |
-| `tests/` | Test files |
-| `docs/` | Documentation, schemas, PRD |
-| `prompts/` | Agent prompts (legacy location) |
-| `config/prompts/` | Agent prompts (canonical location) |
-| `venv/` | Python virtual environment (USE THIS) |
+| `governor/cmd/governor/` | Go source: handlers, webhooks, main entry point |
+| `governor/internal/` | Go packages: runtime, webhooks, gitree, config |
+| `governor/config/` | JSON config files (models, routing, agents, connectors, system) |
+| `governor/config/prompts/` | Agent prompt templates (planner.md, supervisor.md, analyst.md, council.md) |
+| `governor/scripts/` | Utility scripts (daily_model_health.py) |
+| `docs/` | Documentation, PRD folder, SQL schema |
+| `docs/prd/` | PRD markdown files (push triggers pipeline) |
+| `docs/supabase-schema/` | SQL migrations (numbered 001-132+, applied via psql) |
+| `governor/bin/` | Compiled governor binary |
 
 ---
 
-## Config Files (`config/`)
+## Config Files (`governor/config/`)
 
-| File | Purpose | Status |
-|------|---------|--------|
-| `destinations.json` | WHERE tasks execute (cli/web/api) | NEW v1.1 |
-| `roles.json` | WHAT job is done (13 roles) | NEW v2.0 |
-| `models.json` | WHO provides intelligence (LLMs) | v2.0 |
-| `routing.json` | WHY/strategy (web_first, priorities, throttle) | NEW v1.0 |
-| `tools.json` | HOW execution happens (browser-use, etc) | v2.0 |
-| `routing_contract.json` | Routing decision schema | NEW v1.0 |
-| `skills.json` | Skill definitions | v1.0 |
-| `agents.json` | OLD - replaced by roles.json | DEPRECATED |
-| `platforms.json` | OLD - replaced by destinations.json | DEPRECATED |
+| File | Purpose |
+|------|---------|
+| `models.json` | 58 models with providers, rate limits, buffer_pct |
+| `routing.json` | Cascade strategies: `strategies.free_cascade.priority` |
+| `agents.json` | Agent definitions: roles, models, context policies |
+| `connectors.json` | API connector definitions (openrouter, google, groq, etc.) |
+| `system.json` | System-wide settings: timeouts, trigger attempts, diagnostics |
+| `tools.json` | Tool definitions (browser-use, etc.) |
+| `health_report.json` | Output of daily model health check |
 
 ---
 
-## Supabase Tables
+## Database Tables (PostgreSQL `vibepilot`)
 
-| Table | Maps To | Notes |
-|-------|---------|-------|
-| `models` | models.json + CLI/API destinations | Internal models (Q tier) |
-| `platforms` | web destinations | Web platforms (W tier) |
-| `tasks` | Task queue | Has routing_flag column |
-| `task_runs` | Execution records | Has tokens_in/out, courier tracking |
-| `secrets_vault` | API keys | Encrypted, use vault_manager.py |
-| `skills` | skills.json | Optional sync |
-| `tools` | tools.json | Optional sync |
-| `prompts` | prompts/*.md | Optional sync |
+| Table | What | Key Columns |
+|-------|------|-------------|
+| `tasks` | Work items from plans | id, title, status, plan_id, assigned_to, attempts, total_tokens_in/out, total_cost_usd |
+| `task_runs` | Each model invocation | task_id, model_id, role (planner/supervisor/executor/analyst), tokens_in/out |
+| `plans` | Generated from PRD | id, prd_path, status, tasks (JSONB) |
+| `orchestrator_events` | Pipeline lifecycle | event_type, task_id (TEXT), details (JSONB) |
+| `subscription_history` | Subscription tracking | provider, model_id, tokens_consumed, api_equivalent_cost_usd |
+| `platforms` | Web AI destinations | name, status, daily_limit, daily_used |
+| `models` | Model performance stats | model_id, success_rate, avg_response_time |
+| `secrets_vault` | Encrypted API keys | AES-256-GCM, access via `./governor vault` |
+| `maintenance_commands` | Infrastructure fixes | command_type, status, task_id |
 
-**Does NOT have:** destinations, roles, routing tables (JSON-only for now)
-
----
-
-## Sync: JSON ↔ Supabase
-
-```bash
-# Import: JSON → Supabase
-./venv/bin/python scripts/sync_config_to_supabase.py
-
-# Export: Supabase → JSON
-./venv/bin/python scripts/sync_config_to_supabase.py --export
-```
-
-**Currently syncs:** models.json, platforms.json, skills.json, tools.json, prompts/
-
-**NOT YET synced:** destinations.json, roles.json, routing.json
-
----
-
-## Vault (API Keys)
-
-**Where credentials live:**
-
-| Secret Type | Location | Notes |
-|-------------|----------|-------|
-| `SUPABASE_URL` | GitHub Secrets | Bootstrap credential |
-| `SUPABASE_SERVICE_KEY` | GitHub Secrets | Service role for admin ops |
-| `VAULT_KEY` | GitHub Secrets | Decrypts Supabase vault |
-| **All other API keys** | Supabase Vault | Encrypted, retrieved at runtime |
-
-**Never hardcode secrets.** Use `vault_manager.py` to retrieve at runtime.
-
-```python
-# Location: vault_manager.py
-from vault_manager import get_api_key, VaultManager
-
-# Get a key
-key = get_api_key('GEMINI_API_KEY')
-
-# Add a key
-vault = VaultManager()
-vault.ingest_secret('GEMINI_API_KEY', 'your-key-here')
-```
-
-**Keys in vault:**
-- DEEPSEEK_API_KEY ✓
-- GITHUB_TOKEN ✓
-- GEMINI_API_KEY - NOT YET ADDED
+**Migrations**: `docs/supabase-schema/NNN_*.sql`, applied with `psql -d vibepilot -f migration.sql`
 
 ---
 
@@ -122,155 +70,55 @@ vault.ingest_secret('GEMINI_API_KEY', 'your-key-here')
 
 **Location:** `~/vibeflow/`
 
-**Key file:** `apps/dashboard/lib/vibepilotAdapter.ts`
-- Reads from Supabase tables (models, platforms, tasks, task_runs)
-- Transforms to dashboard shape
-- Calculates ROI metrics
+| File | What |
+|------|------|
+| `apps/dashboard/lib/vibepilotAdapter.ts` | Transforms governor API data to dashboard shape. Plan-to-task mapping. ROI calculation. Token metrics. |
+| `apps/dashboard/lib/supabase.ts` | Supabase client (for dashboard hosting on Vercel) |
+| `apps/dashboard/hooks/useMissionData.ts` | Data fetching hooks |
 
-**Supabase client:** `apps/dashboard/lib/supabase.ts`
-
----
-
-## Courier Runner
-
-**Location:** `runners/contract_runners.py`
-- `CourierContractRunner` class (lines 413-704)
-- Uses browser-use for web automation
-- Needs LLM with `browser_control` capability
-
-**Hardcoded platforms (line 427-443):**
-```python
-WEB_PLATFORMS = {
-    "chatgpt": {...},
-    "claude": {...},
-    "gemini": {...},
-    # MISSING: huggingchat, deepseek-web, copilot-web
-}
-```
+**Deploy**: Push to main → Vercel auto-deploys. Must include `dist/` in commit.
 
 ---
 
-## Orchestrator
+## API Keys
 
-**Location:** `core/orchestrator.py`
-- `ConcurrentOrchestrator` class
-- `CooldownManager` - handles 80% pause
-- `UsageTracker` - tracks usage
-- `RunnerPool` - loads available runners
+**Where they live:**
+- `~/.hermes/.env` — Provider keys (GEMINI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY, etc.)
+- PostgreSQL `secrets_vault` table — Governor runtime keys (encrypted)
+- Use `./governor vault list/get/set` to manage vault entries
 
-**Gap:** `_call_runner()` doesn't have courier dispatch yet
-
----
-
-## Database Schemas
-
-**Location:** `docs/supabase-schema/` (committed to GitHub)
-
-**TO APPLY SCHEMAS:**
-1. Wait for file to be committed to GitHub
-2. Open GitHub: `VibePilot/tree/main/docs/supabase-schema/`
-3. Copy SQL content from file
-4. Go to Supabase Dashboard → SQL Editor
-5. Paste and Run
-
-**DO NOT:** Try to click links in opencode output (user cannot click)
-**ALWAYS:** Commit schema files to `docs/supabase-schema/` so user can access from GitHub
-
-| File | What It Adds |
-|------|--------------|
-| `schema_v1_core.sql` | Core tables (models, tasks, task_runs) |
-| `schema_v1.1_routing.sql` | routing_flag, slice_id, task_number |
-| `schema_v1.4_roi_enhanced.sql` | tokens_in/out, courier tracking, ROI functions |
-| `schema_intelligence.sql` | Model/platform intelligence, weekly reports |
-| `schema_performance_fix.sql` | Index fixes for Supabase warnings |
-| `001_data_model_redesign.sql` | NEW: models_new, tools, access, task_history tables |
+**Key gotcha**: Shell key loading needs `export $(grep KEYNAME ~/.hermes/.env | tr -d '"')`. Plain `source` without `set -a` doesn't export.
 
 ---
 
-## Quick Checks
+## Governor Operations
 
 ```bash
-# Check venv packages
-./venv/bin/pip list | grep -iE "browser-use|google-genai|supabase"
+# Status
+systemctl --user status vibepilot-governor
 
-# Check vault keys
-./venv/bin/python -c "from vault_manager import get_api_key; print(get_api_key('DEEPSEEK_API_KEY'))"
+# Restart
+systemctl --user restart vibepilot-governor
 
-# Check git status
-git status
+# Rebuild (after Go code changes)
+cd ~/vibepilot/governor && go build -o bin/governor ./cmd/governor/
 
-# Check recent commits
-git log --oneline -10
+# Logs
+journalctl --user -u vibepilot-governor -f
 
-# Validate configs
-./venv/bin/python core/config_loader.py
+# DB query
+psql -d vibepilot -c "SELECT ..."
+
+# Migration
+psql -d vibepilot -f /path/to/migration.sql
 ```
 
 ---
 
-## Cleanup Log
+## Daily Model Health Check
 
-Record what was removed/cleaned up to avoid re-investigating.
+Script: `governor/scripts/daily_model_health.py`
+Cron: 6 AM via Hermes
+Output: `governor/config/health_report.json`
 
-### Courier API Call Reality (2026-02-17)
-
-**CRITICAL: browser-use is NOT 1 API call per task.**
-
-Each browser-use step = 1 LLM API call. A simple task takes 4-8 calls:
-1. Navigate to URL → 1 call
-2. Find input element → 1 call  
-3. Type prompt → 1 call
-4. Submit → 1 call
-5. Wait for response → 1-2 calls
-6. Extract answer → 1 call
-
-**Impact on free tier limits:**
-
-| Platform | Limit | Courier Tasks/Hour (est) |
-|----------|-------|--------------------------|
-| Gemini API | 15 req/min, 1500/day | ~2-3/min, ~200/day |
-| DeepSeek API | Credit-based | Depends on credit |
-
-**Recommendation:**
-- Simple queries → Use internal API (1 call)
-- Complex/long tasks → Use courier (worth 4-8 calls)
-- Research tasks → Courier to web platform (free access to best models)
-
-### 2026-02-17 Session
-
-| Item | Action | Reason |
-|------|--------|--------|
-| streamlit | REMOVED from requirements.txt | Failed experiment, never used |
-| asyncio | REMOVED from requirements.txt | Built into Python, unnecessary |
-| browser-use | ADDED to requirements.txt | Already in venv, needed for courier |
-| google-genai | ADDED to requirements.txt | Already in venv, needed for courier |
-| playwright | INSTALLED in venv | Browser automation for courier |
-| langchain-openai | INSTALLED in venv | LLM interface for browser-use |
-| langchain-google-genai | INSTALLED in venv | Alternative Gemini interface |
-| test_*.py in root | Ignored via .gitignore | Messy test scripts, kept out of git |
-
-**Investigated but kept:**
-- `venv/` - Contains browser-use v0.11.9, google-genai v1.63.0, all needed packages
-- `agents.json` - Kept as deprecated, roles.json replaces
-- `platforms.json` - Kept as deprecated, destinations.json replaces
-
-### Courier Status (2026-02-17)
-
-**Working:**
-- Playwright/Chromium installed and launches
-- Browser navigates to web platforms
-- No-auth platform URLs identified: chatgate.ai (ChatGPT), chat.deepseek.com
-
-**Remaining:**
-- LLM adapter for browser-use needs correct interface
-- browser-use 0.11.x expects specific model interface (provider, ainvoke, etc.)
-- LangChain models work but need Pydantic v2 compatibility fix
-
----
-
-## Notes
-
-- Always use `./venv/bin/python` - system Python doesn't have packages
-- Config files are version-controlled, Supabase is live state
-- Dashboard reads from Supabase, not JSON directly
-- Courier needs GEMINI_API_KEY in vault before first test
+What it does: Fetches models from Gemini/Groq/OpenRouter APIs, health-checks cascade models (actual API calls), updates rate limits, reports new free models, applies ban list.
