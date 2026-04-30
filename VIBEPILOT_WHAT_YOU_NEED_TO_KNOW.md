@@ -30,7 +30,7 @@ A global, massively scalable, multilingual, multimedia social media platform whe
 - **Network:** Phone USB tethered (wifi chip died during repaste), planning ethernet + headless
 - **Architecture:** Config-driven plug-and-play modules, YAML DAG pipeline
 - **Model Strategy:** Cloud free tier cascade across multiple providers. Counts change frequently — see `CURRENT_STATE.md` for verified numbers. Providers include Groq, OpenRouter (free + low-cost), Gemini (4 independent Google Cloud projects = 60 RPM free), NVIDIA NIM. Local inference too slow on this hardware (tested, 2 tok/s).
-- **Cost Tracking System:** Every model touch recorded in task_runs with exact/estimated tokens and cost data. Web platforms estimate ~4 chars/token. Header token pill toggles between Live/Project mode. Subscription history persisted. GLM-5: $45 for 786.6M tokens (3,099% ROI). Decision needed: Z.AI ($200/3mo) vs DeepSeek V4 Flash (~$51/mo) vs DeepSeek V4 Pro (~$160/mo discounted).
+- **Cost Tracking System:** Every model touch recorded in task_runs with exact/estimated tokens and cost data. 4-phase system deployed (see Section 6d). `record_internal_run` RPC for planner/supervisor/analyst calls. `aggregate_task_costs` on completion. Dashboard ROI panel with 10 fixes (Apr 29). Analyst agent handles diagnostic ceiling (see Section 6c). Decision needed: Z.AI ($200/3mo) vs DeepSeek V4 Flash (~$51/mo) vs DeepSeek V4 Pro (~$160/mo discounted).
 - **Config/DB Sync:** Research findings write to config/models.json AND PostgreSQL atomically via `ResearchActionApplier`. No LLM middleman. Both sources stay in sync automatically.
 - **Dashboard:** https://vibeflow-dashboard.vercel.app/ (sacred, Vercel auto-deploy)
 - **Tunnel:** vibestribe.rocks via cloudflared (sacred, don't touch)
@@ -618,6 +618,66 @@ When supervisor approves research findings (new_model, pricing_change, config_tw
 2. Both sources update atomically — no LLM middleman, no drift
 3. Fallback to maintenance command if direct apply fails
 4. Thread-safe with mutex-protected config writes
+
+---
+
+## 6c. Analyst Agent (Diagnostic Ceiling)
+
+When a task fails repeatedly, the system doesn't loop forever. After `diagnostic_trigger_attempts` failures (default 2, configured in `system.json`), the analyst agent kicks in:
+
+1. **Trigger**: `handleTaskReview` checks attempt count against ceiling before retrying
+2. **Analyst runs**: `runAnalystDiagnosis()` gathers all failure feedback, sends to analyst model with role `"analyst"`
+3. **Parser**: `ParseAnalystDecision()` extracts structured diagnosis (root_cause, action, excluded_models, guidance)
+4. **Routing**: `routeAnalystDecision()` takes action based on diagnosis:
+   - `re_prompt`: reset to pending with new guidance from analyst
+   - `exclude_and_retry`: exclude failed model(s), reset to pending
+   - `split_task`: flag for planner to break into subtasks
+   - `escalate`: surface to human as genuinely blocked
+5. **Cost tracking**: Analyst model call recorded via `record_internal_run` with role `"analyst"`
+6. **Pipeline event**: `analyst_diagnosis` event logged to orchestrator_events
+
+**Key files**: `handlers_task.go` (runAnalystDiagnosis, routeAnalystDecision), `prompts/analyst.md`, `runtime/` (ParseAnalystDecision, AnalystDecision type)
+
+**Config**: `system.json` → `execution.diagnostic_trigger_attempts` (default 2)
+
+---
+
+## 6d. Cost Tracking System (deployed 2026-04-29)
+
+Every model touch is now tracked in `task_runs` with token counts and cost data.
+
+### Data Flow
+
+```
+Model call completes → record_internal_run(task_id, role, model_id, tokens, cost)
+  → INSERT INTO task_runs (role, token_source, tokens_in, tokens_out, costs)
+
+Task completes testing → aggregate_task_costs(task_id)
+  → UPDATE tasks SET total_tokens_in/out, total_cost_usd, model_count FROM task_runs
+
+Dashboard ROI panel → reads tasks + task_runs + subscription_history
+```
+
+### RPCs
+- `record_internal_run`: Creates task_run rows for planner, supervisor, analyst model calls
+- `aggregate_task_costs`: Sums all task_runs into task-level totals (called on task completion)
+- `calc_run_costs`: Calculates costs for a single run based on model pricing
+
+### Tables
+- `task_runs`: per-invocation records with `role`, `token_source`, `total_actual_cost_usd`
+- `tasks`: aggregated totals `total_tokens_in`, `total_tokens_out`, `total_cost_usd`, `model_count`
+- `subscription_history`: tracks all subscriptions over time, persists when archived
+- `project_snapshots`: archive/clear functionality for project totals
+
+### Token Estimation
+- API models: use reported token counts
+- Web/courier models: ~4 chars/token estimated from output length
+- Dashboard shows both live (session) and project (cumulative) modes via header pill toggle
+
+### Dashboard ROI (vibeflow, Apr 29)
+- 10 fixes: subscription_history wired, token display, formatting, visibility
+- USD/CAD converter (1.36 default, live rate from DB or exchangerate-api.com)
+- Header alerts banner polls `/api/project/alerts` every 60s for subscription/credit warnings
 
 ---
 
