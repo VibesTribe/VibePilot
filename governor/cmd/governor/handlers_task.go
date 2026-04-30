@@ -231,7 +231,13 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		modelID = routingResult.ModelID
 		connectorID = routingResult.ConnectorID
 		connConfig = h.cfg.GetConnector(connectorID)
-		routingFlag = h.deriveRoutingFlag(connConfig)
+		// Use the router's RoutingFlag when explicitly set (e.g., "web" for courier dispatch).
+		// Only fall back to deriving from connector type when the router didn't specify.
+		if routingResult.RoutingFlag != "" {
+			routingFlag = routingResult.RoutingFlag
+		} else {
+			routingFlag = h.deriveRoutingFlag(connConfig)
+		}
 
 		// Check pool capacity
 		if !h.pool.HasCapacity(sliceID, connectorID) {
