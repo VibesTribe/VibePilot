@@ -6,7 +6,7 @@
 
 | Category | Open | Fixed | Deferred |
 |----------|------|-------|----------|
-| Dashboard | 1 | 0 | 0 |
+| Dashboard | 1 | 10 (ROI calc fixes Apr 29) | 0 |
 | Pipeline data | 0 | 6 | 0 |
 | Pipeline events | 0 | 21+ | 0 |
 | Gap analysis | 0 | 8 | 0 |
@@ -41,7 +41,7 @@
 7. STATUS_ORDER missing human_review — FIXED
 8. transition_task no status validation — FIXED
 9. Duplicate task creation race — FIXED
-10. Task stuck at review after max attempts — UNCLEAR
+10. Task stuck at review after max attempts — FIXED (analyst agent, commit c323d640: backwards reasoning diagnosis at diagnostic_trigger_attempts ceiling)
 
 ---
 
@@ -68,11 +68,11 @@
 - Council (2): council_approved, council_feedback
 
 ---\n\n## Fixed Issues (April 29, 2026 — Cost Tracking Overhaul)\n\n### Phase 1: Data Foundation — COMPLETE (commit 6d37581f)\n- Created subscription_history table to track all subscriptions over time\n- Created project_snapshots table for archive/clear functionality\n- Added role, token_source, total_actual_cost_usd columns to task_runs\n- Added total_tokens_in/out, total_cost_usd, total_api_equivalent_usd, model_count columns to tasks\n- Seeded GLM-5 history: $45 for 786.6M tokens (3,099% ROI)\n- Fixed calc_run_costs(), vp_notify_change(), check_subscription_thresholds(), create_project_snapshot()\n- Added RPC allowlist entries for new cost functions\n- Registered new API endpoints: /api/project/snapshot, /api/project/history, /api/project/alerts\n- Alerts endpoint already returns GLM-5 expiry warning\n\n### Phase 2: Per-Task Full Cost Tracking — COMPLETE (commit e22f1e99)\n- Added record_internal_run RPC to create task_run rows for planner, supervisor, analyst model calls\n- Wire planner (handlers_plan.go): record planner model invocation after successful plan generation\n- Wire supervisor (handlers_task.go): record supervisor model invocation after output review\n- Wire analyst (handlers_task.go): record analyst model invocation after diagnostic review\n- Enhanced courier result handler (main.go): estimate tokens from output length when API doesn't report counts (~4 chars/token)\n- Added aggregate_task_costs call in testing handler on task completion to sum all runs into task totals\n- Built and deployed governor binary with all changes\n\n### Phase 3: Dashboard Overhaul — COMPLETE (commit 7613e19a7)\n- Reordered ROI panel sections: Project-to-Date → Slices → Models → Subscriptions → Session\n- Added SubscriptionHistorySection with archived subscription display\n- Enhanced MissionHeader token pill with click-to-toggle between Live (session) and Project (cumulative) mode\n- Added EventTone=\"warning\" for alert events\n\n### Phase 4: Alerting — COMPLETE (commit a0ee1fc82)\n- Added header alerts banner that polls /api/project/alerts every 60s\n- Shows subscription expiry and credit threshold warnings\n- GLM-5 already flagged: \"2 days remaining\" (expires Apr 30)\n\n### USD/CAD Converter\n- Present in RoiPanel (MissionModals.tsx): USD | CAD toggle buttons\n- Defaults to 1.36, fetches live rate from governor DB (exchange_rates table) then exchangerate-api.com fallback\n- Every dollar amount in ROI panel converts when toggled\n- Exchange rate in DB: 1.36 USD/CAD, seeded 2026-02-16, source=\"seed\"\n\n## Dashboard Issues\n
-### 1. ROI Popup Needs Work
-**Priority**: P3 (after E2E verified)
-**Impact**: ProjectTracker and SessionTracker deployed but user says "it needs work"
-**Status**: Waiting for user specifications after E2E test
-**Files**: MissionModals.tsx
+### 1. ROI Calculator Needs Real Data Verification
+**Priority**: P1 (after E2E test)
+**Impact**: 10 dashboard fixes deployed Apr 29 (subscription_history wiring, token display, formatting, visibility). All showing correctly with seeded GLM-5 data. Needs real task_runs from E2E to verify full calculation chain.
+**Status**: Ready for E2E verification
+**Commits**: e6c644471 through f75d8f9c2 (vibeflow, Apr 29)
 
 ---
 
@@ -256,8 +256,7 @@
 
 | Priority | Issue | Effort | What's Needed |
 |----------|-------|--------|---------------|
-| P0 | Next E2E test to verify all gap analysis fixes + Apr 28 data fixes | Low | Push PRD, monitor all 29 event types + learning RPCs |
-| P1 | ROI popup revisions | Low | User specs |
+| P0 | E2E test to verify all fixes + cost tracking + output pipeline | Low | Push PRD, monitor all 29 event types + learning RPCs + cost data |
+| P1 | ROI calculator verification with real task data | Low | Run E2E, verify task_runs populate ROI panel correctly |
 | P2 | Task context E2E verification | Low | Run E2E, check if planner outputs target_files |
 | P3 | Stale Supabase-era prompts in DB | Trivial | DELETE FROM prompts (governor reads filesystem) |
-| P3 | Bug 10: No explicit terminal state on max review retries | Low | Add status='failed' after exhausting attempts |
