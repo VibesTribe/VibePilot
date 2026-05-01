@@ -32,6 +32,7 @@ type MCPToolInfo struct {
 type ContextBuilder struct {
 	db       RPCQuerier
 	mcpTools MCPToolLister
+	kb       KBProvider
 	repoPath string
 	cfg      *CodeMapConfig
 
@@ -52,8 +53,8 @@ func (b *ContextBuilder) SetMCPRegistry(registry MCPToolLister) {
 	b.mcpTools = registry
 }
 
-// loadCodeMap reads the code map from disk with TTL-based caching.
-// After TTL expires, next call re-reads from disk.
+// loadCodeMap reads the code map from KB database (preferred) or disk, with TTL-based caching.
+// After TTL expires, next call re-reads from the source.
 func (b *ContextBuilder) loadCodeMap() (string, error) {
 	ttl := time.Duration(b.cfg.CacheTTLMins) * time.Minute
 
@@ -74,10 +75,18 @@ func (b *ContextBuilder) loadCodeMap() (string, error) {
 		return b.codeMapCache, nil
 	}
 
+	// Try KB database first
+	if kbMap, ok := b.loadCodeMapFromKB(context.Background()); ok {
+		b.codeMapCache = kbMap
+		b.codeMapLoaded = time.Now()
+		return b.codeMapCache, nil
+	}
+
+	// Fallback to disk
 	mapPath := filepath.Join(b.repoPath, b.cfg.Path)
 	data, err := os.ReadFile(mapPath)
 	if err != nil {
-		return "", fmt.Errorf("read code map: %w", err)
+		return "", fmt.Errorf("read code map: %w (KB also unavailable)", err)
 	}
 
 	b.codeMapCache = string(data)
@@ -93,8 +102,14 @@ func (b *ContextBuilder) InvalidateCache() {
 	b.mu.Unlock()
 }
 
-// loadFileTree extracts just the file headers from map.md (lightweight for supervisor/council).
+// loadFileTree extracts file headers from KB (preferred) or map.md (lightweight for supervisor/council).
 func (b *ContextBuilder) loadFileTree() (string, error) {
+	// Try KB first
+	if kbTree, ok := b.loadFileTreeFromKB(context.Background()); ok {
+		return kbTree, nil
+	}
+
+	// Fallback to extracting from disk-based code map
 	fullMap, err := b.loadCodeMap()
 	if err != nil {
 		return "", err
