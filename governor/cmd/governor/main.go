@@ -24,6 +24,8 @@ import (
 	"github.com/vibepilot/governor/internal/tools"
 	"github.com/vibepilot/governor/internal/vault"
 	"github.com/vibepilot/governor/internal/webhooks"
+
+	pgkb "github.com/vibepilot/governor/internal/kb"
 )
 
 var (
@@ -184,6 +186,14 @@ func main() {
 
 	contextBuilder := runtime.NewContextBuilder(database, repoPath, cfg.System.CodeMap)
 	sessionFactory.SetContextBuilder(contextBuilder)
+
+	// Wire knowledge base provider for DB-backed code map (falls back to disk if unavailable)
+	if kbConn, err := pgkb.New(context.Background(), "dbname=vibepilot"); err == nil {
+		contextBuilder.SetKBProvider(&kbAdapter{inner: kbConn})
+		log.Println("[KB] Knowledge base connected — code map will use DB queries")
+	} else {
+		log.Printf("[KB] Knowledge base unavailable, using disk-based code map: %v", err)
+	}
 
 	// Wire compactor for automatic session summary generation
 	compactor := memory.NewCompactor(database)
