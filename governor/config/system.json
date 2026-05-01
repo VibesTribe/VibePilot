@@ -163,28 +163,9 @@
       "name": "jcodemunch",
       "transport": "stdio",
       "command": "/home/vibes/.local/bin/jcodemunch-mcp",
-      "args": ["serve"],
-      "enabled": true
-    },
-    {
-      "name": "jdatamunch",
-      "transport": "stdio",
-      "command": "/home/vibes/.local/bin/jdatamunch-mcp",
-      "args": [],
-      "enabled": true
-    },
-    {
-      "name": "jdocmunch",
-      "transport": "stdio",
-      "command": "/home/vibes/.local/bin/jdocmunch-mcp",
-      "args": ["serve"],
-      "enabled": true
-    },
-    {
-      "name": "code-review-graph",
-      "transport": "stdio",
-      "command": "/home/vibes/.local/bin/code-review-graph",
-      "args": ["serve"],
+      "args": [
+        "serve"
+      ],
       "enabled": true
     }
   ],
