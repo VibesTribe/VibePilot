@@ -304,3 +304,41 @@ func ParseFileID(fileID string) (repoID, relativePath string) {
 	}
 	return "", fileID
 }
+
+// SemanticResult represents a result from semantic search across any table.
+type SemanticResult struct {
+	SourceTable string  `json:"source_table"`
+	ID          string  `json:"id"`
+	Title       string  `json:"title"`
+	Detail      string  `json:"detail"`
+	Similarity  float64 `json:"similarity"`
+}
+
+// SearchAllSemantic performs cross-table semantic search using pgvector.
+// The embedding vector must be 768-dimensional (nomic-embed-text).
+func (k *KB) SearchAllSemantic(ctx context.Context, embedding string, limit int, minSimilarity float64) ([]SemanticResult, error) {
+	if limit <= 0 {
+		limit = 30
+	}
+	if minSimilarity <= 0 {
+		minSimilarity = 0.5
+	}
+	rows, err := k.pool.Query(ctx,
+		"SELECT source_table, id, title, detail, similarity FROM kb_search_all_semantic($1::vector, $2, $3)",
+		embedding, limit, minSimilarity,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("kb: semantic search: %w", err)
+	}
+	defer rows.Close()
+
+	var results []SemanticResult
+	for rows.Next() {
+		var r SemanticResult
+		if err := rows.Scan(&r.SourceTable, &r.ID, &r.Title, &r.Detail, &r.Similarity); err != nil {
+			return nil, fmt.Errorf("kb: scan semantic result: %w", err)
+		}
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
