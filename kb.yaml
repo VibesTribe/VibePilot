@@ -1,0 +1,148 @@
+# VibePilot Knowledge Base Configuration
+# Lives in the project repo - tracked in git, portable anywhere.
+# Database is a derived cache - rebuild anytime with: kb-sync --project ~/vibepilot/kb.yaml
+
+name: vibepilot
+database: "dbname=vibepilot"
+
+repos:
+  vibepilot: ~/vibepilot
+  vibeflow: ~/vibeflow
+  knowledgebase: ~/knowledgebase
+
+sync:
+  skip_paths:
+    - .git
+    - node_modules
+    - __pycache__
+    - .context
+    - .vscode
+    - dist
+    - .venv
+    - vendor
+    - target
+    - .next
+    - graphify-out
+
+  docs:
+    # Only skip auto-generated junk. Real docs, reports, agent outputs = KEEP ALL.
+    skip_paths:
+      - .context/
+
+  media:
+    # Track everything — images, video, audio, PDFs, social media assets.
+    # We want to know WHAT we have, WHERE it is, WHAT it's FOR, WHEN created.
+    extract_metadata: true   # dimensions, duration, format, size
+    generate_thumbnails: false  # not yet, maybe later
+
+  symbols:
+    min_description_length: 5
+    use_docstrings: true
+    use_signatures: true
+
+# Knowledge item types for the agent decision pipeline.
+# Agents deposit/query by type to route work through the chain:
+#   researcher → supervisor → council → human
+knowledge_types:
+  # Researcher agent deposits daily reports, findings, model evaluations
+  research_report:
+    description: "Research findings, model evaluations, platform reviews"
+    queryable: true
+
+  # Supervisor reviews researcher output, handles simple approvals
+  supervisor_review:
+    description: "Supervisor assessment — simple approvals or escalation to council"
+    queryable: true
+
+  # Council reviews escalated items, gives feedback
+  council_feedback:
+    description: "Council feedback on bigger decisions needing broader perspective"
+    queryable: true
+
+  # Human's final decision/approval
+  human_decision:
+    description: "Final human approval or rejection with reasoning"
+    queryable: true
+
+  # General project knowledge, ADRs, design docs
+  design_doc:
+    description: "Architecture decisions, design specs, project conventions"
+    queryable: true
+
+  # Config and pipeline definitions
+  config:
+    description: "YAML/JSON configuration files and pipeline definitions"
+    queryable: true
+
+  # Prompts and agent instructions
+  prompt:
+    description: "System prompts, agent instructions, behavioral rules"
+    queryable: true
+
+  # Hermes skills - tracked so we can audit for rot
+  skill:
+    description: "Agent skills — what they do, when created, last used. Auditable for staleness."
+    queryable: true
+    track_usage: true
+    track_created_at: true
+
+extraction:
+  go:
+    # Functions that register HTTP routes (first arg=route, second arg=handler)
+    route_functions:
+      - HandleFunc
+      - Handle
+      - Get
+      - Post
+      - Put
+      - Delete
+      - Patch
+      - Group
+
+    # Standard library packages to exclude from CALLS edges (noise)
+    stdlib_filter:
+      - fmt
+      - strings
+      - os
+      - json
+      - http
+      - context
+      - sync
+      - time
+      - strconv
+      - io
+      - bytes
+      - errors
+      - log
+      - filepath
+      - regexp
+      - encoding
+      - bufio
+      - reflect
+      - sort
+      - unicode
+      - path
+      - syscall
+      - math
+      - net
+      - crypto
+      - url
+      - html
+      - template
+      - hash
+      - sql
+      - pgx
+      - testing
+
+  typescript:
+    route_patterns:
+      - "app.get"
+      - "app.post"
+      - "app.put"
+      - "app.delete"
+      - "app.patch"
+      - "router.get"
+      - "router.post"
+
+hooks:
+  auto_install: true
