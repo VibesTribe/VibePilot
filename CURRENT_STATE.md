@@ -1,5 +1,5 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-29 — VERIFIED AGAINST CODE AND RUNNING SYSTEM (+ cost tracking overhaul)
+# AUTO-UPDATED: 2026-05-02 — KB MCP server converted to streamable-http systemd service
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 
@@ -32,7 +32,7 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 670698fd (VibePilot), a0ee1fc82 (Vibeflow)
+- **Git:** main branch. Last: 04eb349f (VibePilot), a0ee1fc82 (Vibeflow)
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
 - **Chrome CDP:** 127.0.0.1:9222
 - **Pipeline tables:** 1 task (merged), 1 plan (review), 65 plans (draft from PRDs), 12 orchestrator_events
@@ -172,18 +172,22 @@ All 5 courier bugs fixed (Apr 25):
 
 ## Knowledgebase (VibesTribe/knowledgebase — OPERATIONAL)
 
-- **Repo**: https://github.com/VibesTribe/knowledgebase (14 commits)
+- **Repo**: https://github.com/VibesTribe/knowledgebase (15 commits)
 - **Storage**: Local PostgreSQL, same DB as governor (NOT SQLite, NOT Supabase)
 - **Embedding**: OpenRouter NVIDIA llama-nemotron-embed-vl-1b-v2:free (2000-dim, ~20 rows/sec, FREE)
   - Previous: Ollama nomic-embed-text (768-dim, 0.6 rows/sec) -- switched for 25x speed gain
   - All 11,633 rows embedded: 3,316 code symbols + 3,718 knowledge items + 4,599 doc sections
-- **Coverage**: 3 repos indexed (vibepilot, vibeflow, knowledgebase), 851 files tracked
-- **Symbols**: 3,306 code symbols (functions, methods, types, constants) from Go AST + TS/SQL/MD parsers
-- **Edges**: 3,963 code edges (CALLS, IMPORTS, REFERENCES, QUERIES) with 43% qualified_name resolution
-- **Agent access**: MCP server (18 tools) -- semantic search, symbol lookup, blast radius, callers/callees
+- **Coverage**: 3 repos indexed (vibepilot, vibeflow, knowledgebase), 755 files tracked
+- **Symbols**: 3,316 code symbols (functions, methods, types, constants) from Go AST + TS/SQL/MD parsers
+- **Edges**: 3,963 code edges (CALLS, IMPORTS, REFERENCES, QUERIES, SERVES) with ~18% qualified_name resolution (known mismatch)
+- **MCP server**: streamable-http on http://127.0.0.1:8901/mcp (18 tools)
+  - Systemd user service: `kb-mcp-server.service` (enabled, auto-restart)
+  - Health endpoint: http://127.0.0.1:8901/health
+  - Independent of Hermes lifecycle — any agent can query it
+  - Hermes config: `mcp_servers.kb.url = "http://127.0.0.1:8901/mcp"`
 - **Auto-sync**: Post-commit hooks in all 3 repos trigger sync_direct.py on every push
 - **Backup**: pg_dump nightly at 3am, pushed to VibesTribe/knowledgebase (git-versioned SQL)
-- **Remaining**: (1) Lineage QUERIES/SERVES edges, (2) Go function-level CALLS noise cleanup, (3) Blast radius verification
+- **Remaining**: (1) Normalize edge qualified names for RPC resolution (~18% → target 80%+), (2) Blast radius verification
 
 ## Budget
 - **OpenRouter**: $0 credit account. Free embedding model (NVIDIA llama-nemotron-embed-vl-1b-v2) for KB semantic search.
@@ -240,7 +244,7 @@ All 5 courier bugs fixed (Apr 25):
 |------|---------|---------|
 | VibePilot | 1792 | Governor, pipeline, agents |
 | vibeflow | 55 | Dashboard UI |
-| knowledgebase | 11 | Institutional memory (building next) |
+| knowledgebase | 15 | Institutional memory (MCP HTTP service) |
 | vibes-agent-context | 48 | Hermes memory backups |
 
 ## Router Architecture (config-driven, NOT hardcoded)
