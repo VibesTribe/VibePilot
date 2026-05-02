@@ -170,20 +170,23 @@ All 5 courier bugs fixed (Apr 25):
 1. a0ee1fc82 — feat: header alerts banner for subscription/credit threshold warnings - Phase 4 (Apr 29)
 2. 7613e19a7 — feat: cost tracking dashboard overhaul - Phase 3 (Apr 29)
 
-## Knowledgebase (VibesTribe/knowledgebase — 11 commits, ready to build)
+## Knowledgebase (VibesTribe/knowledgebase — OPERATIONAL)
 
-- **Repo**: https://github.com/VibesTribe/knowledgebase (exists, 11 commits)
-- **Storage**: Local PostgreSQL (NOT SQLite — already running, proven)
-- **Human-readable backup**: Markdown + Frontmatter files in repo
-- **Index**: map.json for low-token agent discovery
-- **Dashboard**: DOCS button links to vis.js graph (nodes colored by status)
-- **Researcher**: GitHub Actions cron (2x daily), reads from sources.txt RSS list
-- **Flow**: Researcher deposits reports to knowledgebase repo → supervisor auto-approves simple additions → council reviews complex ones → feedback appended to report → comes to human via knowledgebase link → implementation happens in vibepilot task branches
-- **Institutional memory**: Every model/tool/API ever researched, when adopted/rejected, why, relationships, reconsideration when updates fix past rejection reasons
-- **Status**: Not yet operational. Will be built and dogfooded by VibePilot after E2E verified.
+- **Repo**: https://github.com/VibesTribe/knowledgebase (14 commits)
+- **Storage**: Local PostgreSQL, same DB as governor (NOT SQLite, NOT Supabase)
+- **Embedding**: OpenRouter NVIDIA llama-nemotron-embed-vl-1b-v2:free (2000-dim, ~20 rows/sec, FREE)
+  - Previous: Ollama nomic-embed-text (768-dim, 0.6 rows/sec) -- switched for 25x speed gain
+  - All 11,633 rows embedded: 3,316 code symbols + 3,718 knowledge items + 4,599 doc sections
+- **Coverage**: 3 repos indexed (vibepilot, vibeflow, knowledgebase), 851 files tracked
+- **Symbols**: 3,306 code symbols (functions, methods, types, constants) from Go AST + TS/SQL/MD parsers
+- **Edges**: 3,963 code edges (CALLS, IMPORTS, REFERENCES, QUERIES) with 43% qualified_name resolution
+- **Agent access**: MCP server (18 tools) -- semantic search, symbol lookup, blast radius, callers/callees
+- **Auto-sync**: Post-commit hooks in all 3 repos trigger sync_direct.py on every push
+- **Backup**: pg_dump nightly at 3am, pushed to VibesTribe/knowledgebase (git-versioned SQL)
+- **Remaining**: (1) Lineage QUERIES/SERVES edges, (2) Go function-level CALLS noise cleanup, (3) Blast radius verification
 
 ## Budget
-- **OpenRouter**: $0 credit account. No payment added.
+- **OpenRouter**: $0 credit account. Free embedding model (NVIDIA llama-nemotron-embed-vl-1b-v2) for KB semantic search.
 - **Groq**: Free tier
 - **Gemini**: 4x free tier (no billing on any project)
 - **NVIDIA NIM**: Free tier
