@@ -342,8 +342,3 @@ func (k *KB) SearchAllSemantic(ctx context.Context, embedding string, limit int,
 	}
 	return results, rows.Err()
 }
-
-// KBFreshnessTest is a verification function to test post-commit sync.
-func KBFreshnessTest() string {
-	return "kb is fresh"
-}
