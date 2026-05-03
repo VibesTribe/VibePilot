@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-30T06:27:16.595578+00:00",
+  "timestamp": "2026-05-03T18:47:37.715324+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,8 +11,8 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 368,
-      "free": 32
+      "models": 371,
+      "free": 33
     }
   },
   "health_checks": {
@@ -52,9 +52,9 @@
       "provider": "groq"
     },
     "llama-3.3-70b-versatile": {
-      "alive": false,
-      "status": "HTTP 400: {\"error\":{\"message\":\"llama-3.3-70b-versatile is not a valid model ID\",\"code\":400},\"user_id\":\"user_2tah8DKI9w82OcpvvhpZxxOMG3Z\"}",
-      "provider": "meta"
+      "alive": true,
+      "status": "ok",
+      "provider": "groq"
     },
     "groq/compound": {
       "alive": true,
@@ -72,9 +72,9 @@
       "provider": "groq"
     },
     "llama-3.1-8b-instant": {
-      "alive": false,
-      "status": "HTTP 400: {\"error\":{\"message\":\"llama-3.1-8b-instant is not a valid model ID\",\"code\":400},\"user_id\":\"user_2tah8DKI9w82OcpvvhpZxxOMG3Z\"}",
-      "provider": "meta"
+      "alive": true,
+      "status": "ok",
+      "provider": "groq"
     },
     "meta/llama-3.3-70b-instruct": {
       "alive": false,
@@ -105,7 +105,7 @@
   "changes": [
     {
       "action": "new_free_models",
-      "count": 60,
+      "count": 61,
       "models": [
         "gemini-2.0-flash",
         "gemini-2.0-flash-001",
@@ -130,5 +130,297 @@
       ]
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "cooldown_state": {
+    "aizolo-mix": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "bytedance/ui-tars-1.5-7b": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "codestral": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "cognitivecomputations/dolphin-mistral-24b-venice-edition:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "deepseek-chat": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "deepseek-r1": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "deepseek-v3": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "deepseek-web": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "gemini-2.5-flash-lite": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "gemini-2.5-pro": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "gemini-3.1-flash-lite-preview": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "gemini-3.1-pro-preview-web": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "gemini-3-flash-preview": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "glm-5": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "google/gemma-3-12b-it:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "google/gemma-3-27b-it:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "google/gemma-3-4b-it:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "google/gemma-3n-e2b-it:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "google/gemma-3n-e4b-it:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "google/gemma-4-26b-a4b-it:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "google/gemma-4-31b-it": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "gpt-4o-mini-chatbox": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "groq/compound": {
+      "status": "active",
+      "cooldown_until": "2026-04-19 06:11 PM",
+      "cooldown_state": "expired_not_yet_probed"
+    },
+    "groq/compound-mini": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "inclusionai/ling-2.6-1t:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "inclusionai/ling-2.6-flash:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "kimi-k2.6-instant": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "kimi-k2-instruct-0905-hf": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "liquid/lfm-2.5-1.2b-instruct:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "liquid/lfm-2.5-1.2b-thinking:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "llama-3.1-8b-instant": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "llama-3.3-70b-versatile": {
+      "status": "active",
+      "cooldown_until": "2026-04-18 10:17 PM",
+      "cooldown_state": "expired_not_yet_probed"
+    },
+    "meta/llama-3.3-70b-instruct": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "meta-llama/llama-3.2-3b-instruct:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "meta-llama/llama-3.3-70b-instruct:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "meta-llama/llama-4-scout-17b-16e-instruct": {
+      "status": "active",
+      "cooldown_until": "2026-04-19 06:11 PM",
+      "cooldown_state": "expired_not_yet_probed"
+    },
+    "minimax/minimax-m2.5": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "mistral-large": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "moonshotai/kimi-k2-instruct": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "nousresearch/hermes-3-llama-3.1-405b:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "nvidia/llama-3.1-nemotron-ultra-253b-v1": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "nvidia/nemotron-3-nano-30b-a3b:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "nvidia/nemotron-3-super-120b-a12b": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "nvidia/nemotron-nano-12b-v2-vl:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "nvidia/nemotron-nano-9b-v2:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "openai/gpt-oss-120b": {
+      "status": "active",
+      "cooldown_until": "2026-04-21 11:52 PM",
+      "cooldown_state": "expired_not_yet_probed"
+    },
+    "openai/gpt-oss-20b:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "openrouter/free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "perplexity-free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "pixtral": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "poe-mix": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "qwen-2.5": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "qwen3-32b": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "qwen-3.6-plus": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "qwen/qwen3-coder:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "qwen/qwen3-next-80b-a3b-instruct:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "tencent/hy3-preview:free": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "z-ai/glm-4.5-air": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    }
+  }
 }
