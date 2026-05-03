@@ -222,6 +222,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Start CooldownWatcher: probes models coming off cooldown, brings them back or extends
+	cooldownWatcher := runtime.NewCooldownWatcher(usageTracker, sessionFactory, cfg, database)
+	cooldownWatcher.Start(ctx)
+	_ = cooldownWatcher // runs in background goroutine, stopped by ctx cancel
+
 	// Initialize CourierRunner for web platform dispatch (courier agent system)
 	repoSlug := repoOwner + "/" + repoName // from ManagedRepo config above
 	if githubToken, err := v.GetSecret(ctx, "GITHUB_TOKEN"); err == nil && githubToken != "" {

@@ -305,8 +305,142 @@ def update_models_config(remote_models, current_config):
 
     return updated, new_free_models, changed_limits
 
+def apply_pending_research_suggestions():
+    """Apply approved research suggestions from the database.
+
+    This runs as part of the daily health check so that model discoveries
+    from the research agent get applied even if nobody manually approves them
+    during the day. Only applies suggestions with status='approved'.
+    """
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['psql', '-d', 'vibepilot', '-t', '-A', '-c',
+             "SELECT id, suggestion_type, details "
+             "FROM research_suggestions "
+             "WHERE status = 'approved' "
+             "ORDER BY created_at"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return 0, []
+
+        applied = []
+        for line in result.stdout.strip().split('\n'):
+            if not line:
+                continue
+            parts = line.split('|', 2)
+            if len(parts) < 3:
+                continue
+            sug_id, sug_type, details_json = parts
+            try:
+                details = json.loads(details_json)
+            except:
+                continue
+
+            # Apply via the governor API (localhost:8080 is default)
+            try:
+                body = {"suggestion_id": sug_id, "action": "apply"}
+                resp, err = api_post(
+                    "http://127.0.0.1:8080/api/research/apply",
+                    body,
+                    timeout=15
+                )
+                if err:
+                    applied.append(f"{sug_id}: FAILED ({err})")
+                else:
+                    applied.append(f"{sug_id}: applied")
+            except Exception as e:
+                applied.append(f"{sug_id}: error ({e})")
+
+        return len(applied), applied
+    except Exception as e:
+        print(f"  Warning: could not check research suggestions: {e}")
+        return 0, []
+
+
+def load_env_from_vault():
+    """Load API keys from the VibePilot vault (preferred source)."""
+    env = {}
+    try:
+        import subprocess
+        # Read vault key from systemd override (same source as governor)
+        import re
+        override_path = Path.home() / ".config/systemd/user/vibepilot-governor.service.d/override.conf"
+        vault_key = None
+        if override_path.exists():
+            for line in override_path.read_text().splitlines():
+                m = re.match(r'Environment="VAULT_KEY=(.*)"', line)
+                if m:
+                    vault_key = m.group(1)
+                    break
+
+        if not vault_key:
+            # Fall back to env var
+            vault_key = os.environ.get("VAULT_KEY", "")
+
+        if not vault_key:
+            return env
+
+        # Use governor API to read secrets (vault is encrypted, governor has the key)
+        for key in ["GROQ_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY",
+                     "OPENROUTER_API_KEY", "NVIDIA_API_KEY", "ZAI_API_KEY"]:
+            try:
+                result = subprocess.run(
+                    ['curl', '-s', '-H', 'Authorization: Bearer local',
+                     f'http://127.0.0.1:8080/api/vault/{key}'],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    val = result.stdout.strip().strip('"')
+                    if val and val != "null":
+                        env[key] = val
+            except:
+                pass
+    except Exception as e:
+        print(f"  Warning: vault lookup failed: {e}")
+
+    return env
+
+
+def auto_commit_if_changed():
+    """Auto-commit updated models.json and health_report.json if they changed."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ['git', 'diff', '--name-only', '--', 'governor/config/models.json', 'governor/config/health_report.json'],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(Path(__file__).parent.parent.parent)  # repo root
+        )
+        changed_files = [f for f in result.stdout.strip().split('\n') if f]
+        if not changed_files:
+            print("\n  No changes to commit.")
+            return False
+
+        repo_root = str(Path(__file__).parent.parent.parent)
+        subprocess.run(['git', 'add'] + changed_files, cwd=repo_root, timeout=10)
+
+        commit_msg = f"chore: daily model health check ({datetime.now().strftime('%Y-%m-%d')})"
+        subprocess.run(['git', 'commit', '-m', commit_msg, '--quiet'], cwd=repo_root, timeout=10)
+
+        subprocess.run(['git', 'push', 'origin', 'main', '--quiet'], cwd=repo_root, timeout=30)
+
+        print(f"\n  Auto-committed: {', '.join(changed_files)}")
+        return True
+    except Exception as e:
+        print(f"\n  Warning: auto-commit failed: {e}")
+        return False
+
+
 def main():
     env = load_env()
+
+    # Also try vault keys (preferred source) -- governor may be running
+    vault_env = load_env_from_vault()
+    for k, v in vault_env.items():
+        if v and k not in env:
+            env[k] = v
+
     report = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "providers": {},
@@ -404,6 +538,44 @@ def main():
         else:
             print(f"  {mid}: SKIP (no provider)")
 
+    # Add cooldown state for all models (with actual date/time, not countdown)
+    print(f"\n--- Model Cooldown State ---")
+    try:
+        import subprocess
+        cooldown_result = subprocess.run(
+            ['psql', '-d', 'vibepilot', '-t', '-A', '-c',
+             "SELECT id, status, "
+             "  COALESCE(to_char(cooldown_expires_at, 'YYYY-MM-DD HH:MI AM'), 'none') as cooldown_until, "
+             "  CASE WHEN cooldown_expires_at IS NOT NULL AND cooldown_expires_at > NOW() "
+             "    THEN 'in_cooldown' "
+             "    WHEN cooldown_expires_at IS NOT NULL AND cooldown_expires_at <= NOW() "
+             "    THEN 'expired_not_yet_probed' "
+             "    ELSE 'ready' "
+             "  END as cooldown_state "
+             "FROM models "
+             "WHERE status = 'active' "
+             "ORDER BY id"],
+            capture_output=True, text=True, timeout=10
+        )
+        cooldown_state = {}
+        if cooldown_result.returncode == 0 and cooldown_result.stdout.strip():
+            for line in cooldown_result.stdout.strip().split('\n'):
+                parts = line.split('|')
+                if len(parts) >= 3:
+                    mid, status, until, state = parts[0], parts[1], parts[2], parts[3]
+                    cooldown_state[mid] = {
+                        "status": status,
+                        "cooldown_until": until,
+                        "cooldown_state": state
+                    }
+            in_cd = sum(1 for v in cooldown_state.values() if v["cooldown_state"] == "in_cooldown")
+            expired = sum(1 for v in cooldown_state.values() if v["cooldown_state"] == "expired_not_yet_probed")
+            ready = sum(1 for v in cooldown_state.values() if v["cooldown_state"] == "ready")
+            print(f"  {len(cooldown_state)} models: {ready} ready, {in_cd} in cooldown, {expired} expired (awaiting probe)")
+        report["cooldown_state"] = cooldown_state
+    except Exception as e:
+        print(f"  Warning: could not fetch cooldown state: {e}")
+
     # Save updated config
     config["models"] = updated_models
     config["last_health_check"] = report["timestamp"]
@@ -416,6 +588,20 @@ def main():
     with open(REPORT_FILE, "w") as f:
         json.dump(report, f, indent=2)
     print(f"  Saved health_report.json")
+
+    # Apply any approved research suggestions from the database
+    print(f"\n--- Research Suggestions ---")
+    applied_count, applied_details = apply_pending_research_suggestions()
+    if applied_count > 0:
+        print(f"  Applied {applied_count} approved research suggestions:")
+        for detail in applied_details:
+            print(f"    {detail}")
+    else:
+        print(f"  No approved research suggestions pending.")
+
+    # Auto-commit if anything changed
+    print(f"\n--- Auto-commit ---")
+    auto_commit_if_changed()
 
     print(f"\nDone. {len(report['warnings'])} warnings.")
 
