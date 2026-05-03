@@ -315,6 +315,10 @@ func (b *ContextBuilder) BuildKBContextPack(ctx context.Context, topic string) s
 		case "repo_map_snippet":
 			sb.WriteString("### File Map\n")
 			formatFileMapSection(&sb, s.Content)
+		case "system_overview":
+			sb.WriteString("### System Overview\n")
+			sb.WriteString("This is what VibePilot IS and how the system works.\n\n")
+			formatOverviewSection(&sb, s.Content)
 		}
 	}
 
@@ -434,6 +438,20 @@ func formatRawSection(sb *strings.Builder, raw json.RawMessage) {
 		sb.WriteString(fmt.Sprintf("- %s\n", strings.Join(parts, ", ")))
 	}
 	sb.WriteString("\n")
+}
+
+func formatOverviewSection(sb *strings.Builder, raw json.RawMessage) {
+	var sections []struct {
+		Title   string `json:"title"`
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal(raw, &sections); err != nil {
+		sb.WriteString("  (parse error)\n")
+		return
+	}
+	for _, s := range sections {
+		sb.WriteString(fmt.Sprintf("**%s**\n%s\n\n", s.Title, s.Content))
+	}
 }
 
 func (b *ContextBuilder) BuildSupervisorContext(ctx context.Context, taskType string) (string, error) {
