@@ -98,6 +98,10 @@ type ModelUsage struct {
 	RateLimitCount    int          `json:"rate_limit_count"`
 	CooldownExpiresAt *time.Time   `json:"cooldown_expires_at"`
 	Learned           LearnedData  `json:"learned"`
+	// Credit tracking for paid models
+	CreditTotal      float64 `json:"credit_total_usd"`
+	CreditRemaining  float64 `json:"credit_remaining_usd"`
+	CreditAlertPct   float64 `json:"credit_alert_threshold"`
 }
 
 type UsageTracker struct {
@@ -373,6 +377,51 @@ func (t *UsageTracker) RecordUsage(ctx context.Context, modelID string, tokensIn
 	if t.connectorTracker != nil {
 		for _, connectorID := range usage.Profile.AccessVia {
 			t.connectorTracker.RecordUsage(ctx, connectorID, tokensIn, tokensOut)
+		}
+	}
+
+	// Credit tracking: deduct cost for paid models with credit
+	if usage.CreditTotal > 0 {
+		pricing := usage.Profile.APIPricing
+		costUSD := (float64(tokensIn) * pricing.InputPer1MUsd / 1_000_000) +
+			(float64(tokensOut) * pricing.OutputPer1MUsd / 1_000_000)
+		if costUSD > 0 {
+			usage.CreditRemaining -= costUSD
+			if usage.CreditRemaining < 0 {
+				usage.CreditRemaining = 0
+			}
+
+			// Deduct from DB
+			if t.db != nil {
+				result, err := t.db.RPC(ctx, "deduct_model_credit", map[string]any{
+					"p_model_id":  modelID,
+					"p_cost_usd":  costUSD,
+				})
+				if err == nil && result != nil {
+					var dbResult struct {
+						CreditRemaining float64 `json:"credit_remaining"`
+						CreditTotal     float64 `json:"credit_total"`
+						AlertThreshold  float64 `json:"alert_threshold"`
+						Exhausted       bool    `json:"exhausted"`
+					}
+					if json.Unmarshal(result, &dbResult) == nil {
+						usage.CreditRemaining = dbResult.CreditRemaining
+						usage.CreditTotal = dbResult.CreditTotal
+
+						if dbResult.Exhausted {
+							log.Printf("[UsageTracker] CREDIT EXHAUSTED: %s — benching model", modelID)
+							usage.Profile.Status = "paused"
+							usage.Profile.StatusReason = "credit exhausted"
+						} else if dbResult.AlertThreshold > 0 && usage.CreditTotal > 0 {
+							pctUsed := 1.0 - (usage.CreditRemaining / usage.CreditTotal)
+							if pctUsed >= dbResult.AlertThreshold {
+								log.Printf("[UsageTracker] CREDIT WARNING: %s — %.0f%% used ($%.4f / $%.2f remaining)",
+									modelID, pctUsed*100, usage.CreditRemaining, usage.CreditTotal)
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -666,6 +715,23 @@ func (t *UsageTracker) LoadFromDatabase(ctx context.Context) error {
 			}
 		}
 
+		// Restore credit tracking
+		if raw, ok := row["credit_total_usd"]; ok && raw != nil {
+			if f, ok := raw.(float64); ok {
+				usage.CreditTotal = f
+			}
+		}
+		if raw, ok := row["credit_remaining_usd"]; ok && raw != nil {
+			if f, ok := raw.(float64); ok {
+				usage.CreditRemaining = f
+			}
+		}
+		if raw, ok := row["credit_alert_threshold"]; ok && raw != nil {
+			if f, ok := raw.(float64); ok {
+				usage.CreditAlertPct = f
+			}
+		}
+
 		restored++
 	}
 
@@ -714,6 +780,42 @@ func (t *UsageTracker) PersistToDatabase(ctx context.Context) {
 	if t.platformTracker != nil {
 		t.platformTracker.PersistToDatabase(ctx, t.db)
 	}
+}
+
+// SetCredit sets the credit balance for a model. Used when user says "I added $10 credit".
+func (t *UsageTracker) SetCredit(ctx context.Context, modelID string, totalUSD float64) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	usage, exists := t.models[modelID]
+	if !exists {
+		return fmt.Errorf("model %s not registered", modelID)
+	}
+
+	usage.CreditTotal = totalUSD
+	usage.CreditRemaining = totalUSD
+	usage.CreditAlertPct = 0.8
+
+	// If was paused due to credit exhaustion, reactivate
+	if usage.Profile.StatusReason == "credit exhausted" {
+		usage.Profile.Status = "active"
+		usage.Profile.StatusReason = ""
+		log.Printf("[UsageTracker] CREDIT RESTORED: %s — $%.2f, reactivated", modelID, totalUSD)
+	}
+
+	// Persist to DB
+	if t.db != nil {
+		_, err := t.db.RPC(ctx, "set_model_credit", map[string]any{
+			"p_model_id":         modelID,
+			"p_credit_total_usd": totalUSD,
+		})
+		if err != nil {
+			log.Printf("[UsageTracker] Failed to persist credit for %s: %v", modelID, err)
+		}
+	}
+
+	log.Printf("[UsageTracker] CREDIT SET: %s — $%.2f total, $%.2f remaining", modelID, usage.CreditTotal, usage.CreditRemaining)
+	return nil
 }
 
 // GetMinuteRequestCount returns the number of requests made to a model in the current minute window.

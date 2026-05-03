@@ -47,7 +47,8 @@ type Server struct {
 	courierResultFn CourierResultFunc
 	vault      VaultManager
 	adminToken string
-	configDir  string // governor config directory (e.g. governor/config)
+	configDir     string // governor config directory (e.g. governor/config)
+	creditTracker CreditTracker
 }
 
 type DBQuerier interface {
@@ -127,6 +128,15 @@ func (s *Server) SetAdminToken(token string) {
 
 func (s *Server) SetConfigDir(dir string) {
 	s.configDir = dir
+}
+
+// CreditTracker interface — only needs SetCredit for admin API
+type CreditTracker interface {
+	SetCredit(ctx context.Context, modelID string, totalUSD float64) error
+}
+
+func (s *Server) SetCreditTracker(tracker CreditTracker) {
+	s.creditTracker = tracker
 }
 
 func (s *Server) RegisterHandler(eventType string, handler EventHandler) {
@@ -1171,8 +1181,9 @@ func (s *Server) handleAdminModel(w http.ResponseWriter, r *http.Request) {
 		APIKeyName   string   `json:"api_key_name"`
 		APIKeyValue  string   `json:"api_key_value"`
 		CreditInfo   string   `json:"credit_info"`
-		Reason       string   `json:"reason"`        // for bench
+		Reason       string   `json:"reason"`         // for bench
 		AccessVia    []string `json:"access_via"`
+		CreditAmount float64  `json:"credit_amount"`  // for set_credit
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1196,6 +1207,8 @@ func (s *Server) handleAdminModel(w http.ResponseWriter, r *http.Request) {
 		s.handleModelUnbench(ctx, w, &req)
 	case "probe":
 		s.handleModelProbe(ctx, w, &req)
+	case "set_credit":
+		s.handleModelSetCredit(ctx, w, &req)
 	default:
 		http.Error(w, fmt.Sprintf(`{"error":"unknown action: %s"}`, req.Action), http.StatusBadRequest)
 	}
@@ -1215,6 +1228,7 @@ func (s *Server) handleModelAddUpdate(ctx context.Context, w http.ResponseWriter
 	CreditInfo   string   `json:"credit_info"`
 	Reason       string   `json:"reason"`
 	AccessVia    []string `json:"access_via"`
+	CreditAmount float64  `json:"credit_amount"`
 }) {
 	modelID := req.ModelID
 	if modelID == "" {
@@ -1377,6 +1391,7 @@ func (s *Server) handleModelBench(ctx context.Context, w http.ResponseWriter, re
 	CreditInfo   string   `json:"credit_info"`
 	Reason       string   `json:"reason"`
 	AccessVia    []string `json:"access_via"`
+	CreditAmount float64  `json:"credit_amount"`
 }) {
 	reason := req.Reason
 	if reason == "" {
@@ -1437,6 +1452,7 @@ func (s *Server) handleModelUnbench(ctx context.Context, w http.ResponseWriter, 
 	CreditInfo   string   `json:"credit_info"`
 	Reason       string   `json:"reason"`
 	AccessVia    []string `json:"access_via"`
+	CreditAmount float64  `json:"credit_amount"`
 }) {
 	// Update models.json
 	if s.configDir != "" {
@@ -1490,6 +1506,7 @@ func (s *Server) handleModelProbe(ctx context.Context, w http.ResponseWriter, re
 	CreditInfo   string   `json:"credit_info"`
 	Reason       string   `json:"reason"`
 	AccessVia    []string `json:"access_via"`
+	CreditAmount float64  `json:"credit_amount"`
 }) {
 	// Quick probe: send a minimal request via the connector
 	// For now, return model status from DB
@@ -1507,6 +1524,72 @@ func (s *Server) handleModelProbe(ctx context.Context, w http.ResponseWriter, re
 		"model_id": req.ModelID,
 		"action":   "probe",
 		"message":  "probe requested (runs async via CooldownWatcher)",
+	})
+}
+
+func (s *Server) handleModelSetCredit(ctx context.Context, w http.ResponseWriter, req *struct {
+	Action       string   `json:"action"`
+	ModelID      string   `json:"model_id"`
+	Name         string   `json:"name"`
+	Provider     string   `json:"provider"`
+	Tier         string   `json:"tier"`
+	Role         string   `json:"role"`
+	ContextLimit int      `json:"context_limit"`
+	Capabilities []string `json:"capabilities"`
+	APIKeyName   string   `json:"api_key_name"`
+	APIKeyValue  string   `json:"api_key_value"`
+	CreditInfo   string   `json:"credit_info"`
+	Reason       string   `json:"reason"`
+	AccessVia    []string `json:"access_via"`
+	CreditAmount float64  `json:"credit_amount"`
+}) {
+	if req.CreditAmount <= 0 {
+		http.Error(w, `{"error":"credit_amount must be > 0"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Set credit via UsageTracker (persists to DB)
+	if s.creditTracker != nil {
+		if err := s.creditTracker.SetCredit(ctx, req.ModelID, req.CreditAmount); err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%v"}`, err), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Also update models.json credit_info
+	if s.configDir != "" {
+		modelsPath := filepath.Join(s.configDir, "models.json")
+		data, err := os.ReadFile(modelsPath)
+		if err == nil {
+			var modelsFile struct {
+				Models []map[string]interface{} `json:"models"`
+			}
+			if json.Unmarshal(data, &modelsFile) == nil {
+				for _, m := range modelsFile.Models {
+					if m["id"] == req.ModelID {
+						m["credit_info"] = fmt.Sprintf("$%.2f credit", req.CreditAmount)
+						if m["status"] == "paused" {
+							m["status"] = "active"
+							delete(m, "status_reason")
+						}
+						break
+					}
+				}
+				if updated, err := json.MarshalIndent(modelsFile, "", "  "); err == nil {
+					os.WriteFile(modelsPath, updated, 0644)
+				}
+			}
+		}
+	}
+
+	log.Printf("[AdminModel] Credit set: %s = $%.2f", req.ModelID, req.CreditAmount)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":           "ok",
+		"model_id":         req.ModelID,
+		"action":           "credit_set",
+		"credit_total":     req.CreditAmount,
+		"credit_remaining": req.CreditAmount,
+		"message":          fmt.Sprintf("Set $%.2f credit on %s", req.CreditAmount, req.ModelID),
 	})
 }
 
