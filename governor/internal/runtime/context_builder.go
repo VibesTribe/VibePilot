@@ -317,8 +317,9 @@ func (b *ContextBuilder) BuildKBContextPack(ctx context.Context, topic string) s
 			formatFileMapSection(&sb, s.Content)
 		case "system_overview":
 			sb.WriteString("### System Overview\n")
-			sb.WriteString("This is what VibePilot IS and how the system works.\n\n")
-			formatOverviewSection(&sb, s.Content)
+			sb.WriteString("This is what VibePilot IS and how the system works.\n")
+			sb.WriteString("Data below is VERIFIED -- extracted from code, not hand-written docs.\n\n")
+			formatOverviewStruct(&sb, s.Content)
 		}
 	}
 
@@ -440,17 +441,57 @@ func formatRawSection(sb *strings.Builder, raw json.RawMessage) {
 	sb.WriteString("\n")
 }
 
-func formatOverviewSection(sb *strings.Builder, raw json.RawMessage) {
-	var sections []struct {
-		Title   string `json:"title"`
-		Content string `json:"content"`
+func formatOverviewStruct(sb *strings.Builder, raw json.RawMessage) {
+	var overview struct {
+		PipelineStages []struct {
+			Stage       int    `json:"stage"`
+			Description string `json:"description"`
+		} `json:"pipeline_stages"`
+		Agents []struct {
+			Agent       string `json:"agent"`
+			Description string `json:"description"`
+		} `json:"agents"`
+		KeyDecisions []struct {
+			ID        string `json:"id"`
+			Decision  string `json:"decision"`
+		} `json:"key_decisions"`
+		DataFlowPaths int `json:"data_flow_paths"`
+		TotalSymbols  int `json:"total_symbols"`
+		TotalFiles    int `json:"total_files"`
 	}
-	if err := json.Unmarshal(raw, &sections); err != nil {
+	if err := json.Unmarshal(raw, &overview); err != nil {
 		sb.WriteString("  (parse error)\n")
 		return
 	}
-	for _, s := range sections {
-		sb.WriteString(fmt.Sprintf("**%s**\n%s\n\n", s.Title, s.Content))
+
+	sb.WriteString(fmt.Sprintf("**Codebase:** %d files, %d symbols, %d data flow paths\n\n", overview.TotalFiles, overview.TotalSymbols, overview.DataFlowPaths))
+
+	if len(overview.PipelineStages) > 0 {
+		sb.WriteString("**Pipeline (code-verified):**\n")
+		for _, s := range overview.PipelineStages {
+			sb.WriteString(fmt.Sprintf("  %d. %s\n", s.Stage, s.Description))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(overview.Agents) > 0 {
+		sb.WriteString("**Agents:**\n")
+		for _, a := range overview.Agents {
+			desc := a.Description
+			if desc == "" {
+				desc = "(no description)"
+			}
+			sb.WriteString(fmt.Sprintf("  - %s: %s\n", a.Agent, desc))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(overview.KeyDecisions) > 0 {
+		sb.WriteString("**Key Decisions:**\n")
+		for _, d := range overview.KeyDecisions {
+			sb.WriteString(fmt.Sprintf("  - %s: %s\n", d.ID, d.Decision))
+		}
+		sb.WriteString("\n")
 	}
 }
 
