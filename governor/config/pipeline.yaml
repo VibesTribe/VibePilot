@@ -94,13 +94,19 @@ pipeline:
       constant: EventTaskTesting
       source_table: tasks
       source_condition: "status = 'testing'"
-      handler: none (event defined but NO handler registered)
-      handler_file: N/A
-      description: "Task in testing phase. Event fires but goes unhandled."
-      note: "GAP -- test_results events also have no handler. Testing may rely on external triggers."
+      handler: handleTaskTesting
+      handler_file: cmd/governor/handlers_testing.go
+      description: "Runs 3-layer quality gate: artifact validation, semgrep security scan, native tests (Go/Node/Python)."
+      details:
+        layer_1_artifact_validation: "Verifies expected output files exist, non-empty, format-valid (JSON/HTML/YAML/TS)"
+        layer_2_semgrep: "Static analysis with semgrep --config auto, ERROR severity blocks pipeline"
+        layer_3_native_tests: "Auto-detects project type -- go test, npm test, or pytest. Skips if no tests."
+      on_pass: "Records result, feeds model learning, transitions to complete (or human_review for ui_ux tasks)"
+      on_fail: "Records result, excludes failed model, creates tester rule, retries with different model"
       next_events:
-        - task_approved (tests pass)
-        - task_merge_pending (ready to merge)
+        - task_approved (pass → complete)
+        - task_human_review (pass → ui_ux task needs human visual QA)
+        - task_available (fail → retry with different model)
 
     - event: task_approved
       constant: EventTaskApproval
@@ -176,6 +182,12 @@ pipeline:
       handler: handleMaintenanceCommand
       handler_file: cmd/governor/handlers_maint.go
       description: "Dashboard-issued maintenance command (restart, reset, etc.)."
+
+  # ─── DASHBOARD-ONLY EVENTS (SSE feed, no internal handlers needed) ──
+  sse_only_events:
+    - event: test_results
+      constant: EventTestResults
+      description: "Fired when recordTestResult inserts to test_results table. Dashboard shows test pass/fail in timeline. No handler needed -- the testing handler already processed the result."
 
   # ─── DASHBOARD-ONLY TABLES (SSE only, no internal handlers) ──
   sse_only_tables:
