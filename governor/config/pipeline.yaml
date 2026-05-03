@@ -1,0 +1,193 @@
+# VibePilot Event-Driven Pipeline
+# This file documents the ACTUAL pipeline as implemented in code.
+# All events originate from PostgreSQL NOTIFY on the 'vp_changes' channel,
+# routed through pgnotify.Listener -> EventRouter -> handler functions.
+#
+# Source of truth: cmd/governor/handlers_*.go, internal/pgnotify/listener.go
+# This file is a living document -- update when the pipeline changes.
+
+pipeline:
+  name: vibepilot-governor
+  type: event-driven
+  trigger: postgres_notify
+  notify_channel: vp_changes
+  listener: internal/pgnotify/listener.go
+
+  events:
+    # ─── PLAN LIFECYCLE ─────────────────────────────────────────
+    - event: plan_created
+      constant: EventPlanCreated
+      source_table: plans
+      source_condition: "status = 'draft', action = INSERT or UPDATE"
+      handler: handlePlanCreated
+      handler_file: cmd/governor/handlers_plan.go
+      description: "New plan inserted or draft updated. Supervisor reviews the plan."
+      next_events:
+        - plan_review (supervisor approves/rejects)
+        - revision_needed (supervisor sends back for changes)
+
+    - event: plan_review
+      constant: EventPlanReview
+      source_table: plans
+      source_condition: "status = 'review'"
+      handler: handlePlanReview
+      handler_file: cmd/governor/handlers_plan.go
+      description: "Plan marked for review. Supervisor validates and approves."
+      next_events:
+        - plan_approved (supervisor approves)
+        - council_review (routed to council for complex plans)
+        - revision_needed (sent back for changes)
+
+    - event: plan_approved
+      constant: EventPlanApproved
+      source_table: plans
+      source_condition: "status = 'approved'"
+      handler: none (no dedicated handler -- plans handler sets status which triggers task creation)
+      handler_file: N/A
+      description: "Plan approved. Tasks are created from the plan."
+      next_events:
+        - task_available (individual tasks become available)
+
+    - event: council_review
+      constant: EventCouncilReview
+      source_table: plans
+      source_condition: "status = 'council_review'"
+      handler: handleCouncilReview
+      handler_file: cmd/governor/handlers_council.go
+      description: "Complex plan sent to council for multi-model review."
+      next_events:
+        - plan_approved (council approves)
+        - revision_needed (council rejects)
+
+    - event: revision_needed
+      constant: EventRevisionNeeded
+      source_table: plans
+      source_condition: "status = 'revision_needed'"
+      handler: none (recovery only)
+      handler_file: N/A
+      description: "Plan sent back for revision. Awaiting human or agent update."
+
+    # ─── TASK LIFECYCLE ──────────────────────────────────────────
+    - event: task_available
+      constant: EventTaskAvailable
+      source_table: tasks
+      source_condition: "status = 'available' or 'pending' (no processing_by)"
+      handler: handleTaskAvailable
+      handler_file: cmd/governor/handlers_task.go
+      description: "Task ready for execution. Dispatched to model, output recorded."
+      next_events:
+        - task_review (model completes, output ready for review)
+        - courier_result (if using courier agent)
+
+    - event: task_review
+      constant: EventTaskReview
+      source_table: tasks
+      source_condition: "status = 'review'"
+      handler: handleTaskReview
+      handler_file: cmd/governor/handlers_task.go
+      description: "Task output ready for review. Supervisor validates quality."
+      next_events:
+        - task_testing (passes review, sent for testing)
+        - task_human_review (needs human visual QA)
+
+    - event: task_testing
+      constant: EventTaskTesting
+      source_table: tasks
+      source_condition: "status = 'testing'"
+      handler: none (event defined but NO handler registered)
+      handler_file: N/A
+      description: "Task in testing phase. Event fires but goes unhandled."
+      note: "GAP -- test_results events also have no handler. Testing may rely on external triggers."
+      next_events:
+        - task_approved (tests pass)
+        - task_merge_pending (ready to merge)
+
+    - event: task_approved
+      constant: EventTaskApproval
+      source_table: tasks
+      source_condition: "status = 'complete'"
+      handler: handleTaskApproved
+      handler_file: cmd/governor/handlers_maint.go
+      description: "Task approved (tests passed or review accepted)."
+      next_events:
+        - task_merge_pending
+
+    - event: task_merge_pending
+      constant: EventTaskMergePending
+      source_table: tasks
+      source_condition: "status = 'merge_pending'"
+      handler: handleTaskMergePending
+      handler_file: cmd/governor/handlers_maint.go
+      description: "Task ready to merge. Governor merges the git branch."
+      next_events:
+        - task_merged (merge complete)
+
+    - event: task_human_review
+      constant: EventTaskHumanReview
+      source_table: tasks
+      source_condition: "status = 'human_review'"
+      handler: none (awaiting human action)
+      handler_file: N/A
+      description: "Task needs human visual QA before proceeding."
+
+    - event: task_merged
+      constant: EventTaskMerged
+      source_table: tasks
+      source_condition: "status = 'merged'"
+      handler: none (terminal state)
+      handler_file: N/A
+      description: "Task merged to main. Terminal state."
+
+    # ─── COURIER AGENTS ─────────────────────────────────────────
+    - event: courier_result
+      constant: EventCourierResult
+      source_table: task_runs
+      source_condition: "status = 'success' or 'failed'"
+      handler: handleCourierResult (in main.go)
+      handler_file: cmd/governor/main.go
+      description: "Courier agent (GitHub Actions) returned a result."
+      next_events:
+        - task_review (success -- output ready for review)
+
+    # ─── RESEARCH ───────────────────────────────────────────────
+    - event: research_ready
+      constant: EventResearchReady
+      source_table: research_suggestions
+      source_condition: "status = 'ready'"
+      handler: handleResearchReady
+      handler_file: cmd/governor/handlers_research.go
+      description: "Research item ready for processing."
+      next_events:
+        - research_council (complex items routed to council)
+
+    - event: research_council
+      constant: EventResearchCouncil
+      source_table: research_suggestions
+      source_condition: "status = 'council_review'"
+      handler: handleResearchCouncil
+      handler_file: cmd/governor/handlers_research.go
+      description: "Research item needs council review."
+
+    # ─── MAINTENANCE ────────────────────────────────────────────
+    - event: maintenance_command
+      constant: EventMaintenanceCmd
+      source_table: maintenance_commands
+      source_condition: "status = 'pending'"
+      handler: handleMaintenanceCommand
+      handler_file: cmd/governor/handlers_maint.go
+      description: "Dashboard-issued maintenance command (restart, reset, etc.)."
+
+  # ─── DASHBOARD-ONLY TABLES (SSE only, no internal handlers) ──
+  sse_only_tables:
+    - orchestrator_events
+    - models
+    - platforms
+    - exchange_rates
+
+  # ─── RECOVERY ─────────────────────────────────────────────────
+  recovery:
+    file: cmd/governor/recovery.go
+    description: "On startup, scans for stuck plans/tasks in active statuses and re-routes them."
+    recoverable_statuses:
+      plans: "draft, review, council_review, revision_needed, pending_human"
+      tasks: "available, pending, review, testing, merge_pending"

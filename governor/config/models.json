@@ -1377,6 +1377,7 @@
         "reasoning"
       ],
       "context_limit": 128000,
+      "credit_info": "$5.00 credit",
       "id": "deepseek-reasoner",
       "learned": {
         "avg_task_duration_seconds": null,
@@ -1402,7 +1403,7 @@
         "timeout_seconds": 600
       },
       "spacing_min_seconds": 1,
-      "status": "paused",
+      "status": "active",
       "strengths": [
         "reasoning",
         "planning"
