@@ -171,6 +171,75 @@
       },
       "security_level": "execute",
       "implementation": "sandbox"
+    },
+    "kb_search_symbols": {
+      "description": "Search knowledge base for code symbols (functions, types, methods)",
+      "parameters": {
+        "query": {"type": "string", "required": true},
+        "filter_repo": {"type": "string", "required": false},
+        "limit": {"type": "integer", "required": false}
+      },
+      "security_level": "read",
+      "implementation": "kb"
+    },
+    "kb_search_docs": {
+      "description": "Search knowledge base for documentation sections",
+      "parameters": {
+        "query": {"type": "string", "required": true},
+        "filter_repo": {"type": "string", "required": false},
+        "limit": {"type": "integer", "required": false}
+      },
+      "security_level": "read",
+      "implementation": "kb"
+    },
+    "kb_get_callers": {
+      "description": "Find all code locations that call a specific function",
+      "parameters": {
+        "qualified_name": {"type": "string", "required": true}
+      },
+      "security_level": "read",
+      "implementation": "kb"
+    },
+    "kb_get_callees": {
+      "description": "Find all functions called by a specific function",
+      "parameters": {
+        "qualified_name": {"type": "string", "required": true}
+      },
+      "security_level": "read",
+      "implementation": "kb"
+    },
+    "kb_get_blast_radius": {
+      "description": "Trace impact radius of changing a function (callers of callers)",
+      "parameters": {
+        "qualified_name": {"type": "string", "required": true},
+        "max_depth": {"type": "integer", "required": false}
+      },
+      "security_level": "read",
+      "implementation": "kb"
+    },
+    "kb_context_pack": {
+      "description": "Get a topic-oriented context pack from the knowledge base",
+      "parameters": {
+        "query": {"type": "string", "required": true},
+        "repo_id": {"type": "string", "required": false}
+      },
+      "security_level": "read",
+      "implementation": "kb"
+    },
+    "kb_list_decisions": {
+      "description": "List all architecture decision records",
+      "parameters": {},
+      "security_level": "read",
+      "implementation": "kb"
+    },
+    "kb_get_stale_docs": {
+      "description": "Find documentation that may be out of sync with code",
+      "parameters": {
+        "repo_id": {"type": "string", "required": false},
+        "limit": {"type": "integer", "required": false}
+      },
+      "security_level": "read",
+      "implementation": "kb"
     }
   }
 }
