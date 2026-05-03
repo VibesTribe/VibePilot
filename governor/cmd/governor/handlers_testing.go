@@ -292,9 +292,13 @@ func (h *TestingHandler) resolveTestDir(ctx context.Context, branchName string) 
 type projectType string
 
 const (
-	projectGo     projectType = "go"
-	projectNode   projectType = "node"
-	projectPython projectType = "python"
+	projectGo      projectType = "go"
+	projectNode    projectType = "node"
+	projectPython  projectType = "python"
+	projectRust    projectType = "rust"
+	projectRuby    projectType = "ruby"
+	projectJava    projectType = "java"
+	projectDotNet  projectType = "dotnet"
 	projectGeneric projectType = "generic" // no project file, pure output
 )
 
@@ -320,6 +324,30 @@ func detectProjectType(dir string) projectType {
 		}
 		if _, err := os.Stat(filepath.Join(checkDir, "setup.py")); err == nil {
 			return projectPython
+		}
+		if _, err := os.Stat(filepath.Join(checkDir, "Cargo.toml")); err == nil {
+			return projectRust
+		}
+		if _, err := os.Stat(filepath.Join(checkDir, "Gemfile")); err == nil {
+			return projectRuby
+		}
+		if _, err := os.Stat(filepath.Join(checkDir, "pom.xml")); err == nil {
+			return projectJava
+		}
+		if _, err := os.Stat(filepath.Join(checkDir, "build.gradle")); err == nil {
+			return projectJava
+		}
+		if _, err := os.Stat(filepath.Join(checkDir, "build.gradle.kts")); err == nil {
+			return projectJava
+		}
+		// .NET: any *.csproj or *.fsproj file
+		if entries, err := os.ReadDir(checkDir); err == nil {
+			for _, e := range entries {
+				n := e.Name()
+				if strings.HasSuffix(n, ".csproj") || strings.HasSuffix(n, ".fsproj") {
+					return projectDotNet
+				}
+			}
 		}
 	}
 	return projectGeneric
@@ -603,6 +631,14 @@ func (h *TestingHandler) runNativeTests(ctx context.Context, testDir string, pt 
 		return h.runNodeTests(ctx, testDir)
 	case projectPython:
 		return h.runPythonTests(ctx, testDir)
+	case projectRust:
+		return h.runRustTests(ctx, testDir)
+	case projectRuby:
+		return h.runRubyTests(ctx, testDir)
+	case projectJava:
+		return h.runJavaTests(ctx, testDir)
+	case projectDotNet:
+		return h.runDotNetTests(ctx, testDir)
 	default:
 		// No project file detected — pure output task, no native tests
 		return true, "", true
@@ -761,6 +797,188 @@ func (h *TestingHandler) runPythonTests(ctx context.Context, testDir string) (bo
 		return false, output.String(), false
 	}
 	output.WriteString(fmt.Sprintf("pytest: PASS\n%s\n", truncateOutput(outputStr)))
+	return true, output.String(), false
+}
+
+// runRustTests runs cargo test on Rust projects.
+func (h *TestingHandler) runRustTests(ctx context.Context, testDir string) (bool, string, bool) {
+	cargoPath, err := exec.LookPath("cargo")
+	if err != nil {
+		return true, "cargo not found — skipping Rust tests\n", true
+	}
+
+	// Check if there are any test files (any file with #[test] or in tests/ dir)
+	hasTests := false
+	filepath.WalkDir(testDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !d.IsDir() && strings.HasSuffix(d.Name(), ".rs") {
+			if strings.Contains(path, "/tests/") || strings.HasPrefix(d.Name(), "test_") {
+				hasTests = true
+				return filepath.SkipAll
+			}
+		}
+		return nil
+	})
+
+	if !hasTests {
+		// Rust always has at least compilation, run cargo check
+		var output strings.Builder
+		cmd := exec.CommandContext(ctx, cargoPath, "check")
+		cmd.Dir = testDir
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		output.WriteString("Running: cargo check (no test files)\n")
+		if err := cmd.Run(); err != nil {
+			output.WriteString(fmt.Sprintf("cargo check FAILED:\n%s\n", truncateOutput(stderr.String())))
+			return false, output.String(), false
+		}
+		output.WriteString("cargo check: PASS\n")
+		return true, output.String(), true
+	}
+
+	var output strings.Builder
+	cmd := exec.CommandContext(ctx, cargoPath, "test", "--verbose")
+	cmd.Dir = testDir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	output.WriteString("Running: cargo test --verbose\n")
+
+	err = cmd.Run()
+	outputStr := stdout.String()
+	if stderr.Len() > 0 {
+		outputStr += "\n" + stderr.String()
+	}
+	if err != nil {
+		output.WriteString(fmt.Sprintf("cargo test FAILED:\n%s\n", truncateOutput(outputStr)))
+		return false, output.String(), false
+	}
+	output.WriteString(fmt.Sprintf("cargo test: PASS\n%s\n", truncateOutput(outputStr)))
+	return true, output.String(), false
+}
+
+// runRubyTests runs rspec or ruby test on Ruby projects.
+func (h *TestingHandler) runRubyTests(ctx context.Context, testDir string) (bool, string, bool) {
+	// Try bundle exec rspec first, then plain rspec, then ruby
+	rspecPath, rspecErr := exec.LookPath("rspec")
+	rubyPath, rubyErr := exec.LookPath("ruby")
+
+	if rspecErr != nil && rubyErr != nil {
+		return true, "rspec/ruby not found — skipping Ruby tests\n", true
+	}
+
+	// Check for test files
+	hasTests := false
+	filepath.WalkDir(testDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !d.IsDir() && strings.HasSuffix(d.Name(), "_test.rb") || strings.HasSuffix(d.Name(), "_spec.rb") {
+			hasTests = true
+			return filepath.SkipAll
+		}
+		return nil
+	})
+
+	if !hasTests {
+		return true, "No Ruby test files found — skipping\n", true
+	}
+
+	var output strings.Builder
+	var cmd *exec.Cmd
+	if rspecPath != "" {
+		cmd = exec.CommandContext(ctx, rspecPath, "--format", "documentation")
+		output.WriteString("Running: rspec --format documentation\n")
+	} else {
+		cmd = exec.CommandContext(ctx, rubyPath, "-Ilib:test", "-e", "Dir.glob('test/**/*_test.rb').each { |f| require_relative f }")
+		output.WriteString("Running: ruby test runner\n")
+	}
+	cmd.Dir = testDir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	outputStr := stdout.String()
+	if stderr.Len() > 0 {
+		outputStr += "\n" + stderr.String()
+	}
+	if err != nil {
+		output.WriteString(fmt.Sprintf("Ruby tests FAILED:\n%s\n", truncateOutput(outputStr)))
+		return false, output.String(), false
+	}
+	output.WriteString(fmt.Sprintf("Ruby tests: PASS\n%s\n", truncateOutput(outputStr)))
+	return true, output.String(), false
+}
+
+// runJavaTests runs maven or gradle tests on Java/Kotlin projects.
+func (h *TestingHandler) runJavaTests(ctx context.Context, testDir string) (bool, string, bool) {
+	var output strings.Builder
+	var cmd *exec.Cmd
+
+	// Check for maven wrapper, then gradle wrapper, then system maven/gradle
+	if _, err := os.Stat(filepath.Join(testDir, "mvnw")); err == nil {
+		cmd = exec.CommandContext(ctx, "./mvnw", "test")
+		output.WriteString("Running: ./mvnw test\n")
+	} else if _, err := os.Stat(filepath.Join(testDir, "gradlew")); err == nil {
+		cmd = exec.CommandContext(ctx, "./gradlew", "test")
+		output.WriteString("Running: ./gradlew test\n")
+	} else if mvnPath, err := exec.LookPath("mvn"); err == nil {
+		cmd = exec.CommandContext(ctx, mvnPath, "test")
+		output.WriteString("Running: mvn test\n")
+	} else if gradlePath, err := exec.LookPath("gradle"); err == nil {
+		cmd = exec.CommandContext(ctx, gradlePath, "test")
+		output.WriteString("Running: gradle test\n")
+	} else {
+		return true, "maven/gradle not found — skipping Java tests\n", true
+	}
+
+	cmd.Dir = testDir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	outputStr := stdout.String()
+	if stderr.Len() > 0 {
+		outputStr += "\n" + stderr.String()
+	}
+	if err != nil {
+		output.WriteString(fmt.Sprintf("Java tests FAILED:\n%s\n", truncateOutput(outputStr)))
+		return false, output.String(), false
+	}
+	output.WriteString(fmt.Sprintf("Java test: PASS\n%s\n", truncateOutput(outputStr)))
+	return true, output.String(), false
+}
+
+// runDotNetTests runs dotnet test on .NET projects.
+func (h *TestingHandler) runDotNetTests(ctx context.Context, testDir string) (bool, string, bool) {
+	dotnetPath, err := exec.LookPath("dotnet")
+	if err != nil {
+		return true, "dotnet not found — skipping .NET tests\n", true
+	}
+
+	var output strings.Builder
+	cmd := exec.CommandContext(ctx, dotnetPath, "test", "--verbosity", "normal")
+	cmd.Dir = testDir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	output.WriteString("Running: dotnet test --verbosity normal\n")
+
+	err = cmd.Run()
+	outputStr := stdout.String()
+	if stderr.Len() > 0 {
+		outputStr += "\n" + stderr.String()
+	}
+	if err != nil {
+		output.WriteString(fmt.Sprintf("dotnet test FAILED:\n%s\n", truncateOutput(outputStr)))
+		return false, output.String(), false
+	}
+	output.WriteString(fmt.Sprintf("dotnet test: PASS\n%s\n", truncateOutput(outputStr)))
 	return true, output.String(), false
 }
 
