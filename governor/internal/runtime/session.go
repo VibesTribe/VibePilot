@@ -167,6 +167,11 @@ func (f *SessionFactory) buildAgentContext(ctx context.Context, agentID string, 
 		}
 		return extra
 
+	case "kb_pack":
+		// KB context pack: topic-oriented symbols, data flow, docs, decisions, rules
+		// Topic is derived from task type (e.g. "dashboard feature" -> "dashboard")
+		return f.contextBuilder.BuildKBContextPack(ctx, taskType)
+
 	case "council":
 		extra, err := f.contextBuilder.BuildCouncilContext(ctx, taskType)
 		if err != nil {

@@ -256,6 +256,186 @@ func (b *ContextBuilder) BuildPlannerContext(ctx context.Context, projectType st
 	return contextBuilder.String(), nil
 }
 
+// BuildKBContextPack queries the knowledge base for a topic-oriented context pack.
+// Returns compressed context: symbols, data flow, docs, decisions, rules, principles.
+// Used by consultant, council, researcher, and analyst agents who need full system awareness.
+func (b *ContextBuilder) BuildKBContextPack(ctx context.Context, topic string) string {
+	if topic == "" {
+		topic = "governor pipeline model"
+	}
+
+	result, err := b.db.RPC(ctx, "kb_context_pack", map[string]any{
+		"p_query":  topic,
+		"p_repo_id": nil,
+		"p_limit":  30,
+	})
+	if err != nil {
+		return fmt.Sprintf("<!-- KB context pack unavailable: %v -->\n", err)
+	}
+
+	// Result is JSON array of {section, content} rows
+	var sections []struct {
+		Section string          `json:"section"`
+		Content json.RawMessage `json:"content"`
+	}
+	if err := json.Unmarshal(result, &sections); err != nil {
+		return fmt.Sprintf("<!-- KB context pack parse error: %v -->\n", err)
+	}
+
+	var sb strings.Builder
+	sb.WriteString("## Knowledge Base Context\n\n")
+	sb.WriteString(fmt.Sprintf("Topic: %s\n\n", topic))
+
+	for _, s := range sections {
+		if s.Content == nil || string(s.Content) == "null" {
+			continue
+		}
+		switch s.Section {
+		case "symbols":
+			sb.WriteString("### Relevant Symbols\n")
+			formatSymbolSection(&sb, s.Content)
+		case "data_flow":
+			sb.WriteString("### Data Flow\n")
+			formatRawSection(&sb, s.Content)
+		case "docs":
+			sb.WriteString("### Related Documentation\n")
+			formatRawSection(&sb, s.Content)
+		case "decisions":
+			sb.WriteString("### Architecture Decisions\n")
+			formatDecisionSection(&sb, s.Content)
+		case "knowledge":
+			sb.WriteString("### Knowledge Items\n")
+			formatRawSection(&sb, s.Content)
+		case "non_negotiable_rules":
+			sb.WriteString("### NON-NEGOTIABLE RULES\n")
+			formatRuleSection(&sb, s.Content)
+		case "principles":
+			sb.WriteString("### Key Principles\n")
+			formatRawSection(&sb, s.Content)
+		case "repo_map_snippet":
+			sb.WriteString("### File Map\n")
+			formatFileMapSection(&sb, s.Content)
+		}
+	}
+
+	return sb.String()
+}
+
+func formatSymbolSection(sb *strings.Builder, raw json.RawMessage) {
+	var symbols []struct {
+		Name          string `json:"name"`
+		QualifiedName string `json:"qualified_name"`
+		Kind          string `json:"kind"`
+		Summary       string `json:"summary"`
+		File          string `json:"file"`
+		Line          int    `json:"line"`
+	}
+	if err := json.Unmarshal(raw, &symbols); err != nil {
+		sb.WriteString("  (parse error)\n")
+		return
+	}
+	for _, sym := range symbols {
+		if sym.Summary != "" {
+			sb.WriteString(fmt.Sprintf("- %s (%s) at %s:%d — %s\n", sym.Name, sym.Kind, sym.File, sym.Line, sym.Summary))
+		} else {
+			sb.WriteString(fmt.Sprintf("- %s (%s) at %s:%d\n", sym.Name, sym.Kind, sym.File, sym.Line))
+		}
+	}
+	sb.WriteString("\n")
+}
+
+func formatDecisionSection(sb *strings.Builder, raw json.RawMessage) {
+	var decisions []struct {
+		Name     string `json:"name"`
+		Title    string `json:"title"`
+		Summary  string `json:"summary"`
+		Decision string `json:"decision"`
+		Rejected string `json:"rejected"`
+		Date     string `json:"date"`
+	}
+	if err := json.Unmarshal(raw, &decisions); err != nil {
+		sb.WriteString("  (parse error)\n")
+		return
+	}
+	for _, d := range decisions {
+		sb.WriteString(fmt.Sprintf("- **%s** (%s): %s\n", d.Name, d.Date, d.Decision))
+		if d.Rejected != "" {
+			sb.WriteString(fmt.Sprintf("  Rejected: %s\n", d.Rejected))
+		}
+	}
+	sb.WriteString("\n")
+}
+
+func formatRuleSection(sb *strings.Builder, raw json.RawMessage) {
+	var rules []struct {
+		Rule    string `json:"rule"`
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal(raw, &rules); err != nil {
+		sb.WriteString("  (parse error)\n")
+		return
+	}
+	for _, r := range rules {
+		if r.Summary != "" {
+			sb.WriteString(fmt.Sprintf("- **%s**: %s\n", r.Rule, r.Summary))
+		} else {
+			sb.WriteString(fmt.Sprintf("- **%s**\n", r.Rule))
+		}
+	}
+	sb.WriteString("\n")
+}
+
+func formatFileMapSection(sb *strings.Builder, raw json.RawMessage) {
+	var files []struct {
+		File    string `json:"file"`
+		Symbols []struct {
+			Name    string `json:"name"`
+			Kind    string `json:"kind"`
+			Line    int    `json:"line"`
+			Summary string `json:"summary"`
+		} `json:"symbols"`
+	}
+	if err := json.Unmarshal(raw, &files); err != nil {
+		sb.WriteString("  (parse error)\n")
+		return
+	}
+	for _, f := range files {
+		sb.WriteString(fmt.Sprintf("**%s**\n", f.File))
+		for _, sym := range f.Symbols {
+			if sym.Summary != "" {
+				sb.WriteString(fmt.Sprintf("  %s:%d %s (%s) — %s\n", f.File, sym.Line, sym.Name, sym.Kind, sym.Summary))
+			} else {
+				sb.WriteString(fmt.Sprintf("  %s:%d %s (%s)\n", f.File, sym.Line, sym.Name, sym.Kind))
+			}
+		}
+	}
+	sb.WriteString("\n")
+}
+
+func formatRawSection(sb *strings.Builder, raw json.RawMessage) {
+	// Generic fallback: just pretty-print as indented JSON, truncated
+	var items []map[string]any
+	if err := json.Unmarshal(raw, &items); err != nil {
+		sb.WriteString("  (parse error)\n")
+		return
+	}
+	for _, item := range items {
+		parts := []string{}
+		for k, v := range item {
+			if v == nil {
+				continue
+			}
+			s := fmt.Sprintf("%v", v)
+			if len(s) > 100 {
+				s = s[:100] + "..."
+			}
+			parts = append(parts, fmt.Sprintf("%s=%s", k, s))
+		}
+		sb.WriteString(fmt.Sprintf("- %s\n", strings.Join(parts, ", ")))
+	}
+	sb.WriteString("\n")
+}
+
 func (b *ContextBuilder) BuildSupervisorContext(ctx context.Context, taskType string) (string, error) {
 	var contextBuilder strings.Builder
 

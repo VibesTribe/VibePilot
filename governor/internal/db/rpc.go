@@ -179,6 +179,9 @@ var defaultRPCAllowlist = map[string]bool{
 	"archive_project_cost":   true,
 	"list_project_costs":     true,
 	"get_project_cost_summary": true,
+
+	// Knowledge base context pack (for agent orientation)
+	"kb_context_pack": true,
 }
 
 type RPCAllowlist struct {
