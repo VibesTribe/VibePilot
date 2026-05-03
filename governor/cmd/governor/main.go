@@ -343,6 +343,7 @@ func main() {
 	webhookServer.SetDB(database)
 	webhookServer.SetSSEBroker(sseBroker)
 	webhookServer.SetVault(v)
+	webhookServer.SetConfigDir(configDir)
 
 	// Admin token for vault API — read from env var (configurable in system.json).
 	// If not set, vault API endpoints are disabled (403).

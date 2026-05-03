@@ -10,6 +10,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -45,6 +47,7 @@ type Server struct {
 	courierResultFn CourierResultFunc
 	vault      VaultManager
 	adminToken string
+	configDir  string // governor config directory (e.g. governor/config)
 }
 
 type DBQuerier interface {
@@ -122,6 +125,10 @@ func (s *Server) SetAdminToken(token string) {
 	s.adminToken = token
 }
 
+func (s *Server) SetConfigDir(dir string) {
+	s.configDir = dir
+}
+
 func (s *Server) RegisterHandler(eventType string, handler EventHandler) {
 	s.handlers[eventType] = handler
 	log.Printf("[Webhooks] Registered handler for: %s", eventType)
@@ -141,6 +148,8 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/project/history", s.handleProjectHistory)
 	mux.HandleFunc("/api/project/alerts", s.handleProjectAlerts)
 	mux.HandleFunc("/api/project-costs", s.handleProjectCosts)
+	mux.HandleFunc("/api/admin/model", s.handleAdminModel)
+	mux.HandleFunc("/api/admin/models", s.handleAdminModels)
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
@@ -1063,4 +1072,515 @@ func (s *Server) handleProjectCosts(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 	}
+}
+
+// handleAdminModels returns all models from the database (GET /api/admin/models).
+// Used by the admin panel and agent chat to see current model roster.
+func (s *Server) handleAdminModels(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if !s.checkAdminAuth(r) {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+	result, err := s.db.RPC(ctx, "get_models_summary", map[string]interface{}{
+		"p_status": "all",
+	})
+	if err != nil {
+		// Fallback: query models table directly
+		raw, err2 := s.db.Query(ctx, "models", map[string]any{"select": "*"})
+		if err2 != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%v"}`, err), http.StatusInternalServerError)
+			return
+		}
+		w.Write(raw)
+		return
+	}
+	w.Write(result)
+}
+
+// handleAdminModel handles add/update/bench/unbench operations on models.
+//
+// POST /api/admin/model  — Add or update a model
+//   Body: {
+//     "action": "add",
+//     "model_id": "deepseek/deepseek-chat",
+//     "name": "DeepSeek V4",
+//     "provider": "deepseek",
+//     "tier": "paid",           // "free" or "paid"
+//     "role": "backup",         // "primary", "backup", "fallback"
+//     "context_limit": 128000,
+//     "capabilities": ["code", "reasoning"],
+//     "api_key_name": "DEEPSEEK_API_KEY",
+//     "api_key_value": "sk-...",
+//     "credit_info": "$10 credit",
+//     "access_via": ["deepseek-api"]
+//   }
+//
+// POST /api/admin/model  — Bench or unbench
+//   Body: {"action": "bench", "model_id": "...", "reason": "..."}
+//   Body: {"action": "unbench", "model_id": "..."}
+//
+// POST /api/admin/model  — Health probe
+//   Body: {"action": "probe", "model_id": "..."}
+func (s *Server) handleAdminModel(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if !s.checkAdminAuth(r) {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Action       string   `json:"action"`        // add, update, bench, unbench, probe
+		ModelID      string   `json:"model_id"`
+		Name         string   `json:"name"`
+		Provider     string   `json:"provider"`
+		Tier         string   `json:"tier"`          // free or paid
+		Role         string   `json:"role"`          // primary, backup, fallback
+		ContextLimit int      `json:"context_limit"`
+		Capabilities []string `json:"capabilities"`
+		APIKeyName   string   `json:"api_key_name"`
+		APIKeyValue  string   `json:"api_key_value"`
+		CreditInfo   string   `json:"credit_info"`
+		Reason       string   `json:"reason"`        // for bench
+		AccessVia    []string `json:"access_via"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"invalid json: %v"}`, err), http.StatusBadRequest)
+		return
+	}
+
+	if req.ModelID == "" && req.Action != "add" {
+		http.Error(w, `{"error":"model_id required"}`, http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+
+	switch req.Action {
+	case "add", "update":
+		s.handleModelAddUpdate(ctx, w, &req)
+	case "bench":
+		s.handleModelBench(ctx, w, &req)
+	case "unbench":
+		s.handleModelUnbench(ctx, w, &req)
+	case "probe":
+		s.handleModelProbe(ctx, w, &req)
+	default:
+		http.Error(w, fmt.Sprintf(`{"error":"unknown action: %s"}`, req.Action), http.StatusBadRequest)
+	}
+}
+
+func (s *Server) handleModelAddUpdate(ctx context.Context, w http.ResponseWriter, req *struct {
+	Action       string   `json:"action"`
+	ModelID      string   `json:"model_id"`
+	Name         string   `json:"name"`
+	Provider     string   `json:"provider"`
+	Tier         string   `json:"tier"`
+	Role         string   `json:"role"`
+	ContextLimit int      `json:"context_limit"`
+	Capabilities []string `json:"capabilities"`
+	APIKeyName   string   `json:"api_key_name"`
+	APIKeyValue  string   `json:"api_key_value"`
+	CreditInfo   string   `json:"credit_info"`
+	Reason       string   `json:"reason"`
+	AccessVia    []string `json:"access_via"`
+}) {
+	modelID := req.ModelID
+	if modelID == "" {
+		modelID = req.Name // fallback
+	}
+
+	// 1. Store API key in vault if provided
+	if req.APIKeyValue != "" && s.vault != nil {
+		keyName := req.APIKeyName
+		if keyName == "" {
+			// Auto-generate key name from provider
+			keyName = strings.ToUpper(req.Provider) + "_API_KEY"
+		}
+		if err := s.vault.StoreSecret(ctx, keyName, req.APIKeyValue); err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"vault store failed: %v"}`, err), http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[AdminModel] Stored API key %s in vault", keyName)
+	}
+
+	// 2. Update models.json
+	if s.configDir == "" {
+		http.Error(w, `{"error":"config dir not set"}`, http.StatusInternalServerError)
+		return
+	}
+
+	modelsPath := filepath.Join(s.configDir, "models.json")
+	data, err := os.ReadFile(modelsPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"read models.json: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+
+	var modelsFile struct {
+		Models []map[string]interface{} `json:"models"`
+	}
+	if err := json.Unmarshal(data, &modelsFile); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"parse models.json: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+
+	// Build the model entry
+	tier := req.Tier
+	if tier == "" {
+		tier = "free"
+	}
+	contextLimit := req.ContextLimit
+	if contextLimit == 0 {
+		contextLimit = 128000
+	}
+	capabilities := req.Capabilities
+	if len(capabilities) == 0 {
+		capabilities = []string{"code", "reasoning", "instruction"}
+	}
+
+	// Default access_via based on provider
+	accessVia := req.AccessVia
+	if len(accessVia) == 0 {
+		accessVia = []string{req.Provider + "-api"}
+	}
+
+	newModel := map[string]interface{}{
+		"id":            modelID,
+		"name":          req.Name,
+		"provider":      req.Provider,
+		"status":        "active",
+		"context_limit": contextLimit,
+		"capabilities":  capabilities,
+		"access_via":    accessVia,
+		"buffer_pct":    80,
+		"rate_limits": map[string]interface{}{
+			"requests_per_minute": 60,
+			"requests_per_day":    nil,
+			"tokens_per_minute":   nil,
+			"tokens_per_day":      nil,
+		},
+		"tier":        tier,
+		"credit_info": req.CreditInfo,
+	}
+
+	// Find and update or append
+	found := false
+	for i, m := range modelsFile.Models {
+		if m["id"] == modelID {
+			// Preserve existing fields that aren't overridden
+			for k, v := range newModel {
+				modelsFile.Models[i][k] = v
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		modelsFile.Models = append(modelsFile.Models, newModel)
+	}
+
+	updatedData, err := json.MarshalIndent(modelsFile, "", "  ")
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"marshal: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+	if err := os.WriteFile(modelsPath, updatedData, 0644); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"write models.json: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("[AdminModel] %s model %s in models.json", map[bool]string{true: "Updated", false: "Added"}[found], modelID)
+
+	// 3. Add to routing cascade if requested
+	if req.Role != "" {
+		s.addToRoutingCascade(modelID, req.Role)
+	}
+
+	// 4. Sync to database via RPC
+	if s.db != nil {
+		s.db.RPC(ctx, "upsert_model", map[string]interface{}{
+			"p_id":         modelID,
+			"p_name":       req.Name,
+			"p_provider":   req.Provider,
+			"p_status":     "active",
+			"p_tier":       tier,
+			"p_credit_info": req.CreditInfo,
+		})
+	}
+
+	verb := "Added"
+	if found {
+		verb = "Updated"
+	}
+
+	resp := map[string]interface{}{
+		"status":   "ok",
+		"action":   verb,
+		"model_id": modelID,
+		"provider": req.Provider,
+		"tier":     tier,
+		"active":   true,
+		"message":  fmt.Sprintf("%s %s (%s, %s)", verb, modelID, req.Provider, tier),
+	}
+	if req.APIKeyValue != "" {
+		resp["vault_key_stored"] = true
+	}
+	if req.CreditInfo != "" {
+		resp["credit_info"] = req.CreditInfo
+	}
+
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleModelBench(ctx context.Context, w http.ResponseWriter, req *struct {
+	Action       string   `json:"action"`
+	ModelID      string   `json:"model_id"`
+	Name         string   `json:"name"`
+	Provider     string   `json:"provider"`
+	Tier         string   `json:"tier"`
+	Role         string   `json:"role"`
+	ContextLimit int      `json:"context_limit"`
+	Capabilities []string `json:"capabilities"`
+	APIKeyName   string   `json:"api_key_name"`
+	APIKeyValue  string   `json:"api_key_value"`
+	CreditInfo   string   `json:"credit_info"`
+	Reason       string   `json:"reason"`
+	AccessVia    []string `json:"access_via"`
+}) {
+	reason := req.Reason
+	if reason == "" {
+		reason = "benched via admin"
+	}
+
+	// Update models.json
+	if s.configDir != "" {
+		modelsPath := filepath.Join(s.configDir, "models.json")
+		data, err := os.ReadFile(modelsPath)
+		if err == nil {
+			var modelsFile struct {
+				Models []map[string]interface{} `json:"models"`
+			}
+			if json.Unmarshal(data, &modelsFile) == nil {
+				for _, m := range modelsFile.Models {
+					if m["id"] == req.ModelID {
+						m["status"] = "benched"
+						m["status_reason"] = reason
+						break
+					}
+				}
+				if updated, err := json.MarshalIndent(modelsFile, "", "  "); err == nil {
+					os.WriteFile(modelsPath, updated, 0644)
+				}
+			}
+		}
+	}
+
+	// Update DB
+	if s.db != nil {
+		s.db.RPC(ctx, "bench_model", map[string]interface{}{
+			"p_id":     req.ModelID,
+			"p_reason": reason,
+		})
+	}
+
+	log.Printf("[AdminModel] Benched model %s: %s", req.ModelID, reason)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":   "ok",
+		"model_id": req.ModelID,
+		"action":   "benched",
+		"reason":   reason,
+	})
+}
+
+func (s *Server) handleModelUnbench(ctx context.Context, w http.ResponseWriter, req *struct {
+	Action       string   `json:"action"`
+	ModelID      string   `json:"model_id"`
+	Name         string   `json:"name"`
+	Provider     string   `json:"provider"`
+	Tier         string   `json:"tier"`
+	Role         string   `json:"role"`
+	ContextLimit int      `json:"context_limit"`
+	Capabilities []string `json:"capabilities"`
+	APIKeyName   string   `json:"api_key_name"`
+	APIKeyValue  string   `json:"api_key_value"`
+	CreditInfo   string   `json:"credit_info"`
+	Reason       string   `json:"reason"`
+	AccessVia    []string `json:"access_via"`
+}) {
+	// Update models.json
+	if s.configDir != "" {
+		modelsPath := filepath.Join(s.configDir, "models.json")
+		data, err := os.ReadFile(modelsPath)
+		if err == nil {
+			var modelsFile struct {
+				Models []map[string]interface{} `json:"models"`
+			}
+			if json.Unmarshal(data, &modelsFile) == nil {
+				for _, m := range modelsFile.Models {
+					if m["id"] == req.ModelID {
+						m["status"] = "active"
+						delete(m, "status_reason")
+						break
+					}
+				}
+				if updated, err := json.MarshalIndent(modelsFile, "", "  "); err == nil {
+					os.WriteFile(modelsPath, updated, 0644)
+				}
+			}
+		}
+	}
+
+	// Update DB
+	if s.db != nil {
+		s.db.RPC(ctx, "unbench_model", map[string]interface{}{
+			"p_id": req.ModelID,
+		})
+	}
+
+	log.Printf("[AdminModel] Unbenched model %s", req.ModelID)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":   "ok",
+		"model_id": req.ModelID,
+		"action":   "unbenched",
+	})
+}
+
+func (s *Server) handleModelProbe(ctx context.Context, w http.ResponseWriter, req *struct {
+	Action       string   `json:"action"`
+	ModelID      string   `json:"model_id"`
+	Name         string   `json:"name"`
+	Provider     string   `json:"provider"`
+	Tier         string   `json:"tier"`
+	Role         string   `json:"role"`
+	ContextLimit int      `json:"context_limit"`
+	Capabilities []string `json:"capabilities"`
+	APIKeyName   string   `json:"api_key_name"`
+	APIKeyValue  string   `json:"api_key_value"`
+	CreditInfo   string   `json:"credit_info"`
+	Reason       string   `json:"reason"`
+	AccessVia    []string `json:"access_via"`
+}) {
+	// Quick probe: send a minimal request via the connector
+	// For now, return model status from DB
+	if s.db != nil {
+		raw, err := s.db.Query(ctx, "models", map[string]any{
+			"filter": map[string]any{"id": req.ModelID},
+		})
+		if err == nil {
+			w.Write(raw)
+			return
+		}
+	}
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":   "ok",
+		"model_id": req.ModelID,
+		"action":   "probe",
+		"message":  "probe requested (runs async via CooldownWatcher)",
+	})
+}
+
+// addToRoutingCascade inserts a model into the free_cascade priority list in routing.json.
+// Role determines position: "primary" = near front, "backup" = near end, "fallback" = very end.
+func (s *Server) addToRoutingCascade(modelID, role string) {
+	if s.configDir == "" {
+		return
+	}
+
+	routingPath := filepath.Join(s.configDir, "routing.json")
+	data, err := os.ReadFile(routingPath)
+	if err != nil {
+		log.Printf("[AdminModel] Warning: could not read routing.json: %v", err)
+		return
+	}
+
+	var routing map[string]interface{}
+	if err := json.Unmarshal(data, &routing); err != nil {
+		log.Printf("[AdminModel] Warning: could not parse routing.json: %v", err)
+		return
+	}
+
+	strategies, ok := routing["strategies"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	cascade, ok := strategies["free_cascade"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	priority, ok := cascade["priority"].([]interface{})
+	if !ok {
+		return
+	}
+
+	// Check if already in cascade
+	for _, p := range priority {
+		if p == modelID {
+			return // already there
+		}
+	}
+
+	// Insert based on role
+	switch role {
+	case "primary":
+		// Insert after the first Gemini entries (position 4 or so)
+		pos := 4
+		if pos > len(priority) {
+			pos = len(priority)
+		}
+		priority = append(priority[:pos], append([]interface{}{modelID}, priority[pos:]...)...)
+	case "backup":
+		// Insert before the last few fallback entries
+		pos := len(priority) - 2
+		if pos < 0 {
+			pos = len(priority)
+		}
+		priority = append(priority[:pos], append([]interface{}{modelID}, priority[pos:]...)...)
+	case "fallback":
+		priority = append(priority, modelID)
+	default:
+		priority = append(priority, modelID)
+	}
+
+	cascade["priority"] = priority
+
+	updated, err := json.MarshalIndent(routing, "", "  ")
+	if err != nil {
+		return
+	}
+	if err := os.WriteFile(routingPath, updated, 0644); err != nil {
+		log.Printf("[AdminModel] Warning: could not write routing.json: %v", err)
+		return
+	}
+	log.Printf("[AdminModel] Added %s to routing cascade as %s", modelID, role)
 }
