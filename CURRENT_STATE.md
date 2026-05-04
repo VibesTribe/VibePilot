@@ -1,5 +1,5 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-05-02 — KB MCP server converted to streamable-http systemd service
+# AUTO-UPDATED: 2026-05-03 — Hermes gateway restored, dashboard consultant/research channel wired
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 
@@ -35,6 +35,19 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 - **Git:** main branch. Last: 04eb349f (VibePilot), a0ee1fc82 (Vibeflow)
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
 - **Chrome CDP:** 127.0.0.1:9222
+- **Hermes Gateway:** RUNNING (hermes-gateway.service, port 8642, Gemini 2.5 Flash)
+  - Telegram bot: @Vibestribebot (long polling, 100 commands)
+  - API server: localhost:8642 (SSE chat, TTS, admin endpoints)
+  - Tunnel: api.vibestribe.rocks → localhost:8642
+  - Logs: ~/.hermes/logs/agent.log (NOT journalctl)
+  - Config: ~/.hermes/config.yaml (model, auxiliary, platforms, agent system_prompt)
+  - Both channels have full toolsets (terminal, file, web, browser, KB MCP, delegation)
+  - Agent system_prompt includes consultant mode, research workflow, PRD submission workflow
+- **Dashboard Chat:** Voice + text input, TTS audio on voice input only
+  - STT: Chrome Web Speech API (browser-local, free)
+  - TTS: Microsoft Edge-TTS via /api/tts endpoint (free, en-US-AvaNeural, markdown stripped)
+  - Text input = text response only (no audio playback)
+  - Voice input = text response + TTS audio playback
 - **Pipeline tables:** 1 task (merged), 1 plan (review), 65 plans (draft from PRDs), 12 orchestrator_events
 - **System counters:** ~689,120 tokens / ~143 runs lifetime
 - **Cost tracking:** Phase 1-4 complete. Every model touch now records task_run rows with cost data.
@@ -44,6 +57,12 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 1. **Visual UI/UX review** — after visual tester agent has reviewed
 2. **Paid API benched** — out of credit, human decides add credits or keep benched
 3. **Research after council** — council-reviewed suggestions, human gives final yes/no
+
+## Channels to Human
+
+- **Dashboard chat** (vibeflow-dashboard.vercel.app) — voice or text, consultant mode, research requests, PRD submission
+- **Telegram** (@Vibestribebot) — mobile access, quick actions, same capabilities as dashboard
+- **CLI agent** — deep coding, architecture work, debugging (GLM-5.1 via Z.AI)
 
 ## E2E Pipeline Path (verified 2026-04-28, 29 pipeline event call sites)
 
@@ -156,19 +175,25 @@ All 5 courier bugs fixed (Apr 25):
 - Git operations: `governor/internal/gitree/gitree.go` (MergeBranch, MergeBranchToSubdir, DeleteBranch, CommitAndPush)
 - Dashboard: `~/vibeflow/apps/dashboard/` (MissionModals.tsx, useMissionData.ts)
 
-## RECENT COMMITS (Apr 25-29)
+## RECENT COMMITS (Apr 25 - May 3)
 
-1. 670698fd — chore: update migration 132 with record_internal_run RPC (Apr 29)
-2. e22f1e99 — feat: per-task full cost tracking - Phase 2 (Apr 29)
-3. 6d37581f — feat: cost tracking data foundation - Phase 1 (Apr 29)
-4. c323d640 — feat: analyst agent for diagnostic ceiling (Apr 28)
-5. b347f866 — fix: items 2-7 from gap analysis cleanup (Apr 28)
-6. 4a94a00f — fix: supervisor sees everything on branch, multi-strategy parser, one prompt template (Apr 28)
-7. b4cf7f1e — fix: 5 fragilities + E2E test + diagnostic ceiling + web-first routing + transition_task SOT (Apr 28)
+1. 33217425 — feat: activate KB context packs for consultant, supervisor, researcher, analyst (May 1)
+2. 7df4ebae — docs: pipeline.yaml now AUTO-GENERATED from code scanning (May 1)
+3. 46374ba2 — feat: add Rust, Ruby, Java, .NET test runners to quality gate (May 1)
+4. 670698fd — chore: update migration 132 with record_internal_run RPC (Apr 29)
+5. e22f1e99 — feat: per-task full cost tracking - Phase 2 (Apr 29)
+6. 6d37581f — feat: cost tracking data foundation - Phase 1 (Apr 29)
 
 ### Vibeflow Commits
-1. a0ee1fc82 — feat: header alerts banner for subscription/credit threshold warnings - Phase 4 (Apr 29)
-2. 7613e19a7 — feat: cost tracking dashboard overhaul - Phase 3 (Apr 29)
+1. dcebdf7bd — fix: TTS only on voice input, not text. Track input mode (May 3)
+2. d696232ff — fix: hardcoded localhost in 3 dashboard components (May 3)
+3. a0ee1fc82 — feat: header alerts banner for subscription/credit threshold warnings (Apr 29)
+4. 7613e19a7 — feat: cost tracking dashboard overhaul (Apr 29)
+
+### Knowledgebase Commits
+1. 54afd5d — docs: channels and interfaces architecture (May 3)
+2. c935c8b — fix: add doc reindexing to cron pipeline (May 3)
+3. 098d028 — feat: auto-generate pipeline.yaml from code scanning (May 3)
 
 ## Knowledgebase (VibesTribe/knowledgebase — OPERATIONAL)
 
@@ -180,6 +205,7 @@ All 5 courier bugs fixed (Apr 25):
 - **Coverage**: 3 repos indexed (vibepilot, vibeflow, knowledgebase), 755 files tracked
 - **Symbols**: 3,316 code symbols (functions, methods, types, constants) from Go AST + TS/SQL/MD parsers
 - **Edges**: 3,963 code edges (CALLS, IMPORTS, REFERENCES, QUERIES, SERVES) with ~18% qualified_name resolution (known mismatch)
+- **Channels doc**: knowledge/architecture/channels-and-interfaces.md — dashboard, Telegram, CLI, research/PRD workflows
 - **MCP server**: streamable-http on http://127.0.0.1:8901/mcp (18 tools)
   - Systemd user service: `kb-mcp-server.service` (enabled, auto-restart)
   - Health endpoint: http://127.0.0.1:8901/health
@@ -194,9 +220,7 @@ All 5 courier bugs fixed (Apr 25):
 - **Groq**: Free tier
 - **Gemini**: 4x free tier (no billing on any project)
 - **NVIDIA NIM**: Free tier
-- **GLM-5 (Hermes layer)**: Z.AI Pro subscription, EXPIRES APR 30, 2026. $45/3mo grandfathered rate DEAD. New price $200/3mo.
-  - 786.6M tokens consumed over 3 months = $1,439.56 at API rates = 3,099% ROI
-  - Decision needed: Z.AI ($200/3mo) vs DeepSeek V4 Flash (~$51/mo) vs DeepSeek V4 Pro (~$160/mo discounted until May 31)
+- **GLM-5 (Hermes layer)**: Z.AI Pro subscription, renewed May 2026. CLI agent uses GLM-5.1, gateway (dashboard + Telegram) uses Gemini 2.5 Flash.
 - **Total project spend**: ~$135 across all platforms over ~6 months
 - **Total API cost going forward**: $0/month (all free tiers) unless GLM-5 replacement chosen
 
@@ -347,18 +371,19 @@ The perpetual parsing failure problem. Root causes found and fixed:
 The task agent works on ONE task, ONE branch, ONE worktree. `git diff --name-only main..HEAD` = exactly the task output. No pre-filtering needed. The supervisor sees the diff and the original prompt, judges accordingly. This works for code, video, images, research — anything. The model is the quality gate, not regex.
 
 ### Still open
-- Consultant agent not wired into pipeline (separate scope)
-- Research flow DEFERRED — Researcher agent not yet running
+- Consultant agent wired via dashboard chat (May 3) — can research, write PRDs, submit to pipeline
+- Research intake wired via dashboard chat (May 3) — saves to knowledgebase/research/, inserts research_suggestions, triggers EventResearchReady
+- Daily researcher agent not scheduled — research only happens on explicit user request via dashboard/Telegram
 - No auto-discovery of new free models (research agent handles daily checks)
+- Courier result handler (EventCourierResult) not wired — courier runs but governor doesn't process results
 - `get_change_approvals` is a stub — no `change_approvals` table exists yet
 - Bug 10: No explicit terminal state when max retries exceeded in review loop
 - Stale Supabase-era prompts in DB rows (harmless, governor reads filesystem)
 - CooldownWatcher pollInterval hardcoded 2 min
 - managed_repo.go email hardcoded governor@vibepilot.dev
-- **GLM-5 Z.AI subscription expires Apr 30** — decision needed on replacement
-- **Debug console.logs in MissionModals.tsx CAD toggle** — need cleanup next session
-- **ROI calculator math** — user says it needs work, positioning changes pending
-- **task_runs was empty before Phase 2** — new wiring needs E2E proof with real task data
+- Debug console.logs in MissionModals.tsx CAD toggle — need cleanup
+- ROI calculator math — user says it needs work, positioning changes pending
+- task_runs was empty before Phase 2 — new wiring needs E2E proof with real task data
 
 ## Pipeline Data Fixes (deployed 2026-04-28, commit 61b1a3da)
 - **Task packets now stored in task_packets table** — prompt_packet survives result JSONB overwrites during execution
