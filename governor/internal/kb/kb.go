@@ -315,7 +315,7 @@ type SemanticResult struct {
 }
 
 // SearchAllSemantic performs cross-table semantic search using pgvector.
-// The embedding vector must be 768-dimensional (nomic-embed-text).
+// The embedding vector is 2000-dimensional (nvidia/llama-nemotron-embed-vl-1b-v2:free, truncated from 2048).
 func (k *KB) SearchAllSemantic(ctx context.Context, embedding string, limit int, minSimilarity float64) ([]SemanticResult, error) {
 	if limit <= 0 {
 		limit = 30
