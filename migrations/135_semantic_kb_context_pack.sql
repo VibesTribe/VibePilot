@@ -3,6 +3,9 @@
 -- to find semantically similar symbols. No external API needed.
 -- Also adds multi-word keyword splitting for broader matching.
 
+-- Drop old 3-arg version if it exists (from before semantic upgrade)
+DROP FUNCTION IF EXISTS kb_context_pack(text, text, integer);
+
 CREATE OR REPLACE FUNCTION kb_context_pack(
     p_query text,
     p_repo_id text DEFAULT NULL,
