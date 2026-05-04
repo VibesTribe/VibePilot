@@ -224,6 +224,9 @@ func main() {
 
 	// Start CooldownWatcher: probes models coming off cooldown, brings them back or extends
 	cooldownWatcher := runtime.NewCooldownWatcher(usageTracker, sessionFactory, cfg, database)
+	if ms := cfg.GetCooldownPollIntervalMs(); ms > 0 {
+		cooldownWatcher.SetPollInterval(time.Duration(ms) * time.Millisecond)
+	}
 	cooldownWatcher.Start(ctx)
 	_ = cooldownWatcher // runs in background goroutine, stopped by ctx cancel
 

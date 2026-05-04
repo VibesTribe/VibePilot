@@ -210,6 +210,7 @@ type RuntimeConfig struct {
 	MaxRetries             int `json:"max_retries"`
 	RepoSyncIntervalSeconds int `json:"repo_sync_interval_seconds"`
 	EventQueryLimit        int `json:"event_query_limit"`
+	CooldownPollIntervalMs int `json:"cooldown_poll_interval_ms"`
 }
 
 type ConcurrencyConfig struct {
@@ -1065,6 +1066,17 @@ func (c *Config) GetRepoSyncIntervalSeconds() int {
 		return 300 // 5 minutes default
 	}
 	return c.System.Runtime.RepoSyncIntervalSeconds
+}
+
+// GetCooldownPollIntervalMs returns how often CooldownWatcher checks for expired cooldowns.
+// Default 120000ms (2 minutes).
+func (c *Config) GetCooldownPollIntervalMs() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.System == nil || c.System.Runtime.CooldownPollIntervalMs <= 0 {
+		return 120000
+	}
+	return c.System.Runtime.CooldownPollIntervalMs
 }
 
 func (c *Config) GetWebToolsConfig() *WebToolsConfig {

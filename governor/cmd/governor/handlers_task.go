@@ -267,7 +267,8 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	}
 
 	if routingResult == nil {
-		log.Printf("[TaskAvailable] No routing available for task %s after %d attempts", truncateID(taskID), maxRetries)
+		log.Printf("[TaskAvailable] No routing available for task %s after %d attempts — triggering analyst", truncateID(taskID), maxRetries)
+		h.failTask(ctx, taskID, "no_routing_available", "", fmt.Sprintf("exhausted %d routing attempts, failed models: %v", maxRetries, failedModels))
 		return
 	}
 
@@ -980,10 +981,15 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 	}
 
 	if result == nil {
-		log.Printf("[TaskReview] No supervisor available for task %s after %d attempts — releasing lock", truncateID(taskID), maxRetries)
+		log.Printf("[TaskReview] No supervisor available for task %s after %d attempts — triggering analyst", truncateID(taskID), maxRetries)
 		h.database.Update(ctx, "tasks", taskID, map[string]any{
 			"processing_by": nil,
 		})
+		lastModel := ""
+		if len(failedModels) > 0 {
+			lastModel = failedModels[len(failedModels)-1]
+		}
+		h.failTask(ctx, taskID, lastModel, "", fmt.Sprintf("supervisor_exhausted: %d attempts failed, models: %v", maxRetries, failedModels))
 		return
 	}
 
