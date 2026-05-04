@@ -1280,12 +1280,14 @@
         "optimal_cooldown_minutes": null
       },
       "name": "GLM-5 (Z.AI)",
-      "notes": "Subscription via OpenCode. Throttles by slowing down, not hard cutoff.",
+      "notes": "Z.AI Pro free tier until July 2, 2026. Throttles by slowing down, not hard cutoff.",
       "provider": "zhipu",
       "rate_limits": {
+        "requests_per_5_hours": 400,
         "requests_per_day": 200,
         "requests_per_hour": 30,
         "requests_per_minute": 3,
+        "requests_per_week": 2000,
         "tokens_per_day": 500000,
         "tokens_per_minute": 30000
       },
@@ -1304,8 +1306,10 @@
         "tools"
       ],
       "subscription": {
-        "cost_usd": null,
-        "period": "monthly"
+        "cost_usd": 0,
+        "ends_at": "2026-07-02T00:00:00-04:00",
+        "period": "monthly",
+        "status": "active"
       },
       "throttle_behavior": "slow_down",
       "weaknesses": []
