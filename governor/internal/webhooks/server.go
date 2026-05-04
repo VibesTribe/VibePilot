@@ -160,6 +160,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/project-costs", s.handleProjectCosts)
 	mux.HandleFunc("/api/admin/model", s.handleAdminModel)
 	mux.HandleFunc("/api/admin/models", s.handleAdminModels)
+	mux.HandleFunc("/api/chat/usage", s.handleChatUsage)
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
@@ -476,6 +477,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"project_costs", map[string]any{"order": "incurred_at.desc", "limit": 200}},
 		{"subscription_history", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"project_snapshots", map[string]any{"order": "created_at.desc", "limit": 50}},
+		{"chat_usage", map[string]any{"order": "created_at.desc", "limit": 500}},
 	}
 
 	results := make(chan tableResult, len(tables))

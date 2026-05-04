@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/vibepilot/governor/internal/db"
@@ -123,7 +124,23 @@ func handlePlanCreated(
 			return
 		}
 
-		session, err := factory.CreateWithConnector(ctx, "planner", "planning", routingResult.ConnectorID)
+		// Derive topic from PRD path for richer KB context
+		plannerTopic := "planning"
+		if prdPath != "" {
+			// Extract meaningful part: "docs/prd/dashboard_overhaul.md" -> "dashboard overhaul"
+			base := prdPath
+			if idx := strings.LastIndex(base, "/"); idx >= 0 {
+				base = base[idx+1:]
+			}
+			base = strings.TrimSuffix(base, ".md")
+			base = strings.ReplaceAll(base, "_", " ")
+			base = strings.ReplaceAll(base, "-", " ")
+			if base != "" {
+				plannerTopic = base
+			}
+		}
+
+		session, err := factory.CreateWithConnector(ctx, "planner", plannerTopic, routingResult.ConnectorID)
 		if err != nil {
 			log.Printf("[EventPlanCreated] Failed to create planner session: %v", err)
 			setPlanError(ctx, database, planID, "session_failed")

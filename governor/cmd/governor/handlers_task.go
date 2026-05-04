@@ -1384,7 +1384,16 @@ func (h *TaskHandler) runAnalystDiagnosis(ctx context.Context, taskID, lastModel
 		return
 	}
 
-	session, sessErr := h.factory.CreateWithConnector(ctx, "analyst", "diagnosis", routingResult.ConnectorID)
+	// Build a richer topic for KB context from task data
+	analystTopic := getString(task, "title")
+	if cat := getString(task, "category"); cat != "" {
+		analystTopic = cat + " " + analystTopic
+	}
+	if analystTopic == "" {
+		analystTopic = "diagnosis"
+	}
+
+	session, sessErr := h.factory.CreateWithConnector(ctx, "analyst", analystTopic, routingResult.ConnectorID)
 	if sessErr != nil {
 		log.Printf("[Analyst] Session creation failed for %s: %v. Falling back to pending.", truncateID(taskID), sessErr)
 		h.database.RPC(ctx, "transition_task", map[string]any{

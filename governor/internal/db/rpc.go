@@ -182,6 +182,9 @@ var defaultRPCAllowlist = map[string]bool{
 
 	// Knowledge base context pack (for agent orientation)
 	"kb_context_pack": true,
+
+	// Dashboard chat usage (ROI tracking)
+	"record_chat_usage": true,
 }
 
 type RPCAllowlist struct {
