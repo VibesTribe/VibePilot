@@ -249,8 +249,9 @@ RETURNS JSONB AS $$
 DECLARE
   v_result JSONB;
 BEGIN
-  SELECT jsonb_agg(
-    jsonb_build_object(
+  SELECT jsonb_agg(sub) INTO v_result
+  FROM (
+    SELECT jsonb_build_object(
       'model_id', id,
       'model_name', name,
       'subscription_cost_usd', subscription_cost_usd,
@@ -259,13 +260,13 @@ BEGIN
       'days_remaining', EXTRACT(DAY FROM subscription_ends_at - NOW())::INT,
       'tasks_completed', tasks_completed,
       'tokens_used', tokens_used
-    )
-  ) INTO v_result
-  FROM models
-  WHERE subscription_status = 'active'
-  ORDER BY subscription_ends_at ASC;
+    ) AS sub
+    FROM models
+    WHERE subscription_status = 'active'
+    ORDER BY subscription_ends_at ASC
+  ) agg;
   
-  RETURN v_result;
+  RETURN COALESCE(v_result, '[]'::jsonb);
 END;
 $$ LANGUAGE plpgsql;
 
