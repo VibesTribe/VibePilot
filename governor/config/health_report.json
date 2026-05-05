@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-05T05:30:01.651374+00:00",
+  "timestamp": "2026-05-05T10:01:14.893217+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -23,7 +23,7 @@
     },
     "gemini-3.1-flash-lite-preview": {
       "alive": false,
-      "status": "The read operation timed out",
+      "status": "HTTP 503: {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
       "provider": "google"
     },
     "gemini-3-flash-preview": {
@@ -33,7 +33,7 @@
     },
     "gemini-2.5-flash": {
       "alive": true,
-      "status": "rate_limited_but_alive",
+      "status": "ok",
       "provider": "google"
     },
     "qwen/qwen3-next-80b-a3b-instruct:free": {
