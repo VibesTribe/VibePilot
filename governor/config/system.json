@@ -170,7 +170,7 @@
     }
   ],
   "governor_mcp": {
-    "enabled": true,
+    "enabled": false,
     "transport": "sse",
     "port": 8081
   },
@@ -182,5 +182,35 @@
     "path": ".context/map.md",
     "cache_ttl_mins": 60,
     "refresh_on_startup": true
+  },
+  "model_scanner": {
+    "enabled": true,
+    "scan_on_startup": true,
+    "scan_interval_minutes": 720,
+    "health_check_interval_minutes": 30,
+    "request_timeout_seconds": 15,
+    "providers": [
+      {
+        "name": "openrouter",
+        "endpoint": "https://openrouter.ai/api/v1/models",
+        "vault_key": "OPENROUTER_API_KEY",
+        "api_style": "openai",
+        "free_only": true
+      },
+      {
+        "name": "groq",
+        "endpoint": "https://api.groq.com/openai/v1/models",
+        "vault_key": "GROQ_API_KEY",
+        "api_style": "openai",
+        "free_only": false
+      },
+      {
+        "name": "gemini",
+        "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+        "vault_key": "GEMINI_GENERAL_KEY",
+        "api_style": "google",
+        "free_only": false
+      }
+    ]
   }
 }

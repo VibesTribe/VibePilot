@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-05-03T06:00:05Z | Commit: de12cd75 | Branch: main
+# Generated: 2026-05-05T17:25:13Z | Commit: d05baab7 | Branch: 
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -171,7 +171,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Codebase Structure (auto-discovered)
 - governor/cmd/cleanup/ (1 files, 1 funcs, 0 types)
 - governor/cmd/encrypt_secret/ (1 files, 1 funcs, 0 types)
-- governor/cmd/governor/ (17 files, 148 funcs, 15 types)
+- governor/cmd/governor/ (18 files, 158 funcs, 16 types)
 - governor/cmd/migrate_vault/ (1 files, 5 funcs, 1 types)
 - governor/cmd/vault_encrypt/ (1 files, 1 funcs, 0 types)
 - governor/internal/connectors/ (2 files, 28 funcs, 9 types)
@@ -180,15 +180,16 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/db/ (5 files, 52 funcs, 9 types)
 - governor/internal/gitree/ (3 files, 47 funcs, 8 types)
 - governor/internal/hello/ (1 files, 2 funcs, 0 types)
+- governor/internal/kb/ (1 files, 21 funcs, 9 types)
 - governor/internal/maintenance/ (3 files, 31 funcs, 7 types)
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
 - governor/internal/memory/ (2 files, 19 funcs, 5 types)
 - governor/internal/pgnotify/ (1 files, 4 funcs, 3 types)
-- governor/internal/runtime/ (15 files, 262 funcs, 112 types)
+- governor/internal/runtime/ (17 files, 289 funcs, 123 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 20 funcs, 4 types)
-- governor/internal/webhooks/ (3 files, 49 funcs, 12 types)
+- governor/internal/webhooks/ (3 files, 59 funcs, 13 types)
 - governor/pkg/types/ (1 files, 0 funcs, 9 types)
 ## Config: JSON (auto-discovered)
   config/agents.json - Agent configurations. Empty model field = use cascade routing from routing.json free_cascade strategy. context_policy: full_map=entire codebase, file_tree=section headers only, targeted=specific task files only, none=no codebase context.
@@ -222,8 +223,8 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Service Info
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
-- Branch: main
-- Commit: de12cd75
+- Branch: 
+- Commit: d05baab7
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -243,7 +244,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 
 ## Current Status (from CURRENT_STATE.md)
 # VibePilot Current State
-# AUTO-UPDATED: 2026-04-29 — VERIFIED AGAINST CODE AND RUNNING SYSTEM (+ cost tracking overhaul)
+# AUTO-UPDATED: 2026-05-03 — Hermes gateway restored, dashboard consultant/research channel wired
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 ## Three Sources of Truth
@@ -270,5 +271,5 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 670698fd (VibePilot), a0ee1fc82 (Vibeflow)
+- **Git:** main branch. Last: 04eb349f (VibePilot), a0ee1fc82 (Vibeflow)
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)

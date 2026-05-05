@@ -418,6 +418,13 @@ func main() {
 
 	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, configDir, contextBuilder)
 
+	// Start model scanner if configured
+	if cfg.System.ModelScanner != nil && cfg.System.ModelScanner.Enabled {
+		modelScanner := runtime.NewModelScanner(cfg.System.ModelScanner, database, v)
+		modelScanner.StartBackgroundScanner(ctx)
+		log.Println("[ModelScanner] Enabled and started")
+	}
+
 	// Usage state is persisted only on shutdown (no polling).
 	// Dashboard reads model data via realtime subscriptions, not polled tables.
 	// This goroutine waits for shutdown and does one final persist.

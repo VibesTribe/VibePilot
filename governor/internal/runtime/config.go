@@ -35,6 +35,7 @@ type SystemConfig struct {
 	GovernorMCP *GovernorMCPConfig     `json:"governor_mcp,omitempty"`
 	Worktrees   *WorktreeConfig        `json:"worktrees,omitempty"`
 	CodeMap     *CodeMapConfig         `json:"code_map,omitempty"`
+	ModelScanner *ModelScannerConfig  `json:"model_scanner,omitempty"`
 }
 
 // CodeMapConfig configures the code map (jcodemunch) integration.
