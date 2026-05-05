@@ -1,0 +1,229 @@
+# VibePilot Provider Scanner Configuration
+# Per-provider settings for the model scanner
+
+providers:
+  openrouter:
+    enabled: true
+    api_base: "https://openrouter.ai/api/v1"
+    auth_env_var: "OPENROUTER_API_KEY"
+    auth_type: "bearer"
+    
+    # List models endpoint
+    list_endpoint: "/models"
+    list_method: "GET"
+    
+    # Health check endpoint (uses chat completions)
+    health_endpoint: "/chat/completions"
+    health_method: "POST"
+    health_payload:
+      model: "{model_id}"
+      messages:
+        - role: user
+          content: "hi"
+      max_tokens: 5
+    
+    # Default rate limits for free models
+    default_free_limits:
+      requests_per_minute: 20
+      requests_per_day: 200
+    
+    # Model ID patterns that indicate free tier
+    free_indicators:
+      - ":free"
+    
+    # Parse response structure
+    response_format: "openai_compatible"
+    models_path: "data"
+    
+    # Fields to extract
+    field_mapping:
+      id: "id"
+      name: "name"
+      context_length: "context_length"
+      pricing_input: "pricing.prompt"
+      pricing_output: "pricing.completion"
+      architecture: "architecture"
+    
+    # Vendor extraction from model ID
+    vendor_from_id: true  # First part before /
+    
+  google:
+    enabled: true
+    api_base: "https://generativelanguage.googleapis.com/v1beta"
+    auth_env_var: "GEMINI_API_KEY"
+    auth_type: "query_param"  # ?key=XXX
+    auth_param_name: "key"
+    
+    list_endpoint: "/models"
+    list_method: "GET"
+    
+    health_endpoint: "/models/{model_id}:generateContent"
+    health_method: "POST"
+    health_payload:
+      contents:
+        - parts:
+            - text: "hi"
+    
+    default_free_limits:
+      requests_per_minute: 15
+      requests_per_day: 1500
+    
+    # Gemini has 4 keys = 4x free tier
+    key_pooling:
+      enabled: true
+      env_vars:
+        - "GEMINI_API_KEY"
+        - "GEMINI_API_KEY_2"
+        - "GEMINI_API_KEY_3"
+        - "GEMINI_API_KEY_4"
+      per_key_limits:
+        requests_per_minute: 15
+        requests_per_day: 1500
+    
+    response_format: "google"
+    models_path: "models"
+    
+    field_mapping:
+      id: "name"  # needs "models/" prefix stripped
+      name: "displayName"
+      context_length: "inputTokenLimit"
+      methods: "supportedGenerationMethods"
+    
+    skip_patterns:
+      - "embedding"
+      - "aqa"
+    
+    vendor_from_id: false
+    fixed_vendor: "google"
+
+  groq:
+    enabled: true
+    api_base: "https://api.groq.com/openai/v1"
+    auth_env_var: "GROQ_API_KEY"
+    auth_type: "bearer"
+    
+    list_endpoint: "/models"
+    list_method: "GET"
+    
+    health_endpoint: "/chat/completions"
+    health_method: "POST"
+    health_payload:
+      model: "{model_id}"
+      messages:
+        - role: user
+          content: "hi"
+      max_tokens: 5
+    
+    default_free_limits:
+      requests_per_minute: 30
+      requests_per_day: 14400
+    
+    response_format: "openai_compatible"
+    models_path: "data"
+    
+    field_mapping:
+      id: "id"
+      name: "id"
+    
+    vendor_from_id: false
+    fixed_vendor: "groq"
+
+  nvidia:
+    enabled: false  # RE-ENABLE after testing
+    api_base: "https://integrate.api.nvidia.com/v1"
+    auth_env_var: "NVIDIA_API_KEY"
+    auth_type: "bearer"
+    
+    list_endpoint: "/models"
+    list_method: "GET"
+    
+    health_endpoint: "/chat/completions"
+    health_method: "POST"
+    health_payload:
+      model: "{model_id}"
+      messages:
+        - role: user
+          content: "hi"
+      max_tokens: 5
+      temperature: 0.1
+    
+    default_free_limits:
+      requests_per_minute: 10
+      requests_per_day: 1000
+    
+    response_format: "openai_compatible"
+    models_path: "data"
+    
+    field_mapping:
+      id: "id"
+      name: "id"
+      context_length: "context_length"
+    
+    vendor_from_id: true
+    
+    # Known model IDs on NVIDIA (for initial seeding)
+    known_models:
+      - "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+      - "nvidia/nemotron-3-super-120b-a12b"
+      - "nvidia/nemotron-3-nano-30b-a3b"
+      - "nvidia/nemotron-nano-12b-v2-vl"
+      - "nvidia/nemotron-nano-9b-v2"
+
+  deepseek:
+    enabled: false  # RE-ENABLE after testing
+    api_base: "https://api.deepseek.com/v1"
+    auth_env_var: "DEEPSEEK_API_KEY"
+    auth_type: "bearer"
+    
+    list_endpoint: "/models"
+    list_method: "GET"
+    
+    health_endpoint: "/chat/completions"
+    health_method: "POST"
+    health_payload:
+      model: "{model_id}"
+      messages:
+        - role: user
+          content: "hi"
+      max_tokens: 5
+    
+    # DeepSeek has rate limits but no public docs on exact limits
+    default_free_limits:
+      requests_per_minute: 10
+      requests_per_day: 500
+    
+    response_format: "openai_compatible"
+    models_path: "data"
+    
+    field_mapping:
+      id: "id"
+      name: "id"
+      context_length: null  # DeepSeek doesn't return this
+    
+    vendor_from_id: false
+    fixed_vendor: "deepseek"
+    
+    # Known DeepSeek models
+    known_models:
+      - "deepseek-chat"
+      - "deepseek-reasoner"
+      - "deepseek-v3"
+      - "deepseek-r1"
+
+# Health check scheduling per provider
+health_schedule:
+  openrouter:
+    interval_minutes: 30
+    batch_size: 10
+  google:
+    interval_minutes: 20
+    batch_size: 5
+  groq:
+    interval_minutes: 30
+    batch_size: 5
+  nvidia:
+    interval_minutes: 60
+    batch_size: 3
+  deepseek:
+    interval_minutes: 60
+    batch_size: 3
