@@ -75,10 +75,6 @@ func (h *GitHubWebhookHandler) checkAndCreatePRD(ctx context.Context, file, repo
 		return
 	}
 
-	if strings.Contains(file, "/processed/") {
-		return
-	}
-
 	exists, err := h.prdExists(ctx, file)
 	if err != nil {
 		log.Printf("[GitHub Webhooks] Error checking PRD existence: %v", err)

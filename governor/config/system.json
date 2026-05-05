@@ -170,7 +170,7 @@
     }
   ],
   "governor_mcp": {
-    "enabled": false,
+    "enabled": true,
     "transport": "sse",
     "port": 8081
   },
