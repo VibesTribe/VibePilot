@@ -129,7 +129,7 @@ providers:
     fixed_vendor: "groq"
 
   nvidia:
-    enabled: false  # RE-ENABLE after testing
+    enabled: true  # RE-ENABLE after testing
     api_base: "https://integrate.api.nvidia.com/v1"
     auth_env_var: "NVIDIA_API_KEY"
     auth_type: "bearer"

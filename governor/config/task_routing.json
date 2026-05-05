@@ -1,0 +1,195 @@
+{
+  "$schema": "./schemas/task_routing.schema.json",
+  "version": "1.0",
+  "description": "Task-aware model routing rules. Drives which models are considered for each task type. Not hardcoded anywhere in code.",
+
+  "task_types": {
+    "coding": {
+      "description": "Code generation, editing, review, debugging",
+      "require_capabilities": ["code"],
+      "avoid_patterns": [
+        "nemotron",
+        "llama-instruct"
+      ],
+      "min_params_billion": 7,
+      "prefer_capabilities": ["reasoning", "instruction"]
+    },
+    "analysis": {
+      "description": "Research, analysis, summarization, planning",
+      "require_capabilities": ["reasoning"],
+      "avoid_patterns": [],
+      "min_params_billion": 7,
+      "prefer_capabilities": ["instruction"]
+    },
+    "embedding": {
+      "description": "Text embeddings for semantic search and similarity",
+      "require_capabilities": ["embedding"],
+      "avoid_patterns": [],
+      "min_params_billion": 0
+    },
+    "image_generation": {
+      "description": "Image creation and editing",
+      "require_capabilities": ["image"],
+      "avoid_patterns": [],
+      "min_params_billion": 0
+    },
+    "image_analysis": {
+      "description": "Image understanding, visual QA, OCR",
+      "require_capabilities": ["vision"],
+      "avoid_patterns": [],
+      "min_params_billion": 3
+    },
+    "tts": {
+      "description": "Text to speech synthesis",
+      "require_capabilities": ["tts"],
+      "avoid_patterns": [],
+      "min_params_billion": 0
+    },
+    "stt": {
+      "description": "Speech to text transcription",
+      "require_capabilities": ["stt"],
+      "avoid_patterns": [],
+      "min_params_billion": 0
+    },
+    "research": {
+      "description": "Web research with citations",
+      "require_capabilities": ["reasoning", "instruction"],
+      "avoid_patterns": [],
+      "min_params_billion": 7
+    },
+    "general": {
+      "description": "General purpose chat, any capable model",
+      "require_capabilities": ["instruction"],
+      "avoid_patterns": [],
+      "min_params_billion": 3
+    }
+  },
+
+  "capability_detection": {
+    "description": "Auto-detect model capabilities from model metadata. Keywords and patterns that indicate each capability.",
+    "rules": [
+      {
+        "capability": "code",
+        "detect_patterns": ["codellama", "code-", "codestral", "coder", "deepseek-coder", "qwen.*coder", "starcoder"],
+        "assume_for_families": ["gpt-4", "gpt-oss", "claude", "gemini-flash", "gemini-pro", "llama-3.3-70b", "llama-4", "glm", "compound"],
+        "notes": "Most modern 70B+ models can code even without 'code' in name"
+      },
+      {
+        "capability": "reasoning",
+        "detect_patterns": ["reasoner", "r1", "thinking", "pro-preview", "o1", "o3", "qwen3", "qwen-3"],
+        "assume_for_families": ["gemini-flash", "gemini-pro", "gpt-4", "gpt-oss", "claude", "glm", "compound", "llama-3.3-70b", "llama-4"],
+        "notes": "70B+ models generally have reasoning"
+      },
+      {
+        "capability": "instruction",
+        "detect_patterns": ["-it$", "instruct", "chat", "turbo", "flash-lite"],
+        "assume_for_families": ["gemini", "gpt", "claude", "llama", "qwen", "mistral", "deepseek", "glm", "kimi", "compound"],
+        "notes": "Almost all chat/text models support instruction following"
+      },
+      {
+        "capability": "embedding",
+        "detect_patterns": ["embed", "embedding", "e5-", "bge-", "text-embedding"],
+        "assume_for_families": [],
+        "notes": "Dedicated embedding models only"
+      },
+      {
+        "capability": "vision",
+        "detect_patterns": ["vision", "vl$", "vqa", "pixtral", "gemma-.*-it", "-vl-", "multimodal"],
+        "assume_for_families": ["gemini-flash", "gemini-pro", "gpt-4o", "claude-3", "llama-4"],
+        "notes": "Multimodal models can process images"
+      },
+      {
+        "capability": "image",
+        "detect_patterns": ["dall-e", "stable-diffusion", "imagen", "flux", "sdxl", "image-gen"],
+        "assume_for_families": [],
+        "notes": "Dedicated image generation models only"
+      },
+      {
+        "capability": "tts",
+        "detect_patterns": ["tts", "speech", "audio-gen"],
+        "assume_for_families": [],
+        "notes": "Text-to-speech models"
+      },
+      {
+        "capability": "stt",
+        "detect_patterns": ["whisper", "asr", "speech-to-text", "transcri"],
+        "assume_for_families": [],
+        "notes": "Speech-to-text models"
+      }
+    ],
+    "always_exclude": {
+      "description": "Patterns that indicate non-text models to tag but never use for text tasks",
+      "non_text_patterns": [
+        "embedding", "embed-", "image-gen", "tts", "speech", "asr",
+        "whisper", "dall-e", "stable-diffusion", "flux", "sdxl",
+        "aqa", "robotics", "depth", "segment"
+      ]
+    }
+  },
+
+  "provider_rate_limit_scope": {
+    "description": "How rate limits apply per provider. Critical for not exceeding limits.",
+    "providers": {
+      "google": {
+        "scope": "per_key",
+        "keys": ["GEMINI_COURIER_KEY", "GEMINI_RESEARCHER_KEY", "GEMINI_VISUAL_TESTER_KEY", "GEMINI_GENERAL_KEY"],
+        "notes": "4 separate projects, 4x free tier. Each key gets its own RPM/RPD limit. Rotation across keys is essential for throughput.",
+        "free_tier": {
+          "flash_rpm": 15,
+          "flash_rpd": 1500,
+          "flash_tpm": 1000000,
+          "pro_rpm": 5,
+          "pro_rpd": 25,
+          "pro_tpm": 250000
+        }
+      },
+      "groq": {
+        "scope": "org",
+        "notes": "SHARED across ALL models. 100K tokens/day and 14.4K requests/day for the entire org, not per model.",
+        "free_tier": {
+          "total_tokens_per_day": 100000,
+          "total_requests_per_day": 14400
+        }
+      },
+      "openrouter": {
+        "scope": "per_model",
+        "notes": "Per-model RPM. Account-level RPD depends on funding. We are UNFUNDED (no credit, free models only).",
+        "free_tier": {
+          "rpm_per_model": 20,
+          "rpd_unfunded": 200,
+          "rpd_funded": 1000,
+          "our_funding": "unfunded",
+          "always_free_suffix": ":free"
+        }
+      },
+      "nvidia": {
+        "scope": "account",
+        "notes": "Free tier with credits that refresh. Need to monitor credit balance. Models can be added/removed by NVIDIA.",
+        "free_tier": {
+          "requests_per_day": 5000,
+          "tokens_per_day": 200000,
+          "credit_monitoring": true,
+          "free_access_can_expire": true
+        }
+      },
+      "deepseek": {
+        "scope": "account",
+        "notes": "Currently OUT OF CREDIT. Mark as inactive.",
+        "free_tier": {
+          "status": "no_credit"
+        }
+      }
+    }
+  },
+
+  "discovery": {
+    "description": "Settings for auto-discovering new free models from providers.",
+    "auto_add_new_free": false,
+    "auto_add_note": "New free models are detected and reported but NOT auto-added to routing. They need explicit approval (research suggestion -> human review or council).",
+    "report_new_as": "research_suggestion",
+    "scan_schedule": "on_startup_and_12h",
+    "providers_to_scan": ["google", "groq", "openrouter", "nvidia"],
+    "health_check_on_discover": true,
+    "persist_to_db": true
+  }
+}
