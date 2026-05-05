@@ -2889,5 +2889,6 @@
         "openrouter_rate_limits"
       ]
     }
-  ]
+  ],
+  "last_health_check": "2026-05-05T05:30:01.651374+00:00"
 }

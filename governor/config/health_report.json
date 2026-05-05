@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-03T18:49:44.357213+00:00",
+  "timestamp": "2026-05-05T05:30:01.651374+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,7 +11,7 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 371,
+      "models": 372,
       "free": 33
     }
   },
@@ -22,8 +22,8 @@
       "provider": "google"
     },
     "gemini-3.1-flash-lite-preview": {
-      "alive": true,
-      "status": "ok",
+      "alive": false,
+      "status": "The read operation timed out",
       "provider": "google"
     },
     "gemini-3-flash-preview": {
@@ -33,7 +33,7 @@
     },
     "gemini-2.5-flash": {
       "alive": true,
-      "status": "ok",
+      "status": "rate_limited_but_alive",
       "provider": "google"
     },
     "qwen/qwen3-next-80b-a3b-instruct:free": {
@@ -158,6 +158,11 @@
       "cooldown_state": "ready"
     },
     "deepseek-r1": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "deepseek-reasoner": {
       "status": "active",
       "cooldown_until": "none",
       "cooldown_state": "ready"
