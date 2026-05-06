@@ -677,9 +677,9 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
-      "status": "active"
+      "status": "benched"
     },
     {
       "id": "google/gemma-3-27b-it",
