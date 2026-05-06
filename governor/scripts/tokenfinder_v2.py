@@ -452,19 +452,47 @@ def main():
                    "total": len(snapshot), "models": snapshot}, f, indent=2)
     print(f"  Wrote {len(snapshot)} models to governor/config/models_live.json")
 
-    # Also write governor-compatible models.json so the Go router picks up live data
+    go_models = []
+    
+    # Query models table for existing status overrides
+    existing_status = {}
+    try:
+        r = subprocess.run(["psql", "-d", "vibepilot", "-t", "-A", "-F", "|",
+            "-c", "SELECT id, status, status_reason FROM models WHERE status != 'active';"],
+            capture_output=True, text=True, timeout=5)
+        for line in r.stdout.strip().split('\n'):
+            if not line.strip():
+                continue
+            parts = line.split('|')
+            if len(parts) >= 2:
+                existing_status[parts[0]] = {"status": parts[1], "reason": parts[2] if len(parts) >= 3 else ""}
+    except:
+        pass
+    
+    # Map short provider names to actual connector IDs
     provider_to_connector = {
         "openrouter": ["openrouter-api"],
         "groq": ["groq-api"],
         "nvidia": ["nvidia-api"],
-        "gemini": ["gemini-api-general"],
         "google": ["gemini-api-general"],
+        "gemini": ["gemini-api-general"],
     }
-    go_models = []
+    
     for m in snapshot:
-        access_via = m.get("connector_ids", [])
+        # Map connector_ids to actual connector IDs
+        raw_ids = m.get("connector_ids", [])
+        access_via = []
+        for cid in raw_ids:
+            mapped = provider_to_connector.get(cid, [cid + "-api" if not cid.endswith("-api") else cid])
+            access_via.extend(mapped if isinstance(mapped, list) else [mapped])
         if not access_via:
             access_via = provider_to_connector.get(m["provider"], [m["provider"] + "-api"])
+        
+        # Preserve status from models table if available (e.g., bench/cooldown)
+        model_status = "active"
+        if m["id"] in existing_status:
+            model_status = existing_status[m["id"]]["status"]
+        
         go_models.append({
             "id": m["id"],
             "name": m["name"],
@@ -472,7 +500,7 @@ def main():
             "context_limit": m["context_length"],
             "capabilities": m["capabilities"],
             "access_via": access_via,
-            "status": "active",
+            "status": model_status,
         })
 
     # Rename old models.json to .legacy, write new one

@@ -1,88 +1,18 @@
 # Model Routing System
 
 **Status:** Active documentation
-**Last updated:** 2026-05-06
+**Last updated:** 2026-05-05
 **Scope:** How VibePilot selects models and connectors for task execution
 
 ---
 
 ## Overview
 
-When a task needs to be executed, the governor must decide: which model, on which connector, and is it available right now? This system spans live DB data, 3 config files, 4 Go modules, and an auto-discovery scanner that keeps everything current.
+When a task needs to be executed, the governor must decide: which model, on which connector, and is it available right now? This system spans 3 config files, 4 Go modules, and makes decisions in under 100ms.
 
 ---
 
-## The Data Sources (Live vs Static)
-
-### models.json (Live, auto-generated)
-
-Location: governor/config/models.json
-
-This file is now **auto-generated every 30 minutes** by TokenFinder v2 (governor/scripts/tokenfinder_v2.py). It reads from the `model_catalog` PostgreSQL table which contains verified free models from 4 providers.
-
-Each model has:
-- id: matches what the provider API expects (e.g. "gemini-2.5-flash-lite", "groq/llama-3.3-70b-versatile")
-- access_via: which connectors can reach this model (mapped from provider: openrouter→openrouter-api, etc.)
-- context_limit: max tokens the model can handle
-- capabilities: code, reasoning, instruction, vision, embedding, text
-- status: "active" or "benched"
-
-The old static models.json has been renamed to models.json.legacy for reference.
-
-### model_catalog (Source of Truth)
-
-Location: PostgreSQL table `model_catalog`
-
-This is the live source. Updated every 30 min by TokenFinder. Contains:
-- 194 verified free models across OpenRouter, Groq, NVIDIA, Gemini
-- Standard API pricing for ROI calculator (pricing_input/pricing_output)
-- Rate limits with scope info (per_key, org, account, per_model+account)
-- Capability tags using task_routing.json detection rules
-- Cooldown state (GLM 5.1 benched until May 8)
-
-### models_live.json (Human-readable snapshot)
-
-Location: governor/config/models_live.json
-
-Same data as model_catalog but in a human-readable JSON format with pricing and rate limits.
-
-### connectors.json (Static, manual)
-
-Location: governor/config/connectors.json
-
-Defines every API endpoint, CLI tool, and web platform we can use. Still manually managed because connectors change rarely.
-
-### routing.json (Live cascade, semi-auto)
-
-Location: governor/config/routing.json
-
-The free_cascade strategy is updated to match live model IDs. Currently manually maintained but designed to be auto-generated.
-
-### Task Routing Rules (Config-driven)
-
-Location: governor/config/task_routing.json
-
-Maps task types (coding, analysis, embedding, image_generation, research, general) to required capabilities. Governs which models the router considers for each task type.
-
----
-
-## Auto-Discovery: TokenFinder v2
-
-Every 30 minutes, TokenFinder v2:
-
-1. Scans OpenRouter (29 free models), Groq (12), NVIDIA (134), Gemini (26)
-2. Tags capabilities using task_routing.json rules (code, reasoning, instruction, vision, embedding)
-3. Stores standard API pricing for ROI calculations
-4. Stores rate limits with scope information
-5. Benchmarks old models not found in latest scan
-6. Writes models.json for the governor
-7. Pushes all changes to GitHub
-
-This means models are never more than 30 minutes stale. New free models from OpenRouter are discovered within 30 minutes of appearing.
-
----
-
-## The Three Config Files (Legacy Reference)
+## The Three Config Files
 
 ### 1. connectors.json (Where we can reach models)
 
@@ -90,7 +20,7 @@ Location: governor/config/connectors.json
 Purpose: Defines every API endpoint, CLI tool, and web platform we can use
 
 Each connector has:
-- id: unique identifier (e.g. "gemini-api-general", "groq-api", "nvidia-api", "openrouter-api")
+- id: unique identifier (e.g. "gemini-api-courier", "groq-api", "hermes")
 - type: "api" (HTTP endpoint), "cli" (local command), or "web" (browser platform)
 - status: "active", "inactive", or "disabled"
 - models_available: which models this connector can access
@@ -98,34 +28,42 @@ Each connector has:
 - api_key_ref: which vault key to use (for API connectors)
 - provides_tools: what capabilities the connector offers (read, write, bash, etc)
 
-### 2. routing.json (How we pick)
+Key distinction: Connectors are DESTINATIONS. A model might be available on multiple connectors (e.g. gemini-2.5-flash is on 4 Gemini API connectors with different keys).
+
+### 2. models.json (What models we know about)
+
+Location: governor/config/models.json
+Purpose: Profiles every model with its capabilities, limits, costs, and learned data
+
+Each model has:
+- id: matches what the provider API expects (e.g. "gemini-2.5-flash-lite")
+- access_via: which connectors can reach this model
+- context_limit: max tokens the model can handle
+- rate_limits: model-specific limits (may differ from connector limits)
+- api_pricing: cost per million tokens (0 for free)
+- learned: performance data (avg duration, failure rates, best task types)
+- status: "active", "benched", "inactive"
+
+The "learned" field is populated by the governor over time. It tracks which models perform best for which task types. This data feeds into routing decisions.
+
+### 3. routing.json (How we pick)
 
 Location: governor/config/routing.json
 Purpose: Defines routing strategies and agent restrictions
 
 Key section: strategies.free_cascade
-- Ordered list of 15 models in priority order (updated for live data)
+- Ordered list of 19 models in priority order
 - Router tries them in order, skipping any that are in cooldown
 - Round-robin rotation distributes load across models
 
 Agent restrictions:
-- internal_only: planner, supervisor, council, orchestrator, maintenance, watcher, tester
-- default: consultant, researcher, courier, task_runner
+- internal_only: planner, supervisor, council, orchestrator, maintenance, watcher, tester (never use web platforms)
+- default: consultant, researcher, courier, task_runner (can use web or internal)
 
-### 3. task_routing.json (What capabilities each task needs)
-
-Location: governor/config/task_routing.json
-Purpose: Maps task types to required model capabilities
-
-Task types:
-- coding → requires "code" capability
-- analysis → requires "reasoning"
-- embedding → requires "embedding"
-- image_analysis → requires "vision"
-- research → requires "reasoning" + "instruction"
-- general → requires "instruction"
-
-Capability detection uses regex patterns AND family assumptions (e.g., all gemini-flash models get code+reasoning automatically).
+Selection criteria:
+- status: "active" (skip inactive/benched)
+- not_at_limit: respect rate limits
+- prefer_learned_best: use learned scores to prefer proven models
 
 ---
 
@@ -262,14 +200,25 @@ Use pinned model              Try cascade (19 models)
 
 ---
 
-## What's Now Fixed (Previously Known Gaps)
+## What's Missing (Known Gaps)
 
-| Gap | Status | How |
-|-----|--------|-----|
-| No scanner verifies models on provider APIs | **FIXED** | TokenFinder v2 scans all 4 providers every 30 min |
-| No session-start health check | **FIXED** | TokenFinder runs on startup + every 30 min via cron |
-| No auto-update mechanism for config | **FIXED** | TokenFinder auto-generates models.json + pushes to GitHub |
-| No documentation of this system | **FIXED** | This document |
+1. No scanner verifies models still exist on provider APIs
+   - models.json was last manually curated April 30
+   - Models could have been removed and we'd only discover on task failure
+
+2. No session-start health check
+   - CooldownWatcher probes on 2-min intervals but doesn't do full availability scan
+   - A model could be gone for hours before cooldown cycle catches it
+
+3. No auto-update mechanism for config
+   - New free models appear on OpenRouter regularly
+   - Requires manual JSON editing to add them
+
+4. No documentation of this system (until now)
+   - Multiple people have asked "how does model selection work"
+   - Knowledge was tribal, spread across config files and Go code
+
+These gaps are addressed by the KB Intelligence Strategic Plan v2, Phase 1.
 
 ---
 
@@ -277,45 +226,40 @@ Use pinned model              Try cascade (19 models)
 
 | File | Path | Purpose |
 |------|------|---------|
-| model_catalog | PostgreSQL table | Live source of truth, 194 verified free models |
-| models.json | governor/config/models.json | Auto-generated from model_catalog every 30 min |
-| models.json.legacy | governor/config/models.json.legacy | Original static config (preserved for reference) |
-| models_live.json | governor/config/models_live.json | Human-readable snapshot with pricing |
 | connectors.json | governor/config/connectors.json | Where we reach models |
-| routing.json | governor/config/routing.json | How we pick models (cascade) |
-| task_routing.json | governor/config/task_routing.json | Task-to-capability mapping |
+| models.json | governor/config/models.json | What models we know |
+| routing.json | governor/config/routing.json | How we pick models |
 | agents.json | governor/config/agents.json | Agent definitions + model pins |
 | system.json | governor/config/system.json | Global settings |
-| tokenfinder_v2.py | governor/scripts/tokenfinder_v2.py | Auto-discovery scanner |
+
+Note: CONFIG lives in governor/config/ (set by GOVERNOR_CONFIG_DIR env var). The config/ directory at repo root is a copy and may be stale.
 
 ---
 
-## Quick Reference: How Models Stay Current
+## Quick Reference: Adding a New Model
 
-Nothing to do manually. TokenFinder runs every 30 min:
+1. Add connector entry in connectors.json (if new provider)
+2. Add model profile in models.json with access_via pointing to connector
+3. Add model ID to routing.json free_cascade (in priority position)
+4. Restart governor: systemctl --user restart vibepilot-governor
+5. Verify: check governor logs for "[Router] Cascade routing" showing new model
+
+## Quick Reference: Removing a Model
+
+1. Set status: "inactive" in models.json (don't delete, keep for history)
+2. Remove from routing.json free_cascade
+3. Restart governor
+4. Alternatively: set status: "benched" to keep it discoverable but unused
+
+## Quick Reference: Checking Model Health
 
 ```bash
-# Check scan results
-psql -d vibepilot -c "SELECT * FROM provider_scan_state ORDER BY last_scan_at DESC;"
-
-# View active models
-psql -d vibepilot -c "SELECT provider, COUNT(*) FROM model_catalog WHERE status = 'active' GROUP BY provider;"
-
-# Check governor routing logs
+# Governor logs showing routing decisions
 journalctl --user -u vibepilot-governor --since "1 hour ago" | grep "\[Router\]"
 
-# Check cooldowns
-psql -d vibepilot -c "SELECT id, status, status_reason FROM model_catalog WHERE status = 'benched';"
-```
+# Cooldown state in database
+psql -d vibepilot -c "SELECT model_id, connector_id, cooldown_until FROM model_cooldowns WHERE cooldown_until > now();"
 
-## Quick Reference: Force a Scanner Run
-
-```bash
-cd ~/vibepilot && python3 governor/scripts/tokenfinder_v2.py
-```
-
-## Quick Reference: Restart Governor After Config Changes
-
-```bash
-systemctl --user restart vibepilot-governor
+# Usage tracker state
+psql -d vibepilot -c "SELECT * FROM connector_usage ORDER BY connector_id;"
 ```

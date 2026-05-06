@@ -1,46 +1,45 @@
 {
-  "timestamp": "2026-05-06T05:30:01.669019+00:00",
+  "timestamp": "2026-05-05T10:01:14.893217+00:00",
   "providers": {
+    "google": {
+      "status": "ok",
+      "models": 46
+    },
     "groq": {
       "status": "ok",
       "models": 16
     },
     "openrouter": {
       "status": "ok",
-      "models": 370,
-      "free": 29
+      "models": 372,
+      "free": 33
     }
   },
   "health_checks": {
     "gemini-2.5-flash-lite": {
-      "alive": null,
-      "status": "skip",
-      "provider": "gemini"
+      "alive": true,
+      "status": "ok",
+      "provider": "google"
     },
     "gemini-3.1-flash-lite-preview": {
-      "alive": null,
-      "status": "skip",
-      "provider": "gemini"
+      "alive": false,
+      "status": "HTTP 503: {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}\n",
+      "provider": "google"
     },
     "gemini-3-flash-preview": {
-      "alive": null,
-      "status": "skip",
-      "provider": "gemini"
+      "alive": true,
+      "status": "ok",
+      "provider": "google"
     },
     "gemini-2.5-flash": {
-      "alive": null,
-      "status": "skip",
-      "provider": "gemini"
+      "alive": true,
+      "status": "ok",
+      "provider": "google"
     },
     "qwen/qwen3-next-80b-a3b-instruct:free": {
       "alive": true,
       "status": "rate_limited_but_alive",
-      "provider": "openrouter"
-    },
-    "qwen/qwen3-coder:free": {
-      "alive": true,
-      "status": "rate_limited_but_alive",
-      "provider": "openrouter"
+      "provider": "alibaba"
     },
     "openrouter/free": {
       "alive": true,
@@ -48,6 +47,11 @@
       "provider": "openrouter"
     },
     "meta-llama/llama-4-scout-17b-16e-instruct": {
+      "alive": true,
+      "status": "ok",
+      "provider": "groq"
+    },
+    "llama-3.3-70b-versatile": {
       "alive": true,
       "status": "ok",
       "provider": "groq"
@@ -60,42 +64,73 @@
     "openai/gpt-oss-120b": {
       "alive": true,
       "status": "ok",
-      "provider": "nvidia"
+      "provider": "groq"
     },
     "groq/compound-mini": {
       "alive": true,
       "status": "ok",
       "provider": "groq"
     },
+    "llama-3.1-8b-instant": {
+      "alive": true,
+      "status": "ok",
+      "provider": "groq"
+    },
     "meta/llama-3.3-70b-instruct": {
       "alive": false,
-      "status": "HTTP 400: {\"error\":{\"message\":\"meta/llama-3.3-70b-instruct is not a valid model ID\",\"code\":400},\"user_id\":\"user_3CdMRRHo4N09mdBX77OuOG9Ihkq\"}",
+      "status": "HTTP 400: {\"error\":{\"message\":\"meta/llama-3.3-70b-instruct is not a valid model ID\",\"code\":400},\"user_id\":\"user_2tah8DKI9w82OcpvvhpZxxOMG3Z\"}",
       "provider": "nvidia"
     },
     "google/gemma-4-26b-a4b-it:free": {
-      "alive": true,
-      "status": "rate_limited_but_alive",
-      "provider": "openrouter"
+      "alive": false,
+      "status": "HTTP 404: ",
+      "provider": "google"
+    },
+    "google/gemma-3-27b-it:free": {
+      "alive": false,
+      "status": "HTTP 404: ",
+      "provider": "google"
+    },
+    "deepseek-chat": {
+      "alive": null,
+      "status": "skip",
+      "provider": "deepseek"
+    },
+    "glm-5": {
+      "alive": null,
+      "status": "skip",
+      "provider": "zhipu"
     }
   },
   "changes": [
     {
       "action": "new_free_models",
-      "count": 7,
+      "count": 61,
       "models": [
-        "llama-3.1-8b-instant",
-        "llama-3.3-70b-versatile",
-        "whisper-large-v3-turbo",
-        "meta-llama/llama-prompt-guard-2-86m",
-        "allam-2-7b",
-        "whisper-large-v3",
-        "meta-llama/llama-prompt-guard-2-22m"
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-001",
+        "gemini-2.0-flash-lite-001",
+        "gemini-2.0-flash-lite",
+        "gemini-2.5-flash-preview-tts",
+        "gemini-2.5-pro-preview-tts",
+        "gemma-3-1b-it",
+        "gemma-3-4b-it",
+        "gemma-3-12b-it",
+        "gemma-3-27b-it",
+        "gemma-3n-e4b-it",
+        "gemma-3n-e2b-it",
+        "gemma-4-26b-a4b-it",
+        "gemma-4-31b-it",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-pro-latest",
+        "gemini-2.5-flash-image",
+        "gemini-3-pro-preview",
+        "gemini-3.1-pro-preview"
       ]
     }
   ],
-  "warnings": [
-    "Gemini: HTTP 400: Bad Request"
-  ],
+  "warnings": [],
   "cooldown_state": {
     "aizolo-mix": {
       "status": "active",
