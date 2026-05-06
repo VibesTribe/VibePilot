@@ -195,13 +195,18 @@ def scan_openrouter():
         vendor = model_id.split("/")[0] if "/" in model_id else "openrouter"
         caps = infer_capabilities(model_id, name)
 
+        # OpenRouter returns standard API pricing even for free models
+        # Store it for ROI calculator (theoretical cost vs actual $0 paid)
+        pricing_input = float(m.get("pricing", {}).get("prompt", "0") or "0")
+        pricing_output = float(m.get("pricing", {}).get("completion", "0") or "0")
+
         # OpenRouter free tier rate limits
         rate_limits = {"rpd": 200, "rpm": 20}
 
         free.append({
             "id": model_id, "name": name, "provider": "openrouter",
             "context_length": ctx, "is_free": True,
-            "pricing_input": 0, "pricing_output": 0,
+            "pricing_input": pricing_input, "pricing_output": pricing_output,
             "vendor": vendor, "capabilities": caps,
             "rate_limits": rate_limits,
         })
