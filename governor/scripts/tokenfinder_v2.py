@@ -392,18 +392,60 @@ def main():
     print(f"\n{'=' * 60}")
     print(f"Total: {total_upserted} models upserted to model_catalog")
 
-    # Clean up: remove entries that weren't updated by this scan
-    print(f"\n--- Cleanup: benching models from before this scan ---")
+    # Clean up: bench old entries not updated by this scan
+    print(f"\n--- Cleanup: benching old entries ---")
     cutoff = scan_start.isoformat()
     cleanup_sql = f"UPDATE model_catalog SET status = 'benched', updated_at = NOW() WHERE status = 'active' AND (last_scan_at IS DISTINCT FROM NULL AND last_scan_at < '{cutoff}');"
-    r = subprocess.run(["psql", "-d", "vibepilot", "-c", cleanup_sql],
-                      capture_output=True, text=True, timeout=30)
-    if r.returncode == 0:
-        for line in r.stdout.split('\n'):
+    cr = subprocess.run(["psql", "-d", "vibepilot", "-c", cleanup_sql], capture_output=True, text=True, timeout=30)
+    if cr.returncode == 0:
+        for line in cr.stdout.split('\n'):
             if 'UPDATE' in line:
-                print(f"  {line.strip()} old/filtered entries benched")
+                print(f"  {line.strip()} old entries benched")
     else:
-        print(f"  Cleanup error: {r.stderr[:100]}")
+        print(f"  Cleanup error: {cr.stderr[:100]}")
+
+    # Write live snapshot to GitHub repo
+    print("\n--- Writing live model snapshot to repo ---")
+    snapshot = []
+    for provider in ["openrouter", "groq", "nvidia", "gemini"]:
+        r = subprocess.run(["psql", "-d", "vibepilot", "-t", "-A", "-F", "|",
+            "-c", f"SELECT id, name, context_length, capabilities::text, rate_limits::text FROM model_catalog WHERE provider = '{provider}' AND status = 'active' ORDER BY context_length DESC;"],
+            capture_output=True, text=True, timeout=10)
+        for line in r.stdout.strip().split('\n'):
+            if not line.strip():
+                continue
+            parts = line.split('|')
+            if len(parts) >= 5:
+                snapshot.append({
+                    "id": parts[0], "name": parts[1],
+                    "context_length": int(parts[2]) if parts[2].isdigit() else 0,
+                    "capabilities": parts[3].strip('{}').split(',') if parts[3] != '{}' else [],
+                    "rate_limits": json.loads(parts[4]) if parts[4] else {},
+                    "provider": provider
+                })
+
+    with open("/home/vibes/vibepilot/governor/config/models_live.json", "w") as f:
+        json.dump({"version": 2, "updated": datetime.now(timezone.utc).isoformat(),
+                   "total": len(snapshot), "models": snapshot}, f, indent=2)
+    print(f"  Wrote {len(snapshot)} models to governor/config/models_live.json")
+
+    # Commit and push to GitHub
+    r = subprocess.run(["git", "-C", "/home/vibes/vibepilot", "add", "governor/config/models_live.json"],
+                      capture_output=True, text=True, timeout=10)
+    r2 = subprocess.run(["git", "-C", "/home/vibes/vibepilot", "diff", "--cached", "--quiet"],
+                       capture_output=True, timeout=10)
+    if r2.returncode != 0:
+        try:
+            subprocess.run(["git", "-C", "/home/vibes/vibepilot", "commit", "-m",
+                           f"live model snapshot: {len(snapshot)} free models from 4 providers"],
+                           capture_output=True, timeout=60)
+            r3 = subprocess.run(["git", "-C", "/home/vibes/vibepilot", "push", "origin", "main"],
+                               capture_output=True, text=True, timeout=60)
+            print(f"  Pushed to GitHub")
+        except subprocess.TimeoutExpired:
+            print("  Git commit/push timed out — will retry next scan")
+    else:
+        print("  No changes since last snapshot")
 
     print("Done")
 
