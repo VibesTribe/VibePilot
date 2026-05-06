@@ -176,10 +176,6 @@ def scan_openrouter():
         vendor = model_id.split("/")[0] if "/" in model_id else "openrouter"
         caps = infer_capabilities(model_id, name)
 
-        # Only keep models useful for LLM tasks
-        if caps == ["text"]:
-            continue
-
         # OpenRouter free tier rate limits
         rate_limits = {"rpd": 200, "rpm": 20}
 
@@ -252,10 +248,8 @@ def scan_nvidia():
         full_id = f"nvidia/{model_id}" if "/" not in model_id else model_id
         caps = infer_capabilities(model_id)
         
-        # Only keep models useful for LLM tasks (skip plain text-only)
-        if caps == ["text"]:
-            continue
-        if ctx < 32000:
+        # Skip text-only models with small context (likely embeddings/specialized)
+        if caps == ["text"] and ctx < 8000:
             continue
             
         rate_limits = {"rpm": 10, "rpd": 1000}
