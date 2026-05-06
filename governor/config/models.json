@@ -41,8 +41,35 @@
       "status": "active"
     },
     {
+      "id": "google/gemma-4-31b-it:free",
+      "name": "Google: Gemma 4 31B (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
       "id": "tencent/hy3-preview:free",
       "name": "Tencent: Hy3 preview (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "name": "NVIDIA: Nemotron 3 Super (free)",
       "provider": "openrouter",
       "context_limit": 262144,
       "capabilities": [
@@ -61,33 +88,6 @@
       "capabilities": [
         "instruction",
         "reasoning",
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "google/gemma-4-31b-it:free",
-      "name": "Google: Gemma 4 31B (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text",
-        "vision"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "nvidia/nemotron-3-super-120b-a12b:free",
-      "name": "NVIDIA: Nemotron 3 Super (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
         "text"
       ],
       "access_via": [
@@ -2364,9 +2364,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "instruction",
         "text",
-        "vision",
-        "instruction"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2380,9 +2380,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "instruction",
         "text",
-        "vision",
-        "instruction"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2396,9 +2396,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "instruction",
         "text",
-        "vision",
-        "instruction"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2412,8 +2412,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2427,10 +2427,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
-        "vision",
         "reasoning",
-        "instruction"
+        "instruction",
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2444,9 +2444,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "instruction",
         "text",
-        "vision",
-        "instruction"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2460,8 +2460,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2475,11 +2475,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
-        "vision",
-        "text",
         "code",
-        "instruction"
+        "reasoning",
+        "text",
+        "instruction",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2493,10 +2493,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
-        "vision",
         "reasoning",
-        "instruction"
+        "instruction",
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2510,9 +2510,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "instruction",
         "text",
-        "vision",
-        "instruction"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2526,11 +2526,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
-        "vision",
-        "text",
         "code",
-        "instruction"
+        "reasoning",
+        "text",
+        "instruction",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2544,10 +2544,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
-        "vision",
         "reasoning",
-        "instruction"
+        "instruction",
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2561,9 +2561,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "instruction",
         "text",
-        "vision",
-        "instruction"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2577,11 +2577,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
-        "vision",
-        "text",
         "code",
-        "instruction"
+        "reasoning",
+        "text",
+        "instruction",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2595,9 +2595,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "instruction",
         "text",
-        "vision",
-        "instruction"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2611,9 +2611,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "instruction",
         "text",
-        "vision",
-        "instruction"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2627,9 +2627,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "instruction",
         "text",
-        "vision",
-        "instruction"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2643,9 +2643,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
         "reasoning",
-        "text"
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2659,8 +2659,8 @@
       "provider": "gemini",
       "context_limit": 262144,
       "capabilities": [
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2674,8 +2674,8 @@
       "provider": "gemini",
       "context_limit": 262144,
       "capabilities": [
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2689,9 +2689,9 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
+        "instruction",
         "text",
-        "vision",
-        "instruction"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2705,9 +2705,9 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "vision",
         "reasoning",
-        "text"
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2721,8 +2721,8 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2736,9 +2736,9 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "vision",
         "reasoning",
-        "text"
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2752,8 +2752,8 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2767,8 +2767,8 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
