@@ -41,32 +41,6 @@
       "status": "active"
     },
     {
-      "id": "nvidia/nemotron-3-super-120b-a12b:free",
-      "name": "NVIDIA: Nemotron 3 Super (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "tencent/hy3-preview:free",
-      "name": "Tencent: Hy3 preview (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
       "id": "qwen/qwen3-next-80b-a3b-instruct:free",
       "name": "Qwen: Qwen3 Next 80B A3B Instruct (free)",
       "provider": "openrouter",
@@ -96,8 +70,22 @@
       "status": "active"
     },
     {
-      "id": "inclusionai/ling-2.6-1t:free",
-      "name": "inclusionAI: Ling-2.6-1T (free)",
+      "id": "google/gemma-4-31b-it:free",
+      "name": "Google: Gemma 4 31B (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "tencent/hy3-preview:free",
+      "name": "Tencent: Hy3 preview (free)",
       "provider": "openrouter",
       "context_limit": 262144,
       "capabilities": [
@@ -109,13 +97,25 @@
       "status": "active"
     },
     {
-      "id": "google/gemma-4-31b-it:free",
-      "name": "Google: Gemma 4 31B (free)",
+      "id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "name": "NVIDIA: Nemotron 3 Super (free)",
       "provider": "openrouter",
       "context_limit": 262144,
       "capabilities": [
-        "text",
-        "vision"
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "inclusionai/ling-2.6-1t:free",
+      "name": "inclusionAI: Ling-2.6-1T (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
       ],
       "access_via": [
         "openrouter-api"
@@ -220,19 +220,6 @@
       "status": "active"
     },
     {
-      "id": "poolside/laguna-m.1:free",
-      "name": "Poolside: Laguna M.1 (free)",
-      "provider": "openrouter",
-      "context_limit": 131072,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
       "id": "z-ai/glm-4.5-air:free",
       "name": "Z.ai: GLM 4.5 Air (free)",
       "provider": "openrouter",
@@ -241,6 +228,19 @@
         "code",
         "instruction",
         "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "poolside/laguna-m.1:free",
+      "name": "Poolside: Laguna M.1 (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
+      "capabilities": [
         "text"
       ],
       "access_via": [
@@ -375,12 +375,12 @@
       "status": "active"
     },
     {
-      "id": "liquid/lfm-2.5-1.2b-thinking:free",
-      "name": "LiquidAI: LFM2.5-1.2B-Thinking (free)",
+      "id": "liquid/lfm-2.5-1.2b-instruct:free",
+      "name": "LiquidAI: LFM2.5-1.2B-Instruct (free)",
       "provider": "openrouter",
       "context_limit": 32768,
       "capabilities": [
-        "reasoning",
+        "instruction",
         "text"
       ],
       "access_via": [
@@ -389,12 +389,12 @@
       "status": "active"
     },
     {
-      "id": "liquid/lfm-2.5-1.2b-instruct:free",
-      "name": "LiquidAI: LFM2.5-1.2B-Instruct (free)",
+      "id": "liquid/lfm-2.5-1.2b-thinking:free",
+      "name": "LiquidAI: LFM2.5-1.2B-Thinking (free)",
       "provider": "openrouter",
       "context_limit": 32768,
       "capabilities": [
-        "instruction",
+        "reasoning",
         "text"
       ],
       "access_via": [
@@ -679,7 +679,7 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "benched"
+      "status": "active"
     },
     {
       "id": "moonshotai/kimi-k2-instruct",
@@ -2475,11 +2475,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
-        "text",
         "reasoning",
+        "code",
         "instruction",
-        "code"
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2521,24 +2521,6 @@
       "status": "active"
     },
     {
-      "id": "gemini-flash-lite-latest",
-      "name": "Gemini Flash-Lite Latest",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "vision",
-        "text",
-        "reasoning",
-        "instruction",
-        "code"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active"
-    },
-    {
       "id": "gemini-3-pro-preview",
       "name": "Gemini 3 Pro Preview",
       "provider": "gemini",
@@ -2547,6 +2529,24 @@
         "reasoning",
         "text",
         "instruction",
+        "vision"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-flash-lite-latest",
+      "name": "Gemini Flash-Lite Latest",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "reasoning",
+        "code",
+        "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -2577,11 +2577,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
-        "text",
         "reasoning",
+        "code",
         "instruction",
-        "code"
+        "text",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
