@@ -47,23 +47,42 @@ def curl_get(url, headers=None):
         return {"_error": str(e)}
 
 
-def infer_capabilities(model_id, name="", pricing_input=0):
-    """Infer model capabilities from name/ID."""
-    caps = {"text"}
-    mid = model_id.lower() + " " + name.lower()
-    if any(k in mid for k in ["code", "coder", "instruct"]):
-        caps.add("code")
-    if any(k in mid for k in ["reason", "think", "deep"]):
-        caps.add("reasoning")
-    if any(k in mid for k in ["embed", "retrieval"]):
-        caps.add("retrieval")
-    if any(k in mid for k in ["image", "vision", "multimodal"]):
-        caps.add("vision")
-    if any(k in mid for k in ["agent", "tool"]):
-        caps.add("tool_use")
-    if "instruct" in mid:
-        caps.add("instruction")
-    return list(caps)
+def infer_capabilities(model_id, name=""):
+    """Infer model capabilities from model ID/name using task_routing.json detection rules."""
+    mid = (model_id + " " + name).lower()
+
+    # Load detection rules from task_routing.json
+    try:
+        with open("/home/vibes/vibepilot/governor/config/task_routing.json") as f:
+            rules = json.load(f)
+    except:
+        rules = {}
+
+    caps = set()
+    detection = rules.get("capability_detection", {})
+    skill_rules = detection.get("rules", [])
+
+    for rule in skill_rules:
+        cap = rule["capability"]
+        patterns = rule.get("detect_patterns", [])
+        families = rule.get("assume_for_families", [])
+
+        # Check name patterns
+        import re
+        matched = any(re.search(p, mid) for p in patterns if p)
+
+        # Check family assumptions
+        family_match = any(f.lower() in mid for f in families)
+
+        if matched or family_match:
+            caps.add(cap)
+
+    # Always add 'text' for anything that's not excluded
+    exclude_patterns = detection.get("always_exclude", {}).get("non_text_patterns", [])
+    if not any(re.search(p, mid) for p in exclude_patterns):
+        caps.add("text")
+
+    return sorted(caps)
 
 
 def db_upsert(models, provider):
