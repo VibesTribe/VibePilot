@@ -1,2894 +1,2767 @@
 {
   "models": [
     {
-      "access_via": [
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general"
-      ],
-      "buffer_pct": 80,
+      "id": "openrouter/owl-alpha",
+      "name": "Owl Alpha",
+      "provider": "openrouter",
+      "context_limit": 1048756,
       "capabilities": [
-        "code",
-        "reasoning",
-        "instruction"
+        "text"
       ],
-      "context_length": 1048576,
-      "context_limit": 1000000,
-      "id": "gemini-2.5-flash",
-      "name": "Gemini 2.5 Flash",
-      "provider": "google",
-      "rate_limits": {
-        "requests_per_day": 1500,
-        "requests_per_minute": 15,
-        "tokens_per_day": null,
-        "tokens_per_minute": 1000000
-      },
+      "access_via": [
+        "openrouter"
+      ],
       "status": "active"
     },
     {
-      "access_type": "web",
-      "access_via": [
-        "gemini-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "context_length": 1048576,
-      "context_limit": 1000000,
-      "id": "gemini-2.5-pro",
-      "name": "Gemini 2.5 Pro (Web)",
-      "notes": "Browser Use courier via gemini-web connector. 5 RPM, 100 RPD free tier.",
-      "provider": "google",
-      "rate_limits": {
-        "limit_source": "Google AI docs: 2.5 Pro Preview 5 RPM/250K TPM/25 RPD",
-        "limit_type": "verified_api_docs",
-        "requests_per_day": 25,
-        "requests_per_minute": 5,
-        "tokens_per_day": null,
-        "tokens_per_minute": 250000
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "on_rate_limit": "cooldown"
-      },
-      "spacing_min_seconds": 12,
-      "status": "active",
-      "strengths": [
-        "reasoning",
-        "1M context",
-        "code"
-      ],
-      "vendor": "google",
-      "weaknesses": [
-        "web-only",
-        "5 RPM web limit"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general"
-      ],
-      "api_key_ref": "GEMINI_COURIER_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "context_length": 1048576,
-      "context_limit": 1000000,
-      "courier": true,
-      "id": "gemini-2.5-flash-lite",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Gemini 2.5 Flash Lite (Courier)",
-      "notes": "Stable workhorse for high-throughput courier tasks. 1000 RPD free-tier. Safest choice.",
-      "provider": "google",
-      "rate_limits": {
-        "requests_per_day": 1500,
-        "requests_per_minute": 15,
-        "tokens_per_minute": 1000000
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 5,
-      "status": "active",
-      "strengths": [
-        "stable",
-        "high_throughput",
-        "long_context",
-        "multimodal"
-      ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "lite_model"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general"
-      ],
-      "api_key_ref": "GEMINI_VISUAL_TESTER_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "context_length": 1048576,
-      "context_limit": 1000000,
-      "id": "gemini-3-flash-preview",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Gemini 3 Flash Preview (Visual QA / Brain)",
-      "notes": "Best available on free tier for code/visual QA. 3.1-pro-preview requires billing. 3-flash is free and capable.",
-      "provider": "google",
-      "rate_limits": {
-        "requests_per_day": 1500,
-        "requests_per_minute": 15,
-        "tokens_per_minute": 1000000
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 5,
-      "status": "active",
-      "strengths": [
-        "strong_reasoning",
-        "code_generation",
-        "visual_qa",
-        "preview_features"
-      ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "preview_mode",
-        "may_change"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general"
-      ],
-      "api_key_ref": "GEMINI_RESEARCHER_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "context_length": 1048576,
-      "context_limit": 1000000,
-      "id": "gemini-3.1-flash-lite-preview",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Gemini 3.1 Flash Lite Preview (Researcher)",
-      "notes": "Best intelligence for daily system researcher. Smarter than 2.5 but in preview mode.",
-      "provider": "google",
-      "rate_limits": {
-        "requests_per_day": 1500,
-        "requests_per_minute": 15,
-        "tokens_per_minute": 1000000
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 5,
-      "status": "active",
-      "strengths": [
-        "best_intelligence",
-        "long_context",
-        "multimodal",
-        "reasoning"
-      ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "preview_mode",
-        "may_change"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "context_length": 262144,
-      "context_limit": 262144,
-      "courier": false,
-      "id": "tencent/hy3-preview:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Tencent Hy3 Preview (OpenRouter Free)",
-      "notes": "Tencent Hy3 preview. Free on OpenRouter.",
-      "provider": "tencent",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_hour": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "262K context",
-        "reasoning"
-      ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "preview_model",
-        "openrouter_rate_limits",
-        "unknown_quality"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "context_length": 262144,
-      "context_limit": 262144,
-      "courier": true,
-      "id": "google/gemma-4-26b-a4b-it:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Gemma 4 26B MoE (OpenRouter Free)",
-      "notes": "MoE variant, efficient. Free on OpenRouter. Courier fuel model.",
-      "provider": "google",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_hour": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "vision",
-        "efficient_moe",
-        "large_context",
-        "courier_fuel"
-      ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "openrouter_rate_limits",
-        "smaller_than_31b"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0.13,
-        "output_per_1m_usd": 0.38
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "context_length": 262144,
-      "context_limit": 262000,
-      "courier": true,
-      "id": "google/gemma-4-31b-it",
-      "name": "Gemma 4 31B (OpenRouter)",
-      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix.",
+      "id": "google/lyria-3-clip-preview",
+      "name": "Google: Lyria 3 Clip Preview",
       "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20,
-        "tokens_per_day": null,
-        "tokens_per_minute": null
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "vision",
-        "balanced",
-        "large_context",
-        "courier_fuel"
+      "context_limit": 1048576,
+      "capabilities": [
+        "text"
       ],
-      "vendor": "google",
-      "weaknesses": [
-        "openrouter_rate_limits",
-        "quality_varies"
-      ]
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
     },
     {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tool_calling"
-      ],
-      "context_length": 196608,
-      "context_limit": 131072,
-      "id": "minimax/minimax-m2.5",
-      "name": "MiniMax M2.5 (OpenRouter)",
-      "notes": "OpenRouter free tier. 20 RPM, 200 RPD. Use :free suffix.",
+      "id": "google/lyria-3-pro-preview",
+      "name": "Google: Lyria 3 Pro Preview",
       "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "general",
-        "reasoning"
+      "context_limit": 1048576,
+      "capabilities": [
+        "reasoning",
+        "text"
       ],
-      "vendor": "minimax",
-      "weaknesses": [
-        "free tier rate limits"
-      ]
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
     },
     {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tool_calling",
-        "vision",
-        "multimodal"
-      ],
-      "context_length": 200000,
-      "context_limit": 200000,
-      "courier": true,
-      "id": "openrouter/free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "OpenRouter Free Router",
-      "notes": "OpenRouter free auto-router. Selects best available free model for each request based on required features. Always use as fallback.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "auto_routes_to_best_free_model",
-        "supports_tool_calling",
-        "supports_vision",
-        "supports_structured_output",
-        "always_has_fallback"
-      ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "non_deterministic_model_selection",
-        "openrouter_rate_limits"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tool_calling"
-      ],
-      "context_length": 262144,
-      "context_limit": 262144,
-      "courier": false,
       "id": "qwen/qwen3-next-80b-a3b-instruct:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Qwen3 Next 80B A3B (OpenRouter Free)",
-      "notes": "MoE 80B model, strong reasoning. Free on OpenRouter.",
-      "provider": "alibaba",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_hour": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "reasoning",
-        "262K context",
-        "code",
-        "tool_calling"
-      ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "openrouter_rate_limits"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "groq-api",
-        "openrouter-api"
-      ],
-      "api_key_ref": "GROQ_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.59,
-        "output_per_1m_usd": 0.79
-      },
-      "buffer_pct": 80,
+      "name": "Qwen: Qwen3 Next 80B A3B Instruct (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
       "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "context_length": 131072,
-      "context_limit": 131072,
-      "id": "openai/gpt-oss-120b",
-      "learned": {},
-      "name": "GPT-OSS 120B (Groq)",
-      "notes": "Groq free tier (unverified limits). Using conservative TPD=100K until actual limits confirmed from API headers.",
-      "provider": "groq",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20,
-        "tokens_per_day": 100000,
-        "tokens_per_minute": 12000
-      },
-      "rate_limits_by_connector": {
-        "groq-api": {
-          "requests_per_day": 14400,
-          "requests_per_minute": 30,
-          "tokens_per_day": 100000,
-          "tokens_per_minute": 12000
-        },
-        "openrouter-api": {
-          "requests_per_day": 200,
-          "requests_per_minute": 20
-        }
-      },
-      "recovery": {
-        "cooldown_minutes": 2,
-        "on_rate_limit": "wait_and_retry",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 2,
-      "status": "active",
-      "strengths": [
+        "instruction",
         "reasoning",
-        "code",
-        "instruction_following"
+        "text"
       ],
-      "throttle_behavior": "wait_and_retry",
-      "weaknesses": []
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
     },
     {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
+      "id": "google/gemma-4-26b-a4b-it:free",
+      "name": "Google: Gemma 4 26B A4B  (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
       "capabilities": [
         "text",
-        "reasoning",
-        "code"
+        "vision"
       ],
-      "context_length": 131072,
-      "context_limit": 131072,
-      "id": "openai/gpt-oss-20b:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "GPT-OSS 20B (Free via OpenRouter)",
-      "notes": "Free on OpenRouter. OpenAI open-source 20B. Companion to the 120B variant on Groq.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "openai_quality",
-        "fast",
-        "code"
+      "access_via": [
+        "openrouter"
       ],
-      "throttle_behavior": "queue",
-      "vendor": "openai",
-      "weaknesses": [
-        "smaller_than_120b"
-      ]
+      "status": "active"
     },
     {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0.1,
-        "output_per_1m_usd": 0.3
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tool_calling"
-      ],
-      "context_length": 131072,
-      "context_limit": 131000,
-      "id": "z-ai/glm-4.5-air",
-      "name": "GLM 4.5 Air (OpenRouter)",
-      "notes": "OpenRouter free tier: ~20 RPM per model, 200 RPD (unfunded account). Always use :free suffix.",
+      "id": "google/gemma-4-31b-it:free",
+      "name": "Google: Gemma 4 31B (free)",
       "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20,
-        "tokens_per_day": null,
-        "tokens_per_minute": null
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "fast",
-        "free GLM access",
-        "free on openrouter"
-      ],
-      "vendor": "zhipu",
-      "weaknesses": [
-        "20 RPM rate limit"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
+      "context_limit": 262144,
       "capabilities": [
         "text",
-        "code",
-        "reasoning",
-        "tool_calling"
+        "vision"
       ],
-      "context_length": 262000,
-      "context_limit": 262000,
-      "courier": true,
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "tencent/hy3-preview:free",
+      "name": "Tencent: Hy3 preview (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "name": "NVIDIA: Nemotron 3 Super (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "inclusionai/ling-2.6-1t:free",
+      "name": "inclusionAI: Ling-2.6-1T (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
       "id": "qwen/qwen3-coder:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Qwen3 Coder (Free)",
-      "notes": "Free on OpenRouter. Code specialist with 262K context. Best free coding model.",
+      "name": "Qwen: Qwen3 Coder 480B A35B (free)",
       "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "code_specialist",
-        "huge_context",
-        "reasoning"
-      ],
-      "throttle_behavior": "queue",
-      "vendor": "alibaba",
-      "weaknesses": [
-        "narrow_focus"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.1,
-        "output_per_1m_usd": 0.2
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "context_length": 128000,
-      "context_limit": 32768,
-      "courier": true,
-      "id": "bytedance/ui-tars-1.5-7b",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "UI-TARS 1.5 7B (GUI Specialist)",
-      "notes": "Purpose-built for GUI automation. Ultra-cheap. Ideal courier fuel for browser navigation.",
-      "provider": "bytedance",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_hour": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 3,
-      "status": "offline",
-      "status_reason": "no_longer_free_on_openrouter",
-      "strengths": [
-        "gui_automation",
-        "courier_fuel",
-        "ultra_cheap",
-        "purpose_built"
-      ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "small_model",
-        "less_reasoning",
-        "tiny_context"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "text",
-        "vision",
-        "multimodal"
-      ],
-      "context_length": 8192,
-      "context_limit": 8000,
-      "id": "google/gemma-3n-e2b-it:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Gemma 3n 2B IT (Free)",
-      "notes": "Free on OpenRouter. Newest Gemma 3n line. Ultra-lightweight. Mobile-class.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "ultra_fast",
-        "vision",
-        "low_resource"
-      ],
-      "throttle_behavior": "queue",
-      "vendor": "google",
-      "weaknesses": [
-        "tiny_model",
-        "tiny_context"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "text",
-        "vision",
-        "multimodal",
-        "audio"
-      ],
-      "context_length": 8192,
-      "context_limit": 8000,
-      "id": "google/gemma-3n-e4b-it:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Gemma 3n 4B IT (Free)",
-      "notes": "Free on OpenRouter. Newest Gemma 3n with audio+vision. Mobile-optimized.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "fast",
-        "vision",
-        "audio",
-        "low_resource"
-      ],
-      "throttle_behavior": "queue",
-      "vendor": "google",
-      "weaknesses": [
-        "small_model",
-        "tiny_context"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "text",
-        "vision",
-        "multimodal",
-        "structured_output",
-        "function_calling"
-      ],
-      "context_length": 32768,
-      "context_limit": 33000,
-      "id": "google/gemma-3-4b-it:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Gemma 3 4B IT (Free)",
-      "notes": "Free on OpenRouter. Smallest Gemma 3 with vision + structured output. Courier fuel.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "vision",
-        "structured_output",
-        "multilingual"
-      ],
-      "throttle_behavior": "queue",
-      "vendor": "google",
-      "weaknesses": [
-        "small_model",
-        "short_context"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "text",
-        "vision",
-        "multimodal",
-        "structured_output",
-        "function_calling"
-      ],
-      "context_length": 32768,
-      "context_limit": 33000,
-      "courier": true,
-      "id": "google/gemma-3-12b-it:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Gemma 3 12B IT (Free)",
-      "notes": "Free on OpenRouter. Mid-size Gemma 3 with vision. Best quality/size ratio in free tier.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "vision",
-        "reasoning",
-        "structured_output",
-        "multilingual"
-      ],
-      "throttle_behavior": "queue",
-      "vendor": "google",
-      "weaknesses": [
-        "medium_model",
-        "short_context"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "context_length": 131072,
-      "context_limit": 131072,
-      "courier": true,
-      "id": "google/gemma-3-27b-it:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Gemma 3 27B (OpenRouter Free)",
-      "notes": "Previous gen Gemma. Free on OpenRouter. Courier fuel model.",
-      "provider": "google",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_hour": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "vision",
-        "balanced",
-        "courier_fuel"
-      ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "previous_gen",
-        "openrouter_rate_limits"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "text",
-        "reasoning",
-        "code",
-        "multilingual",
-        "tool_calling"
-      ],
-      "context_length": 65536,
-      "context_limit": 65536,
-      "courier": true,
-      "id": "meta-llama/llama-3.3-70b-instruct:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Llama 3.3 70B Instruct (Free)",
-      "notes": "Free on OpenRouter. 70B params - best free quality available. Flagship-level.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "large_model",
-        "reasoning",
-        "code",
-        "instruction_following",
-        "multilingual"
-      ],
-      "throttle_behavior": "queue",
-      "vendor": "meta",
-      "weaknesses": [
-        "medium_context"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "text",
-        "reasoning",
-        "multilingual"
-      ],
-      "context_length": 131072,
-      "context_limit": 131000,
-      "id": "meta-llama/llama-3.2-3b-instruct:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Llama 3.2 3B Instruct (Free)",
-      "notes": "Free on OpenRouter. Good for simple/fast tasks.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "fast",
-        "multilingual",
-        "instruction_following"
-      ],
-      "throttle_behavior": "queue",
-      "vendor": "meta",
-      "weaknesses": [
-        "small_model",
-        "limited_reasoning"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "text",
-        "reasoning",
-        "code",
-        "tool_calling"
-      ],
-      "context_length": 131072,
-      "context_limit": 131072,
-      "courier": true,
-      "id": "nousresearch/hermes-3-llama-3.1-405b:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Hermes 3 Llama 3.1 405B (Free)",
-      "notes": "Free on OpenRouter. 405B params - largest free model. Slow but excellent quality.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 5,
-      "status": "active",
-      "strengths": [
-        "largest_free_model",
-        "reasoning",
-        "code",
-        "long_context",
-        "tool_calling"
-      ],
-      "throttle_behavior": "queue",
-      "vendor": "nousresearch",
-      "weaknesses": [
-        "slow_response",
-        "may_queue"
-      ]
-    },
-    {
-      "access_type": "cli_subscription",
-      "access_via": [
-        "hermes"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0.95,
-        "output_per_1m_usd": 3.15
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tools"
-      ],
-      "context_limit": 203000,
-      "courier": false,
-      "id": "glm-5",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "GLM-5 (Z.AI)",
-      "notes": "Z.AI Pro free tier until July 2, 2026. Throttles by slowing down, not hard cutoff.",
-      "provider": "zhipu",
-      "rate_limits": {
-        "requests_per_5_hours": 400,
-        "requests_per_day": 200,
-        "requests_per_hour": 30,
-        "requests_per_minute": 3,
-        "requests_per_week": 2000,
-        "tokens_per_day": 500000,
-        "tokens_per_minute": 30000
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "wait_and_retry",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 600
-      },
-      "spacing_min_seconds": 20,
-      "status": "active",
-      "strengths": [
-        "code",
-        "reasoning",
-        "tools"
-      ],
-      "subscription": {
-        "cost_usd": 0,
-        "ends_at": "2026-07-02T00:00:00-04:00",
-        "period": "monthly",
-        "status": "active"
-      },
-      "throttle_behavior": "slow_down",
-      "weaknesses": []
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "deepseek-api"
-      ],
-      "api_key_ref": "DEEPSEEK_API_KEY",
-      "api_pricing": {
-        "input_per_1m_cached_usd": 0.028,
-        "input_per_1m_usd": 0.28,
-        "output_per_1m_usd": 0.42
-      },
-      "buffer_pct": 80,
-      "cache_supported": true,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "context_limit": 128000,
-      "id": "deepseek-chat",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "DeepSeek Chat",
-      "notes": "Cheapest API. Cache hits 90% cheaper.",
-      "provider": "deepseek",
-      "rate_limits": {
-        "requests_per_day": null,
-        "requests_per_hour": 3600,
-        "requests_per_minute": 60,
-        "tokens_per_day": null
-      },
-      "recovery": {
-        "cooldown_minutes": 1,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 1,
-      "status": "paused",
-      "strengths": [
-        "coding",
-        "reasoning",
-        "cheap"
-      ],
-      "throttle_behavior": "hard_cutoff",
-      "weaknesses": []
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "deepseek-api"
-      ],
-      "api_key_ref": "DEEPSEEK_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.28,
-        "output_per_1m_usd": 0.42
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "reasoning"
-      ],
-      "context_limit": 128000,
-      "credit_info": "$5.00 credit",
-      "id": "deepseek-reasoner",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "DeepSeek Reasoner",
-      "notes": "R1 model for complex reasoning tasks.",
-      "provider": "deepseek",
-      "rate_limits": {
-        "requests_per_day": null,
-        "requests_per_hour": 3600,
-        "requests_per_minute": 60,
-        "tokens_per_day": null
-      },
-      "recovery": {
-        "cooldown_minutes": 1,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 600
-      },
-      "spacing_min_seconds": 1,
-      "status": "active",
-      "strengths": [
-        "reasoning",
-        "planning"
-      ],
-      "throttle_behavior": "hard_cutoff",
-      "weaknesses": [
-        "slower"
-      ]
-    },
-    {
-      "access_type": "web",
-      "access_via": [
-        "chatgpt-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0.15,
-        "output_per_1m_usd": 0.6
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision"
-      ],
-      "context_limit": 128000,
-      "id": "chatgpt-4o-mini",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "ChatGPT 4o Mini",
-      "notes": "Free tier: 10 messages per 3 hours. Attachments may reduce limits.",
-      "provider": "openai",
-      "rate_limits": {
-        "messages_per_3_hours": 10,
-        "requests_per_day": 100,
-        "requests_per_hour": null,
-        "requests_per_minute": 3,
-        "tokens_per_day": null
-      },
-      "recovery": {
-        "cooldown_minutes": 180,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "status": "benched",
-      "status_reason": "Web-only via browser use (ChatGPT free tier)",
-      "strengths": [
-        "reasoning",
-        "coding",
-        "general"
-      ],
-      "throttle_behavior": "hard_cutoff",
-      "weaknesses": [
-        "strict_free_tier_limits"
-      ]
-    },
-    {
-      "access_type": "web",
-      "access_via": [
-        "claude-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 3,
-        "output_per_1m_usd": 15
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision"
-      ],
-      "context_limit": 200000,
-      "id": "claude-sonnet",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Claude Sonnet 4.5",
-      "notes": "Rate limits vary by system demand. 5-8 hour reset period.",
-      "provider": "anthropic",
-      "rate_limits": {
-        "limit_source": "Anthropic: ~10-20/day rolling. Shorter conversations = more.",
-        "limit_type": "dynamic_context_dependent",
-        "messages_per_day": 20,
-        "requests_per_day": 10,
-        "requests_per_minute": 1
-      },
-      "recovery": {
-        "cooldown_minutes": 60,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "status": "benched",
-      "status_reason": "Web-only via browser use (Anthropic free tier). No API key.",
-      "strengths": [
-        "coding",
-        "reasoning",
-        "honesty",
-        "long_context"
-      ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "variable_rate_limits"
-      ]
-    },
-    {
-      "access_type": "web",
-      "access_via": [
-        "gemini-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0.3,
-        "output_per_1m_usd": 2.5
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal"
-      ],
-      "context_limit": 1000000,
-      "id": "gemini-web",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Gemini Web",
-      "notes": "1M tokens/day free tier. Dies fast if exceeded - use with caution.",
-      "provider": "google",
-      "rate_limits": {
-        "requests_per_day": null,
-        "requests_per_hour": null,
-        "requests_per_minute": null,
-        "tokens_per_day": 1000000
-      },
-      "recovery": {
-        "cooldown_minutes": 1440,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "status": "benched",
-      "status_reason": "Web-only via browser use (Gemini free tier)",
-      "strengths": [
-        "long_context",
-        "multimodal",
-        "vision"
-      ],
-      "throttle_behavior": "hard_cutoff",
-      "weaknesses": [
-        "daily_token_limit"
-      ]
-    },
-    {
-      "access_type": "web",
-      "access_via": [
-        "deepseek-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0.28,
-        "output_per_1m_usd": 0.42
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "context_limit": 64000,
-      "id": "deepseek-web",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "DeepSeek Web",
-      "notes": "Web-based courier via Browser Use (Playwright+CDP). Generous free tier. Rate limited by human-like interaction speed.",
-      "provider": "deepseek",
-      "rate_limits": {
-        "requests_per_day": 500,
-        "requests_per_minute": 10,
-        "tokens_per_day": null
-      },
-      "recovery": {
-        "cooldown_minutes": 30,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 6,
-      "status": "active",
-      "strengths": [
-        "coding",
-        "reasoning",
-        "generous_free_tier"
-      ],
-      "throttle_behavior": "slow_down",
-      "weaknesses": []
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "groq-api"
-      ],
-      "api_key_ref": "GROQ_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.59,
-        "output_per_1m_usd": 0.79
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tools"
-      ],
-      "context_limit": 128000,
-      "courier": false,
-      "id": "llama-3.3-70b-versatile",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Llama 3.3 70B (Groq)",
-      "notes": "Groq free tier. Ultra fast inference. Good for quick decisions.",
-      "provider": "groq",
-      "rate_limits": {
-        "requests_per_day": 14400,
-        "requests_per_hour": null,
-        "requests_per_minute": 30,
-        "tokens_per_day": 100000,
-        "tokens_per_minute": 12000
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 180,
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 2,
-      "status": "active",
-      "strengths": [
-        "ultra_fast",
-        "code",
-        "reasoning"
-      ],
-      "throttle_behavior": "hard_cutoff",
-      "weaknesses": [
-        "lower_context_than_gemini"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "groq-api"
-      ],
-      "api_key_ref": "GROQ_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.05,
-        "output_per_1m_usd": 0.08
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "chat"
-      ],
-      "context_limit": 128000,
-      "courier": false,
-      "id": "llama-3.1-8b-instant",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Llama 3.1 8B Instant (Groq)",
-      "notes": "Groq free tier. Fastest. Good for micro-decisions.",
-      "provider": "groq",
-      "rate_limits": {
-        "requests_per_day": 14400,
-        "requests_per_hour": null,
-        "requests_per_minute": 30,
-        "tokens_per_day": 500000,
-        "tokens_per_minute": 6000
-      },
-      "recovery": {
-        "cooldown_minutes": 2,
-        "heartbeat_interval_seconds": 15,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 120,
-        "timeout_seconds": 60
-      },
-      "spacing_min_seconds": 2,
-      "status": "active",
-      "strengths": [
-        "ultra_fast",
-        "simple_tasks",
-        "chat"
-      ],
-      "throttle_behavior": "hard_cutoff",
-      "weaknesses": [
-        "smaller_model"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "groq-api"
-      ],
-      "api_key_ref": "GROQ_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.59,
-        "output_per_1m_usd": 0.79
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "multilingual"
-      ],
-      "context_limit": 128000,
-      "courier": false,
-      "id": "qwen3-32b",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Qwen 3 32B (Groq)",
-      "notes": "Groq free tier. Strong multilingual support.",
-      "provider": "alibaba",
-      "rate_limits": {
-        "requests_per_day": 1000,
-        "requests_per_hour": null,
-        "requests_per_minute": 60,
-        "tokens_per_day": 500000,
-        "tokens_per_minute": 6000
-      },
-      "recovery": {
-        "cooldown_minutes": 2,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 180,
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 1,
-      "status": "active",
-      "strengths": [
-        "multilingual",
-        "code",
-        "fast"
-      ],
-      "throttle_behavior": "hard_cutoff",
-      "weaknesses": []
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "groq-api",
-        "openrouter-api"
-      ],
-      "api_key_ref": "GROQ_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.6,
-        "output_per_1m_usd": 3
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "tools",
-        "long_horizon"
-      ],
       "context_limit": 262000,
-      "id": "kimi-k2-instruct",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Kimi K2 (OpenRouter/Groq)",
-      "notes": "Groq free tier: 60 RPM, 1K RPD, 10K TPM, 300K TPD. Also available via OpenRouter as emergency fallback.",
-      "provider": "moonshot",
-      "rate_limits": {
-        "requests_per_day": 1000,
-        "requests_per_minute": 60,
-        "tokens_per_day": 300000,
-        "tokens_per_minute": 10000
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 3,
-      "status": "offline",
-      "status_reason": "no_longer_free_on_openrouter",
-      "strengths": [
-        "long_horizon",
-        "tool_chaining",
-        "complex_reasoning",
-        "500k_context"
-      ],
-      "throttle_behavior": "hard_cutoff",
-      "weaknesses": []
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "nvidia-api"
-      ],
-      "api_key_ref": "NVIDIA_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.59,
-        "output_per_1m_usd": 0.79
-      },
-      "buffer_pct": 80,
       "capabilities": [
         "code",
-        "reasoning"
-      ],
-      "context_limit": 131072,
-      "id": "meta/llama-3.3-70b-instruct",
-      "learned": {},
-      "name": "Llama 3.3 70B Instruct (NVIDIA)",
-      "notes": "NVIDIA NIM free tier: 40 RPM flat, 1000 credits total (token-based consumption), 4096 max output tokens. Credits are shared across all NIM models.",
-      "provider": "nvidia",
-      "rate_limits": {
-        "requests_per_day": 500,
-        "requests_per_minute": 40,
-        "tokens_per_day": 100000,
-        "tokens_per_minute": 8000
-      },
-      "recovery": {
-        "cooldown_minutes": 2,
-        "on_rate_limit": "wait_and_retry",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 1,
-      "status": "active",
-      "strengths": [
-        "code",
+        "instruction",
         "reasoning",
-        "instruction_following"
+        "text"
       ],
-      "throttle_behavior": "queue",
-      "weaknesses": []
-    },
-    {
-      "access_type": "api",
       "access_via": [
-        "nvidia-api"
+        "openrouter"
       ],
-      "api_key_ref": "NVIDIA_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.6,
-        "output_per_1m_usd": 3
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "context_limit": 131072,
-      "id": "moonshotai/kimi-k2-instruct",
-      "learned": {},
-      "name": "Kimi K2 Instruct (NVIDIA)",
-      "notes": "NVIDIA NIM free tier: 40 RPM flat, 1000 credits total (token-based consumption), 4096 max output tokens. Credits are shared across all NIM models.",
-      "provider": "nvidia",
-      "rate_limits": {
-        "requests_per_day": 500,
-        "requests_per_minute": 40,
-        "tokens_per_day": 100000,
-        "tokens_per_minute": 8000
-      },
-      "recovery": {
-        "cooldown_minutes": 2,
-        "on_rate_limit": "wait_and_retry",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 1,
-      "status": "active",
-      "strengths": [
-        "code",
-        "reasoning",
-        "agentic"
-      ],
-      "throttle_behavior": "queue",
-      "weaknesses": []
+      "status": "active"
     },
     {
-      "access_type": "api",
-      "access_via": [
-        "groq-api"
-      ],
-      "api_key_ref": "GROQ_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.2,
-        "output_per_1m_usd": 0.4
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "vision",
-        "multimodal",
-        "tool_calling"
-      ],
-      "context_limit": 131072,
-      "courier": true,
-      "id": "meta-llama/llama-4-scout-17b-16e-instruct",
-      "learned": {},
-      "name": "Llama 4 Scout 17B (Groq)",
-      "notes": "Groq free tier (unverified limits). Using conservative TPD=100K until actual limits confirmed from API headers.",
-      "provider": "groq",
-      "rate_limits": {
-        "requests_per_day": 14400,
-        "requests_per_minute": 30,
-        "tokens_per_day": 100000,
-        "tokens_per_minute": 12000
-      },
-      "recovery": {
-        "cooldown_minutes": 2,
-        "on_rate_limit": "wait_and_retry",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 2,
-      "status": "active",
-      "strengths": [
-        "multimodal",
-        "vision",
-        "multilingual",
-        "courier_fuel"
-      ],
-      "throttle_behavior": "wait_and_retry",
-      "weaknesses": [
-        "large_memory_footprint"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "groq-api"
-      ],
-      "api_key_ref": "GROQ_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.59,
-        "output_per_1m_usd": 0.79
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "context_limit": 131072,
-      "id": "groq/compound",
-      "learned": {},
-      "name": "Groq Compound (Groq)",
-      "notes": "Groq free tier (unverified limits). Using conservative TPD=100K until actual limits confirmed from API headers.",
-      "provider": "groq",
-      "rate_limits": {
-        "requests_per_day": 14400,
-        "requests_per_minute": 30,
-        "tokens_per_day": 100000,
-        "tokens_per_minute": 12000
-      },
-      "recovery": {
-        "cooldown_minutes": 2,
-        "on_rate_limit": "wait_and_retry",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 2,
-      "status": "active",
-      "strengths": [
-        "reasoning",
-        "agentic"
-      ],
-      "throttle_behavior": "wait_and_retry",
-      "weaknesses": []
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "groq-api"
-      ],
-      "api_key_ref": "GROQ_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0.2,
-        "output_per_1m_usd": 0.4
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "context_limit": 131072,
-      "id": "groq/compound-mini",
-      "learned": {},
-      "name": "Groq Compound Mini (Groq)",
-      "notes": "Groq free tier (unverified limits). Using conservative TPD=100K until actual limits confirmed from API headers.",
-      "provider": "groq",
-      "rate_limits": {
-        "requests_per_day": 14400,
-        "requests_per_minute": 30,
-        "tokens_per_day": 100000,
-        "tokens_per_minute": 12000
-      },
-      "recovery": {
-        "cooldown_minutes": 2,
-        "on_rate_limit": "wait_and_retry",
-        "timeout_seconds": 120
-      },
-      "spacing_min_seconds": 2,
-      "status": "active",
-      "strengths": [
-        "fast",
-        "reasoning"
-      ],
-      "throttle_behavior": "wait_and_retry",
-      "weaknesses": [
-        "smaller_capacity"
-      ]
-    },
-    {
-      "access_type": "api",
-      "api_pricing": {
-        "input_per_1m_usd": 0.26,
-        "output_per_1m_usd": 1.2
-      },
-      "buffer_pct": 80,
-      "context_limit": 205000,
-      "id": "minimax-m2.7",
-      "name": "MiniMax M2.7 (MiniMax)",
+      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
       "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 20
-      },
-      "status": "benched",
-      "status_reason": "No API access. Only available via OpenRouter free tier which is minimax-m2.5.",
-      "strengths": [
-        "agentic benchmarks",
-        "reasoning",
-        "cheap"
-      ],
-      "vendor": "minimax",
-      "weaknesses": []
-    },
-    {
-      "access_type": "web",
-      "access_via": [
-        "deepseek-web",
-        "notegpt-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "context_limit": 128000,
-      "id": "deepseek-r1",
-      "name": "DeepSeek R1 (Web)",
-      "notes": "Browser Use courier. Available on deepseek-web and notegpt-web.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 500,
-        "requests_per_minute": 10
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown"
-      },
-      "spacing_min_seconds": 6,
-      "status": "active",
-      "strengths": [
-        "reasoning",
-        "chain-of-thought",
-        "free"
-      ],
-      "vendor": "deepseek",
-      "weaknesses": [
-        "web-only",
-        "slow reasoning"
-      ]
-    },
-    {
-      "access_type": "web",
-      "access_via": [
-        "notegpt-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "context_limit": 128000,
-      "id": "deepseek-v3",
-      "name": "DeepSeek V3 (Web)",
-      "notes": "Browser Use courier via notegpt-web connector.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 500,
-        "requests_per_minute": 10
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown"
-      },
-      "spacing_min_seconds": 6,
-      "status": "active",
-      "strengths": [
-        "fast",
-        "coding",
-        "free"
-      ],
-      "vendor": "deepseek",
-      "weaknesses": [
-        "web-only"
-      ]
-    },
-    {
-      "access_type": "web",
-      "access_via": [
-        "qwen-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "context_limit": 131072,
-      "id": "qwen-3.6-plus",
-      "name": "Qwen 3.6 Plus",
-      "notes": "Web-only via browser use. Verified serving Qwen3.6-Plus on chat.qwen.ai (April 2026).",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 500,
-        "requests_per_minute": 10
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown"
-      },
-      "spacing_min_seconds": 6,
-      "status": "active",
-      "strengths": [
-        "coding",
-        "multilingual",
-        "free"
-      ],
-      "vendor": "alibaba",
-      "weaknesses": [
-        "web-only"
-      ]
-    },
-    {
-      "access_type": "web",
-      "access_via": [
-        "qwen-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "context_limit": 131072,
-      "id": "qwen-2.5",
-      "name": "Qwen 2.5 (Web)",
-      "notes": "Web-only via browser use. Available on chat.qwen.ai as selectable model.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 500,
-        "requests_per_minute": 10
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown"
-      },
-      "spacing_min_seconds": 6,
-      "status": "active",
-      "strengths": [
-        "fast",
-        "free"
-      ],
-      "vendor": "alibaba",
-      "weaknesses": [
-        "web-only",
-        "older model"
-      ]
-    },
-    {
-      "access_type": "web",
-      "access_via": [
-        "mistral-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "context_limit": 128000,
-      "id": "mistral-large",
-      "name": "Mistral Large (Web)",
-      "notes": "Browser Use courier via mistral-web connector.",
-      "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 8
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown"
-      },
-      "spacing_min_seconds": 8,
-      "status": "active",
-      "strengths": [
-        "reasoning",
-        "European"
-      ],
-      "vendor": "mistral",
-      "weaknesses": [
-        "web-only",
-        "rate limited"
-      ]
-    },
-    {
-      "access_type": "web",
-      "access_via": [
-        "mistral-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
       "context_limit": 256000,
-      "id": "codestral",
-      "name": "Codestral (Web)",
-      "notes": "Browser Use courier via mistral-web connector. Coding specialist.",
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
+      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
       "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 8
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown"
-      },
-      "spacing_min_seconds": 8,
-      "status": "active",
-      "strengths": [
-        "coding",
-        "256K context"
+      "context_limit": 256000,
+      "capabilities": [
+        "text"
       ],
-      "vendor": "mistral",
-      "weaknesses": [
-        "web-only"
-      ]
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
     },
     {
-      "access_type": "web",
-      "access_via": [
-        "mistral-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "context_limit": 128000,
-      "id": "pixtral",
-      "name": "Pixtral (Web)",
-      "notes": "Browser Use courier via mistral-web connector. Vision/multimodal.",
+      "id": "openrouter/free",
+      "name": "Free Models Router",
       "provider": "openrouter",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_minute": 8
-      },
-      "recovery": {
-        "cooldown_minutes": 5,
-        "on_rate_limit": "cooldown"
-      },
-      "spacing_min_seconds": 8,
-      "status": "active",
-      "strengths": [
-        "vision",
-        "multimodal"
+      "context_limit": 200000,
+      "capabilities": [
+        "text"
       ],
-      "vendor": "mistral",
-      "weaknesses": [
-        "web-only"
-      ]
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
     },
     {
-      "access_type": "web",
-      "access_via": [
-        "kimi-web"
+      "id": "minimax/minimax-m2.5:free",
+      "name": "MiniMax: MiniMax M2.5 (free)",
+      "provider": "openrouter",
+      "context_limit": 196608,
+      "capabilities": [
+        "text"
       ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "baidu/cobuddy:free",
+      "name": "Baidu Qianfan: CoBuddy (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "openai/gpt-oss-120b:free",
+      "name": "OpenAI: gpt-oss-120b (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
       "capabilities": [
         "code",
+        "instruction",
         "reasoning",
-        "agents"
+        "text"
       ],
-      "context_limit": 128000,
-      "id": "kimi-k2.6-instant",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Kimi K2.6 Instant",
-      "notes": "Web-only via browser use. K2.6 Instant model. Agent swarm feature.",
-      "provider": "moonshot",
-      "rate_limits": {
-        "messages_per_3_hours": null,
-        "requests_per_day": 50,
-        "requests_per_hour": null,
-        "requests_per_minute": null,
-        "tokens_per_day": null
-      },
-      "recovery": {
-        "cooldown_minutes": 60,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "status": "active",
-      "status_reason": null,
-      "strengths": [
-        "fast_response",
-        "agent_swarm",
-        "coding"
+      "access_via": [
+        "openrouter"
       ],
-      "throttle_behavior": "soft_throttle",
-      "weaknesses": [
-        "unknown_limits"
-      ]
+      "status": "active"
     },
     {
-      "access_type": "web",
-      "access_via": [
-        "huggingchat-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
+      "id": "z-ai/glm-4.5-air:free",
+      "name": "Z.ai: GLM 4.5 Air (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
       "capabilities": [
         "code",
+        "instruction",
         "reasoning",
-        "agentic"
+        "text"
       ],
-      "context_limit": 128000,
-      "id": "kimi-k2-instruct-0905-hf",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Kimi K2 Instruct 0905 (HuggingFace)",
-      "notes": "Web-only via HuggingChat. Currently defaults to this model via novita. Has MCP servers. Unlimited free.",
-      "provider": "moonshot",
-      "rate_limits": {
-        "limit_source": "HuggingFace: community-driven, mostly unlimited",
-        "limit_type": "unlimited_mostly",
-        "requests_per_day": 1000,
-        "requests_per_minute": 60
-      },
-      "recovery": {
-        "cooldown_minutes": 30,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "status": "active",
-      "status_reason": null,
-      "strengths": [
-        "unlimited_free",
-        "multi_model_switcher",
-        "mcp",
-        "agentic"
+      "access_via": [
+        "openrouter"
       ],
-      "throttle_behavior": "soft_throttle",
-      "weaknesses": [
-        "shared_infrastructure"
-      ]
+      "status": "active"
     },
     {
-      "access_type": "web",
-      "access_via": [
-        "aistudio-web"
+      "id": "poolside/laguna-m.1:free",
+      "name": "Poolside: Laguna M.1 (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
+      "capabilities": [
+        "text"
       ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "openai/gpt-oss-20b:free",
+      "name": "OpenAI: gpt-oss-20b (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
       "capabilities": [
         "code",
+        "instruction",
         "reasoning",
-        "vision",
-        "function_calling",
-        "grounding",
-        "url_context"
+        "text"
       ],
-      "context_limit": 1000000,
-      "courier": true,
-      "id": "gemini-3.1-pro-preview-web",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [
-          "design",
-          "apps",
-          "visual_qa"
-        ],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Gemini 3.1 Pro Preview (AI Studio)",
-      "notes": "Best platform for apps and design. Has native tools: function calling, Google Search grounding, Maps, URL context, code execution. May not need Playwright/browser-use -- could use native tool calling.",
-      "provider": "google",
-      "rate_limits": {
-        "messages_per_3_hours": null,
-        "requests_per_day": 1500,
-        "requests_per_hour": null,
-        "requests_per_minute": null,
-        "tokens_per_day": null
-      },
-      "recovery": {
-        "cooldown_minutes": 60,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "status": "active",
-      "status_reason": null,
-      "strengths": [
-        "1M_context",
-        "function_calling",
-        "grounding_search",
-        "grounding_maps",
-        "url_context",
-        "code_execution",
-        "best_for_design"
+      "access_via": [
+        "openrouter"
       ],
-      "throttle_behavior": "soft_throttle",
-      "weaknesses": [
-        "preview_model",
-        "web_only"
-      ]
+      "status": "active"
     },
     {
-      "access_type": "web",
-      "access_via": [
-        "poe-web"
+      "id": "poolside/laguna-xs.2:free",
+      "name": "Poolside: Laguna XS.2 (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
+      "capabilities": [
+        "text"
       ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta-llama/llama-3.2-3b-instruct:free",
+      "name": "Meta: Llama 3.2 3B Instruct (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nousresearch/hermes-3-llama-3.1-405b:free",
+      "name": "Nous: Hermes 3 405B Instruct (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-nano-9b-v2:free",
+      "name": "NVIDIA: Nemotron Nano 9B V2 (free)",
+      "provider": "openrouter",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-nano-12b-v2-vl:free",
+      "name": "NVIDIA: Nemotron Nano 12B 2 VL (free)",
+      "provider": "openrouter",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta-llama/llama-3.3-70b-instruct:free",
+      "name": "Meta: Llama 3.3 70B Instruct (free)",
+      "provider": "openrouter",
+      "context_limit": 65536,
       "capabilities": [
         "code",
+        "instruction",
         "reasoning",
-        "multi_model"
+        "text"
       ],
-      "context_limit": 128000,
-      "id": "poe-mix",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [
-          "research",
-          "comparison"
-        ],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Poe Multi-Model",
-      "notes": "Aggregator platform. 3000 compute points/day. Can switch between models. Google SSO.",
-      "provider": "poe",
-      "rate_limits": {
-        "compute_points_per_day": 3000,
-        "messages_per_3_hours": null,
-        "requests_per_day": 100,
-        "requests_per_hour": null,
-        "requests_per_minute": null,
-        "tokens_per_day": null
-      },
-      "recovery": {
-        "cooldown_minutes": 60,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "status": "active",
-      "status_reason": null,
-      "strengths": [
-        "multi_model_access",
-        "deepseek-r1",
-        "gemma-4",
-        "gemini-3.1-flash-lite"
+      "access_via": [
+        "openrouter"
       ],
-      "throttle_behavior": "hard_cutoff",
-      "weaknesses": [
-        "compute_point_system",
-        "variable_quality"
-      ]
+      "status": "active"
     },
     {
-      "access_type": "web",
-      "access_via": [
-        "chatbox-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
+      "id": "baidu/qianfan-ocr-fast:free",
+      "name": "Baidu: Qianfan-OCR-Fast (free)",
+      "provider": "openrouter",
+      "context_limit": 65536,
       "capabilities": [
-        "code",
-        "reasoning"
+        "text"
       ],
-      "context_limit": 128000,
-      "id": "gpt-4o-mini-chatbox",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "GPT-4o Mini (Chatbox)",
-      "notes": "Free GPT-4o mini via Chatbox wrapper. No auth needed. URL: app.chatbox.ai.",
-      "provider": "openai",
-      "rate_limits": {
-        "limit_source": "No published limits. Wrapper service.",
-        "limit_type": "unknown",
-        "requests_per_day": 50,
-        "requests_per_minute": 3
-      },
-      "recovery": {
-        "cooldown_minutes": 30,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "status": "active",
-      "status_reason": null,
-      "strengths": [
-        "free_gpt4o_mini",
-        "no_auth"
+      "access_via": [
+        "openrouter"
       ],
-      "throttle_behavior": "soft_throttle",
-      "weaknesses": [
-        "unknown_limits",
-        "wrapper_service"
-      ]
+      "status": "active"
     },
     {
-      "access_type": "web",
-      "access_via": [
-        "aizolo-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning",
-        "research",
-        "multi_model"
-      ],
-      "context_limit": 128000,
-      "id": "aizolo-mix",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [
-          "research",
-          "coding",
-          "comparison"
-        ],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "AiZolo Multi-Model",
-      "notes": "Aggregator. Free tier very limited (few messages). $9.90/mo gets 3M tokens across ALL premium models -- cheapest paid fallback. Best for when primary platform credits exhaust.",
-      "provider": "aizolo",
-      "rate_limits": {
-        "messages_per_3_hours": null,
-        "requests_per_day": 5,
-        "requests_per_minute": null,
-        "tokens_per_year": 255000000
-      },
-      "recovery": {
-        "cooldown_minutes": 60,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "failover",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "status": "active",
-      "status_reason": null,
-      "strengths": [
-        "multi_model",
-        "claude_access",
-        "gemini_access",
-        "deepseek_access",
-        "cheap_premium_fallback"
-      ],
-      "throttle_behavior": "hard_cutoff",
-      "weaknesses": [
-        "free_tier_very_limited",
-        "paywall_after_few_messages"
-      ]
-    },
-    {
-      "access_type": "web",
-      "access_via": [
-        "perplexity-web"
-      ],
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "search",
-        "citations",
-        "live_data",
-        "research"
-      ],
-      "context_limit": 32000,
-      "courier": true,
-      "courier_role": "system_researcher",
-      "id": "perplexity-free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [
-          "code_generation",
-          "long_form"
-        ],
-        "best_for_task_types": [
-          "search",
-          "research",
-          "live_data",
-          "citation"
-        ],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Perplexity Free Search",
-      "notes": "System Researcher primary platform. Best for sourcing GitHub repos, API docs, live data. 5 Pro searches/day, unlimited basic. Google SSO. Citations make it ideal for research verification.",
-      "provider": "perplexity",
-      "rate_limits": {
-        "messages_per_3_hours": null,
-        "pro_searches_per_day": 5,
-        "requests_per_day": null,
-        "requests_per_minute": null
-      },
-      "recovery": {
-        "cooldown_minutes": 60,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "status": "active",
-      "status_reason": null,
-      "strengths": [
-        "live_web_search",
-        "citations_with_links",
-        "source_accuracy",
-        "technical_docs",
-        "unlimited_basic"
-      ],
-      "throttle_behavior": "soft_throttle",
-      "weaknesses": [
-        "not_for_code_gen",
-        "limited_pro_searches",
-        "basic_model_for_free"
-      ]
-    },
-    {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code",
-        "reasoning"
-      ],
-      "context_limit": 32768,
-      "courier": false,
       "id": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "Dolphin Mistral 24B Venice (OpenRouter Free)",
-      "notes": "Uncensored variant. Free on OpenRouter.",
-      "provider": "mistral",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_hour": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "uncensored",
-        "reasoning"
+      "name": "Venice: Uncensored (free)",
+      "provider": "openrouter",
+      "context_limit": 32768,
+      "capabilities": [
+        "instruction",
+        "text"
       ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "32K_context_only",
-        "openrouter_rate_limits"
-      ]
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
     },
     {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
-      "capabilities": [
-        "code"
-      ],
-      "context_limit": 32768,
-      "courier": true,
       "id": "liquid/lfm-2.5-1.2b-instruct:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "LFM 2.5 1.2B Instruct (OpenRouter Free)",
-      "notes": "Tiny model for quick tasks. Free on OpenRouter.",
-      "provider": "liquid",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_hour": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "small_fast"
+      "name": "LiquidAI: LFM2.5-1.2B-Instruct (free)",
+      "provider": "openrouter",
+      "context_limit": 32768,
+      "capabilities": [
+        "instruction",
+        "text"
       ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "very_small",
-        "openrouter_rate_limits"
-      ]
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
     },
     {
-      "access_type": "api",
-      "access_via": [
-        "openrouter-api"
-      ],
-      "api_key_ref": "OPENROUTER_API_KEY",
-      "api_pricing": {
-        "input_per_1m_usd": 0,
-        "output_per_1m_usd": 0
-      },
-      "buffer_pct": 80,
+      "id": "liquid/lfm-2.5-1.2b-thinking:free",
+      "name": "LiquidAI: LFM2.5-1.2B-Thinking (free)",
+      "provider": "openrouter",
+      "context_limit": 32768,
       "capabilities": [
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "openrouter"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "qwen/qwen3-32b",
+      "name": "qwen/qwen3-32b",
+      "provider": "groq",
+      "context_limit": 131072,
+      "capabilities": [
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "groq/compound-mini",
+      "name": "groq/compound-mini",
+      "provider": "groq",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "openai/gpt-oss-safeguard-20b",
+      "name": "openai/gpt-oss-safeguard-20b",
+      "provider": "groq",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "groq/llama-3.3-70b-versatile",
+      "name": "llama-3.3-70b-versatile",
+      "provider": "groq",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "groq/llama-3.1-8b-instant",
+      "name": "llama-3.1-8b-instant",
+      "provider": "groq",
+      "context_limit": 131072,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "groq/compound",
+      "name": "groq/compound",
+      "provider": "groq",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta-llama/llama-4-scout-17b-16e-instruct",
+      "name": "meta-llama/llama-4-scout-17b-16e-instruct",
+      "provider": "groq",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "groq/allam-2-7b",
+      "name": "allam-2-7b",
+      "provider": "groq",
+      "context_limit": 4096,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "canopylabs/orpheus-v1-english",
+      "name": "canopylabs/orpheus-v1-english",
+      "provider": "groq",
+      "context_limit": 4000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "canopylabs/orpheus-arabic-saudi",
+      "name": "canopylabs/orpheus-arabic-saudi",
+      "provider": "groq",
+      "context_limit": 4000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-3-nano-30b-a3b",
+      "name": "nvidia/nemotron-3-nano-30b-a3b",
+      "provider": "nvidia",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "moonshotai/kimi-k2-thinking",
+      "name": "moonshotai/kimi-k2-thinking",
+      "provider": "nvidia",
+      "context_limit": 262144,
+      "capabilities": [
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "qwen/qwen3.5-397b-a17b",
+      "name": "qwen/qwen3.5-397b-a17b",
+      "provider": "nvidia",
+      "context_limit": 262144,
+      "capabilities": [
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "qwen/qwen3-next-80b-a3b-instruct",
+      "name": "qwen/qwen3-next-80b-a3b-instruct",
+      "provider": "nvidia",
+      "context_limit": 262144,
+      "capabilities": [
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-3-super-120b-a12b",
+      "name": "nvidia/nemotron-3-super-120b-a12b",
+      "provider": "nvidia",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-4-31b-it",
+      "name": "google/gemma-4-31b-it",
+      "provider": "nvidia",
+      "context_limit": 262144,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "qwen/qwen3.5-122b-a10b",
+      "name": "qwen/qwen3.5-122b-a10b",
+      "provider": "nvidia",
+      "context_limit": 262144,
+      "capabilities": [
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "moonshotai/kimi-k2.6",
+      "name": "moonshotai/kimi-k2.6",
+      "provider": "nvidia",
+      "context_limit": 262142,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "z-ai/glm-5.1",
+      "name": "z-ai/glm-5.1",
+      "provider": "nvidia",
+      "context_limit": 202752,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-3-27b-it",
+      "name": "google/gemma-3-27b-it",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "openai/gpt-oss-120b",
+      "name": "openai/gpt-oss-120b",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia",
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "moonshotai/kimi-k2-instruct",
+      "name": "moonshotai/kimi-k2-instruct",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "openai/gpt-oss-20b",
+      "name": "openai/gpt-oss-20b",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia",
+        "groq"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.1-nemotron-70b-instruct",
+      "name": "nvidia/llama-3.1-nemotron-70b-instruct",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-nano-12b-v2-vl",
+      "name": "nvidia/nemotron-nano-12b-v2-vl",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-3-12b-it",
+      "name": "google/gemma-3-12b-it",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-3-4b-it",
+      "name": "google/gemma-3-4b-it",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "qwen/qwen3-next-80b-a3b-thinking",
+      "name": "qwen/qwen3-next-80b-a3b-thinking",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+      "name": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta/llama-3.3-70b-instruct",
+      "name": "meta/llama-3.3-70b-instruct",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "aisingapore/sea-lion-7b-instruct",
+      "name": "aisingapore/sea-lion-7b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "adept/fuyu-8b",
+      "name": "adept/fuyu-8b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "deepseek-ai/deepseek-coder-6.7b-instruct",
+      "name": "deepseek-ai/deepseek-coder-6.7b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/codegemma-7b",
+      "name": "google/codegemma-7b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-3n-e2b-it",
+      "name": "google/gemma-3n-e2b-it",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/recurrentgemma-2b",
+      "name": "google/recurrentgemma-2b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "ibm/granite-3.0-3b-a800m-instruct",
+      "name": "ibm/granite-3.0-3b-a800m-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "ibm/granite-3.0-8b-instruct",
+      "name": "ibm/granite-3.0-8b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "ibm/granite-34b-code-instruct",
+      "name": "ibm/granite-34b-code-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta/codellama-70b",
+      "name": "meta/codellama-70b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta/llama-3.1-8b-instruct",
+      "name": "meta/llama-3.1-8b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta/llama-3.2-1b-instruct",
+      "name": "meta/llama-3.2-1b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta/llama-3.2-3b-instruct",
+      "name": "meta/llama-3.2-3b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta/llama-guard-4-12b",
+      "name": "meta/llama-guard-4-12b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "microsoft/kosmos-2",
+      "name": "microsoft/kosmos-2",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "microsoft/phi-3.5-moe-instruct",
+      "name": "microsoft/phi-3.5-moe-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "microsoft/phi-4-multimodal-instruct",
+      "name": "microsoft/phi-4-multimodal-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "minimaxai/minimax-m2.5",
+      "name": "minimaxai/minimax-m2.5",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "minimaxai/minimax-m2.7",
+      "name": "minimaxai/minimax-m2.7",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/codestral-22b-instruct-v0.1",
+      "name": "mistralai/codestral-22b-instruct-v0.1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/devstral-2-123b-instruct-2512",
+      "name": "mistralai/devstral-2-123b-instruct-2512",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/magistral-small-2506",
+      "name": "mistralai/magistral-small-2506",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/ministral-14b-instruct-2512",
+      "name": "mistralai/ministral-14b-instruct-2512",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mistral-7b-instruct-v0.3",
+      "name": "mistralai/mistral-7b-instruct-v0.3",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mistral-large-2-instruct",
+      "name": "mistralai/mistral-large-2-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mistral-large-3-675b-instruct-2512",
+      "name": "mistralai/mistral-large-3-675b-instruct-2512",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mistral-medium-3-instruct",
+      "name": "mistralai/mistral-medium-3-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mistral-medium-3.5-128b",
+      "name": "mistralai/mistral-medium-3.5-128b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mistral-nemotron",
+      "name": "mistralai/mistral-nemotron",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mistral-small-4-119b-2603",
+      "name": "mistralai/mistral-small-4-119b-2603",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mixtral-8x22b-instruct-v0.1",
+      "name": "mistralai/mixtral-8x22b-instruct-v0.1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mixtral-8x22b-v0.1",
+      "name": "mistralai/mixtral-8x22b-v0.1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mixtral-8x7b-instruct-v0.1",
+      "name": "mistralai/mixtral-8x7b-instruct-v0.1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "moonshotai/kimi-k2-instruct-0905",
+      "name": "moonshotai/kimi-k2-instruct-0905",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "qwen/qwen3-coder-480b-a35b-instruct",
+      "name": "qwen/qwen3-coder-480b-a35b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/neva-22b",
+      "name": "nvidia/neva-22b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "writer/palmyra-creative-122b",
+      "name": "writer/palmyra-creative-122b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "writer/palmyra-fin-70b-32k",
+      "name": "writer/palmyra-fin-70b-32k",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/cosmos-reason2-8b",
+      "name": "nvidia/cosmos-reason2-8b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nv-embedqa-e5-v5",
+      "name": "nvidia/nv-embedqa-e5-v5",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-2b",
+      "name": "google/gemma-2b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/embed-qa-4",
+      "name": "nvidia/embed-qa-4",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/gliner-pii",
+      "name": "nvidia/gliner-pii",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/ising-calibration-1-35b-a3b",
+      "name": "nvidia/ising-calibration-1-35b-a3b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.1-nemoguard-8b-content-safety",
+      "name": "nvidia/llama-3.1-nemoguard-8b-content-safety",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.1-nemoguard-8b-topic-control",
+      "name": "nvidia/llama-3.1-nemoguard-8b-topic-control",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+      "name": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta/llama2-70b",
+      "name": "meta/llama2-70b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.1-nemotron-safety-guard-8b-v3",
+      "name": "nvidia/llama-3.1-nemotron-safety-guard-8b-v3",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1",
+      "name": "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding",
+        "instruction"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.2-nemoretriever-300m-embed-v1",
+      "name": "nvidia/llama-3.2-nemoretriever-300m-embed-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding",
+        "instruction"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.2-nv-embedqa-1b-v1",
+      "name": "nvidia/llama-3.2-nv-embedqa-1b-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.2-nv-embedqa-1b-v2",
+      "name": "nvidia/llama-3.2-nv-embedqa-1b-v2",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.3-nemotron-super-49b-v1",
+      "name": "nvidia/llama-3.3-nemotron-super-49b-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-nemotron-embed-1b-v2",
+      "name": "nvidia/llama-nemotron-embed-1b-v2",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding",
+        "instruction"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama3-chatqa-1.5-70b",
+      "name": "nvidia/llama3-chatqa-1.5-70b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/mistral-nemo-minitron-8b-8k-instruct",
+      "name": "nvidia/mistral-nemo-minitron-8b-8k-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemoretriever-parse",
+      "name": "nvidia/nemoretriever-parse",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-4-340b-instruct",
+      "name": "nvidia/nemotron-4-340b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-4-340b-reward",
+      "name": "nvidia/nemotron-4-340b-reward",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-mini-4b-instruct",
+      "name": "nvidia/nemotron-mini-4b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-nano-3-30b-a3b",
+      "name": "nvidia/nemotron-nano-3-30b-a3b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-parse",
+      "name": "nvidia/nemotron-parse",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nv-embedcode-7b-v1",
+      "name": "nvidia/nv-embedcode-7b-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "embedding",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "microsoft/phi-4-mini-instruct",
+      "name": "microsoft/phi-4-mini-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nv-embedqa-mistral-7b-v2",
+      "name": "nvidia/nv-embedqa-mistral-7b-v2",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nvclip",
+      "name": "nvidia/nvclip",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nvidia-nemotron-nano-9b-v2",
+      "name": "nvidia/nvidia-nemotron-nano-9b-v2",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/riva-translate-4b-instruct",
+      "name": "nvidia/riva-translate-4b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/riva-translate-4b-instruct-v1.1",
+      "name": "nvidia/riva-translate-4b-instruct-v1.1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "qwen/qwen2.5-coder-32b-instruct",
+      "name": "qwen/qwen2.5-coder-32b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "sarvamai/sarvam-m",
+      "name": "sarvamai/sarvam-m",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "snowflake/arctic-embed-l",
+      "name": "snowflake/arctic-embed-l",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "stepfun-ai/step-3.5-flash",
+      "name": "stepfun-ai/step-3.5-flash",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "stockmark/stockmark-2-100b-instruct",
+      "name": "stockmark/stockmark-2-100b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "upstage/solar-10.7b-instruct",
+      "name": "upstage/solar-10.7b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "z-ai/glm5",
+      "name": "z-ai/glm5",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "zyphra/zamba2-7b-instruct",
+      "name": "zyphra/zamba2-7b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "z-ai/glm4.7",
+      "name": "z-ai/glm4.7",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-3n-e4b-it",
+      "name": "google/gemma-3n-e4b-it",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta/llama-3.1-405b-instruct",
+      "name": "meta/llama-3.1-405b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta/llama-3.1-70b-instruct",
+      "name": "meta/llama-3.1-70b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-nemotron-embed-vl-1b-v2",
+      "name": "nvidia/llama-nemotron-embed-vl-1b-v2",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding",
+        "instruction",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-3-content-safety",
+      "name": "nvidia/nemotron-3-content-safety",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nv-mistralai/mistral-nemo-12b-instruct",
+      "name": "nv-mistralai/mistral-nemo-12b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+      "name": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "deepseek-ai/deepseek-v4-pro",
+      "name": "deepseek-ai/deepseek-v4-pro",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-content-safety-reasoning-4b",
+      "name": "nvidia/nemotron-content-safety-reasoning-4b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+      "name": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "writer/palmyra-med-70b",
+      "name": "writer/palmyra-med-70b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.1-nemotron-51b-instruct",
+      "name": "nvidia/llama-3.1-nemotron-51b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+      "name": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nv-embed-v1",
+      "name": "nvidia/nv-embed-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta/llama-4-maverick-17b-128e-instruct",
+      "name": "meta/llama-4-maverick-17b-128e-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "ibm/granite-8b-code-instruct",
+      "name": "ibm/granite-8b-code-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mistral-large",
+      "name": "mistralai/mistral-large",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "01-ai/yi-large",
+      "name": "01-ai/yi-large",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "writer/palmyra-med-70b-32k",
+      "name": "writer/palmyra-med-70b-32k",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "abacusai/dracarys-llama-3.1-70b-instruct",
+      "name": "abacusai/dracarys-llama-3.1-70b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "ai21labs/jamba-1.5-large-instruct",
+      "name": "ai21labs/jamba-1.5-large-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "baai/bge-m3",
+      "name": "baai/bge-m3",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "bigcode/starcoder2-15b",
+      "name": "bigcode/starcoder2-15b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "bytedance/seed-oss-36b-instruct",
+      "name": "bytedance/seed-oss-36b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "databricks/dbrx-instruct",
+      "name": "databricks/dbrx-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "deepseek-ai/deepseek-v4-flash",
+      "name": "deepseek-ai/deepseek-v4-flash",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/codegemma-1.1-7b",
+      "name": "google/codegemma-1.1-7b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/deplot",
+      "name": "google/deplot",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-2-2b-it",
+      "name": "google/gemma-2-2b-it",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash-Lite",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-3-flash-preview",
+      "name": "Gemini 3 Flash Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "lyria-3-clip-preview",
+      "name": "Lyria 3 Clip Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-3.1-pro-preview-customtools",
+      "name": "Gemini 3.1 Pro Preview Custom Tools",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "reasoning",
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.0-flash-001",
+      "name": "Gemini 2.0 Flash 001",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-robotics-er-1.5-preview",
+      "name": "Gemini Robotics-ER 1.5 Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-pro-latest",
+      "name": "Gemini Pro Latest",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "instruction",
+        "reasoning",
+        "code",
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "name": "Gemini 3.1 Pro Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "reasoning",
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "name": "Gemini 2.5 Pro",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-flash-lite-latest",
+      "name": "Gemini Flash-Lite Latest",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "instruction",
+        "reasoning",
+        "code",
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-3-pro-preview",
+      "name": "Gemini 3 Pro Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "reasoning",
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.0-flash-lite-001",
+      "name": "Gemini 2.0 Flash-Lite 001",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-flash-latest",
+      "name": "Gemini Flash Latest",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "instruction",
+        "reasoning",
+        "code",
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.0-flash",
+      "name": "Gemini 2.0 Flash",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.0-flash-lite",
+      "name": "Gemini 2.0 Flash-Lite",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-3.1-flash-lite-preview",
+      "name": "Gemini 3.1 Flash Lite Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "lyria-3-pro-preview",
+      "name": "Lyria 3 Pro Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text",
         "reasoning"
       ],
-      "context_limit": 32768,
-      "courier": false,
-      "id": "liquid/lfm-2.5-1.2b-thinking:free",
-      "learned": {
-        "avg_task_duration_seconds": null,
-        "avoid_for_task_types": [],
-        "best_for_task_types": [],
-        "failure_rate_by_type": {},
-        "optimal_cooldown_minutes": null
-      },
-      "name": "LFM 2.5 1.2B Thinking (OpenRouter Free)",
-      "notes": "Tiny thinking model. Free on OpenRouter.",
-      "provider": "liquid",
-      "rate_limits": {
-        "requests_per_day": 200,
-        "requests_per_hour": 200,
-        "requests_per_minute": 20
-      },
-      "recovery": {
-        "cooldown_minutes": 10,
-        "heartbeat_interval_seconds": 30,
-        "on_rate_limit": "cooldown",
-        "orphan_threshold_seconds": 300,
-        "timeout_seconds": 300
-      },
-      "spacing_min_seconds": 3,
-      "status": "active",
-      "strengths": [
-        "small_fast",
-        "chain_of_thought"
+      "access_via": [
+        "google",
+        "gemini"
       ],
-      "throttle_behavior": "queue",
-      "weaknesses": [
-        "very_small",
-        "openrouter_rate_limits"
-      ]
+      "status": "active"
+    },
+    {
+      "id": "gemma-4-26b-a4b-it",
+      "name": "Gemma 4 26B A4B IT",
+      "provider": "gemini",
+      "context_limit": 262144,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemma-4-31b-it",
+      "name": "Gemma 4 31B IT",
+      "provider": "gemini",
+      "context_limit": 262144,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.5-computer-use-preview-10-2025",
+      "name": "Gemini 2.5 Computer Use Preview 10-2025",
+      "provider": "gemini",
+      "context_limit": 131072,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "deep-research-max-preview-04-2026",
+      "name": "Deep Research Max Preview (Apr-21-2026)",
+      "provider": "gemini",
+      "context_limit": 131072,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "deep-research-pro-preview-12-2025",
+      "name": "Deep Research Pro Preview (Dec-12-2025)",
+      "provider": "gemini",
+      "context_limit": 131072,
+      "capabilities": [
+        "vision",
+        "text",
+        "reasoning"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nano-banana-pro-preview",
+      "name": "Nano Banana Pro",
+      "provider": "gemini",
+      "context_limit": 131072,
+      "capabilities": [
+        "vision",
+        "text",
+        "reasoning"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "deep-research-preview-04-2026",
+      "name": "Deep Research Preview (Apr-21-2026)",
+      "provider": "gemini",
+      "context_limit": 131072,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-robotics-er-1.6-preview",
+      "name": "Gemini Robotics-ER 1.6 Preview",
+      "provider": "gemini",
+      "context_limit": 131072,
+      "capabilities": [
+        "vision",
+        "instruction"
+      ],
+      "access_via": [
+        "google",
+        "gemini"
+      ],
+      "status": "active"
     }
-  ],
-  "last_health_check": "2026-05-05T10:01:14.893217+00:00"
+  ]
 }
