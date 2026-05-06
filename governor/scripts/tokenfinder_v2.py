@@ -90,11 +90,27 @@ def db_upsert(models, provider):
     if not models:
         return 0
 
+    # Check which models should stay in their current state
+    # (e.g., GLM 5.1 is benched for cooldown, should not be re-activated)
+    preserved = set()
+    try:
+        r = subprocess.run(["psql", "-d", "vibepilot", "-t", "-A",
+            "-c", "SELECT id FROM model_catalog WHERE status = 'benched' AND status_reason IS NOT NULL AND status_reason != '';"],
+            capture_output=True, text=True, timeout=5)
+        for line in r.stdout.strip().split('\n'):
+            if line.strip():
+                preserved.add(line.strip())
+    except:
+        pass
+
     # Deduplicate by ID before building SQL
     seen_ids = set()
     unique_models = []
     for m in models:
         mid = m["id"]
+        # Skip models that are manually benched (e.g., GLM 5.1 cooldown)
+        if mid in preserved:
+            continue
         if mid not in seen_ids:
             seen_ids.add(mid)
             unique_models.append(m)
