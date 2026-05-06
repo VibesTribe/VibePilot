@@ -1,0 +1,131 @@
+# VibePilot Model Policy
+# Defines which models are suitable for which pipeline tasks
+# The scanner reads this to set excluded_from per task type
+
+# Task types in the VibePilot pipeline
+task_types:
+  code_generation:
+    description: "Generate working code from PRD/spec"
+    required_capabilities: [code]
+    min_context_length: 8192
+    excluded_patterns:
+      - "nemotron"           # User policy: nemotron doesn't do code right
+      - "llama-3.2-3b"      # Too small for pipeline
+      - "dolphin-mistral"    # Too small for pipeline
+      - "lfm-2.5-1.2b"      # 1.2B too small
+      - "ling-2.6"           # Not suitable for code
+      - "pixtral"            # Vision model, not code
+    excluded_providers: []
+
+  planning:
+    description: "Analyze requirements and create implementation plan"
+    required_capabilities: [code]
+    min_context_length: 8192
+    excluded_patterns:
+      - "nemotron"
+      - "llama-3.2-3b"
+      - "dolphin-mistral"
+      - "lfm-2.5-1.2b"
+      - "ling-2.6"
+    excluded_providers: []
+
+  code_review:
+    description: "Review generated code for quality and security"
+    required_capabilities: [code]
+    min_context_length: 16384
+    excluded_patterns:
+      - "nemotron"
+      - "llama-3.2-3b"
+      - "dolphin-mistral"
+      - "lfm-2.5-1.2b"
+      - "ling-2.6"
+      - "pixtral"
+    excluded_providers: []
+
+  testing:
+    description: "Write and validate tests"
+    required_capabilities: [code]
+    min_context_length: 8192
+    excluded_patterns:
+      - "nemotron"
+      - "llama-3.2-3b"
+      - "dolphin-mistral"
+      - "lfm-2.5-1.2b"
+      - "ling-2.6"
+    excluded_providers: []
+
+  consultant_fallback:
+    description: "Dashboard chat and research fallback"
+    required_capabilities: []  # Any model can be used
+    min_context_length: 4096
+    excluded_patterns:
+      - "nemotron"
+    excluded_providers: []
+
+  research:
+    description: "Web research and analysis"
+    required_capabilities: []  # Any model
+    min_context_length: 4096
+    excluded_patterns: []
+    excluded_providers: []
+
+# Global exclusion rules (applied to ALL task types)
+global_exclusions:
+  patterns:
+    - "embedding"
+    - "aqa"
+    - "tts"
+    - "image-gen"
+    - "whisper"
+  # Models with consecutive_failures >= this get auto-excluded
+  max_consecutive_failures: 5
+  # Models not seen in this many hours get marked stale
+  stale_after_hours: 72
+
+# Capability inference rules
+# If a model matches these patterns, assume these capabilities
+capability_inference:
+  code:
+    - "codestral"
+    - "code"
+    - "qwen.*coder"
+    - "deepseek-coder"
+    - "codellama"
+  reasoning:
+    - "o1"
+    - "o3"
+    - "r1"
+    - "reasoner"
+    - "thinking"
+    - "deepseek-r"
+  vision:
+    - "vision"
+    - "vl"
+    - "multimodal"
+    - "pixtral"
+  tool_calling:
+    - "tool"
+    - "function"
+    - "agent"
+
+# Routing preferences (higher = preferred)
+routing_preferences:
+  prefer_free: true
+  prefer_fast: true  # Prefer models with lower response times
+  
+  # Multiplier for models with tool_calling capability
+  tool_calling_bonus: 1.2
+  
+  # Multiplier for models with reasoning capability  
+  reasoning_bonus: 1.1
+
+# Scanner schedule
+scanner:
+  # How often to run full scan (hours)
+  full_scan_interval: 12
+  # How often to run health checks (minutes)
+  health_check_interval: 30
+  # How many models to health-check per cycle
+  health_check_batch_size: 10
+  # Timeout for health check requests (seconds)
+  health_check_timeout: 15
