@@ -410,42 +410,83 @@ def main():
         print(f"  Cleanup error: {cr.stderr[:100]}")
 
     # Write live snapshot to GitHub repo
-    print("\n--- Writing live model snapshot to repo ---")
+    print("\n--- Writing live model configs to repo ---")
     snapshot = []
     for provider in ["openrouter", "groq", "nvidia", "gemini"]:
         r = subprocess.run(["psql", "-d", "vibepilot", "-t", "-A", "-F", "|",
-            "-c", f"SELECT id, name, context_length, capabilities::text, rate_limits::text FROM model_catalog WHERE provider = '{provider}' AND status = 'active' ORDER BY context_length DESC;"],
+            "-c", f"SELECT id, name, context_length, capabilities::text, rate_limits::text, connector_ids::text FROM model_catalog WHERE provider = '{provider}' AND status = 'active' ORDER BY context_length DESC;"],
             capture_output=True, text=True, timeout=10)
         for line in r.stdout.strip().split('\n'):
             if not line.strip():
                 continue
             parts = line.split('|')
-            if len(parts) >= 5:
+            if len(parts) >= 6:
                 snapshot.append({
                     "id": parts[0], "name": parts[1],
                     "context_length": int(parts[2]) if parts[2].isdigit() else 0,
                     "capabilities": parts[3].strip('{}').split(',') if parts[3] != '{}' else [],
                     "rate_limits": json.loads(parts[4]) if parts[4] else {},
-                    "provider": provider
+                    "provider": provider,
+                    "connector_ids": parts[5].strip('{}').split(',') if parts[5] != '{}' else []
                 })
 
+    # Write models_live.json (human-readable snapshot)
     with open("/home/vibes/vibepilot/governor/config/models_live.json", "w") as f:
         json.dump({"version": 2, "updated": datetime.now(timezone.utc).isoformat(),
                    "total": len(snapshot), "models": snapshot}, f, indent=2)
     print(f"  Wrote {len(snapshot)} models to governor/config/models_live.json")
 
-    # Commit and push to GitHub
-    r = subprocess.run(["git", "-C", "/home/vibes/vibepilot", "add", "governor/config/models_live.json"],
-                      capture_output=True, text=True, timeout=10)
+    # Also write governor-compatible models.json so the Go router picks up live data
+    provider_to_connector = {
+        "openrouter": ["openrouter-api"],
+        "groq": ["groq-api"],
+        "nvidia": ["nvidia-api"],
+        "gemini": ["gemini-api-general"],
+        "google": ["gemini-api-general"],
+    }
+    go_models = []
+    for m in snapshot:
+        access_via = m.get("connector_ids", [])
+        if not access_via:
+            access_via = provider_to_connector.get(m["provider"], [m["provider"] + "-api"])
+        go_models.append({
+            "id": m["id"],
+            "name": m["name"],
+            "provider": m["provider"],
+            "context_limit": m["context_length"],
+            "capabilities": m["capabilities"],
+            "access_via": access_via,
+            "status": "active",
+        })
+
+    # Rename old models.json to .legacy, write new one
+    legacy = "/home/vibes/vibepilot/governor/config/models.json.legacy"
+    current = "/home/vibes/vibepilot/governor/config/models.json"
+    if os.path.exists(current) and not os.path.exists(legacy):
+        os.rename(current, legacy)
+        print(f"  Renamed old models.json -> models.json.legacy")
+
+    with open(current, "w") as f:
+        json.dump({"models": go_models}, f, indent=2)
+    print(f"  Wrote {len(go_models)} models to governor/config/models.json")
+
+    # Commit and push both files to GitHub
+    git_files = ["governor/config/models_live.json", "governor/config/models.json"]
+    if os.path.exists(legacy):
+        git_files.append("governor/config/models.json.legacy")
+    
+    for gf in git_files:
+        subprocess.run(["git", "-C", "/home/vibes/vibepilot", "add", gf],
+                      capture_output=True, timeout=10)
     r2 = subprocess.run(["git", "-C", "/home/vibes/vibepilot", "diff", "--cached", "--quiet"],
                        capture_output=True, timeout=10)
     if r2.returncode != 0:
         try:
             subprocess.run(["git", "-C", "/home/vibes/vibepilot", "commit", "-m",
-                           f"live model snapshot: {len(snapshot)} free models from 4 providers"],
+                           f"live model config: {len(go_models)} models from model_catalog"],
                            capture_output=True, timeout=60)
-            r3 = subprocess.run(["git", "-C", "/home/vibes/vibepilot", "push", "origin", "main"],
-                               capture_output=True, text=True, timeout=60)
+            subprocess.run(["git", "-C", "/home/vibes/vibepilot", "push", "origin", "main"],
+                          capture_output=True, timeout=60)
             print(f"  Pushed to GitHub")
         except subprocess.TimeoutExpired:
             print("  Git commit/push timed out — will retry next scan")
