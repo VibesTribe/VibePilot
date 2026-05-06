@@ -113,6 +113,7 @@ VALUES
 """ + ",\n".join(values) + """
 ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
+    provider = EXCLUDED.provider,
     connector_ids = CASE WHEN NOT model_catalog.connector_ids @> EXCLUDED.connector_ids
                          THEN model_catalog.connector_ids || EXCLUDED.connector_ids
                          ELSE model_catalog.connector_ids END,
@@ -174,6 +175,10 @@ def scan_openrouter():
         name = m.get("name", model_id)
         vendor = model_id.split("/")[0] if "/" in model_id else "openrouter"
         caps = infer_capabilities(model_id, name)
+
+        # Only keep models useful for LLM tasks
+        if caps == ["text"]:
+            continue
 
         # OpenRouter free tier rate limits
         rate_limits = {"rpd": 200, "rpm": 20}
@@ -246,6 +251,13 @@ def scan_nvidia():
         ctx = 128000  # Default — all NIM models support >= 128K
         full_id = f"nvidia/{model_id}" if "/" not in model_id else model_id
         caps = infer_capabilities(model_id)
+        
+        # Only keep models useful for LLM tasks (skip plain text-only)
+        if caps == ["text"]:
+            continue
+        if ctx < 32000:
+            continue
+            
         rate_limits = {"rpm": 10, "rpd": 1000}
 
         available.append({
@@ -328,6 +340,9 @@ def main():
     print(f"TokenFinder v2 — {datetime.now(timezone.utc).isoformat()}")
     print("=" * 60)
 
+    # Record scan start time for cleanup
+    scan_start = datetime.now(timezone.utc)
+
     total_upserted = 0
 
     scans = []
@@ -364,20 +379,16 @@ def main():
     print(f"\n{'=' * 60}")
     print(f"Total: {total_upserted} models upserted to model_catalog")
 
-    # Clean up: mark old models as disappeared if not found in this scan
-    print("\n--- Cleanup: marking disappeared models ---")
-    cleanup_sql = """UPDATE model_catalog
-SET status = 'disappeared', updated_at = NOW()
-WHERE status = 'active'
-AND last_scan_at IS DISTINCT FROM NULL
-AND last_scan_at < NOW() - INTERVAL '1 hour';"""
+    # Clean up: remove entries that weren't updated by this scan
+    print(f"\n--- Cleanup: benching models from before this scan ---")
+    cutoff = scan_start.isoformat()
+    cleanup_sql = f"UPDATE model_catalog SET status = 'benched', updated_at = NOW() WHERE status = 'active' AND (last_scan_at IS DISTINCT FROM NULL AND last_scan_at < '{cutoff}');"
     r = subprocess.run(["psql", "-d", "vibepilot", "-c", cleanup_sql],
                       capture_output=True, text=True, timeout=30)
     if r.returncode == 0:
-        # Parse UPDATE count from output
         for line in r.stdout.split('\n'):
             if 'UPDATE' in line:
-                print(f"  {line.strip()} old models marked disappeared")
+                print(f"  {line.strip()} old/filtered entries benched")
     else:
         print(f"  Cleanup error: {r.stderr[:100]}")
 
