@@ -9,7 +9,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -22,7 +22,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -36,7 +36,33 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "name": "NVIDIA: Nemotron 3 Super (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "tencent/hy3-preview:free",
+      "name": "Tencent: Hy3 preview (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -51,7 +77,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -65,7 +91,20 @@
         "vision"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "inclusionai/ling-2.6-1t:free",
+      "name": "inclusionAI: Ling-2.6-1T (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -79,46 +118,7 @@
         "vision"
       ],
       "access_via": [
-        "openrouter"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "tencent/hy3-preview:free",
-      "name": "Tencent: Hy3 preview (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "nvidia/nemotron-3-super-120b-a12b:free",
-      "name": "NVIDIA: Nemotron 3 Super (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "inclusionai/ling-2.6-1t:free",
-      "name": "inclusionAI: Ling-2.6-1T (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -134,7 +134,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -147,7 +147,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -160,7 +160,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -173,7 +173,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -186,7 +186,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -199,7 +199,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -215,7 +215,20 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "poolside/laguna-m.1:free",
+      "name": "Poolside: Laguna M.1 (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -231,20 +244,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "poolside/laguna-m.1:free",
-      "name": "Poolside: Laguna M.1 (free)",
-      "provider": "openrouter",
-      "context_limit": 131072,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -260,7 +260,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -273,7 +273,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -287,7 +287,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -301,7 +301,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -314,7 +314,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -327,7 +327,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -343,7 +343,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -356,7 +356,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -370,21 +370,7 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "liquid/lfm-2.5-1.2b-instruct:free",
-      "name": "LiquidAI: LFM2.5-1.2B-Instruct (free)",
-      "provider": "openrouter",
-      "context_limit": 32768,
-      "capabilities": [
-        "instruction",
-        "text"
-      ],
-      "access_via": [
-        "openrouter"
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -398,7 +384,21 @@
         "text"
       ],
       "access_via": [
-        "openrouter"
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "liquid/lfm-2.5-1.2b-instruct:free",
+      "name": "LiquidAI: LFM2.5-1.2B-Instruct (free)",
+      "provider": "openrouter",
+      "context_limit": 32768,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
       ],
       "status": "active"
     },
@@ -413,7 +413,7 @@
         "text"
       ],
       "access_via": [
-        "groq"
+        "groq-api"
       ],
       "status": "active"
     },
@@ -429,7 +429,7 @@
         "text"
       ],
       "access_via": [
-        "groq"
+        "groq-api"
       ],
       "status": "active"
     },
@@ -445,7 +445,7 @@
         "text"
       ],
       "access_via": [
-        "groq"
+        "groq-api"
       ],
       "status": "active"
     },
@@ -461,7 +461,7 @@
         "text"
       ],
       "access_via": [
-        "groq"
+        "groq-api"
       ],
       "status": "active"
     },
@@ -475,7 +475,7 @@
         "text"
       ],
       "access_via": [
-        "groq"
+        "groq-api"
       ],
       "status": "active"
     },
@@ -491,7 +491,7 @@
         "text"
       ],
       "access_via": [
-        "groq"
+        "groq-api"
       ],
       "status": "active"
     },
@@ -508,7 +508,7 @@
         "vision"
       ],
       "access_via": [
-        "groq"
+        "groq-api"
       ],
       "status": "active"
     },
@@ -521,7 +521,7 @@
         "text"
       ],
       "access_via": [
-        "groq"
+        "groq-api"
       ],
       "status": "active"
     },
@@ -534,7 +534,7 @@
         "text"
       ],
       "access_via": [
-        "groq"
+        "groq-api"
       ],
       "status": "active"
     },
@@ -547,7 +547,7 @@
         "text"
       ],
       "access_via": [
-        "groq"
+        "groq-api"
       ],
       "status": "active"
     },
@@ -560,7 +560,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -575,7 +575,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -588,7 +588,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -603,7 +603,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -618,7 +618,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -633,7 +633,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -647,7 +647,7 @@
         "vision"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -661,7 +661,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -677,7 +677,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "benched"
     },
@@ -691,7 +691,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -707,8 +707,8 @@
         "text"
       ],
       "access_via": [
-        "nvidia",
-        "groq"
+        "nvidia-api",
+        "groq-api"
       ],
       "status": "active"
     },
@@ -722,7 +722,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -738,7 +738,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -752,7 +752,7 @@
         "vision"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -766,7 +766,7 @@
         "vision"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -782,8 +782,8 @@
         "text"
       ],
       "access_via": [
-        "nvidia",
-        "groq"
+        "nvidia-api",
+        "groq-api"
       ],
       "status": "active"
     },
@@ -797,7 +797,7 @@
         "vision"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -810,7 +810,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -825,7 +825,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -839,7 +839,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -853,7 +853,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -866,7 +866,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -881,7 +881,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -894,7 +894,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -908,7 +908,7 @@
         "vision"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -921,7 +921,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -935,7 +935,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -949,7 +949,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -964,7 +964,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -979,7 +979,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -993,7 +993,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1007,7 +1007,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1021,7 +1021,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1035,7 +1035,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1048,7 +1048,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1062,7 +1062,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1077,7 +1077,7 @@
         "vision"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1090,7 +1090,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1103,7 +1103,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1118,7 +1118,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1132,7 +1132,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1146,7 +1146,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1160,7 +1160,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1174,7 +1174,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1188,7 +1188,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1202,7 +1202,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1216,7 +1216,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1230,7 +1230,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1244,7 +1244,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1258,7 +1258,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1272,7 +1272,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1286,7 +1286,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1300,7 +1300,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1314,7 +1314,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1330,7 +1330,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1343,7 +1343,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1356,7 +1356,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1369,7 +1369,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1382,7 +1382,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1396,7 +1396,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1409,7 +1409,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1422,7 +1422,7 @@
         "embedding"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1435,7 +1435,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1448,7 +1448,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1462,7 +1462,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1476,7 +1476,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1490,7 +1490,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1504,7 +1504,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1518,7 +1518,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1532,7 +1532,7 @@
         "instruction"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1546,7 +1546,7 @@
         "instruction"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1561,7 +1561,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1576,7 +1576,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1590,7 +1590,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1604,7 +1604,7 @@
         "instruction"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1618,7 +1618,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1632,7 +1632,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1645,7 +1645,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1659,7 +1659,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1672,7 +1672,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1686,7 +1686,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1699,7 +1699,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1712,7 +1712,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1727,7 +1727,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1741,7 +1741,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1756,7 +1756,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1769,7 +1769,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1782,7 +1782,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1796,7 +1796,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1810,7 +1810,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1823,7 +1823,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1838,7 +1838,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1851,7 +1851,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1864,7 +1864,7 @@
         "embedding"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1877,7 +1877,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1891,7 +1891,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1905,7 +1905,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1921,7 +1921,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1935,7 +1935,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1951,7 +1951,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1965,7 +1965,7 @@
         "vision"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1979,7 +1979,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1993,7 +1993,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2008,7 +2008,7 @@
         "vision"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2021,7 +2021,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2035,7 +2035,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2049,7 +2049,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2063,7 +2063,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2076,7 +2076,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2091,7 +2091,7 @@
         "vision"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2104,7 +2104,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2118,7 +2118,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2131,7 +2131,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2144,7 +2144,7 @@
         "embedding"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2161,7 +2161,7 @@
         "vision"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2176,7 +2176,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2190,7 +2190,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2203,7 +2203,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2216,7 +2216,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2230,7 +2230,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2244,7 +2244,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2258,7 +2258,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2272,7 +2272,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2286,7 +2286,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2300,7 +2300,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2314,7 +2314,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2327,7 +2327,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2340,7 +2340,7 @@
         "text"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2354,7 +2354,7 @@
         "vision"
       ],
       "access_via": [
-        "nvidia"
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -2369,8 +2369,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2385,8 +2385,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2401,8 +2401,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "benched"
     },
@@ -2416,8 +2416,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2427,14 +2427,14 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "reasoning",
         "text",
         "instruction",
-        "vision",
-        "reasoning"
+        "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2449,8 +2449,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2464,8 +2464,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2475,15 +2475,15 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "code",
-        "instruction",
-        "text",
         "vision",
-        "reasoning"
+        "text",
+        "reasoning",
+        "instruction",
+        "code"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2493,14 +2493,14 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "reasoning",
         "text",
         "instruction",
-        "vision",
-        "reasoning"
+        "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2515,8 +2515,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2526,15 +2526,15 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "code",
-        "instruction",
-        "text",
         "vision",
-        "reasoning"
+        "text",
+        "reasoning",
+        "instruction",
+        "code"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2544,14 +2544,14 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "reasoning",
         "text",
         "instruction",
-        "vision",
-        "reasoning"
+        "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2566,8 +2566,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2577,15 +2577,15 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "code",
-        "instruction",
-        "text",
         "vision",
-        "reasoning"
+        "text",
+        "reasoning",
+        "instruction",
+        "code"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2600,8 +2600,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2616,8 +2616,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2632,8 +2632,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2643,13 +2643,13 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "reasoning",
         "text",
-        "vision",
-        "reasoning"
+        "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2663,8 +2663,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2678,8 +2678,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2694,8 +2694,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2705,13 +2705,13 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
+        "reasoning",
         "text",
-        "vision",
-        "reasoning"
+        "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2725,8 +2725,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2736,13 +2736,13 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
+        "reasoning",
         "text",
-        "vision",
-        "reasoning"
+        "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2756,8 +2756,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     },
@@ -2771,8 +2771,8 @@
         "vision"
       ],
       "access_via": [
-        "google",
-        "gemini"
+        "gemini-api-general",
+        "gemini-api-general"
       ],
       "status": "active"
     }
