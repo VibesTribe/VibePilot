@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-05-06T15:16:12.003460+00:00",
+  "updated": "2026-05-06T15:48:14.758252+00:00",
   "total": 194,
   "models": [
     {
@@ -8,23 +8,6 @@
       "name": "Owl Alpha",
       "context_length": 1048756,
       "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "google/lyria-3-pro-preview",
-      "name": "Google: Lyria 3 Pro Preview",
-      "context_length": 1048576,
-      "capabilities": [
-        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -53,11 +36,10 @@
       ]
     },
     {
-      "id": "qwen/qwen3-next-80b-a3b-instruct:free",
-      "name": "Qwen: Qwen3 Next 80B A3B Instruct (free)",
-      "context_length": 262144,
+      "id": "google/lyria-3-pro-preview",
+      "name": "Google: Lyria 3 Pro Preview",
+      "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "reasoning",
         "text"
       ],
@@ -104,11 +86,12 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3-super-120b-a12b:free",
-      "name": "NVIDIA: Nemotron 3 Super (free)",
+      "id": "google/gemma-4-26b-a4b-it:free",
+      "name": "Google: Gemma 4 26B A4B  (free)",
       "context_length": 262144,
       "capabilities": [
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "rpd": 200,
@@ -136,12 +119,29 @@
       ]
     },
     {
-      "id": "google/gemma-4-26b-a4b-it:free",
-      "name": "Google: Gemma 4 26B A4B  (free)",
+      "id": "qwen/qwen3-next-80b-a3b-instruct:free",
+      "name": "Qwen: Qwen3 Next 80B A3B Instruct (free)",
       "context_length": 262144,
       "capabilities": [
-        "text",
-        "vision"
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
+      "id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "name": "NVIDIA: Nemotron 3 Super (free)",
+      "context_length": 262144,
+      "capabilities": [
+        "text"
       ],
       "rate_limits": {
         "rpd": 200,
@@ -2871,8 +2871,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2891,8 +2891,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2911,8 +2911,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2949,10 +2949,10 @@
       "name": "Gemini 3.1 Pro Preview Custom Tools",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
         "instruction",
-        "text",
-        "reasoning"
+        "vision",
+        "reasoning",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2971,8 +2971,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3011,9 +3011,9 @@
       "capabilities": [
         "reasoning",
         "instruction",
-        "text",
         "vision",
-        "code"
+        "code",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3031,10 +3031,10 @@
       "name": "Gemini 3.1 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
         "instruction",
-        "text",
-        "reasoning"
+        "vision",
+        "reasoning",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3053,8 +3053,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3074,9 +3074,9 @@
       "capabilities": [
         "reasoning",
         "instruction",
-        "text",
         "vision",
-        "code"
+        "code",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3094,10 +3094,10 @@
       "name": "Gemini 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
         "instruction",
-        "text",
-        "reasoning"
+        "vision",
+        "reasoning",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3116,8 +3116,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3137,9 +3137,9 @@
       "capabilities": [
         "reasoning",
         "instruction",
-        "text",
         "vision",
-        "code"
+        "code",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3158,8 +3158,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3178,8 +3178,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3198,8 +3198,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3217,8 +3217,8 @@
       "name": "Lyria 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
         "text",
+        "vision",
         "reasoning"
       ],
       "rate_limits": {
@@ -3276,8 +3276,8 @@
       "context_length": 131072,
       "capabilities": [
         "instruction",
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3295,8 +3295,8 @@
       "name": "Nano Banana Pro",
       "context_length": 131072,
       "capabilities": [
-        "vision",
         "text",
+        "vision",
         "reasoning"
       ],
       "rate_limits": {
@@ -3334,8 +3334,8 @@
       "name": "Deep Research Pro Preview (Dec-12-2025)",
       "context_length": 131072,
       "capabilities": [
-        "vision",
         "text",
+        "vision",
         "reasoning"
       ],
       "rate_limits": {
