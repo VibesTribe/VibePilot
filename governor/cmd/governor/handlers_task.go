@@ -101,6 +101,32 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		return
 	}
 
+	// ATTEMPT GUARD: Stop dispatching if this task has exceeded its max attempts.
+	// Prevents infinite dispatch loops where a failing task is retried forever.
+	// The diagnostic ceiling in failTask() checks and triggers the analyst, but
+	// that path still transitions back to 'pending'. This is the absolute cutoff.
+	guardAttempts := 0
+	if v, ok := task["attempts"].(float64); ok {
+		guardAttempts = int(v)
+	}
+	guardMax := h.cfg.GetDiagnosticTriggerAttempts()
+	if guardAttempts >= guardMax {
+		log.Printf("[TaskAvailable] ATTEMPT GUARD: Task %s has %d tries (max %d). Blocking dispatch and transitioning to failed.",
+			taskNumber, guardAttempts, guardMax)
+		h.database.RPC(ctx, "transition_task", map[string]any{
+			"p_task_id":        taskID,
+			"p_new_status":     "failed",
+			"p_failure_reason": fmt.Sprintf("MAX_ATTEMPTS_EXCEEDED: Task attempted %d times (limit %d). Dispatch blocked by attempt guard.", guardAttempts, guardMax),
+		})
+		recordPipelineEvent(ctx, h.database, "task_dispatch_blocked", taskID, "", "",
+			map[string]any{
+				"attempts":     guardAttempts,
+				"max_attempts": guardMax,
+				"reason":       "exceeded_max_attempts",
+			})
+		return
+	}
+
 	// DEPENDENCY GATE: Block tasks whose dependencies aren't complete
 	if deps, ok := task["dependencies"].([]any); ok && len(deps) > 0 {
 		allComplete := true
