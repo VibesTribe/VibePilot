@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-05-07T15:12:00.539325+00:00",
+  "updated": "2026-05-07T15:43:47.370769+00:00",
   "total": 191,
   "models": [
     {
@@ -86,23 +86,6 @@
       ]
     },
     {
-      "id": "google/gemma-4-26b-a4b-it:free",
-      "name": "Google: Gemma 4 26B A4B  (free)",
-      "context_length": 262144,
-      "capabilities": [
-        "text",
-        "vision"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
       "id": "nvidia/nemotron-3-super-120b-a12b:free",
       "name": "NVIDIA: Nemotron 3 Super (free)",
       "context_length": 262144,
@@ -137,6 +120,23 @@
       ]
     },
     {
+      "id": "google/gemma-4-26b-a4b-it:free",
+      "name": "Google: Gemma 4 26B A4B  (free)",
+      "context_length": 262144,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
       "id": "qwen/qwen3-coder:free",
       "name": "Qwen: Qwen3 Coder 480B A35B (free)",
       "context_length": 262000,
@@ -156,8 +156,8 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-      "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
+      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
+      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
       "context_length": 256000,
       "capabilities": [
         "text"
@@ -172,8 +172,8 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
-      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
+      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
       "context_length": 256000,
       "capabilities": [
         "text"
@@ -2806,8 +2806,8 @@
       "capabilities": [
         "instruction",
         "vision",
-        "reasoning",
-        "text"
+        "text",
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2906,8 +2906,8 @@
       "capabilities": [
         "instruction",
         "vision",
-        "reasoning",
-        "text"
+        "text",
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2964,10 +2964,10 @@
       "name": "Gemini Pro Latest",
       "context_length": 1048576,
       "capabilities": [
+        "text",
+        "reasoning",
         "code",
         "instruction",
-        "reasoning",
-        "text",
         "vision"
       ],
       "rate_limits": {
@@ -3025,10 +3025,10 @@
       "name": "Gemini Flash-Lite Latest",
       "context_length": 1048576,
       "capabilities": [
+        "text",
+        "reasoning",
         "code",
         "instruction",
-        "reasoning",
-        "text",
         "vision"
       ],
       "rate_limits": {
@@ -3049,8 +3049,8 @@
       "capabilities": [
         "instruction",
         "vision",
-        "reasoning",
-        "text"
+        "text",
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3088,10 +3088,10 @@
       "name": "Gemini Flash Latest",
       "context_length": 1048576,
       "capabilities": [
+        "text",
+        "reasoning",
         "code",
         "instruction",
-        "reasoning",
-        "text",
         "vision"
       ],
       "rate_limits": {
@@ -3170,8 +3170,8 @@
       "name": "Lyria 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "reasoning"
       ],
       "rate_limits": {
@@ -3248,8 +3248,8 @@
       "name": "Nano Banana Pro",
       "context_length": 131072,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "reasoning"
       ],
       "rate_limits": {
@@ -3287,8 +3287,8 @@
       "name": "Deep Research Pro Preview (Dec-12-2025)",
       "context_length": 131072,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "reasoning"
       ],
       "rate_limits": {
