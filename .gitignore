@@ -94,6 +94,9 @@ list_models.py
 
 # Go binaries
 governor/governor
+governor/governor.new
+governor/vibepilot-governor
+governor/governor.backup.old
 governor/governor.yaml
 
 # Supabase migrations - keep specific files
