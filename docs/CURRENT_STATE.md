@@ -1,5 +1,5 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-05-02 — KB MCP server converted to streamable-http systemd service
+# AUTO-UPDATED: 2026-05-07 — Git cleanup, backup system, memory limits, analyst proactive
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 
@@ -22,17 +22,24 @@ VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
 
 ## System Status
 
-- **Governor:** RUNNING (systemd service, Restart=always)
+- **Governor:** RUNNING (systemd service, Restart=always, MemoryMax=4GB)
   - Binary: /home/vibes/vibepilot/governor/governor
   - Config: /home/vibes/vibepilot/governor/config/ (GOVERNOR_CONFIG_DIR env var)
   - WARNING: /vibepilot/config/ is a stale git copy. Always use governor/config/.
-  - Database: Local PostgreSQL 16 (system.json type=postgres)
+  - Database: Local PostgreSQL 16 (system.json type=postgres, shared_buffers=2GB)
   - Webhook: port 8080/webhooks
   - SSE: pg_notify on vp_changes → SSE broker → dashboard
   - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
   - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
   - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 04eb349f (VibePilot), a0ee1fc82 (Vibeflow)
+- **Git:** main branch. Last: e2c1637 (vibepilot), daf1cfb (knowledgebase)
+- **Git cleanup (May 7):** VibePilot repo 271MB -> 28MB (filter-repo removed venv/.context/governor binaries from history). Vibes-agent-context 7.8GB -> 376KB (removed hourly 288MB pg_dump bloat). All repos consolidated to 1-2 pack files, zero loose objects.
+- **Git pack limits:** windowMemory=256m, deltaCacheSize=128m, threads=2 on all repos. CRITICAL: never use `git gc --aggressive` (triggers 9.7GB pack-objects OOM).
+- **Database backup:** Hourly full dump gzip -9 (~80MB) to `backups` branch of knowledgebase repo on GitHub. Single rotating commit (--amend + force push). Dedicated repo at ~/db-backups. Verified: clone from GitHub, gzip -t valid, 227 tables.
+- **Disaster recovery:** docs/DISASTER_RECOVERY.md in knowledgebase repo — step-by-step rebuild from any machine.
+- **Model pricing:** Verified from OpenRouter API. deepseek-v4-flash $0.14/$0.28 per 1K, gemini-2.5-flash $0.30/$2.50, flash-lite $0.10/$0.40. Research doc at knowledgebase/research/model-pricing-reference.md.
+- **Service memory limits:** governor=4GB, kb-mcp=1GB, knowledgebase-server=512MB, hermes-gateway=1GB
+- **Analyst proactive:** Daily pattern scan at 5am. Queries task_runs/tasks for high-failure models, high-retry categories, recurring failure patterns. Inserts proposals into research_suggestions (type=analyst_proposal). Simple proposals auto-implement, complex go to council.
 - **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
 - **Chrome CDP:** 127.0.0.1:9222
 - **Pipeline tables:** 1 task (merged), 1 plan (review), 65 plans (draft from PRDs), 12 orchestrator_events
