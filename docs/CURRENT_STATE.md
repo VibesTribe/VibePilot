@@ -1,5 +1,5 @@
 # VibePilot Current State
-# AUTO-UPDATED: 2026-05-07 — Git cleanup, backup system, memory limits, analyst proactive
+# AUTO-UPDATED: 2026-05-07 — Session state protocol v2, agent auto-logging, stale cleanup
 # RULE: Update after ANY change. Resume from here, never from guesses.
 # RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
 
