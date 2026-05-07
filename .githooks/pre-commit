@@ -1,0 +1,45 @@
+#!/bin/bash
+"""
+Pre-commit hook that detects config changes and reminds about KB doc updates.
+"""
+
+echo "=== Change Discipline Check ==="
+
+# Get list of changed files
+CHANGED_FILES=$(git diff --cached --name-only)
+
+# Check if any config files changed
+CONFIG_CHANGES=$(echo "$CHANGED_FILES" | grep -E '^config/|^governor/config/' || true)
+MODEL_CHANGES=$(echo "$CHANGED_FILES" | grep -E 'models\.json|platforms\.json|roles\.json|connectors\.json' || true)
+MIGRATION_CHANGES=$(echo "$CHANGED_FILES" | grep -E '^docs/supabase-schema/' || true)
+
+HAS_WARNING=0
+
+if [ -n "$CONFIG_CHANGES" ]; then
+    echo ""
+    echo "REMINDER: Config files changed. Consider updating KB docs:"
+    echo "$CONFIG_CHANGES" | sed 's/^/  /'
+    echo ""
+    echo "  If this change affects operational state (new model, new platform, etc.),"
+    echo "  please write/update a KB doc at:"
+    echo "    ~/knowledgebase/knowledge/operational/<topic>.md"
+    echo "  with frontmatter including next_review date."
+    echo ""
+    HAS_WARNING=1
+fi
+
+if [ -n "$MIGRATION_CHANGES" ]; then
+    echo ""
+    echo "REMINDER: Schema migration files changed."
+    echo "  If this migration changes data that agents query,"
+    echo "  update the relevant KB docs to reflect the new schema."
+    echo ""
+    HAS_WARNING=1
+fi
+
+# Run config validator on staged files
+if [ "$HAS_WARNING" -eq 1 ]; then
+    echo "  Run config validation: python3 ~/knowledgebase/scripts/validate_configs.py"
+fi
+
+exit 0  # Don't block the commit, just warn

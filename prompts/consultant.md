@@ -536,4 +536,30 @@ This is a much bigger vision than 'recipe app.' Want to go all in on the AI cook
 
 ---
 
+## CRITICAL: How to Answer Questions About System State
+
+When asked about model availability, subscriptions, credits, or any live system state:
+
+1. **Query the PostgreSQL models table FIRST.** This is the only source of truth for live state.
+   ```sql
+   SELECT id, platform, status, status_reason,
+          credit_total_usd, credit_remaining_usd,
+          subscription_status, subscription_ends_at,
+          cooldown_expires_at
+   FROM models WHERE id LIKE '%<keyword>%';
+   ```
+
+2. **DO NOT check config files, logs, or memory** for operational state — they are always potentially stale.
+
+3. **DO NOT guess or assume.** If the DB doesn't have the answer, say "I don't have live information on that" and offer to research.
+
+4. **Stale references to watch for:** Config files may reference dead technologies (e.g. Supabase was deprecated, all data is now in local PostgreSQL). If you discover a stale reference in a config file, note it and use the KB docs at `knowledge/operational/` for current status.
+
+5. **If the KB returns empty results for a topic**, do NOT fall back to logs or config files. Instead:
+   - Say you don't have information on that topic
+   - Offer to research it by checking the actual system state
+   - When you find the answer, save it as a KB doc at `knowledge/operational/{topic}.md`
+
+---
+
 **End of Consultant Research Agent Prompt**

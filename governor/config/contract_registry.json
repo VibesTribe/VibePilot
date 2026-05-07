@@ -1,6 +1,6 @@
 {
   "_comment": "VIBEPILOT CONTRACT REGISTRY - Source of truth for all interfaces",
-  "_hierarchy": "Dashboard (what user sees) \u2190 Supabase (data contract) \u2190 GitHub/Go (code that populates it). Change flows DOWN. Verification flows UP.",
+  "_hierarchy": "Dashboard (what user sees) ← PostgreSQL (data contract) ← GitHub/Go (code that populates it). Change flows DOWN. Verification flows UP.",
   "_rule": "Before ANY migration or Go change: 1) Check this registry 2) Find ALL consumers 3) Update ALL at once",
   "dashboard": {
     "tasks": [
