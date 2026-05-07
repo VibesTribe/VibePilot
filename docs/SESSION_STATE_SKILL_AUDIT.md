@@ -17,34 +17,45 @@
 - [x] Found 16 contradictions, resolved all (5 resolved + 11 dismissed)
 - [x] 3 canonical truth entries added to kb_canon
 
-### Skill Cleanup
+### Skill Cleanup (Session 1)
 - [x] Deleted 6 obsolete Supabase skills (egress, migration-writing, etc.)
 - [x] Kept 2 generic Supabase skills (bulk-operations, frontend-recon)
 - [x] Deleted 1 stale implementation plan (vibepilot-cost-tracking-overhaul)
 - [x] Verified NOT duplicates: all pairs checked (race, context, pipeline, dashboard, dataflow, event, audit skills)
 - [x] Identified 1 actual duplicate: vibepilot-file-sync-pattern vs vibepilot-governor-dashboard-file-sync
 
-### Deep Audit Progress (resume here)
-- [x] Priority 1: vibepilot (10 skills) - PARTIALLY DONE
+### Skill Cleanup (Session 2 - May 6 continuation)
+- [x] Loaded & assessed all remaining vibepilot skills (10/10)
+- [x] Verified NOT stale: vibepilot-knowledgebase-graphify (Supabase mentions are truth statements about dead tech, not usage references)
+- [x] Verified NOT stale: vibeflow-dashboard-roi-panel (all file paths, data sources, architecture correct)
+- [x] Verified NOT stale: vibepilot-conflict-detection-workflow (version 2.0, current)
+- [x] Verified NOT stale: vibepilot-model-discovery-tokenfinder (tokenfinder_v2.py EXISTS, DB tables confirmed)
+- [x] Merged file-sync duplicate: absorbed generic pattern content into governor-dashboard-file-sync, deleted file-sync-pattern
+- [x] Archived: vibepilot-output-pipeline-improvement (implementation complete)
+- [x] Created: vibepilot-output-pipeline-critical-lessons (6 key architecture lessons extracted from plan)
+
+### Deep Audit Progress
+- [x] Priority 1: vibepilot (10 skills) - DONE
 - [ ] Priority 2: devops (45 skills) - NOT STARTED
 - [ ] Priority 3: software-development (35 skills) - NOT STARTED
 - [ ] Priority 4: remaining (93 skills) - NOT STARTED
 
-## Vibepilot Skills Audit Findings
+## Vibepilot Skills Audit Findings (Final)
 
-### Assessed (no issues):
-1. vibepilot-file-sync-pattern - correct, but DUPLICATE of governor-dashboard-file-sync
-2. vibepilot-race-condition-and-prd-flood-fix - comprehensive changelog, correct
-3. vibepilot-cost-tracking - comprehensive reference, correct
+### Assessed - Current (no issues):
+1. vibepilot-contradiction-detection-workflow - v2.0, created this session
+2. vibepilot-cost-tracking - comprehensive reference, correct
+3. vibepilot-race-condition-and-prd-flood-fix - comprehensive changelog, correct
 4. systematic-skill-audit - created this session, current
-5. vibeflow-dashboard-roi-panel - NOT YET LOADED
-6. vibepilot-contradiction-detection-workflow - NOT YET LOADED
+5. vibeflow-dashboard-roi-panel - correct architecture, all file paths verified
+6. vibepilot-knowledgebase-graphify - mostly current, Supabase claims are truth statements not stale references
+7. vibepilot-model-discovery-tokenfinder - tokenfinder_v2.py active, DB tables confirmed
 
-### Needs action:
-1. vibepilot-governor-dashboard-file-sync - DUPLICATE of file-sync-pattern, should merge
-2. vibepilot-knowledgebase-graphify - MASSIVE skill, has some Supabase-era dead references, needs cleanup
-3. vibepilot-model-discovery-tokenfinder - references tokenfinder_v2.py, verify if active
-4. vibepilot-output-pipeline-improvement - implementation PLAN, implementation complete, could archive
+### Action taken:
+1. vibepilot-file-sync-pattern - DELETED (duplicate, merged into governor-dashboard-file-sync)
+2. vibepilot-governor-dashboard-file-sync - UPDATED (v2.0, absorbed generic pattern + verification checklist + adaptation notes)
+3. vibepilot-output-pipeline-improvement - DELETED (implementation complete, critical lessons extracted)
+4. vibepilot-output-pipeline-critical-lessons - CREATED (6 critical architecture lessons from the completed plan)
 
 ## Kanban State (Critical Items)
 | ID | Status | Title |
@@ -63,14 +74,11 @@
 ## System State at End of Session
 - Governor: RUNNING with new binary (attempt guard active)
 - PostgreSQL: TUNED (2GB shared_buffers, sync_commit off, swappiness 10)
-- Knowledgebase: 183 skills, 3 canon entries, 16 resolved contradictions
+- Knowledgebase: 182 skills (was 189, -1 cost-tracking-overhaul, -6 supabase, -1 file-sync-pattern, -1 output-pipeline-improvement, +1 critical-lessons), 3 canon entries, 16 resolved contradictions
 - Tasks: clean slate (1 merged task, 0 pending, 0 in_progress)
 - Dashboard: should show clean state with no flooding
 
 ## To Resume Next Session
-1. Continue deep audit: load remaining 8 vibepilot skills
-2. Move to devops (45 skills) - check for Supabase references, stale configs
-3. Continue through software-development (35) then remaining (93)
-4. Merge the file-sync duplicate pair
-5. Archive vibepilot-output-pipeline-improvement
-6. Clean stale references in vibepilot-knowledgebase-graphify
+1. Move to devops (45 skills) - check for Supabase references, stale configs, obsolete tooling
+2. Continue through software-development (35) then remaining (93)
+3. Session state file lives at ~/vibepilot/docs/SESSION_STATE_SKILL_AUDIT.md
