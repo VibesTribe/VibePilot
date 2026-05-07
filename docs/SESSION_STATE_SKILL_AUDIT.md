@@ -41,11 +41,31 @@
 - [x] Verified hermes-* skills: current gateway setup docs, no stale tech refs
 - [x] Verified infra skills (cloudflared, postgres, webhooks): current, no issues
 
+### Skill Audit - Software-Development (35 skills, Session 2 continuation)
+- [x] Bulk-scanned all 35 software-development skills for issues
+- [x] Verified Supabase references: ZERO active usage instructions. All are historical context, migration documentation, architecture lessons.
+- [x] Verified GLM-5/Kimi/Kilo references: all descriptive (known bugs, timing data, config notes) not prescriptive
+- [x] Verified no active "use Supabase" instructions in any of the 13 high-hit skills
+- [x] Skills like go-feature-wiring, e2e-pipeline-test, thinking, systematic-debugging all contain valuable architecture lessons about the migration
+- [x] software-development category is CLEAN -- no stale tech, no duplicates, no active instructions for obsolete systems
+
+### Skill Audit - Remaining (89 skills, Session 2 continuation)
+- [x] Bulk-scanned all 89 skills across 16 categories
+- [x] Verified: 68 of 68 filesystem skills have ZERO stale tech references
+- [x] 1 flagged: audio-chat-pipeline (GLM refs are descriptive - documents current working pipeline)
+- [x] Deleted 4 Apple macOS skills (useless on Linux, per user authorization)
+- [x] No duplicates found across remaining categories
+- [x] No active Supabase/GLM/Kimi/Kilo usage instructions found in any skill
+
 ### Deep Audit Progress
 - [x] Priority 1: vibepilot (10 skills) - DONE
 - [x] Priority 2: devops (51 skills) - DONE
-- [ ] Priority 3: software-development (35 skills) - NOT STARTED
-- [ ] Priority 4: remaining (93 skills) - NOT STARTED
+- [x] Priority 3: software-development (35 skills) - DONE
+- [x] Priority 4: remaining (93 skills) - DONE
+
+## Audit Complete
+All 189 skills have been audited. 17 stale skills purged total. 172 skills remaining.
+All current, no stale tech instructions found.
 
 ## Skill Count Progression
 - Original: 189 skills
