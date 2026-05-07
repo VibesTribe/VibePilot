@@ -78,7 +78,7 @@ All current, no stale tech instructions found.
 | ID | Status | Title |
 |----|--------|-------|
 | 64 | DONE | Fix max_attempts dispatch guard |
-| 66 | IN PROGRESS | Architecture principles vs implementation audit |
+| 66 | DONE | Architecture principles vs implementation audit |
 | 67 | DONE | Phase 1: Semantic contradiction detection |
 | 71 | BACKLOG | Phase 2: Canon resolution UI + propagation |
 | 72 | BACKLOG | Phase 3: Model routing context window filter |
