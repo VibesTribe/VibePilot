@@ -478,6 +478,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"subscription_history", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"project_snapshots", map[string]any{"order": "created_at.desc", "limit": 50}},
 		{"chat_usage", map[string]any{"order": "created_at.desc", "limit": 500}},
+		{"agent_sessions", map[string]any{"order": "last_activity_at.desc", "limit": 100}},
 	}
 
 	results := make(chan tableResult, len(tables))
