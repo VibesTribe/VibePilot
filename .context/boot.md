@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-05-07T20:17:27Z | Commit: 946733d0 | Branch: main
+# Generated: 2026-05-07T20:46:54Z | Commit: a38fd7cf | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -224,7 +224,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 946733d0
+- Commit: a38fd7cf
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
@@ -243,33 +243,4 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 5. Raw source = for implementation details only
 
 ## Current Status (from CURRENT_STATE.md)
-# VibePilot Current State
-# AUTO-UPDATED: 2026-05-03 — Hermes gateway restored, dashboard consultant/research channel wired
-# RULE: Update after ANY change. Resume from here, never from guesses.
-# RULE: NEVER update from assumptions. ALWAYS verify against actual code/data.
-## Three Sources of Truth
-1. **GitHub (code):** https://github.com/VibesTribe/VibePilot — pushed=real
-2. **Local PostgreSQL (data):** localhost:5432, db=vibepilot, user=vibes — in DB=real
-3. **Dashboard (live):** https://vibeflow-dashboard.vercel.app/ — rendering=working
-   - Dashboard is USER DOMAIN. Additive-only, never remove without explicit OK.
-## Hierarchy (everything serves what's above it)
-```
-VibePilot Architecture & Principles (modular, agnostic, no hardcoding)
-  → Dashboard (what user sees and controls) — DASHBOARD IS SACRED
-    → PostgreSQL (data layer, local)
-      → Governor (pipeline executor)
-        → Hermes (maintenance, audit, contract enforcement)
-```
-## System Status
-- **Governor:** RUNNING (systemd service, Restart=always)
-  - Binary: /home/vibes/vibepilot/governor/governor
-  - Config: /home/vibes/vibepilot/governor/config/ (GOVERNOR_CONFIG_DIR env var)
-  - WARNING: /vibepilot/config/ is a stale git copy. Always use governor/config/.
-  - Database: Local PostgreSQL 16 (system.json type=postgres)
-  - Webhook: port 8080/webhooks
-  - SSE: pg_notify on vp_changes → SSE broker → dashboard
-  - Governor URL: https://webhooks.vibestribe.rocks (for courier callbacks)
-  - GitHub webhook: configured with secret (vp_webhook_2026_secret, stored in vault)
-  - Vault: all secrets encrypted with current x220 VAULT_KEY, decrypt verified
-- **Git:** main branch. Last: 04eb349f (VibePilot), a0ee1fc82 (Vibeflow)
-- **Dashboard:** Live at vibeflow-dashboard.vercel.app (auto-deploys from GitHub main)
+
