@@ -12,7 +12,7 @@
       "requires_model_capability": ["text", "code"],
       "default_destination": "gemini-api",
       "default_model": "gemini-2.0-flash",
-      "tools": ["supabase_query", "web_search", "file_read", "voice_stt", "voice_tts"],
+      "tools": ["db_query", "web_search", "file_read", "voice_stt", "voice_tts"],
       "prompt": "prompts/vibes.md",
       "channels": ["voice", "text", "email"],
       "notes": "Sits above orchestrator. Human's primary interface."
@@ -25,7 +25,7 @@
       "requires_model_capability": ["text"],
       "default_destination": "gemini-api",
       "default_model": "gemini-2.0-flash",
-      "tools": ["supabase_query", "supabase_write"],
+      "tools": ["db_query", "db_update", "db_insert"],
       "prompt": "prompts/orchestrator.md",
       "notes": "Strategic brain. Works with Researcher for continuous improvement."
     },
@@ -85,7 +85,7 @@
       "requires_model_capability": ["text", "code"],
       "default_destination": "gemini-api",
       "default_model": "gemini-2.0-flash",
-      "tools": ["supabase_query", "supabase_write", "git"],
+      "tools": ["db_query", "db_update", "db_insert", "git"],
       "prompt": "prompts/supervisor.md",
       "notes": "Quality gate. Orchestrator routes, Supervisor validates."
     },
