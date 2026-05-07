@@ -3,7 +3,10 @@
     "git_create_branch": {
       "description": "Create a new git branch",
       "parameters": {
-        "name": {"type": "string", "required": true}
+        "name": {
+          "type": "string",
+          "required": true
+        }
       },
       "security_level": "write",
       "implementation": "gitree"
@@ -11,7 +14,10 @@
     "git_read_branch": {
       "description": "Read files from a branch",
       "parameters": {
-        "branch": {"type": "string", "required": true}
+        "branch": {
+          "type": "string",
+          "required": true
+        }
       },
       "security_level": "read",
       "implementation": "gitree"
@@ -19,8 +25,14 @@
     "git_commit": {
       "description": "Commit output to a branch",
       "parameters": {
-        "branch": {"type": "string", "required": true},
-        "output": {"type": "object", "required": true}
+        "branch": {
+          "type": "string",
+          "required": true
+        },
+        "output": {
+          "type": "object",
+          "required": true
+        }
       },
       "security_level": "write",
       "implementation": "gitree"
@@ -28,8 +40,14 @@
     "git_merge": {
       "description": "Merge source branch into target branch",
       "parameters": {
-        "source": {"type": "string", "required": true},
-        "target": {"type": "string", "required": true}
+        "source": {
+          "type": "string",
+          "required": true
+        },
+        "target": {
+          "type": "string",
+          "required": true
+        }
       },
       "security_level": "write",
       "implementation": "gitree"
@@ -37,7 +55,10 @@
     "git_delete_branch": {
       "description": "Delete a git branch",
       "parameters": {
-        "name": {"type": "string", "required": true}
+        "name": {
+          "type": "string",
+          "required": true
+        }
       },
       "security_level": "write",
       "implementation": "gitree"
@@ -45,7 +66,10 @@
     "git_clear_branch": {
       "description": "Clear all files from a branch for retry",
       "parameters": {
-        "name": {"type": "string", "required": true}
+        "name": {
+          "type": "string",
+          "required": true
+        }
       },
       "security_level": "write",
       "implementation": "gitree"
@@ -53,10 +77,22 @@
     "db_query": {
       "description": "Query database table",
       "parameters": {
-        "table": {"type": "string", "required": true},
-        "columns": {"type": "array", "required": false},
-        "where": {"type": "object", "required": false},
-        "limit": {"type": "integer", "required": false}
+        "table": {
+          "type": "string",
+          "required": true
+        },
+        "columns": {
+          "type": "array",
+          "required": false
+        },
+        "where": {
+          "type": "object",
+          "required": false
+        },
+        "limit": {
+          "type": "integer",
+          "required": false
+        }
       },
       "security_level": "read",
       "implementation": "db"
@@ -64,9 +100,18 @@
     "db_update": {
       "description": "Update database record",
       "parameters": {
-        "table": {"type": "string", "required": true},
-        "id": {"type": "string", "required": true},
-        "data": {"type": "object", "required": true}
+        "table": {
+          "type": "string",
+          "required": true
+        },
+        "id": {
+          "type": "string",
+          "required": true
+        },
+        "data": {
+          "type": "object",
+          "required": true
+        }
       },
       "security_level": "write",
       "implementation": "db"
@@ -74,8 +119,14 @@
     "db_insert": {
       "description": "Insert new record into database table",
       "parameters": {
-        "table": {"type": "string", "required": true},
-        "data": {"type": "object", "required": true}
+        "table": {
+          "type": "string",
+          "required": true
+        },
+        "data": {
+          "type": "object",
+          "required": true
+        }
       },
       "security_level": "write",
       "implementation": "db"
@@ -83,8 +134,14 @@
     "db_rpc": {
       "description": "Call database RPC function",
       "parameters": {
-        "name": {"type": "string", "required": true},
-        "params": {"type": "object", "required": false}
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "params": {
+          "type": "object",
+          "required": false
+        }
       },
       "security_level": "write",
       "implementation": "db"
@@ -92,8 +149,14 @@
     "command_maintenance": {
       "description": "Queue a maintenance command",
       "parameters": {
-        "command": {"type": "string", "required": true},
-        "params": {"type": "object", "required": false}
+        "command": {
+          "type": "string",
+          "required": true
+        },
+        "params": {
+          "type": "object",
+          "required": false
+        }
       },
       "security_level": "write",
       "implementation": "db"
@@ -101,7 +164,10 @@
     "file_read": {
       "description": "Read file from repository",
       "parameters": {
-        "path": {"type": "string", "required": true}
+        "path": {
+          "type": "string",
+          "required": true
+        }
       },
       "security_level": "read",
       "implementation": "file"
@@ -109,8 +175,14 @@
     "file_write": {
       "description": "Write file to repository",
       "parameters": {
-        "path": {"type": "string", "required": true},
-        "content": {"type": "string", "required": true}
+        "path": {
+          "type": "string",
+          "required": true
+        },
+        "content": {
+          "type": "string",
+          "required": true
+        }
       },
       "security_level": "write",
       "implementation": "file"
@@ -118,7 +190,10 @@
     "file_delete": {
       "description": "Delete file from repository",
       "parameters": {
-        "path": {"type": "string", "required": true}
+        "path": {
+          "type": "string",
+          "required": true
+        }
       },
       "security_level": "write",
       "implementation": "file"
@@ -126,7 +201,10 @@
     "vault_get": {
       "description": "Get secret from vault (returns existence only, not value)",
       "parameters": {
-        "key": {"type": "string", "required": true}
+        "key": {
+          "type": "string",
+          "required": true
+        }
       },
       "security_level": "secret",
       "implementation": "vault"
@@ -134,7 +212,10 @@
     "web_search": {
       "description": "Search the web using DuckDuckGo",
       "parameters": {
-        "query": {"type": "string", "required": true}
+        "query": {
+          "type": "string",
+          "required": true
+        }
       },
       "security_level": "read",
       "implementation": "web"
@@ -142,7 +223,10 @@
     "web_fetch": {
       "description": "Fetch content from a URL",
       "parameters": {
-        "url": {"type": "string", "required": true}
+        "url": {
+          "type": "string",
+          "required": true
+        }
       },
       "security_level": "read",
       "implementation": "web"
@@ -150,8 +234,14 @@
     "sandbox_test": {
       "description": "Run code in sandbox for testing",
       "parameters": {
-        "files": {"type": "array", "required": true},
-        "test_command": {"type": "string", "required": false}
+        "files": {
+          "type": "array",
+          "required": true
+        },
+        "test_command": {
+          "type": "string",
+          "required": false
+        }
       },
       "security_level": "execute",
       "implementation": "sandbox"
@@ -159,7 +249,10 @@
     "run_lint": {
       "description": "Run linter on codebase",
       "parameters": {
-        "path": {"type": "string", "required": false}
+        "path": {
+          "type": "string",
+          "required": false
+        }
       },
       "security_level": "execute",
       "implementation": "sandbox"
@@ -167,10 +260,57 @@
     "run_typecheck": {
       "description": "Run type checker on codebase",
       "parameters": {
-        "path": {"type": "string", "required": false}
+        "path": {
+          "type": "string",
+          "required": false
+        }
       },
       "security_level": "execute",
       "implementation": "sandbox"
+    },
+    "cli": {
+      "description": "Execute shell commands in the task environment",
+      "parameters": {
+        "command": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "security_level": "execute",
+      "implementation": "shell"
+    },
+    "git": {
+      "description": "Execute git operations in the repository",
+      "parameters": {
+        "args": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "security_level": "write",
+      "implementation": "shell"
+    },
+    "voice_stt": {
+      "description": "Speech-to-text conversion for voice input",
+      "parameters": {
+        "audio": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "security_level": "read",
+      "implementation": "ai"
+    },
+    "voice_tts": {
+      "description": "Text-to-speech conversion for voice output",
+      "parameters": {
+        "text": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "security_level": "read",
+      "implementation": "ai"
     }
   }
 }

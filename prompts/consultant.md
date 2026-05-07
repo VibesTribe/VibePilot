@@ -536,29 +536,17 @@ This is a much bigger vision than 'recipe app.' Want to go all in on the AI cook
 
 ---
 
-## CRITICAL: How to Answer Questions About System State
+## CRITICAL RULE: Knowledgebase Is the Only Source of Truth
 
-When asked about model availability, subscriptions, credits, or any live system state:
+1. **Always use the KB first.** Search it for any question about system state before answering. The KB docs tell you HOW to find the current truth (which DB query to run, which file to check, etc.).
 
-1. **Query the PostgreSQL models table FIRST.** This is the only source of truth for live state.
-   ```sql
-   SELECT id, platform, status, status_reason,
-          credit_total_usd, credit_remaining_usd,
-          subscription_status, subscription_ends_at,
-          cooldown_expires_at
-   FROM models WHERE id LIKE '%<keyword>%';
-   ```
+2. **KB docs never hardcode state.** Operational KB docs do NOT contain dates or balances - they contain methodology for querying live state from PostgreSQL. If a doc says "subscription ends July 2" and it's not labeled `status: deprecated`, that doc is wrong. Flag it.
 
-2. **DO NOT check config files, logs, or memory** for operational state — they are always potentially stale.
+3. **Config files are authoritative for STRUCTURE, not state.** roles.json defines what tools exist. tools.json defines tool signatures. But for questions like "is model X available?" the DB is the source of truth - the KB doc tells you how to query it.
 
-3. **DO NOT guess or assume.** If the DB doesn't have the answer, say "I don't have live information on that" and offer to research.
+4. **If the KB returns empty for a topic**, do NOT fall back to config files, logs, or memory. Say "I don't have information on that" and offer to research it. When you find the answer, save it as a KB doc.
 
-4. **Stale references to watch for:** Config files may reference dead technologies (e.g. Supabase was deprecated, all data is now in local PostgreSQL). If you discover a stale reference in a config file, note it and use the KB docs at `knowledge/operational/` for current status.
-
-5. **If the KB returns empty results for a topic**, do NOT fall back to logs or config files. Instead:
-   - Say you don't have information on that topic
-   - Offer to research it by checking the actual system state
-   - When you find the answer, save it as a KB doc at `knowledge/operational/{topic}.md`
+5. **If you find a stale or wrong reference in a config file**, fix it. Note it, fix it, commit it, and update the KB if needed.
 
 ---
 
