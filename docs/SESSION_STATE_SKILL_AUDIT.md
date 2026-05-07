@@ -87,7 +87,9 @@ All current, no stale tech instructions found.
 ## System State
 - Governor: RUNNING with new binary (attempt guard active)
 - PostgreSQL: TUNED (2GB shared_buffers, sync_commit off, swappiness 10)
-- Knowledgebase: 176 skills, 3 canon entries, 16 resolved contradictions
+- Knowledgebase: 172 skills, 3 canon entries, 16 resolved contradictions
+- KB Health: checked daily at 3AM via cron-sync.sh, embeddings still backfilling (docs 24%, claims 26%)
+- .hermes.md: updated with KB Navigation Pattern using current MCP tools
 
 ## To Resume Next Session
 1. Move to software-development (35 skills) - check for duplicate patterns, stale arch refs
