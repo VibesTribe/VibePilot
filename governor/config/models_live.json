@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-05-07T21:52:08.562604+00:00",
+  "updated": "2026-05-07T22:22:31.697493+00:00",
   "total": 192,
   "models": [
     {
@@ -86,6 +86,23 @@
       ]
     },
     {
+      "id": "google/gemma-4-26b-a4b-it:free",
+      "name": "Google: Gemma 4 26B A4B  (free)",
+      "context_length": 262144,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
       "id": "nvidia/nemotron-3-super-120b-a12b:free",
       "name": "NVIDIA: Nemotron 3 Super (free)",
       "context_length": 262144,
@@ -109,23 +126,6 @@
         "instruction",
         "reasoning",
         "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "google/gemma-4-26b-a4b-it:free",
-      "name": "Google: Gemma 4 26B A4B  (free)",
-      "context_length": 262144,
-      "capabilities": [
-        "text",
-        "vision"
       ],
       "rate_limits": {
         "rpd": 200,
@@ -2841,8 +2841,8 @@
       "name": "Gemini 2.5 Flash-Lite",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "instruction"
       ],
       "rate_limits": {
@@ -2861,8 +2861,8 @@
       "name": "Gemini 3 Flash Preview",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "instruction"
       ],
       "rate_limits": {
@@ -2881,8 +2881,8 @@
       "name": "Gemini 2.5 Flash",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "instruction"
       ],
       "rate_limits": {
@@ -2901,8 +2901,8 @@
       "name": "Lyria 3 Clip Preview",
       "context_length": 1048576,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2941,8 +2941,8 @@
       "name": "Gemini 2.0 Flash 001",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "instruction"
       ],
       "rate_limits": {
@@ -2982,9 +2982,9 @@
       "capabilities": [
         "reasoning",
         "vision",
+        "instruction",
         "code",
-        "text",
-        "instruction"
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3002,8 +3002,8 @@
       "name": "Gemini 3.1 Flash Lite",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "instruction"
       ],
       "rate_limits": {
@@ -3021,8 +3021,8 @@
       "name": "Gemini 2.5 Pro",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "instruction"
       ],
       "rate_limits": {
@@ -3043,9 +3043,9 @@
       "capabilities": [
         "reasoning",
         "vision",
+        "instruction",
         "code",
-        "text",
-        "instruction"
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3084,8 +3084,8 @@
       "name": "Gemini 2.0 Flash-Lite 001",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "instruction"
       ],
       "rate_limits": {
@@ -3106,9 +3106,9 @@
       "capabilities": [
         "reasoning",
         "vision",
+        "instruction",
         "code",
-        "text",
-        "instruction"
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3126,8 +3126,8 @@
       "name": "Gemini 2.0 Flash",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "instruction"
       ],
       "rate_limits": {
@@ -3146,8 +3146,8 @@
       "name": "Gemini 2.0 Flash-Lite",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "instruction"
       ],
       "rate_limits": {
@@ -3166,8 +3166,8 @@
       "name": "Gemini 3.1 Flash Lite Preview",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "vision",
+        "text",
         "instruction"
       ],
       "rate_limits": {
@@ -3206,8 +3206,8 @@
       "name": "Gemma 4 31B IT",
       "context_length": 262144,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3225,66 +3225,28 @@
       "name": "Gemma 4 26B A4B IT",
       "context_length": 262144,
       "capabilities": [
-        "text",
-        "vision"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "gemini-robotics-er-1.6-preview",
-      "name": "Gemini Robotics-ER 1.6 Preview",
-      "context_length": 131072,
-      "capabilities": [
-        "vision",
-        "instruction"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "deep-research-max-preview-04-2026",
-      "name": "Deep Research Max Preview (Apr-21-2026)",
-      "context_length": 131072,
-      "capabilities": [
-        "text",
-        "vision"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "deep-research-pro-preview-12-2025",
-      "name": "Deep Research Pro Preview (Dec-12-2025)",
-      "context_length": 131072,
-      "capabilities": [
-        "reasoning",
         "vision",
         "text"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "gemini-2.5-computer-use-preview-10-2025",
+      "name": "Gemini 2.5 Computer Use Preview 10-2025",
+      "context_length": 131072,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3318,12 +3280,12 @@
       ]
     },
     {
-      "id": "deep-research-preview-04-2026",
-      "name": "Deep Research Preview (Apr-21-2026)",
+      "id": "deep-research-max-preview-04-2026",
+      "name": "Deep Research Max Preview (Apr-21-2026)",
       "context_length": 131072,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3337,13 +3299,51 @@
       ]
     },
     {
-      "id": "gemini-2.5-computer-use-preview-10-2025",
-      "name": "Gemini 2.5 Computer Use Preview 10-2025",
+      "id": "deep-research-pro-preview-12-2025",
+      "name": "Deep Research Pro Preview (Dec-12-2025)",
       "context_length": 131072,
       "capabilities": [
-        "text",
+        "reasoning",
+        "vision",
+        "text"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "gemini-robotics-er-1.6-preview",
+      "name": "Gemini Robotics-ER 1.6 Preview",
+      "context_length": 131072,
+      "capabilities": [
         "vision",
         "instruction"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "deep-research-preview-04-2026",
+      "name": "Deep Research Preview (Apr-21-2026)",
+      "context_length": 131072,
+      "capabilities": [
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
