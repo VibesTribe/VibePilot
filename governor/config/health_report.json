@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-07T05:30:02.123380+00:00",
+  "timestamp": "2026-05-08T01:29:13.798522+00:00",
   "providers": {
     "groq": {
       "status": "ok",
@@ -7,8 +7,12 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 368,
-      "free": 29
+      "models": 367,
+      "free": 28
+    },
+    "deepseek": {
+      "status": "ok",
+      "balance_usd": 4.88
     }
   },
   "health_checks": {
@@ -83,13 +87,13 @@
       "action": "new_free_models",
       "count": 7,
       "models": [
+        "whisper-large-v3",
         "llama-3.3-70b-versatile",
-        "allam-2-7b",
-        "whisper-large-v3-turbo",
         "meta-llama/llama-prompt-guard-2-22m",
-        "meta-llama/llama-prompt-guard-2-86m",
         "llama-3.1-8b-instant",
-        "whisper-large-v3"
+        "allam-2-7b",
+        "meta-llama/llama-prompt-guard-2-86m",
+        "whisper-large-v3-turbo"
       ]
     }
   ],
@@ -168,6 +172,11 @@
       "cooldown_state": "ready"
     },
     "gemini-3-flash-preview": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "glm-5": {
       "status": "active",
       "cooldown_until": "none",
       "cooldown_state": "ready"

@@ -11,7 +11,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 1048756
     },
     {
       "id": "google/lyria-3-clip-preview",
@@ -24,7 +29,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 1048576
     },
     {
       "id": "google/lyria-3-pro-preview",
@@ -38,7 +48,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 1048576
     },
     {
       "id": "tencent/hy3-preview:free",
@@ -51,7 +66,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "qwen/qwen3-next-80b-a3b-instruct:free",
@@ -66,7 +86,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "google/gemma-4-31b-it:free",
@@ -80,7 +105,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "nvidia/nemotron-3-super-120b-a12b:free",
@@ -107,7 +137,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "qwen/qwen3-coder:free",
@@ -123,7 +158,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262000
     },
     {
       "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
@@ -162,7 +202,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 200000
     },
     {
       "id": "minimax/minimax-m2.5:free",
@@ -175,7 +220,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 196608
     },
     {
       "id": "baidu/cobuddy:free",
@@ -188,7 +238,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "z-ai/glm-4.5-air:free",
@@ -204,7 +259,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "poolside/laguna-m.1:free",
@@ -217,7 +277,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "openai/gpt-oss-120b:free",
@@ -233,7 +298,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "openai/gpt-oss-20b:free",
@@ -249,7 +319,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "poolside/laguna-xs.2:free",
@@ -262,7 +337,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "meta-llama/llama-3.2-3b-instruct:free",
@@ -276,7 +356,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "nousresearch/hermes-3-llama-3.1-405b:free",
@@ -290,7 +375,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "nvidia/nemotron-nano-12b-v2-vl:free",
@@ -329,7 +419,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 65536
     },
     {
       "id": "meta-llama/llama-3.3-70b-instruct:free",
@@ -345,7 +440,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 65536
     },
     {
       "id": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
@@ -402,7 +502,13 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200,
+        "tokens_per_day": 100000
+      },
+      "context_length": 40960
     },
     {
       "id": "groq/compound-mini",
@@ -418,7 +524,12 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_day": 14400,
+        "tokens_per_day": 100000
+      }
     },
     {
       "id": "openai/gpt-oss-safeguard-20b",
@@ -434,7 +545,13 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200,
+        "tokens_per_day": 100000
+      },
+      "context_length": 131072
     },
     {
       "id": "groq/llama-3.3-70b-versatile",
@@ -480,7 +597,12 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_day": 14400,
+        "tokens_per_day": 100000
+      }
     },
     {
       "id": "meta-llama/llama-4-scout-17b-16e-instruct",
@@ -497,7 +619,12 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_day": 14400,
+        "tokens_per_day": 100000
+      }
     },
     {
       "id": "groq/allam-2-7b",
@@ -523,7 +650,12 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_day": 14400,
+        "tokens_per_day": 100000
+      }
     },
     {
       "id": "canopylabs/orpheus-arabic-saudi",
@@ -536,7 +668,12 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_day": 14400,
+        "tokens_per_day": 100000
+      }
     },
     {
       "id": "qwen/qwen3.5-397b-a17b",
@@ -551,7 +688,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "qwen/qwen3-next-80b-a3b-instruct",
@@ -566,7 +708,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "qwen/qwen3.5-122b-a10b",
@@ -581,7 +728,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "nvidia/nemotron-3-super-120b-a12b",
@@ -609,7 +761,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "google/gemma-4-31b-it",
@@ -623,7 +780,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "nvidia/nemotron-3-nano-30b-a3b",
@@ -650,7 +812,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "z-ai/glm-5.1",
@@ -666,7 +833,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 202752
     },
     {
       "id": "google/gemma-3-4b-it",
@@ -680,7 +852,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
@@ -708,7 +885,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "moonshotai/kimi-k2-instruct",
@@ -737,7 +919,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "openai/gpt-oss-120b",
@@ -754,7 +941,13 @@
         "nvidia-api",
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200,
+        "tokens_per_day": 100000
+      },
+      "context_length": 131072
     },
     {
       "id": "openai/gpt-oss-20b",
@@ -771,7 +964,13 @@
         "nvidia-api",
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200,
+        "tokens_per_day": 100000
+      },
+      "context_length": 131072
     },
     {
       "id": "meta/llama-3.3-70b-instruct",
@@ -828,7 +1027,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "aisingapore/sea-lion-7b-instruct",
@@ -1717,7 +1921,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 128000
     },
     {
       "id": "nvidia/nv-embedqa-mistral-7b-v2",
@@ -1928,7 +2137,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 32768
     },
     {
       "id": "meta/llama-3.1-70b-instruct",
@@ -2138,7 +2352,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 128000
     },
     {
       "id": "01-ai/yi-large",
@@ -2737,5 +2956,6 @@
       ],
       "status": "active"
     }
-  ]
+  ],
+  "last_health_check": "2026-05-08T01:29:13.798522+00:00"
 }
