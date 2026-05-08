@@ -31,6 +31,7 @@ Do NOT ask the human "where were we" until you've completed these checks. Git lo
 
 - Full PostgreSQL query access (all task history, metrics, agent sessions, kanban)
 - Knowledgebase MCP tools (kbserver on port 8901 - semantic search, context packs, symbols)
+- **Agent memory repo**: `github.com/VibesTribe/vibes-agent-context` → `memories/MEMORY.md` and `memories/USER.md` (auto-synced every 30 min). Contains persistent facts about the system, user preferences, and learned conventions from prior sessions. Read these at session start.
 - Web search for research
 - File read for understanding codebase
 - Terminal commands for system checks
