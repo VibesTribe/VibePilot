@@ -12,7 +12,7 @@ Usage:
   SCAN_ONLY=openrouter python3 ...   # scan one provider only
 """
 
-import json, os, sys, time, subprocess
+import json, os, sys, time, subprocess, urllib.request, urllib.error
 from datetime import datetime, timezone
 
 VAULT_KEY = os.environ.get("VAULT_KEY", "P9jFR25vbjcNxG2S3lx4ZCyspfGLd7wZYliZWLjqKLc=")
@@ -412,6 +412,50 @@ def main():
 
     print(f"\n{'=' * 60}")
     print(f"Total: {total_upserted} models upserted to model_catalog")
+
+    # ── Credit Balance Check (paid APIs, runs every 30 min) ──
+    print(f"\n--- Credit Balance Check ---")
+    for provider_name, key_env in [("DeepSeek", "DEEPSEEK_V4_FLASH_KEY")]:
+        api_key = os.environ.get(key_env, "")
+        if not api_key:
+            api_key = vault_get(key_env) or ""
+        if api_key:
+            try:
+                req = urllib.request.Request(
+                    f"https://api.deepseek.com/user/balance",
+                    headers={"Authorization": f"Bearer {api_key}", "User-Agent": "VibePilot-TokenFinder/2.0"}
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read())
+                if data.get("is_available"):
+                    total_bal = sum(float(i.get("total_balance", 0)) for i in data.get("balance_infos", []))
+                    print(f"  {provider_name}: ${total_bal:.2f} remaining")
+
+                    import psycopg
+                    conn = psycopg.connect("dbname=vibepilot host=/var/run/postgresql")
+                    cur = conn.execute(
+                        "SELECT SUM(credit_total_usd) FROM models WHERE id LIKE %s AND credit_total_usd > 0",
+                        ("%deepseek%",)
+                    )
+                    row = cur.fetchone()
+                    total_cred = float(row[0]) if row and row[0] else 10.0
+                    if total_cred > 0:
+                        ratio = total_bal / total_cred
+                        conn.execute(
+                            "UPDATE models SET credit_remaining_usd = %s * (credit_total_usd / %s) "
+                            "WHERE id LIKE %s AND credit_total_usd > 0",
+                            (total_bal, total_cred, "%deepseek%")
+                        )
+                        if ratio < 0.2:
+                            print(f"  ⚠️  {provider_name} at {ratio*100:.0f}% remaining (${total_bal:.2f} of ${total_cred:.2f})")
+                        elif ratio < 0.5:
+                            print(f"  {provider_name} at {ratio*100:.0f}% remaining")
+                    conn.commit()
+                    conn.close()
+            except Exception as e:
+                print(f"  {provider_name} credit check error: {e}")
+        else:
+            print(f"  No API key for {provider_name}")
 
     # Clean up: bench old entries not updated by this scan
     print(f"\n--- Cleanup: benching old entries ---")

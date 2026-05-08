@@ -497,6 +497,8 @@ def main():
     if banned_count:
         print(f"\n  Banned {banned_count} models from ban list")
 
+    # Credit balance check moved to tokenfinder_v2.py (runs every 30 min)
+
     # Update config
     print(f"\n--- Updating models.json ---")
     updated_models, new_free_models, changed_limits = update_models_config(all_remote, config)
