@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-08T01:29:13.798522+00:00",
+  "timestamp": "2026-05-08T01:29:49.056604+00:00",
   "providers": {
     "groq": {
       "status": "ok",
@@ -87,18 +87,19 @@
       "action": "new_free_models",
       "count": 7,
       "models": [
-        "whisper-large-v3",
-        "llama-3.3-70b-versatile",
         "meta-llama/llama-prompt-guard-2-22m",
         "llama-3.1-8b-instant",
+        "whisper-large-v3-turbo",
+        "llama-3.3-70b-versatile",
         "allam-2-7b",
-        "meta-llama/llama-prompt-guard-2-86m",
-        "whisper-large-v3-turbo"
+        "whisper-large-v3",
+        "meta-llama/llama-prompt-guard-2-86m"
       ]
     }
   ],
   "warnings": [
-    "Gemini: HTTP 400: Bad Request"
+    "Gemini: HTTP 400: Bad Request",
+    "DeepSeek credit at 20% remaining ($4.88 of $25.00)"
   ],
   "cooldown_state": {
     "aizolo-mix": {
