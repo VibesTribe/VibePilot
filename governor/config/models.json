@@ -14,6 +14,19 @@
       "status": "active"
     },
     {
+      "id": "google/lyria-3-clip-preview",
+      "name": "Google: Lyria 3 Clip Preview",
+      "provider": "openrouter",
+      "context_limit": 1048576,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
       "id": "google/lyria-3-pro-preview",
       "name": "Google: Lyria 3 Pro Preview",
       "provider": "openrouter",
@@ -28,10 +41,10 @@
       "status": "active"
     },
     {
-      "id": "google/lyria-3-clip-preview",
-      "name": "Google: Lyria 3 Clip Preview",
+      "id": "tencent/hy3-preview:free",
+      "name": "Tencent: Hy3 preview (free)",
       "provider": "openrouter",
-      "context_limit": 1048576,
+      "context_limit": 262144,
       "capabilities": [
         "text"
       ],
@@ -43,6 +56,33 @@
     {
       "id": "inclusionai/ring-2.6-1t:free",
       "name": "inclusionAI: Ring-2.6-1T (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-4-31b-it:free",
+      "name": "Google: Gemma 4 31B (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "name": "NVIDIA: Nemotron 3 Super (free)",
       "provider": "openrouter",
       "context_limit": 262144,
       "capabilities": [
@@ -76,46 +116,6 @@
         "instruction",
         "reasoning",
         "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "tencent/hy3-preview:free",
-      "name": "Tencent: Hy3 preview (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "nvidia/nemotron-3-super-120b-a12b:free",
-      "name": "NVIDIA: Nemotron 3 Super (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "google/gemma-4-31b-it:free",
-      "name": "Google: Gemma 4 31B (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text",
-        "vision"
       ],
       "access_via": [
         "openrouter-api"
@@ -2336,10 +2336,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
         "instruction",
         "text",
-        "vision"
+        "vision",
+        "reasoning"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2416,10 +2416,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
         "instruction",
         "text",
-        "vision"
+        "vision",
+        "reasoning"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2464,11 +2464,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
-        "instruction",
-        "code",
         "text",
-        "vision"
+        "reasoning",
+        "vision",
+        "code",
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2513,11 +2513,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
-        "instruction",
-        "code",
         "text",
-        "vision"
+        "reasoning",
+        "vision",
+        "code",
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2531,10 +2531,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
         "instruction",
         "text",
-        "vision"
+        "vision",
+        "reasoning"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2564,11 +2564,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
-        "instruction",
-        "code",
         "text",
-        "vision"
+        "reasoning",
+        "vision",
+        "code",
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
