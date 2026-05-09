@@ -53,12 +53,14 @@ type platformConfig struct {
 	InputY           int
 	ResponseSelector string
 	SubmitKey        string
+	SubmitX          int // For platforms needing button click instead of Enter key
+	SubmitY          int
 	WaitInitial      int
 	WaitStable       int
 }
 
 // platformConfigs maps platform domain substrings to their interaction configs.
-// These are verified working values, not guesses.
+// Verified 2026-05-09 via browser-harness E2E testing.
 var platformConfigs = map[string]platformConfig{
 	"gemini.google": {
 		InputX:           482,
@@ -68,34 +70,84 @@ var platformConfigs = map[string]platformConfig{
 		WaitInitial:      8,
 		WaitStable:       3,
 	},
-	"chatgpt.com": {
-		InputX:           640,
-		InputY:           700,
-		ResponseSelector: "[data-message-author-role='assistant']",
-		SubmitKey:        "Enter",
+	"aistudio.google": {
+		InputX:           643,
+		InputY:           552,
+		ResponseSelector: ".cmark-node",
+		SubmitKey:        "Run",
+		SubmitX:          990,
+		SubmitY:          598,
 		WaitInitial:      8,
 		WaitStable:       3,
 	},
-	"chat.openai.com": {
-		InputX:           640,
-		InputY:           700,
-		ResponseSelector: "[data-message-author-role='assistant']",
+	"chatgpt.com": {
+		InputX:           792,
+		InputY:           305,
+		ResponseSelector: ".markdown.prose",
 		SubmitKey:        "Enter",
 		WaitInitial:      8,
 		WaitStable:       3,
 	},
 	"claude.ai": {
-		InputX:           640,
-		InputY:           700,
-		ResponseSelector: "[data-testid='assistant-message']",
+		InputX:           245,
+		InputY:           536,
+		ResponseSelector: "[data-message]:last-child",
+		SubmitKey:        "Enter",
+		WaitInitial:      8,
+		WaitStable:       3,
+	},
+	"chat.deepseek.com": {
+		InputX:           814,
+		InputY:           329,
+		ResponseSelector: ".ds-markdown",
+		SubmitKey:        "Enter",
+		WaitInitial:      8,
+		WaitStable:       3,
+	},
+	"perplexity.ai": {
+		InputX:           782,
+		InputY:           299,
+		ResponseSelector: ".prose",
+		SubmitKey:        "Enter",
+		WaitInitial:      8,
+		WaitStable:       3,
+	},
+	"chat.qwen.ai": {
+		InputX:           746,
+		InputY:           290,
+		ResponseSelector: ".markdown-body",
+		SubmitKey:        "Enter",
+		WaitInitial:      8,
+		WaitStable:       3,
+	},
+	"huggingface.co/chat": {
+		InputX:           828,
+		InputY:           532,
+		ResponseSelector: ".message-text",
+		SubmitKey:        "Enter",
+		WaitInitial:      8,
+		WaitStable:       3,
+	},
+	"chat.mistral.ai": {
+		InputX:           758,
+		InputY:           324,
+		ResponseSelector: ".prose",
 		SubmitKey:        "Enter",
 		WaitInitial:      10,
 		WaitStable:       3,
 	},
-	"chat.deepseek.com": {
-		InputX:           640,
-		InputY:           700,
-		ResponseSelector: ".ds-markdown",
+	"kimi.moonshot.cn": {
+		InputX:           793,
+		InputY:           275,
+		ResponseSelector: ".message-content",
+		SubmitKey:        "Enter",
+		WaitInitial:      8,
+		WaitStable:       3,
+	},
+	"poe.com": {
+		InputX:           708,
+		InputY:           373,
+		ResponseSelector: ".MessageWrapper",
 		SubmitKey:        "Enter",
 		WaitInitial:      8,
 		WaitStable:       3,
