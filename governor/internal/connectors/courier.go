@@ -219,7 +219,7 @@ try:
         else:
             stable_count = 0
             last_text = current
-    response = js("Array.from(document.querySelectorAll('%s')).map(function(e) { return e.innerText }).join('|||')")
+    response = js("(function() { var els = document.querySelectorAll('%s'); var t = ''; for (var i = 0; i < els.length; i++) { t += els[i].textContent; } return t; })()")
     result = {"status": "success", "output": response, "tokens_in": len(prompt) // 4, "tokens_out": len(response) // 4}
     print(json.dumps(result))
 except Exception as e:

@@ -117,7 +117,7 @@ try:
     # Extract response using platform-specific selector
     response = js(
         "Array.from(document.querySelectorAll('" + response_sel + "'))"
-        ".map(e => e.innerText).join('|||')"
+        ".map(e => e.textContent).join('|||')"
     )
 
     # Fallback: if selector found nothing, use text diff
