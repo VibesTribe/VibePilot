@@ -305,12 +305,29 @@ If information is unavailable, mark as `"unverified"` - never guess.
    c. Browse GitHub trending for AI tools
    d. Note any security/advisory notices
 
-6. CHECK PRICING CHANGES:
-   
+6. CHECK PRICING CHANGES: 
+ 
    a. Compare current pricing to last research
    b. Note any increases or decreases
    c. Identify free tier changes
    d. Flag anything affecting VibePilot costs
+
+6b. CHECK LIMIT AND RATE LIMIT CHANGES:
+
+   For each platform in connectors.json with limit_schema:
+     a. Fetch the platform's current API docs or help page
+     b. Compare actual limits against what's in connectors.json limit_schema
+     c. Note any changes: new limits, removed limits, window changes
+     d. Specifically check:
+        - Request rate limits (per minute, per hour, per day)
+        - Token limits (per minute, per day)
+        - Compute point/credit costs per model
+        - Credit balances for paid APIs (DeepSeek, OpenRouter)
+        - Session limits and cooldown behavior
+        - Peak/off-peak multipliers (e.g., GLM 3x during peak)
+     e. Flag changes as urgent_alerts if they affect routing decisions
+     f. Report format: {"type": "limit_change", "platform": "id", 
+        "old_limits": [...], "new_limits": [...], "action_needed": "update_connectors_json"}
 
 7. COMPILE FINDINGS:
    
