@@ -1,6 +1,10 @@
 {
-  "timestamp": "2026-05-08T01:30:28.464751+00:00",
+  "timestamp": "2026-05-09T05:30:01.767420+00:00",
   "providers": {
+    "google": {
+      "status": "ok",
+      "models": 46
+    },
     "groq": {
       "status": "ok",
       "models": 16
@@ -9,10 +13,6 @@
       "status": "ok",
       "models": 367,
       "free": 28
-    },
-    "deepseek": {
-      "status": "ok",
-      "balance_usd": 4.88
     }
   },
   "health_checks": {
@@ -85,22 +85,32 @@
   "changes": [
     {
       "action": "new_free_models",
-      "count": 7,
+      "count": 26,
       "models": [
-        "llama-3.3-70b-versatile",
-        "meta-llama/llama-prompt-guard-2-22m",
-        "allam-2-7b",
-        "whisper-large-v3-turbo",
-        "whisper-large-v3",
-        "meta-llama/llama-prompt-guard-2-86m",
-        "llama-3.1-8b-instant"
+        "gemini-2.5-flash-preview-tts",
+        "gemini-2.5-pro-preview-tts",
+        "gemini-2.5-flash-image",
+        "gemini-3-pro-image-preview",
+        "gemini-3.1-flash-image-preview",
+        "gemini-3.1-flash-tts-preview",
+        "imagen-4.0-generate-001",
+        "imagen-4.0-ultra-generate-001",
+        "imagen-4.0-fast-generate-001",
+        "veo-2.0-generate-001",
+        "veo-3.0-generate-001",
+        "veo-3.0-fast-generate-001",
+        "veo-3.1-generate-preview",
+        "veo-3.1-fast-generate-preview",
+        "veo-3.1-lite-generate-preview",
+        "gemini-2.5-flash-native-audio-latest",
+        "gemini-2.5-flash-native-audio-preview-09-2025",
+        "gemini-2.5-flash-native-audio-preview-12-2025",
+        "gemini-3.1-flash-live-preview",
+        "allam-2-7b"
       ]
     }
   ],
-  "warnings": [
-    "Gemini: HTTP 400: Bad Request",
-    "DeepSeek credit at 16% remaining ($4.88 of $30.00)"
-  ],
+  "warnings": [],
   "cooldown_state": {
     "aizolo-mix": {
       "status": "active",
