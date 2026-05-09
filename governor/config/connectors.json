@@ -80,7 +80,16 @@
         "terminal",
         "file"
       ],
-      "notes": "Hermes Agent CLI. For executor tasks that need tools. GLM-5 via Z.AI."
+      "notes": "Hermes Agent CLI. For executor tasks that need tools. GLM-5 via Z.AI.",
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "cycle",
+          "value": 400,
+          "alert_pct": 80,
+          "window_seconds": 18000
+        }
+      ]
     },
     {
       "id": "kimi",
@@ -119,7 +128,27 @@
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "Stable workhorse for high-throughput courier tasks. 1000 RPD free-tier limit. Safest choice."
+      "notes": "Stable workhorse for high-throughput courier tasks. 1000 RPD free-tier limit. Safest choice.",
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "minute",
+          "value": 15,
+          "alert_pct": 80
+        },
+        {
+          "type": "tokens",
+          "window": "minute",
+          "value": 1000000,
+          "alert_pct": 80
+        },
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 1500,
+          "alert_pct": 80
+        }
+      ]
     },
     {
       "id": "gemini-api-researcher",
@@ -137,7 +166,27 @@
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "Best intelligence for daily system researcher. Smarter than 2.5 but in preview mode."
+      "notes": "Best intelligence for daily system researcher. Smarter than 2.5 but in preview mode.",
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "minute",
+          "value": 15,
+          "alert_pct": 80
+        },
+        {
+          "type": "tokens",
+          "window": "minute",
+          "value": 1000000,
+          "alert_pct": 80
+        },
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 1500,
+          "alert_pct": 80
+        }
+      ]
     },
     {
       "id": "gemini-api-visual",
@@ -155,7 +204,27 @@
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "Best available on free tier for code/visual QA. 3.1-pro-preview requires billing. 3-flash-preview is free and capable."
+      "notes": "Best available on free tier for code/visual QA. 3.1-pro-preview requires billing. 3-flash-preview is free and capable.",
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "minute",
+          "value": 15,
+          "alert_pct": 80
+        },
+        {
+          "type": "tokens",
+          "window": "minute",
+          "value": 1000000,
+          "alert_pct": 80
+        },
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 1500,
+          "alert_pct": 80
+        }
+      ]
     },
     {
       "id": "gemini-api-general",
@@ -173,7 +242,27 @@
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "The Tank. gemini-1.5-flash removed from API. 2.5-flash-lite is the new stable fallback."
+      "notes": "The Tank. gemini-1.5-flash removed from API. 2.5-flash-lite is the new stable fallback.",
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "minute",
+          "value": 15,
+          "alert_pct": 80
+        },
+        {
+          "type": "tokens",
+          "window": "minute",
+          "value": 1000000,
+          "alert_pct": 80
+        },
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 1500,
+          "alert_pct": 80
+        }
+      ]
     },
     {
       "id": "deepseek-api",
@@ -187,7 +276,15 @@
         "deepseek-chat",
         "deepseek-reasoner"
       ],
-      "provides_tools": []
+      "provides_tools": [],
+      "limit_schema": [
+        {
+          "type": "credit",
+          "window": "never",
+          "value": 281,
+          "alert_pct": 80
+        }
+      ]
     },
     {
       "id": "groq-api",
@@ -211,7 +308,21 @@
         "tokens_per_day": 100000,
         "requests_per_day": 14400
       },
-      "notes": "Re-enabled after vault fix. Org-level shared limits: 100K TPD and 14.4K RPD across ALL models."
+      "notes": "Re-enabled after vault fix. Org-level shared limits: 100K TPD and 14.4K RPD across ALL models.",
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "minute",
+          "value": 30,
+          "alert_pct": 80
+        },
+        {
+          "type": "tokens",
+          "window": "day",
+          "value": 1000000,
+          "alert_pct": 80
+        }
+      ]
     },
     {
       "id": "openrouter-api",
@@ -241,7 +352,15 @@
         "rpd_unfunded": 200,
         "rpd_funded": 1000
       },
-      "credit_remaining_usd": -0.57
+      "credit_remaining_usd": -0.57,
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "minute",
+          "value": 20,
+          "alert_pct": 80
+        }
+      ]
     },
     {
       "id": "nvidia-api",
@@ -257,7 +376,21 @@
         "moonshotai/kimi-k2-instruct"
       ],
       "provides_tools": [],
-      "notes": "Free tier with rate limits. Nemotron Ultra for complex tasks."
+      "notes": "Free tier with rate limits. Nemotron Ultra for complex tasks.",
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "minute",
+          "value": 10,
+          "alert_pct": 80
+        },
+        {
+          "type": "tokens",
+          "window": "day",
+          "value": 500000,
+          "alert_pct": 80
+        }
+      ]
     },
     {
       "id": "chatgpt-web",
@@ -271,10 +404,14 @@
         "chatgpt-4o-mini"
       ],
       "provides_tools": [],
-      "limit_schema": {
-        "messages_per_3h": 40,
-        "model": "GPT-4o limited, GPT-4o mini unlimited fallback"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "3h",
+          "value": 40,
+          "alert_pct": 80
+        }
+      ],
       "notes": "Courier destination. Free tier: ~10 messages/3hrs. Manual or browser automation.",
       "limit_source": "OpenAI docs: dynamic ~10-40 per 3hr window. No fixed published number. GPT-4o mini has no effective limit.",
       "popup_handling": null
@@ -291,10 +428,14 @@
         "claude-sonnet"
       ],
       "provides_tools": [],
-      "limit_schema": {
-        "messages_per_day": 20,
-        "limit_type": "dynamic_context_dependent"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 20,
+          "alert_pct": 80
+        }
+      ],
       "notes": "Courier destination. Variable daily limits. Good for PRD review.",
       "limit_source": "Anthropic docs: ~10-20/day rolling window. Varies by conversation length. Shorter = more messages.",
       "popup_handling": null
@@ -312,10 +453,14 @@
         "gemini-2.5-pro"
       ],
       "provides_tools": [],
-      "limit_schema": {
-        "messages_per_day": null,
-        "limit_type": "undocumented_chat_interface"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 500,
+          "alert_pct": 90
+        }
+      ],
       "notes": "Courier destination. 1M tokens/day free tier.",
       "limit_source": "Google: chat interface limits unpublished. API well-documented (15 RPM/1500 RPD for Flash).",
       "popup_handling": null
@@ -333,10 +478,14 @@
         "deepseek-r1"
       ],
       "provides_tools": [],
-      "limit_schema": {
-        "messages_per_day": null,
-        "limit_type": "server_capacity_only"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 200,
+          "alert_pct": 90
+        }
+      ],
       "notes": "Courier destination. Generous free tier. Works without login.",
       "limit_source": "DeepSeek: no published limit. Server busy errors during peak times only limitation.",
       "popup_handling": null
@@ -354,10 +503,14 @@
         "qwen-2.5"
       ],
       "provides_tools": [],
-      "limit_schema": {
-        "messages_per_day": null,
-        "limit_type": "undocumented_varies_by_model"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 100,
+          "alert_pct": 80
+        }
+      ],
       "notes": "Courier destination. Works without login.",
       "limit_source": "Alibaba: limits not published in English. Varies by model (Turbo > Plus > Max).",
       "popup_handling": null
@@ -376,10 +529,14 @@
         "pixtral"
       ],
       "provides_tools": [],
-      "limit_schema": {
-        "messages_per_day": null,
-        "limit_type": "no_documented_limit"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "hour",
+          "value": 60,
+          "alert_pct": 80
+        }
+      ],
       "notes": "Courier destination. Free tier available. Good for code.",
       "limit_source": "Mistral: free Le Chat has no published message caps. Very generous.",
       "popup_handling": null
@@ -397,10 +554,14 @@
         "deepseek-v3"
       ],
       "provides_tools": [],
-      "limit_schema": {
-        "messages_per_day": 3,
-        "limit_type": "hard_cutoff"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 3,
+          "alert_pct": 80
+        }
+      ],
       "notes": "Courier destination. Free DeepSeek R1 & V3. No login required. Good backup.",
       "limit_source": "User reported: 3 free messages per day.",
       "popup_handling": null
@@ -417,10 +578,14 @@
         "kimi-k2.6-instant"
       ],
       "provides_tools": [],
-      "limit_schema": {
-        "messages_per_day": 50,
-        "limit_type": "estimated"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 50,
+          "alert_pct": 80
+        }
+      ],
       "notes": "Courier destination. Google SSO. K2.6 Instant model. Agent swarm feature available.",
       "limit_source": "Estimated from Moonshot docs. Not precisely published.",
       "popup_handling": null
@@ -439,10 +604,14 @@
       "provides_tools": [
         "mcp"
       ],
-      "limit_schema": {
-        "messages_per_day": null,
-        "limit_type": "unlimited_mostly"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "hour",
+          "value": 100,
+          "alert_pct": 90
+        }
+      ],
       "notes": "Courier destination. Unlimited free. Multi-model switcher. MCP servers. Currently defaulting to Kimi-K2-Instruct-0905 via novita.",
       "limit_source": "HuggingFace: community-driven, mostly unlimited. Shared infrastructure may throttle.",
       "popup_handling": null
@@ -465,12 +634,26 @@
         "url_context",
         "code_execution"
       ],
-      "limit_schema": {
-        "requests_per_day": 1500,
-        "requests_per_minute": 15,
-        "tokens_per_minute": 1000000,
-        "limit_type": "verified_api_docs"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "minute",
+          "value": 15,
+          "alert_pct": 80
+        },
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 1500,
+          "alert_pct": 80
+        },
+        {
+          "type": "tokens",
+          "window": "minute",
+          "value": 1000000,
+          "alert_pct": 80
+        }
+      ],
       "notes": "Courier destination. Best for apps/design. Has native tools: function calling, Google Search grounding, Maps, URL context. Google SSO. Free.",
       "limit_source": "Google AI docs VERIFIED: Gemini Flash 15 RPM/1M TPM/1500 RPD. Pro: 2 RPM/32K TPM/50 RPD.",
       "popup_handling": null
@@ -487,10 +670,14 @@
         "poe-mix"
       ],
       "provides_tools": [],
-      "limit_schema": {
-        "compute_points_per_day": 3000,
-        "limit_type": "verified"
-      },
+      "limit_schema": [
+        {
+          "type": "compute_points",
+          "window": "day",
+          "value": 3000,
+          "alert_pct": 80
+        }
+      ],
       "notes": "Courier destination. Multi-model aggregator. 3000 compute points/day free. Models: DeepSeek-R1, Gemma-4-31B, Gemini-3.1-Flash-Lite and more. Google SSO.",
       "limit_source": "Poe official: 3000 compute points/day. Different models cost different points.",
       "popup_handling": null
@@ -507,10 +694,6 @@
         "gpt-4o-mini-chatbox"
       ],
       "provides_tools": [],
-      "limit_schema": {
-        "messages_per_day": null,
-        "limit_type": "unknown"
-      },
       "notes": "Courier destination. Provides GPT-4o mini for free. No auth needed. URL redirects from chatboxapp.ai to app.chatbox.ai.",
       "limit_source": "No published limits found. Wrapper service for GPT-4o mini.",
       "popup_handling": null
@@ -527,11 +710,20 @@
         "aizolo-mix"
       ],
       "provides_tools": [],
-      "limit_schema": {
-        "messages_per_day_free": 5,
-        "tokens_per_year": 255000000,
-        "limit_type": "verified"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 5,
+          "alert_pct": 80
+        },
+        {
+          "type": "tokens",
+          "window": "day",
+          "value": 700000,
+          "alert_pct": 80
+        }
+      ],
       "best_for": [
         "research",
         "coding",
@@ -556,11 +748,14 @@
         "web_search",
         "citations"
       ],
-      "limit_schema": {
-        "pro_searches_per_day": 5,
-        "basic_searches": "unlimited",
-        "limit_type": "verified"
-      },
+      "limit_schema": [
+        {
+          "type": "requests",
+          "window": "day",
+          "value": 5,
+          "alert_pct": 80
+        }
+      ],
       "best_for": [
         "search",
         "research",

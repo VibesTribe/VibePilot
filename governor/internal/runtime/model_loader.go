@@ -246,27 +246,17 @@ func loadWebPlatformLimits(connectorsPath string, tracker *UsageTracker) {
 
 	registered := 0
 	for _, conn := range file.Connectors {
-		// Only register web destinations with limit_schema
-		if conn.Type != "web" {
+		// Register any connector with limits (web, api, cli)
+		if len(conn.LimitSchema) == 0 {
 			continue
 		}
 
-		// Only register if at least one limit is set
-		if conn.LimitSchema.MessagesPer3h == nil &&
-			conn.LimitSchema.MessagesPer8h == nil &&
-			conn.LimitSchema.MessagesPerDay == nil &&
-			conn.LimitSchema.MessagesPerSession == nil &&
-			conn.LimitSchema.TokensPerDay == nil &&
-			conn.LimitSchema.SessionsPerDay == nil {
-			continue
-		}
-
-		tracker.RegisterPlatformLimits(conn.ID, conn.LimitSchema)
+		tracker.RegisterPlatformLimitsV2(conn.ID, conn.LimitSchema)
 		registered++
 	}
 
 	if registered > 0 {
-		log.Printf("[ModelLoader] Registered platform limits for %d web destinations", registered)
+		log.Printf("[ModelLoader] Registered platform limits for %d connectors", registered)
 	}
 }
 

@@ -668,6 +668,11 @@ func (h *TaskHandler) executeCourierTask(
 	duration := time.Since(runStart)
 	log.Printf("[CourierTask] Courier completed for %s in %.1fs (tokens: %d/%d)", truncateID(taskID), duration.Seconds(), tokensIn, tokensOut)
 
+	// Record platform usage against configured limits (V2 config-driven tracker)
+	if h.usageTracker != nil && platformID != "" {
+		h.usageTracker.RecordPlatformMessage(ctx, platformID, tokensIn+tokensOut)
+	}
+
 	// Parse courier output for files, same as internal execution path
 	taskOutput, parseErr := runtime.ParseTaskRunnerOutput(output)
 	var files []runtime.File
@@ -732,6 +737,7 @@ func (h *TaskHandler) executeCourierTask(
 		"p_courier":     "github-actions",
 		"p_platform":    platformID,
 		"p_tokens_used": totalTokens,
+		"p_chat_url":    "", // populated by local courier path
 		"p_result": map[string]any{
 			"files":               diskFileList,
 			"summary":             summary,

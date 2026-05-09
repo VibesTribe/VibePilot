@@ -339,7 +339,7 @@ type ConnectorConfig struct {
 	Models         []string               `json:"models_available,omitempty"`
 	TimeoutSeconds int                    `json:"timeout_seconds,omitempty"`
 	SharedLimits   RateLimits             `json:"shared_limits,omitempty"`
-	LimitSchema    PlatformLimitSchema    `json:"limit_schema,omitempty"`
+	LimitSchema    []PlatformLimit        `json:"limit_schema,omitempty"`
 	Extra          map[string]interface{} `json:"-"`
 }
 

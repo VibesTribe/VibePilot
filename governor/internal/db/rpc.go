@@ -51,6 +51,9 @@ var defaultRPCAllowlist = map[string]bool{
 	"check_platform_availability": true,
 	"update_model_usage":          true,
 	"deduct_model_credit":        true,
+	"increment_platform_usage":   true,
+	"upsert_platform_usage":      true,
+	"get_all_platform_usage":     true,
 
 	// Planner learning
 	"create_planner_rule":         true,

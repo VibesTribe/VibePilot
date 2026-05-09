@@ -18,6 +18,7 @@ type CourierDB interface {
 	Insert(ctx context.Context, table string, data map[string]any) (json.RawMessage, error)
 	Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error)
 	Update(ctx context.Context, table, id string, data map[string]any) (json.RawMessage, error)
+	CallRPC(ctx context.Context, name string, args map[string]any) (json.RawMessage, error)
 }
 
 // courierWaiter holds a channel that gets signaled when a courier task completes.
@@ -57,6 +58,7 @@ type platformConfig struct {
 	SubmitY          int
 	WaitInitial      int
 	WaitStable       int
+	Category         string // "standard" (any task), "premium" (full projects only), "reserved" (human-initiated)
 }
 
 // platformConfigs maps platform domain substrings to their interaction configs.
@@ -79,6 +81,7 @@ var platformConfigs = map[string]platformConfig{
 		SubmitY:          598,
 		WaitInitial:      8,
 		WaitStable:       3,
+		Category:         "premium",
 	},
 	"chatgpt.com": {
 		InputX:           792,
@@ -272,7 +275,8 @@ try:
             stable_count = 0
             last_text = current
     response = js("(function() { var els = document.querySelectorAll('%s'); var t = ''; for (var i = 0; i < els.length; i++) { t += els[i].textContent; } return t; })()")
-    result = {"status": "success", "output": response, "tokens_in": len(prompt) // 4, "tokens_out": len(response) // 4}
+    chat_url = js("window.location.href")
+    result = {"status": "success", "output": response, "chat_url": chat_url, "tokens_in": len(prompt) // 4, "tokens_out": len(response) // 4}
     print(json.dumps(result))
 except Exception as e:
     print(json.dumps({"status": "error", "error": str(e)}))
@@ -394,6 +398,7 @@ func (r *CourierRunner) Run(ctx context.Context, prompt string, timeout int) (st
 		// Update task_runs with success
 		r.db.Update(ctx, "task_runs", taskID, map[string]any{
 			"status":       "success",
+			"chat_url":     result.ChatURL,
 			"completed_at": time.Now().UTC().Format(time.RFC3339),
 			"tokens_used":  result.TokensIn + result.TokensOut,
 		})
@@ -527,6 +532,7 @@ type TaskRunResult struct {
 	Status    string `json:"status"`
 	Output    string `json:"output"`
 	Error     string `json:"error"`
+	ChatURL   string `json:"chat_url"`
 	TokensIn  int    `json:"tokens_in"`
 	TokensOut int    `json:"tokens_out"`
 }
@@ -536,6 +542,31 @@ func truncateCourierID(id string) string {
 		return id[:8]
 	}
 	return id
+}
+
+// extractPlatformID maps a web platform URL to its platform_usage ID.
+// e.g. "https://chat.openai.com/..." -> "chatgpt-web"
+var urlToPlatformID = map[string]string{
+	"gemini.google":  "gemini-web",
+	"aistudio.google": "aistudio-web",
+	"chatgpt.com":    "chatgpt-web",
+	"claude.ai":      "claude-web",
+	"chat.deepseek":  "deepseek-web",
+	"perplexity.ai":  "perplexity-web",
+	"chat.qwen":      "qwen-web",
+	"huggingface":    "huggingchat-web",
+	"chat.mistral":   "mistral-web",
+	"kimi.moonshot":  "kimi-web",
+	"poe.com":        "poe-web",
+}
+
+func extractPlatformID(url string) string {
+	for domain, pid := range urlToPlatformID {
+		if strings.Contains(url, domain) {
+			return pid
+		}
+	}
+	return "unknown"
 }
 
 func minInt(a, b int) int {

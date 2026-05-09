@@ -111,6 +111,7 @@ type UsageTracker struct {
 	db               Querier
 	connectorTracker *ConnectorUsageTracker
 	platformTracker  *PlatformUsageTracker
+	platformTrackerV2 *PlatformUsageTrackerV2
 }
 
 func NewUsageTracker(db Querier) *UsageTracker {
@@ -119,6 +120,7 @@ func NewUsageTracker(db Querier) *UsageTracker {
 		db:               db,
 		connectorTracker: NewConnectorUsageTracker(80),
 		platformTracker:  NewPlatformUsageTracker(80),
+		platformTrackerV2: NewPlatformUsageTrackerV2(),
 		defaults: ModelProfile{
 			ThrottleBehavior: ThrottleSlowDown,
 			BufferPct:        80,
@@ -160,16 +162,55 @@ func (t *UsageTracker) RegisterPlatformLimits(platformID string, limits Platform
 	}
 }
 
-// PlatformCanMakeRequest checks whether a web platform has capacity for another request.
-func (t *UsageTracker) PlatformCanMakeRequest(ctx context.Context, platformID string, estimatedTokens int) (bool, time.Duration) {
-	if t.platformTracker == nil {
-		return true, 0
+// RegisterPlatformLimitsV2 registers config-driven limits for any connector (V2).
+func (t *UsageTracker) RegisterPlatformLimitsV2(platformID string, limits []PlatformLimit) {
+	if t.platformTrackerV2 != nil {
+		t.platformTrackerV2.RegisterPlatformFromConfig(platformID, limits)
 	}
-	return t.platformTracker.CanMakeRequest(ctx, platformID, estimatedTokens)
 }
 
-// RecordPlatformMessage records a message sent to a web platform destination.
+// PlatformCanMakeRequest checks whether a web platform has capacity for another request.
+// Tries V2 (config-driven) first, falls back to V1 (legacy) if not registered.
+func (t *UsageTracker) PlatformCanMakeRequest(ctx context.Context, platformID string, estimatedTokens int) (bool, time.Duration) {
+	// Try V2 first (config-driven, supports all limit types)
+	if t.platformTrackerV2 != nil && t.platformTrackerV2.HasPlatform(platformID) {
+		return t.platformTrackerV2.CanMakeRequest(ctx, platformID, estimatedTokens)
+	}
+	// Fallback to V1 (legacy, hardcoded 3h/8h/day/session)
+	if t.platformTracker != nil {
+		return t.platformTracker.CanMakeRequest(ctx, platformID, estimatedTokens)
+	}
+	return true, 0
+}
+
+// RecordPlatformMessage records a message sent to a platform destination.
+// Tries V2 first, falls back to V1.
 func (t *UsageTracker) RecordPlatformMessage(ctx context.Context, platformID string, tokensUsed int) {
+	if t.platformTrackerV2 != nil && t.platformTrackerV2.HasPlatform(platformID) {
+		t.platformTrackerV2.RecordUsage(ctx, platformID, tokensUsed, 0)
+		return
+	}
+	if t.platformTracker != nil {
+		t.platformTracker.RecordMessageSent(ctx, platformID, tokensUsed)
+	}
+}
+
+// RecordPlatformUsage records usage with cost for credit-based platforms.
+func (t *UsageTracker) RecordPlatformUsage(ctx context.Context, platformID string, tokensUsed int, costCents int) {
+	if t.platformTrackerV2 != nil {
+		t.platformTrackerV2.RecordUsage(ctx, platformID, tokensUsed, costCents)
+	}
+}
+
+// UpdatePlatformCredit updates the credit balance for a credit-based platform.
+func (t *UsageTracker) UpdatePlatformCredit(platformID string, remainingCents int) {
+	if t.platformTrackerV2 != nil {
+		t.platformTrackerV2.UpdateCreditBalance(platformID, remainingCents)
+	}
+}
+
+// RecordPlatformMessageOld is the legacy RecordPlatformMessage (kept for compat).
+func (t *UsageTracker) RecordPlatformMessageOld(ctx context.Context, platformID string, tokensUsed int) {
 	if t.platformTracker != nil {
 		t.platformTracker.RecordMessageSent(ctx, platformID, tokensUsed)
 	}
@@ -744,6 +785,9 @@ func (t *UsageTracker) LoadFromDatabase(ctx context.Context) error {
 	if t.platformTracker != nil {
 		t.platformTracker.LoadFromDatabase(ctx, t.db)
 	}
+	if t.platformTrackerV2 != nil {
+		t.platformTrackerV2.LoadFromDatabase(ctx, t.db)
+	}
 
 	return nil
 }
@@ -779,6 +823,9 @@ func (t *UsageTracker) PersistToDatabase(ctx context.Context) {
 	}
 	if t.platformTracker != nil {
 		t.platformTracker.PersistToDatabase(ctx, t.db)
+	}
+	if t.platformTrackerV2 != nil {
+		t.platformTrackerV2.PersistToDatabase(ctx, t.db)
 	}
 }
 
