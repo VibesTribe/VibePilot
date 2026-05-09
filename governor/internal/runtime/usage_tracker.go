@@ -169,6 +169,11 @@ func (t *UsageTracker) RegisterPlatformLimitsV2(platformID string, limits []Plat
 	}
 }
 
+// GetPlatformTrackerV2 returns the V2 config-driven platform tracker for credit polling.
+func (t *UsageTracker) GetPlatformTrackerV2() *PlatformUsageTrackerV2 {
+	return t.platformTrackerV2
+}
+
 // PlatformCanMakeRequest checks whether a web platform has capacity for another request.
 // Tries V2 (config-driven) first, falls back to V1 (legacy) if not registered.
 func (t *UsageTracker) PlatformCanMakeRequest(ctx context.Context, platformID string, estimatedTokens int) (bool, time.Duration) {

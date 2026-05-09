@@ -425,6 +425,13 @@ func main() {
 		log.Println("[ModelScanner] Enabled and started")
 	}
 
+	// Start credit poller for paid API providers (DeepSeek, etc.)
+	if v2tracker := usageTracker.GetPlatformTrackerV2(); v2tracker != nil && v != nil {
+		creditPoller := runtime.NewCreditPoller(v2tracker, v)
+		creditPoller.StartBackgroundPolling(ctx)
+		log.Println("[CreditPoller] Started background credit polling")
+	}
+
 	// Usage state is persisted only on shutdown (no polling).
 	// Dashboard reads model data via realtime subscriptions, not polled tables.
 	// This goroutine waits for shutdown and does one final persist.

@@ -28,6 +28,7 @@ const (
 	Window3h     LimitWindow = "3h"     // 3 hour rolling
 	Window8h     LimitWindow = "8h"     // 8 hour rolling
 	WindowDay    LimitWindow = "day"    // 24 hour rolling (calendar day alignment optional)
+	WindowWeek   LimitWindow = "week"   // 7 day rolling
 	WindowCycle  LimitWindow = "cycle"  // custom cycle (GLM: 5h, DeepSeek: monthly)
 	WindowNever  LimitWindow = "never"  // credit-based, no time reset
 )
@@ -42,12 +43,16 @@ const (
 //   - DeepSeek API: credit/never=$2.81
 //   - GLM: requests/cycle=400
 type PlatformLimit struct {
-	Type          LimitType   `json:"type"`            // requests, tokens, compute_points, credit
-	Window        LimitWindow `json:"window"`          // minute, hour, 3h, 8h, day, cycle, never
-	Value         int         `json:"value"`           // the limit amount (requests, tokens, points, cents for credit)
-	AlertPct      int         `json:"alert_pct"`       // percentage threshold for alerting (default 80)
-	WindowSeconds int         `json:"window_seconds"`  // custom window duration in seconds (for cycle type)
-	ResetsAt      string      `json:"resets_at,omitempty"` // ISO timestamp when window resets (for credit/cycle)
+	Type           LimitType   `json:"type"`                       // requests, tokens, compute_points, credit
+	Window         LimitWindow `json:"window"`                     // minute, hour, 3h, 8h, day, week, cycle, never
+	Value          int         `json:"value"`                      // the limit amount (requests, tokens, points, cents for credit)
+	AlertPct       int         `json:"alert_pct"`                  // percentage threshold for alerting (default 80)
+	WindowSeconds  int         `json:"window_seconds"`             // custom window duration in seconds (for cycle type)
+	ResetsAt       string      `json:"resets_at,omitempty"`        // ISO timestamp when window resets (for credit/cycle)
+	CostMultiplier int         `json:"cost_multiplier,omitempty"`  // multiply each request by this (e.g., GLM peak = 3)
+	PeakStartHour  int         `json:"peak_start_hour,omitempty"`  // hour (0-23) in local time when peak starts
+	PeakEndHour    int         `json:"peak_end_hour,omitempty"`    // hour (0-23) in local time when peak ends
+	PeakTimezone   string      `json:"peak_timezone,omitempty"`    // IANA timezone for peak hours (e.g., "America/Toronto")
 }
 
 // PlatformProfileV2 tracks usage for a platform against its configured limits.
@@ -130,6 +135,8 @@ func (pt *PlatformUsageTrackerV2) newUsageForLimit(lim PlatformLimit, now time.T
 		// Align to next midnight local
 		tomorrow := now.AddDate(0, 0, 1)
 		resetAt = time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(), 0, 0, 0, 0, now.Location())
+	case WindowWeek:
+		resetAt = now.Add(7 * 24 * time.Hour)
 	case WindowCycle:
 		if lim.WindowSeconds > 0 {
 			resetAt = now.Add(time.Duration(lim.WindowSeconds) * time.Second)
@@ -190,13 +197,19 @@ func (pt *PlatformUsageTrackerV2) RecordUsage(ctx context.Context, platformID st
 			*usage = pt.newUsageForLimit(lim, now)
 		}
 
+		// Calculate cost multiplier based on peak hours
+		multiplier := 1
+		if lim.CostMultiplier > 0 && lim.PeakStartHour != lim.PeakEndHour {
+			multiplier = pt.peakMultiplier(lim, now)
+		}
+
 		// Increment the right counter based on limit type
 		switch lim.Type {
 		case LimitTypeRequests, LimitTypeTokens:
-			usage.Requests++
+			usage.Requests += multiplier
 			usage.Tokens += tokensUsed
 		case LimitTypeComputePoints:
-			usage.Requests++
+			usage.Requests += multiplier
 			usage.Points += tokensUsed // approximate: tokens as point proxy
 		case LimitTypeCredit:
 			usage.CreditCents += costCents
@@ -343,6 +356,38 @@ func (pt *PlatformUsageTrackerV2) AllPlatformStatus() map[string]map[string]inte
 		result[id] = pt.GetRemainingUsage(id)
 	}
 	return result
+}
+
+// peakMultiplier returns the cost multiplier for the current time.
+// During peak hours, returns CostMultiplier; otherwise returns 1.
+func (pt *PlatformUsageTrackerV2) peakMultiplier(lim PlatformLimit, now time.Time) int {
+	if lim.CostMultiplier <= 0 || lim.PeakStartHour == lim.PeakEndHour {
+		return 1
+	}
+
+	// Get local time in the configured timezone
+	localNow := now
+	if lim.PeakTimezone != "" {
+		if loc, err := time.LoadLocation(lim.PeakTimezone); err == nil {
+			localNow = now.In(loc)
+		}
+	}
+
+	hour := localNow.Hour()
+	start := lim.PeakStartHour
+	end := lim.PeakEndHour
+
+	// Handle overnight ranges (e.g., 22-6)
+	if start > end {
+		if hour >= start || hour < end {
+			return lim.CostMultiplier
+		}
+	} else {
+		if hour >= start && hour < end {
+			return lim.CostMultiplier
+		}
+	}
+	return 1
 }
 
 // PersistToDatabase saves all platform usage data to the platform_usage table.
