@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-05-09T01:53:07.830587+00:00",
+  "updated": "2026-05-09T02:23:35.415238+00:00",
   "total": 191,
   "models": [
     {
@@ -53,28 +53,13 @@
       ]
     },
     {
-      "id": "inclusionai/ring-2.6-1t:free",
-      "name": "inclusionAI: Ring-2.6-1T (free)",
+      "id": "qwen/qwen3-next-80b-a3b-instruct:free",
+      "name": "Qwen: Qwen3 Next 80B A3B Instruct (free)",
       "context_length": 262144,
       "capabilities": [
+        "instruction",
+        "reasoning",
         "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "google/gemma-4-31b-it:free",
-      "name": "Google: Gemma 4 31B (free)",
-      "context_length": 262144,
-      "capabilities": [
-        "text",
-        "vision"
       ],
       "rate_limits": {
         "rpd": 200,
@@ -103,12 +88,10 @@
       ]
     },
     {
-      "id": "qwen/qwen3-next-80b-a3b-instruct:free",
-      "name": "Qwen: Qwen3 Next 80B A3B Instruct (free)",
+      "id": "inclusionai/ring-2.6-1t:free",
+      "name": "inclusionAI: Ring-2.6-1T (free)",
       "context_length": 262144,
       "capabilities": [
-        "instruction",
-        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -126,6 +109,23 @@
       "context_length": 262144,
       "capabilities": [
         "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
+      "id": "google/gemma-4-31b-it:free",
+      "name": "Google: Gemma 4 31B (free)",
+      "context_length": 262144,
+      "capabilities": [
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "rpd": 200,
@@ -2964,11 +2964,11 @@
       "name": "Gemini Pro Latest",
       "context_length": 1048576,
       "capabilities": [
-        "reasoning",
-        "code",
-        "vision",
         "instruction",
-        "text"
+        "text",
+        "reasoning",
+        "vision",
+        "code"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3025,11 +3025,11 @@
       "name": "Gemini Flash-Lite Latest",
       "context_length": 1048576,
       "capabilities": [
-        "reasoning",
-        "code",
-        "vision",
         "instruction",
-        "text"
+        "text",
+        "reasoning",
+        "vision",
+        "code"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3088,11 +3088,11 @@
       "name": "Gemini Flash Latest",
       "context_length": 1048576,
       "capabilities": [
-        "reasoning",
-        "code",
-        "vision",
         "instruction",
-        "text"
+        "text",
+        "reasoning",
+        "vision",
+        "code"
       ],
       "rate_limits": {
         "total_rpm": 60,
