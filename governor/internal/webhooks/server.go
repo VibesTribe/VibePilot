@@ -161,6 +161,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/admin/model", s.handleAdminModel)
 	mux.HandleFunc("/api/admin/models", s.handleAdminModels)
 	mux.HandleFunc("/api/chat/usage", s.handleChatUsage)
+	mux.HandleFunc("/api/review-queue", s.handleReviewQueue)
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
@@ -981,6 +982,147 @@ func (s *Server) handleProjectAlerts(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(fmt.Sprintf(`{"alerts": %s}`, data)))
+}
+
+// handleReviewQueue returns a unified list of items needing human review
+// across three categories: research reports, visual QA tasks, and credit alerts.
+// GET /api/review-queue
+func (s *Server) handleReviewQueue(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "GET only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	ctx := r.Context()
+
+	type ReviewItem struct {
+		ID          string `json:"id"`
+		Category    string `json:"category"`
+		Title       string `json:"title"`
+		Summary     string `json:"summary"`
+		Status      string `json:"status"`
+		ReviewURL   string `json:"review_url"`
+		CreatedAt   string `json:"created_at,omitempty"`
+		CouncilNote string `json:"council_notes,omitempty"`
+	}
+
+	var items []ReviewItem
+
+	// 1. Research suggestions needing human review (council escalated)
+	researchResult, err := s.db.Query(ctx, "research_suggestions", map[string]any{
+		"status": "pending_human",
+		"limit":  50,
+	})
+	if err == nil {
+		var rows []map[string]any
+		if json.Unmarshal(researchResult, &rows) == nil {
+			for _, row := range rows {
+				id, _ := row["id"].(string)
+				title, _ := row["title"].(string)
+				summary, _ := row["summary"].(string)
+				findingsPath, _ := row["findings_path"].(string)
+				createdAt, _ := row["created_at"].(string)
+
+				councilNote := ""
+				if notes, ok := row["review_notes"].(map[string]any); ok {
+					if noteBytes, err := json.Marshal(notes); err == nil {
+						councilNote = string(noteBytes)
+					}
+				}
+
+				reviewURL := "/research/" + id
+				if findingsPath != "" {
+					reviewURL = "https://github.com/VibesTribe/knowledgebase/blob/main/" + findingsPath
+				}
+
+				items = append(items, ReviewItem{
+					ID:          id,
+					Category:    "research",
+					Title:       title,
+					Summary:     summary,
+					Status:      "pending_human",
+					ReviewURL:   reviewURL,
+					CreatedAt:   createdAt,
+					CouncilNote: councilNote,
+				})
+			}
+		}
+	}
+
+	// 2. Tasks needing human visual QA review
+	taskResult, err := s.db.Query(ctx, "tasks", map[string]any{
+		"status": "human_review",
+		"limit":  50,
+	})
+	if err == nil {
+		var rows []map[string]any
+		if json.Unmarshal(taskResult, &rows) == nil {
+			for _, row := range rows {
+				id, _ := row["id"].(string)
+				title, _ := row["title"].(string)
+				summary, _ := row["summary"].(string)
+				createdAt, _ := row["created_at"].(string)
+				if title == "" {
+					title = "Visual QA Review"
+				}
+
+				items = append(items, ReviewItem{
+					ID:        id,
+					Category:  "task",
+					Title:     title,
+					Summary:   summary,
+					Status:    "human_review",
+					ReviewURL: "/tasks/" + id,
+					CreatedAt: createdAt,
+				})
+			}
+		}
+	}
+
+	// 3. Credit / subscription alerts
+	alertData, err := s.db.RPC(ctx, "check_subscription_thresholds", map[string]any{})
+	if err == nil {
+		var alertResp struct {
+			Alerts []map[string]any `json:"alerts"`
+		}
+		if json.Unmarshal(alertData, &alertResp) == nil {
+			for _, alert := range alertResp.Alerts {
+				modelID, _ := alert["model_id"].(string)
+				alertType, _ := alert["alert_type"].(string)
+				message, _ := alert["message"].(string)
+				if message == "" {
+					message = alertType + " alert for " + modelID
+				}
+
+				items = append(items, ReviewItem{
+					ID:        modelID + "-" + alertType,
+					Category:  "credit_alert",
+					Title:     modelID + " " + alertType,
+					Summary:   message,
+					Status:    "alert",
+					ReviewURL: "/admin#credits",
+				})
+			}
+		}
+	}
+
+	if items == nil {
+		items = []ReviewItem{}
+	}
+
+	responseBytes, _ := json.Marshal(map[string]any{
+		"items": items,
+		"count": len(items),
+	})
+	w.Write(responseBytes)
 }
 
 // handleProjectCosts handles add/archive of project cost entries
