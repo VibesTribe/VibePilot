@@ -2,9 +2,9 @@
   "enabled": true,
   "capture_pages": [
     {
-      "url": "https://vibeflow-dashboard.vercel.app/",
-      "name": "dashboard-home",
-      "viewports": [1280, 768]
+      "url": "http://localhost:8080/api/dashboard",
+      "name": "dashboard-api",
+      "viewports": [1280]
     }
   ],
   "baseline_dir": "visualqa/baselines",
