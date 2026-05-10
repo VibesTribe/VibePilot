@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-05-09T20:18:00Z | Commit: dc238db2 | Branch: main
+# Generated: 2026-05-10T02:23:15Z | Commit: 9f2f638d | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -174,7 +174,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/cmd/governor/ (18 files, 158 funcs, 16 types)
 - governor/cmd/migrate_vault/ (1 files, 5 funcs, 1 types)
 - governor/cmd/vault_encrypt/ (1 files, 1 funcs, 0 types)
-- governor/internal/connectors/ (2 files, 28 funcs, 9 types)
+- governor/internal/connectors/ (2 files, 33 funcs, 10 types)
 - governor/internal/core/ (4 files, 35 funcs, 27 types)
 - governor/internal/dag/ (3 files, 18 funcs, 13 types)
 - governor/internal/db/ (5 files, 52 funcs, 9 types)
@@ -185,11 +185,11 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
 - governor/internal/memory/ (2 files, 19 funcs, 5 types)
 - governor/internal/pgnotify/ (1 files, 4 funcs, 3 types)
-- governor/internal/runtime/ (17 files, 289 funcs, 123 types)
+- governor/internal/runtime/ (19 files, 316 funcs, 132 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 20 funcs, 4 types)
-- governor/internal/webhooks/ (4 files, 60 funcs, 14 types)
+- governor/internal/webhooks/ (4 files, 64 funcs, 14 types)
 - governor/pkg/types/ (1 files, 0 funcs, 9 types)
 ## Config: JSON (auto-discovered)
   config/agents.json - Agent configurations. Empty model field = use cascade routing from routing.json free_cascade strategy. context_policy: full_map=entire codebase, file_tree=section headers only, targeted=specific task files only, none=no codebase context.
@@ -224,7 +224,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: dc238db2
+- Commit: 9f2f638d
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
