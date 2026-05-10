@@ -189,7 +189,7 @@ func (t *UsageTracker) PlatformCanMakeRequest(ctx context.Context, platformID st
 }
 
 // RecordPlatformMessage records a message sent to a platform destination.
-// Tries V2 first, falls back to V1.
+// Tries V2 first, falls back to V1. Cost is set to 0.
 func (t *UsageTracker) RecordPlatformMessage(ctx context.Context, platformID string, tokensUsed int) {
 	if t.platformTrackerV2 != nil && t.platformTrackerV2.HasPlatform(platformID) {
 		t.platformTrackerV2.RecordUsage(ctx, platformID, tokensUsed, 0)
@@ -198,6 +198,43 @@ func (t *UsageTracker) RecordPlatformMessage(ctx context.Context, platformID str
 	if t.platformTracker != nil {
 		t.platformTracker.RecordMessageSent(ctx, platformID, tokensUsed)
 	}
+}
+
+// RecordPlatformMessageWithCost records a platform message with automatic cost estimation.
+// Uses the model's API pricing to calculate per-use dollar cost from input/output tokens.
+func (t *UsageTracker) RecordPlatformMessageWithCost(ctx context.Context, platformID, modelID string, tokensIn, tokensOut int) {
+	costCents := t.estimateCostCents(modelID, tokensIn, tokensOut)
+	if t.platformTrackerV2 != nil && t.platformTrackerV2.HasPlatform(platformID) {
+		t.platformTrackerV2.RecordUsage(ctx, platformID, tokensIn+tokensOut, costCents)
+		return
+	}
+	if t.platformTracker != nil {
+		t.platformTracker.RecordMessageSent(ctx, platformID, tokensIn+tokensOut)
+	}
+}
+
+// estimateCostCents calculates the cost in cents for a request using model pricing.
+// Returns 0 for free models or models without pricing data.
+func (t *UsageTracker) estimateCostCents(modelID string, tokensIn, tokensOut int) int {
+	t.mu.RLock()
+	m, ok := t.models[modelID]
+	t.mu.RUnlock()
+	if !ok || m == nil {
+		return 0
+	}
+	pricing := m.Profile.APIPricing
+	if pricing.InputPer1MUsd == 0 && pricing.OutputPer1MUsd == 0 {
+		return 0
+	}
+	// Cost = (inputTokens / 1M * inputPrice) + (outputTokens / 1M * outputPrice)
+	// Convert to cents (* 100)
+	inputCost := float64(tokensIn) / 1_000_000 * pricing.InputPer1MUsd
+	outputCost := float64(tokensOut) / 1_000_000 * pricing.OutputPer1MUsd
+	totalCents := int((inputCost + outputCost) * 100)
+	if totalCents < 1 && (pricing.InputPer1MUsd > 0 || pricing.OutputPer1MUsd > 0) {
+		totalCents = 1 // minimum 1 cent for paid models
+	}
+	return totalCents
 }
 
 // RecordPlatformUsage records usage with cost for credit-based platforms.

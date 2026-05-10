@@ -670,7 +670,7 @@ func (h *TaskHandler) executeCourierTask(
 
 	// Record platform usage against configured limits (V2 config-driven tracker)
 	if h.usageTracker != nil && platformID != "" {
-		h.usageTracker.RecordPlatformMessage(ctx, platformID, tokensIn+tokensOut)
+		h.usageTracker.RecordPlatformMessageWithCost(ctx, platformID, modelID, tokensIn, tokensOut)
 	}
 
 	// Parse courier output for files, same as internal execution path
@@ -768,8 +768,8 @@ func (h *TaskHandler) executeCourierTask(
 		if err := h.usageTracker.RecordUsage(ctx, modelID, tokensIn, tokensOut); err != nil {
 			log.Printf("[CourierTask] UsageTracker RecordUsage error for %s: %v", modelID, err)
 		}
-		// Record platform message for free-tier limit tracking
-		h.usageTracker.RecordPlatformMessage(ctx, platformID, totalTokens)
+		// Record platform message for free-tier limit tracking (with cost estimation)
+		h.usageTracker.RecordPlatformMessageWithCost(ctx, platformID, modelID, tokensIn, tokensOut)
 		// Record completion for learned data (avg duration, best_for_task_types)
 		h.usageTracker.RecordCompletion(ctx, modelID, taskCategory, duration.Seconds(), true)
 	}
