@@ -159,6 +159,40 @@ User may:
 
 Iterate until they're happy. Maximum 5 rounds.
 
+### Step 6.5: Design Mockup with Open CoDesign
+
+Once the user approves the concept and feature set, produce a visual mockup using Open CoDesign before writing the PRD.
+
+**What is Open CoDesign:**
+- Local-first AI design tool (AppImage on the X220 at ~/open-codesign.AppImage)
+- Prompt-to-prototype: type a description, get an HTML/JSX/React mockup
+- Comment mode: click elements to leave pins/notes, model rewrites only that region
+- AI-tuned sliders for colors, spacing, typography
+- Multi-model BYOK (Gemini recommended via AI Studio keys)
+- Export: HTML, PDF, PPTX, ZIP
+- Free app, you only pay for the API tokens used
+
+**Your role as consultant:**
+1. Format the approved brief as a CoDesign prompt describing the visual layout, key screens, and interactions
+2. Present the prompt to the user so they can iterate in CoDesign
+3. After they approve the mockup, attach the exported HTML/design files to the PRD
+4. The PRD now includes both the functional spec AND the visual reference
+
+**CoDesign prompts should include:**
+- All px units (user prefers absolute px over rem/em)
+- DESIGN.md file with brand tokens for consistency across sessions
+- Specific screens/pages to mock up
+- Target device (phone/tablet/desktop) for preview framing
+
+**If the user skips CoDesign:**
+- That is fine. Not every PRD needs a mockup. Mark it as skipped and proceed to PRD.
+- Simple backend changes, API endpoints, or infrastructure work do not need visual mockups.
+
+**CoDesign is NOT:**
+- A drag-and-drop editor. Changes are prompt/slider driven.
+- A testing tool. Visual QA is a separate stage (Playwright).
+- A courier agent. It uses API calls (Q badge), not browser automation (W badge).
+
 ### Step 7: Produce PRD
 
 Generate complete PRD. Present summary:
