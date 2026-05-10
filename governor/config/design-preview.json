@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "trigger_categories": ["ui", "dashboard", "frontend", "css"],
+  "trigger_tags": ["css", "layout", "visual", "styling", "component", "button", "panel", "modal"],
+  "connector_id": "gemini-api-visual",
+  "model": "gemini-2.5-flash",
+  "design_output_dir": "designs",
+  "manifest_file": "designs/manifest.json",
+  "max_iterations": 3,
+  "git_commit_designs": true,
+  "include_baseline_screenshot": true,
+  "gemini_vault_key": "GEMINI_GENERAL_KEY"
+}

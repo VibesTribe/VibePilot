@@ -1,9 +1,9 @@
 # Auto-generated. DO NOT EDIT.
-commit: dc13904f
+commit: 2b123756
 branch: main
-generated: 2026-05-10T06:00:01Z
-boot_md_bytes: 13556
-map_md_bytes: 74527
+generated: 2026-05-10T20:26:16Z
+boot_md_bytes: 13680
+map_md_bytes: 79358
 has_index_db: true
 has_knowledge_db: true
 indexes:
@@ -11,5 +11,5 @@ indexes:
   knowledge: Unified SQLite - rules, prompts, configs, docs sections
   code_map: lean-ctx map mode - compressed function signatures
 tools:
-  lean_ctx: "MISSING - run .context/tools/install.sh"
-  jcodemunch: "MISSING - run .context/tools/install.sh"
+  lean_ctx: "lean-ctx 3.1.2"
+  jcodemunch: "installed"

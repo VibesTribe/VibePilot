@@ -110,9 +110,9 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 	// Insert initial run record into DB
 	initialResultsJSON, _ := json.Marshal([]PageResult{})
 	_, err := v.db.Exec(ctx, `
-		INSERT INTO visual_qa_runs (id, triggered_by, status, pages_checked, pages_passed, pages_failed, results, error_message, started_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, runID, triggeredBy, "running", 0, 0, 0, initialResultsJSON, "", startedAt)
+		INSERT INTO visual_qa_runs (id, triggered_by, trigger_detail, status, pages_checked, pages_passed, pages_failed, results, error_message, started_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, runID, triggeredBy, triggerDetail, "running", 0, 0, 0, initialResultsJSON, "", startedAt)
 	if err != nil {
 		return RunResult{}, fmt.Errorf("[VisualQA] Failed to insert initial visual_qa_run: %w", err)
 	}

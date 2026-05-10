@@ -2,44 +2,88 @@ package visualqa
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
-	"strconv"
+	"path/filepath"
 	"time"
 )
 
+// CaptureResult holds the result of a screenshot capture.
 type CaptureResult struct {
-	Success bool   `json:"success"`
-	Path    string `json:"path"`
-	Error   string `json:"error"`
+	Path     string
+	FileSize int64
 }
 
-func (v *VisualQA) captureScreenshot(ctx context.Context, url string, outputPath string, width int) (CaptureResult, error) {
-	timeout := 60
-	if v.config.CaptureTimeoutSeconds > 0 {
-		timeout = v.config.CaptureTimeoutSeconds
-	}
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
-	defer cancel()
-
-	scriptPath := v.config.RepoPath + "/governor/scripts/vqa_capture.py"
-	cmd := exec.CommandContext(ctx, "python3", scriptPath, url, outputPath, strconv.Itoa(width))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return CaptureResult{Success: false, Error: fmt.Sprintf("Python script execution failed: %v, Output: %s", err, string(output))},
-			fmt.Errorf("[VisualQA] Screenshot capture failed for %s: %v, Output: %s", url, err, string(output))
+// captureScreenshot captures a single screenshot using Playwright headless Chromium.
+// It includes retry logic with exponential backoff for transient failures.
+func (v *VisualQA) captureScreenshot(ctx context.Context, url, outputPath string, viewportWidth int) (CaptureResult, error) {
+	timeout := time.Duration(v.config.CaptureTimeoutSeconds) * time.Second
+	if timeout == 0 {
+		timeout = 60 * time.Second
 	}
 
-	var result CaptureResult
-	if err := json.Unmarshal(output, &result); err != nil {
-		return CaptureResult{Success: false, Error: fmt.Sprintf("Failed to parse Python script output: %v, Output: %s", err, string(output))},
-			fmt.Errorf("[VisualQA] Failed to parse Python script output for %s: %v, Output: %s", url, err, string(output))
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return CaptureResult{}, fmt.Errorf("failed to create capture directory: %w", err)
 	}
 
-	if !result.Success {
-		return result, fmt.Errorf("[VisualQA] Python script reported error for %s: %s", url, result.Error)
+	// Playwright Python script for screenshot capture.
+	// Uses --no-sandbox for headless Linux environments without a user namespace.
+	script := fmt.Sprintf(`
+from playwright.sync_api import sync_playwright
+import sys, os
+
+def capture():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-gpu"])
+        page = browser.new_page(viewport={"width": %d, "height": 900})
+        page.goto("%s", wait_until="networkidle", timeout=30000)
+        page.screenshot(path="%s", full_page=True)
+        sz = os.path.getsize("%s")
+        if sz < 1000:
+            print(f"WARNING: screenshot is only {sz} bytes, possibly blank", file=sys.stderr)
+        browser.close()
+
+try:
+    capture()
+except Exception as e:
+    print(f"CAPTURE_ERROR: {e}", file=sys.stderr)
+    sys.exit(1)
+`, viewportWidth, url, outputPath, outputPath)
+
+	var lastErr error
+	maxRetries := 2
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(attempt) * 2 * time.Second
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				return CaptureResult{}, ctx.Err()
+			}
+			fmt.Printf("[VisualQA] Retrying capture for %s at %dpx (attempt %d/%d)\n", url, viewportWidth, attempt+1, maxRetries+1)
+		}
+
+		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
+		cmd := exec.CommandContext(attemptCtx, "python3", "-u", "-c", script)
+		output, err := cmd.CombinedOutput()
+		cancel()
+
+		if err == nil {
+			// Verify file was created and has reasonable size
+			info, statErr := os.Stat(outputPath)
+			if statErr == nil && info.Size() > 1000 {
+				return CaptureResult{Path: outputPath, FileSize: info.Size()}, nil
+			}
+			if statErr != nil {
+				lastErr = fmt.Errorf("screenshot file not created: %s", outputPath)
+			} else {
+				lastErr = fmt.Errorf("screenshot too small (%d bytes), possibly blank", info.Size())
+			}
+		} else {
+			lastErr = fmt.Errorf("playwright capture failed for %s (%dpx): %s: %w", url, viewportWidth, string(output), err)
+		}
 	}
 
-	return result, nil
+	return CaptureResult{}, lastErr
 }

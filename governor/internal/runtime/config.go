@@ -39,6 +39,20 @@ type SystemConfig struct {
 }
 
 // CodeMapConfig configures the code map (jcodemunch) integration.
+type DesignPreviewConfig struct {
+	Enabled                 bool     `json:"enabled"`
+	TriggerCategories       []string `json:"trigger_categories"`
+	TriggerTags             []string `json:"trigger_tags"`
+	ConnectorID             string   `json:"connector_id"`
+	Model                   string   `json:"model"`
+	DesignOutputDir         string   `json:"design_output_dir"`
+	ManifestFile            string   `json:"manifest_file"`
+	MaxIterations           int      `json:"max_iterations"`
+	GitCommitDesigns        bool     `json:"git_commit_designs"`
+	IncludeBaselineScreenshot bool     `json:"include_baseline_screenshot"`
+}
+
+// CodeMapConfig configures the code map (jcodemunch) integration.
 type CodeMapConfig struct {
 	Path              string `json:"path"`                          // relative to repo root, default ".context/map.md"
 	CacheTTLMins      int    `json:"cache_ttl_mins"`                // cache TTL in minutes, default 60

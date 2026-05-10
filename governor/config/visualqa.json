@@ -2,38 +2,20 @@
   "enabled": true,
   "capture_pages": [
     {
-      "url": "https://vibeflow-dashboard.vercel.app",
-      "name": "dashboard-main",
-      "viewports": [
-        1280,
-        768,
-        375
-      ]
-    },
-    {
-      "url": "https://vibeflow-dashboard.vercel.app/tasks",
-      "name": "tasks-page",
-      "viewports": [
-        1280,
-        768
-      ]
-    },
-    {
-      "url": "https://vibeflow-dashboard.vercel.app/roi",
-      "name": "roi-page",
-      "viewports": [
-        1280
-      ]
+      "url": "https://vibeflow-dashboard.vercel.app/",
+      "name": "dashboard-home",
+      "viewports": [1280, 768]
     }
   ],
-  "baseline_dir": "baselines/screenshots",
-  "manifest_file": "baselines/manifest.json",
-  "connector_id": "gemini-api-visual",
+  "baseline_dir": "visualqa/baselines",
+  "manifest_file": "manifest.json",
+  "connector_id": "",
   "model": "gemini-2.5-flash",
   "capture_timeout_seconds": 60,
-  "comparison_timeout_seconds": 30,
+  "comparison_timeout_seconds": 45,
   "auto_approve_first_baseline": true,
   "git_commit_baselines": true,
   "temp_dir": "/tmp/vqa-captures",
+  "repo_path": "",
   "gemini_vault_key": "GEMINI_GENERAL_KEY"
 }

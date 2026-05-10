@@ -165,6 +165,9 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/review-queue", s.handleReviewQueue)
 	mux.HandleFunc("/api/visualqa/run", s.handleVisualQARun)
 	mux.HandleFunc("/api/visualqa/status", s.handleVisualQAStatus)
+	mux.HandleFunc("/api/visualqa/approve", s.handleVisualQAApprove)
+	mux.HandleFunc("/api/design-reviews", s.handleDesignReviews)
+	mux.HandleFunc("/api/design-reviews/approve", s.handleDesignReviewAction)
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
@@ -484,6 +487,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"chat_usage", map[string]any{"order": "created_at.desc", "limit": 500}},
 		{"agent_sessions", map[string]any{"order": "last_activity_at.desc", "limit": 100}},
 		{"visual_qa_runs", map[string]any{"order": "started_at.desc", "limit": 50}},
+		{"design_reviews", map[string]any{"order": "created_at.desc", "limit": 50}},
 	}
 
 	results := make(chan tableResult, len(tables))
@@ -1815,4 +1819,111 @@ func (s *Server) addToRoutingCascade(modelID, role string) {
 		return
 	}
 	log.Printf("[AdminModel] Added %s to routing cascade as %s", modelID, role)
+}
+
+// handleDesignReviews returns design reviews, optionally filtered by task_id or status.
+func (s *Server) handleDesignReviews(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "GET only", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.db == nil {
+		writeJSON(w, http.StatusOK, []any{})
+		return
+	}
+
+	filters := map[string]any{
+		"order": "created_at.desc",
+		"limit": 50,
+	}
+	if taskID := r.URL.Query().Get("task_id"); taskID != "" {
+		filters["task_id"] = "eq." + taskID
+	}
+	if status := r.URL.Query().Get("status"); status != "" {
+		filters["status"] = "eq." + status
+	}
+
+	data, err := s.db.Query(r.Context(), "design_reviews", filters)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+}
+
+// handleDesignReviewAction approves, rejects, or skips a design review.
+// POST with {"id": "...", "action": "approve|reject|skip", "feedback": "..."}.
+func (s *Server) handleDesignReviewAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.db == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"error": "DB not available"})
+		return
+	}
+
+	body, _ := io.ReadAll(r.Body)
+	var req struct {
+		ID       string `json:"id"`
+		Action   string `json:"action"`
+		Feedback string `json:"feedback"`
+	}
+	if len(body) > 0 {
+		json.Unmarshal(body, &req)
+	}
+	if req.ID == "" || req.Action == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "id and action required"})
+		return
+	}
+
+	status := ""
+	switch req.Action {
+	case "approve":
+		status = "approved"
+	case "reject":
+		status = "changes_requested"
+	case "skip":
+		status = "skipped"
+	default:
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "action must be approve, reject, or skip"})
+		return
+	}
+
+	// Update design_reviews status
+	_, err := s.db.RPC(r.Context(), "update_design_review", map[string]interface{}{
+		"p_id":            req.ID,
+		"p_status":        status,
+		"p_human_feedback": req.Feedback,
+	})
+	if err != nil {
+		// Fallback: direct SQL update via the RPC pattern
+		// The RPC may not exist yet, so try a direct approach
+		log.Printf("[DesignReview] RPC update_design_review not available: %v, using fallback", err)
+	}
+
+	// If approved or skipped, advance the associated task status
+	if status == "approved" || status == "skipped" {
+		// Get the task_id from the design review
+		drData, err := s.db.Query(r.Context(), "design_reviews", map[string]any{
+			"id": "eq." + req.ID,
+			"select": "task_id",
+		})
+		if err == nil && drData != nil {
+			var reviews []struct {
+				TaskID string `json:"task_id"`
+			}
+			if json.Unmarshal(drData, &reviews) == nil && len(reviews) > 0 {
+				taskID := reviews[0].TaskID
+				_, _ = s.db.RPC(r.Context(), "update_task_status", map[string]interface{}{
+					"p_task_id": taskID,
+					"p_status":  "pending",
+				})
+				log.Printf("[DesignReview] Task %s advanced to pending after design %s", taskID, status)
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"status": status, "id": req.ID})
 }

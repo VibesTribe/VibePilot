@@ -788,3 +788,7 @@ func (a *visualQAServerAdapter) Run(ctx context.Context, triggeredBy, triggerDet
 func (a *visualQAServerAdapter) GetEnabled() bool {
 	return a.inner.GetEnabled()
 }
+
+func (a *visualQAServerAdapter) ApproveBaseline(ctx context.Context, pageName string, viewportWidth int) error {
+	return a.inner.ApproveBaseline(ctx, pageName, viewportWidth)
+}
