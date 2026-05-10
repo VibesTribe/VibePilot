@@ -80,26 +80,7 @@
         "terminal",
         "file"
       ],
-      "notes": "Hermes Agent CLI. For executor tasks that need tools. GLM-5 via Z.AI.",
-      "limit_schema": [
-        {
-          "type": "requests",
-          "limit": 2000,
-          "window": "week",
-          "alert_at_pct": 0.8
-        },
-        {
-          "type": "requests",
-          "limit": 400,
-          "window": "cycle",
-          "window_seconds": 18000,
-          "alert_at_pct": 0.8,
-          "cost_multiplier": 3,
-          "peak_start_hour": 2,
-          "peak_end_hour": 6,
-          "peak_timezone": "America/Toronto"
-        }
-      ]
+      "notes": "Hermes Agent CLI. For executor tasks that need tools. GLM-5 via Z.AI."
     },
     {
       "id": "kimi",
@@ -138,27 +119,7 @@
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "Stable workhorse for high-throughput courier tasks. 1000 RPD free-tier limit. Safest choice.",
-      "limit_schema": [
-        {
-          "type": "requests",
-          "limit": 15,
-          "window": "minute",
-          "alert_at_pct": 0.8
-        },
-        {
-          "type": "tokens",
-          "limit": 1000000,
-          "window": "minute",
-          "alert_at_pct": 0.8
-        },
-        {
-          "type": "requests",
-          "limit": 1500,
-          "window": "day",
-          "alert_at_pct": 0.8
-        }
-      ]
+      "notes": "Stable workhorse for high-throughput courier tasks. 1000 RPD free-tier limit. Safest choice."
     },
     {
       "id": "gemini-api-researcher",
@@ -176,27 +137,7 @@
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "Best intelligence for daily system researcher. Smarter than 2.5 but in preview mode.",
-      "limit_schema": [
-        {
-          "type": "requests",
-          "limit": 15,
-          "window": "minute",
-          "alert_at_pct": 0.8
-        },
-        {
-          "type": "tokens",
-          "limit": 1000000,
-          "window": "minute",
-          "alert_at_pct": 0.8
-        },
-        {
-          "type": "requests",
-          "limit": 1500,
-          "window": "day",
-          "alert_at_pct": 0.8
-        }
-      ]
+      "notes": "Best intelligence for daily system researcher. Smarter than 2.5 but in preview mode."
     },
     {
       "id": "gemini-api-visual",
@@ -214,27 +155,7 @@
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "Best available on free tier for code/visual QA. 3.1-pro-preview requires billing. 3-flash-preview is free and capable.",
-      "limit_schema": [
-        {
-          "type": "requests",
-          "limit": 15,
-          "window": "minute",
-          "alert_at_pct": 0.8
-        },
-        {
-          "type": "tokens",
-          "limit": 1000000,
-          "window": "minute",
-          "alert_at_pct": 0.8
-        },
-        {
-          "type": "requests",
-          "limit": 1500,
-          "window": "day",
-          "alert_at_pct": 0.8
-        }
-      ]
+      "notes": "Best available on free tier for code/visual QA. 3.1-pro-preview requires billing. 3-flash-preview is free and capable."
     },
     {
       "id": "gemini-api-general",
@@ -252,27 +173,7 @@
         "requests_per_minute": 15,
         "requests_per_day": 1500
       },
-      "notes": "The Tank. gemini-1.5-flash removed from API. 2.5-flash-lite is the new stable fallback.",
-      "limit_schema": [
-        {
-          "type": "requests",
-          "limit": 15,
-          "window": "minute",
-          "alert_at_pct": 0.8
-        },
-        {
-          "type": "tokens",
-          "limit": 1000000,
-          "window": "minute",
-          "alert_at_pct": 0.8
-        },
-        {
-          "type": "requests",
-          "limit": 1500,
-          "window": "day",
-          "alert_at_pct": 0.8
-        }
-      ]
+      "notes": "The Tank. gemini-1.5-flash removed from API. 2.5-flash-lite is the new stable fallback."
     },
     {
       "id": "deepseek-api",
@@ -286,15 +187,7 @@
         "deepseek-chat",
         "deepseek-reasoner"
       ],
-      "provides_tools": [],
-      "limit_schema": [
-        {
-          "type": "credit",
-          "limit": 281,
-          "window": "never",
-          "alert_at_pct": 0.2
-        }
-      ]
+      "provides_tools": []
     },
     {
       "id": "groq-api",
@@ -380,10 +273,9 @@
       "provides_tools": [],
       "limit_schema": [
         {
-          "type": "requests",
-          "limit": 40,
           "window": "3h",
-          "alert_at_pct": 0.8
+          "max_requests": 40,
+          "type": "request"
         }
       ],
       "notes": "Courier destination. Free tier: ~10 messages/3hrs. Manual or browser automation.",
@@ -404,10 +296,9 @@
       "provides_tools": [],
       "limit_schema": [
         {
-          "type": "requests",
-          "limit": 20,
           "window": "day",
-          "alert_at_pct": 0.8
+          "max_requests": 20,
+          "type": "request"
         }
       ],
       "notes": "Courier destination. Variable daily limits. Good for PRD review.",
@@ -502,10 +393,9 @@
       "provides_tools": [],
       "limit_schema": [
         {
-          "type": "requests",
-          "limit": 3,
           "window": "day",
-          "alert_at_pct": 0.8
+          "max_requests": 3,
+          "type": "request"
         }
       ],
       "notes": "Courier destination. Free DeepSeek R1 & V3. No login required. Good backup.",
@@ -526,10 +416,9 @@
       "provides_tools": [],
       "limit_schema": [
         {
-          "type": "requests",
-          "limit": 50,
           "window": "day",
-          "alert_at_pct": 0.8
+          "max_requests": 50,
+          "type": "request"
         }
       ],
       "notes": "Courier destination. Google SSO. K2.6 Instant model. Agent swarm feature available.",
@@ -575,22 +464,19 @@
       ],
       "limit_schema": [
         {
-          "type": "requests",
-          "limit": 1500,
+          "window": "min",
+          "max_requests": 15,
+          "type": "request"
+        },
+        {
+          "window": "min",
+          "max_tokens": 1000000,
+          "type": "token"
+        },
+        {
           "window": "day",
-          "alert_at_pct": 0.8
-        },
-        {
-          "type": "requests",
-          "limit": 15,
-          "window": "minute",
-          "alert_at_pct": 0.8
-        },
-        {
-          "type": "tokens",
-          "limit": 1000000,
-          "window": "minute",
-          "alert_at_pct": 0.8
+          "max_requests": 1500,
+          "type": "request"
         }
       ],
       "notes": "Courier destination. Best for apps/design. Has native tools: function calling, Google Search grounding, Maps, URL context. Google SSO. Free.",
@@ -611,10 +497,9 @@
       "provides_tools": [],
       "limit_schema": [
         {
-          "type": "compute_points",
-          "limit": 3000,
           "window": "day",
-          "alert_at_pct": 0.8
+          "max_requests": 3000,
+          "type": "compute_point"
         }
       ],
       "notes": "Courier destination. Multi-model aggregator. 3000 compute points/day free. Models: DeepSeek-R1, Gemma-4-31B, Gemini-3.1-Flash-Lite and more. Google SSO.",
@@ -650,7 +535,13 @@
         "aizolo-mix"
       ],
       "provides_tools": [],
-      "limit_schema": [],
+      "limit_schema": [
+        {
+          "window": "day",
+          "max_requests": 5,
+          "type": "request"
+        }
+      ],
       "best_for": [
         "research",
         "coding",
@@ -677,10 +568,9 @@
       ],
       "limit_schema": [
         {
-          "type": "requests",
-          "limit": 5,
           "window": "day",
-          "alert_at_pct": 0.8
+          "max_requests": 5,
+          "type": "pro_search"
         }
       ],
       "best_for": [

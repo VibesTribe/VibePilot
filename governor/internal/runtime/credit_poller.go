@@ -55,7 +55,7 @@ func NewCreditPoller(tracker *PlatformUsageTrackerV2, vault VaultKeyGetter) *Cre
 			{
 				PlatformID:        "deepseek-api",
 				BalanceURL:        "https://api.deepseek.com/user/balance",
-				APIKeyRef:         "DEEPSEEK_API_KEY",
+				APIKeyRef:         "deepseek-v4-flash",
 				PollInterval:      1 * time.Hour,
 				AlertThresholdPct: 0.2, // alert when 20% or less remaining
 			},
