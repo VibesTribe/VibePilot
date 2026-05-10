@@ -49,6 +49,7 @@ type Server struct {
 	adminToken string
 	configDir     string // governor config directory (e.g. governor/config)
 	creditTracker CreditTracker
+	visualQA      VisualQARunner
 }
 
 type DBQuerier interface {
@@ -162,6 +163,8 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/admin/models", s.handleAdminModels)
 	mux.HandleFunc("/api/chat/usage", s.handleChatUsage)
 	mux.HandleFunc("/api/review-queue", s.handleReviewQueue)
+	mux.HandleFunc("/api/visualqa/run", s.handleVisualQARun)
+	mux.HandleFunc("/api/visualqa/status", s.handleVisualQAStatus)
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
@@ -480,6 +483,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"project_snapshots", map[string]any{"order": "created_at.desc", "limit": 50}},
 		{"chat_usage", map[string]any{"order": "created_at.desc", "limit": 500}},
 		{"agent_sessions", map[string]any{"order": "last_activity_at.desc", "limit": 100}},
+		{"visual_qa_runs", map[string]any{"order": "started_at.desc", "limit": 50}},
 	}
 
 	results := make(chan tableResult, len(tables))

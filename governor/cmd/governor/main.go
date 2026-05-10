@@ -26,6 +26,7 @@ import (
 	"github.com/vibepilot/governor/internal/webhooks"
 
 	pgkb "github.com/vibepilot/governor/internal/kb"
+	"github.com/vibepilot/governor/internal/visualqa"
 )
 
 var (
@@ -414,6 +415,39 @@ func main() {
 	githubHandler := webhooks.NewGitHubWebhookHandler(database, cfg.GetRepoPath())
 	webhookServer.SetGitHubHandler(githubHandler)
 
+	// Initialize Visual QA agent if configured
+	vqaConfigPath := filepath.Join(configDir, "visualqa.json")
+	if vqaCfgData, err := os.ReadFile(vqaConfigPath); err == nil {
+		var vqaCfg visualqa.Config
+		if json.Unmarshal(vqaCfgData, &vqaCfg) == nil && vqaCfg.Enabled {
+			// Get Gemini API key from vault
+			geminiKey := ""
+			vaultKey := vqaCfg.GeminiVaultKey
+			if vaultKey == "" {
+				vaultKey = "GEMINI_GENERAL_KEY"
+			}
+			if k, err := v.GetSecret(ctx, vaultKey); err == nil && k != "" {
+				geminiKey = k
+			}
+
+			// Set repo path from managed repo
+			vqaCfg.RepoPath = repoPath
+
+			// Create DB adapter using the same postgres URL
+			pgURL := cfg.GetPostgresURL()
+			vqaDB, err := visualqa.NewPGXDB(ctx, pgURL)
+			if err != nil {
+				log.Printf("[VisualQA] WARNING: Failed to create DB adapter: %v (VQA disabled)", err)
+			} else {
+				vqa := visualqa.NewVisualQA(vqaCfg, geminiKey, vqaDB)
+				webhookServer.SetVisualQA(&visualQAServerAdapter{inner: vqa})
+				log.Printf("[VisualQA] Enabled: %d pages, model=%s, baselines=%s", len(vqaCfg.CapturePages), vqaCfg.Model, vqaCfg.BaselineDir)
+			}
+		}
+	} else {
+		log.Printf("[VisualQA] No config file at %s: %v", vqaConfigPath, err)
+	}
+
 	go runProcessingRecovery(ctx, database, cfg)
 
 	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, configDir, contextBuilder)
@@ -740,4 +774,17 @@ func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factor
 			})
 		})
 	}
+}
+
+// visualQAServerAdapter adapts visualqa.VisualQA to webhooks.VisualQARunner interface.
+type visualQAServerAdapter struct {
+	inner *visualqa.VisualQA
+}
+
+func (a *visualQAServerAdapter) Run(ctx context.Context, triggeredBy, triggerDetail string) (any, error) {
+	return a.inner.Run(ctx, triggeredBy, triggerDetail)
+}
+
+func (a *visualQAServerAdapter) GetEnabled() bool {
+	return a.inner.GetEnabled()
 }

@@ -212,5 +212,43 @@
         "free_only": false
       }
     ]
+  },
+  "visual_qa": {
+    "enabled": true,
+    "capture_pages": [
+      {
+        "url": "https://vibeflow-dashboard.vercel.app",
+        "name": "dashboard-main",
+        "viewports": [
+          1280,
+          768,
+          375
+        ]
+      },
+      {
+        "url": "https://vibeflow-dashboard.vercel.app/tasks",
+        "name": "tasks-page",
+        "viewports": [
+          1280,
+          768
+        ]
+      },
+      {
+        "url": "https://vibeflow-dashboard.vercel.app/roi",
+        "name": "roi-page",
+        "viewports": [
+          1280
+        ]
+      }
+    ],
+    "baseline_dir": "baselines",
+    "manifest_file": "manifest.json",
+    "model": "gemini-2.5-flash",
+    "capture_timeout_seconds": 60,
+    "comparison_timeout_seconds": 30,
+    "auto_approve_first_baseline": true,
+    "git_commit_baselines": true,
+    "temp_dir": "/tmp/vqa-captures",
+    "gemini_vault_key": "GEMINI_GENERAL_KEY"
   }
 }
