@@ -832,6 +832,14 @@ func (a *visualQAServerAdapter) ApproveBaseline(ctx context.Context, pageName st
 	return a.inner.ApproveBaseline(ctx, pageName, viewportWidth)
 }
 
+func (a *visualQAServerAdapter) RecordIssueFeedback(ctx context.Context, runID, issueType, issueElement, issueDescription string, viewport int, verdict, userNote, patternKey string) error {
+	return a.inner.RecordIssueFeedback(ctx, runID, issueType, issueElement, issueDescription, viewport, verdict, userNote, patternKey)
+}
+
+func (a *visualQAServerAdapter) GetIssueFeedback(ctx context.Context) ([]map[string]any, error) {
+	return a.inner.GetIssueFeedback(ctx)
+}
+
 // vqaDBAdapter is no longer needed - VQA uses its own pgx connection.
 // Keeping the type for compatibility with any remaining references.
 type vqaDBAdapter struct {

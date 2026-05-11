@@ -16,6 +16,8 @@ type VisualQARunner interface {
 	Run(ctx context.Context, triggeredBy, triggerDetail string) (any, error)
 	GetEnabled() bool
 	ApproveBaseline(ctx context.Context, pageName string, viewportWidth int) error
+	RecordIssueFeedback(ctx context.Context, runID, issueType, issueElement, issueDescription string, viewport int, verdict, userNote, patternKey string) error
+	GetIssueFeedback(ctx context.Context) ([]map[string]any, error)
 }
 
 // SetVisualQA sets the Visual QA runner on the server.
@@ -140,6 +142,70 @@ func (s *Server) handleVisualQAApprove(w http.ResponseWriter, r *http.Request) {
 		"page_name": req.PageName,
 		"viewport":  req.Viewport,
 	})
+}
+
+// handleVisualQAFeedback records user feedback on a visual QA issue.
+// POST /api/visualqa/feedback
+// Body: {"run_id": "...", "issue_type": "overflow", "issue_element": "...", "issue_description": "...", "viewport": 1280, "verdict": "confirmed|false_positive|wont_fix", "user_note": "...", "pattern_key": "overflow:model-panel__list"}
+func (s *Server) handleVisualQAFeedback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.visualQA == nil || !s.visualQA.GetEnabled() {
+		writeJSON(w, http.StatusOK, map[string]any{"error": "Visual QA is not enabled"})
+		return
+	}
+
+	body, _ := io.ReadAll(r.Body)
+	var req struct {
+		RunID           string `json:"run_id"`
+		IssueType       string `json:"issue_type"`
+		IssueElement    string `json:"issue_element"`
+		IssueDescription string `json:"issue_description"`
+		Viewport        int    `json:"viewport"`
+		Verdict         string `json:"verdict"`
+		UserNote        string `json:"user_note"`
+		PatternKey      string `json:"pattern_key"`
+	}
+	if len(body) > 0 {
+		json.Unmarshal(body, &req)
+	}
+	if req.RunID == "" || req.Verdict == "" || req.PatternKey == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "run_id, verdict, and pattern_key required"})
+		return
+	}
+
+	if err := s.visualQA.RecordIssueFeedback(r.Context(), req.RunID, req.IssueType, req.IssueElement, req.IssueDescription, req.Viewport, req.Verdict, req.UserNote, req.PatternKey); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":      "recorded",
+		"verdict":     req.Verdict,
+		"pattern_key": req.PatternKey,
+	})
+}
+
+// handleVisualQAFeedbackList returns all feedback for calibration.
+// GET /api/visualqa/feedback
+func (s *Server) handleVisualQAFeedbackList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.visualQA == nil || !s.visualQA.GetEnabled() {
+		writeJSON(w, http.StatusOK, []any{})
+		return
+	}
+
+	feedback, err := s.visualQA.GetIssueFeedback(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, feedback)
 }
 
 // writeJSON is a helper that writes a JSON response with the given status code.

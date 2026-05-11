@@ -190,6 +190,8 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/visualqa/run", s.handleVisualQARun)
 	mux.HandleFunc("/api/visualqa/status", s.handleVisualQAStatus)
 	mux.HandleFunc("/api/visualqa/approve", s.handleVisualQAApprove)
+	mux.HandleFunc("/api/visualqa/feedback", s.handleVisualQAFeedback)
+	mux.HandleFunc("/api/visualqa/feedback/list", s.handleVisualQAFeedbackList)
 
 	// Design Preview API
 	mux.HandleFunc("/api/design-preview/generate", s.handleDesignPreviewGenerate)

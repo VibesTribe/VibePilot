@@ -196,35 +196,19 @@ func worstSeverity(issues []AuditIssue) string {
 }
 
 // domAuditScript returns JavaScript that runs DOM-level quality checks inside Playwright.
-// These checks catch issues that visual comparison misses because they're in the baseline.
+// These checks are designed to catch the REAL issues users see, not subpixel noise.
 func domAuditScript(viewport int) string {
 	return fmt.Sprintf(`() => {
 	const issues = [];
 	const vw = %d;
+	const isMobile = vw < 500;
+	const isTablet = vw >= 500 && vw < 900;
 
-	// 1. STRAY TEXT NODES: Find text nodes that look like leaked code
+	// 1. STRAY TEXT: Code-like text that shouldn't be visible
 	document.querySelectorAll('*').forEach(el => {
 		for (const node of el.childNodes) {
-			if (node.nodeType === 3) { // text node
+			if (node.nodeType === 3) {
 				const text = node.textContent.trim();
-				// Bare numbers that are direct children of buttons/containers
-				if (/^\d+$/.test(text) && text.length <= 3) {
-					const parent = node.parentElement;
-					if (parent && (parent.tagName === 'BUTTON' || parent.tagName === 'DIV' || parent.tagName === 'SPAN')) {
-						// Check if siblings already have styled spans with this content
-						const styled = parent.querySelector('span, strong, em, .token-count');
-						if (styled && styled.textContent.includes(text)) {
-							issues.push({
-								type: 'stray_text',
-								severity: 'critical',
-								element: parent.tagName + '.' + (parent.className || '').substring(0, 50),
-								description: 'Duplicate bare number "' + text + '" rendered as text node alongside styled version. Likely a React falsy-value bug (0 && JSX renders literal 0).',
-								suggestion: 'Change condition from "value && ..." to "value != null && ..." or "!!value && ..."'
-							});
-						}
-					}
-				}
-				// Code-like text that shouldn't be visible
 				if (/^(undefined|null|NaN|\[object|\{.*\}|=&gt;|function|var |let |const )/.test(text)) {
 					issues.push({
 						type: 'stray_text',
@@ -234,118 +218,122 @@ func domAuditScript(viewport int) string {
 						suggestion: 'Check that this value is handled for null/undefined cases'
 					});
 				}
-			}
-		}
-	});
-
-	// 2. OVERFLOW/CLIPPING: Elements with text cut off
-	document.querySelectorAll('button, span, div, p, h1, h2, h3, h4, td, th, li').forEach(el => {
-		if (el.scrollWidth > el.clientWidth + 2 && el.clientWidth > 0) {
-			const style = getComputedStyle(el);
-			if (style.overflow !== 'visible' && style.overflowX !== 'visible') {
-				issues.push({
-					type: 'overflow',
-					severity: 'warning',
-					element: el.tagName + '.' + (el.className || '').substring(0, 60),
-					description: 'Text overflow: content is ' + el.scrollWidth + 'px wide but container is only ' + el.clientWidth + 'px. Text is being clipped.',
-					suggestion: 'Increase container width, reduce font size, or add text-overflow: ellipsis'
-				});
-			}
-		}
-		if (el.scrollHeight > el.clientHeight + 2 && el.clientHeight > 0) {
-			const style = getComputedStyle(el);
-			if (style.overflow !== 'visible' && style.overflowY !== 'visible' && el.clientHeight < 40) {
-				issues.push({
-					type: 'clipping',
-					severity: 'warning',
-					element: el.tagName + '.' + (el.className || '').substring(0, 60),
-					description: 'Vertical clipping: content is ' + el.scrollHeight + 'px tall but container is only ' + el.clientHeight + 'px.',
-					suggestion: 'Increase container height or allow overflow'
-				});
-			}
-		}
-	});
-
-	// 3. CENTERING CHECK: Elements that should be centered but aren't
-	document.querySelectorAll('.slice-orbit, [class*="orbit"], [class*="center"], [class*="hub"]').forEach(el => {
-		const rect = el.getBoundingClientRect();
-		const parent = el.parentElement;
-		if (parent) {
-			const parentRect = parent.getBoundingClientRect();
-			const expectedCenterX = parentRect.left + parentRect.width / 2;
-			const actualCenterX = rect.left + rect.width / 2;
-			const offset = Math.abs(expectedCenterX - actualCenterX);
-			if (offset > 10) {
-				issues.push({
-					type: 'misalignment',
-					severity: 'warning',
-					element: el.tagName + '.' + (el.className || '').substring(0, 60),
-					description: 'Element is ' + Math.round(offset) + 'px off-center horizontally. Expected center at ' + Math.round(expectedCenterX) + ', actual at ' + Math.round(actualCenterX),
-					suggestion: 'Add margin: 0 auto, or justify-content: center, or align-items: center'
-				});
-			}
-			const expectedCenterY = parentRect.top + parentRect.height / 2;
-			const actualCenterY = rect.top + rect.height / 2;
-			const offsetY = Math.abs(expectedCenterY - actualCenterY);
-			if (offsetY > 15 && parentRect.height > 200) {
-				issues.push({
-					type: 'misalignment',
-					severity: 'warning',
-					element: el.tagName + '.' + (el.className || '').substring(0, 60),
-					description: 'Element is ' + Math.round(offsetY) + 'px off-center vertically. Expected center at ' + Math.round(expectedCenterY) + ', actual at ' + Math.round(actualCenterY),
-					suggestion: 'Add align-items: center to parent container'
-				});
-			}
-		}
-	});
-
-	// 4. SPACING CONSISTENCY: Check sibling elements for inconsistent gaps
-	document.querySelectorAll('.mission-header__stats, [class*="pills"], [class*="stats"], [class*="buttons"]').forEach(container => {
-		const children = Array.from(container.children).filter(c => c.offsetHeight > 0);
-		if (children.length >= 3) {
-			const gaps = [];
-			for (let i = 1; i < children.length; i++) {
-				const prevRect = children[i-1].getBoundingClientRect();
-				const currRect = children[i].getBoundingClientRect();
-				gaps.push(Math.round(currRect.left - prevRect.right));
-			}
-			const avg = gaps.reduce((a,b) => a+b, 0) / gaps.length;
-			for (let i = 0; i < gaps.length; i++) {
-				if (Math.abs(gaps[i] - avg) > 8 && avg > 0) {
-					issues.push({
-						type: 'spacing',
-						severity: 'info',
-						element: container.tagName + '.' + (container.className || '').substring(0, 50),
-						description: 'Inconsistent horizontal spacing: gap ' + i + ' is ' + gaps[i] + 'px (average is ' + Math.round(avg) + 'px)',
-						suggestion: 'Use consistent gap/padding values for all sibling elements'
-					});
-					break; // one report per container
+				// Duplicate bare number alongside styled version (React 0 && JSX bug)
+				if (/^\d+$/.test(text) && text.length <= 3) {
+					const parent = node.parentElement;
+					if (parent && (parent.tagName === 'BUTTON' || parent.tagName === 'DIV' || parent.tagName === 'SPAN')) {
+						const styled = parent.querySelector('span, strong, em, .token-count');
+						if (styled && styled.textContent.includes(text)) {
+							issues.push({
+								type: 'stray_text',
+								severity: 'critical',
+								element: parent.tagName + '.' + (parent.className || '').substring(0, 50),
+								description: 'Duplicate bare number "' + text + '" rendered alongside styled version. React falsy-value bug.',
+								suggestion: 'Change condition from "value && ..." to "value != null && ..."'
+							});
+						}
+					}
 				}
 			}
 		}
 	});
 
-	// 5. ALERT/WARNING PLACEMENT: Check if alerts sit in inappropriate locations
-	document.querySelectorAll('[style*="245, 158, 11"], [style*="rgba(245"], [class*="alert"], [class*="warn"]').forEach(el => {
-		const parent = el.parentElement;
-		if (parent) {
-			const parentClass = parent.className || '';
-			// Alerts inside header content area (between buttons and progress bar)
-			if (parentClass.includes('header') || parentClass.includes('content')) {
-				const siblings = Array.from(parent.children);
-				const alertIdx = siblings.indexOf(el);
-				const hasButtonsBefore = siblings.slice(0, alertIdx).some(s => s.tagName === 'BUTTON');
-				const hasProgressAfter = siblings.slice(alertIdx + 1).some(s => (s.className || '').includes('progress'));
-				if (hasButtonsBefore) {
+	// 2. REAL OVERFLOW: Content significantly wider than its visible area (>20px, not subpixel noise)
+	document.querySelectorAll('button, span, div, p, h1, h2, h3, h4, td, th, li, section, article').forEach(el => {
+		if (el.clientWidth <= 0 || el.clientHeight <= 0) return;
+		const overflowX = el.scrollWidth - el.clientWidth;
+		const overflowY = el.scrollHeight - el.clientHeight;
+		const style = getComputedStyle(el);
+
+		// Only flag if content is meaningfully clipped (>20px hidden) AND overflow is hidden
+		if (overflowX > 20 && style.overflow !== 'visible' && style.overflowX !== 'visible') {
+			issues.push({
+				type: 'overflow',
+				severity: overflowX > 80 ? 'critical' : 'warning',
+				element: el.tagName + '.' + (el.className || '').substring(0, 60),
+				description: 'Content is ' + el.scrollWidth + 'px wide but only ' + el.clientWidth + 'px visible (' + overflowX + 'px hidden). Text or controls are cut off.',
+				suggestion: 'Increase container width, allow horizontal scroll, or add text-overflow: ellipsis'
+			});
+		}
+		if (overflowY > 30 && el.clientHeight < 60 && style.overflow !== 'visible' && style.overflowY !== 'visible') {
+			issues.push({
+				type: 'clipping',
+				severity: overflowY > 50 ? 'critical' : 'warning',
+				element: el.tagName + '.' + (el.className || '').substring(0, 60),
+				description: 'Content is ' + el.scrollHeight + 'px tall but only ' + el.clientHeight + 'px visible (' + overflowY + 'px hidden). Content cut off vertically.',
+				suggestion: 'Increase container height or allow overflow'
+			});
+		}
+	});
+
+	// 3. ELEMENTS EXTENDING BEYOND VIEWPORT (the real mobile killer)
+	document.querySelectorAll('div, section, table, ul, ol').forEach(el => {
+		const rect = el.getBoundingClientRect();
+		// Skip tiny elements and offscreen elements
+		if (rect.width < 100 || rect.height < 20) return;
+		if (rect.top > window.innerHeight) return;
+
+		const overRight = Math.round(rect.right - vw);
+		const overLeft = Math.round(-rect.left);
+
+		if (overRight > 15) {
+			issues.push({
+				type: 'layout',
+				severity: overRight > 50 ? 'critical' : 'warning',
+				element: el.tagName + '.' + (el.className || '').substring(0, 60),
+				description: 'Element extends ' + overRight + 'px beyond right edge of viewport. Content on the right side is cut off and inaccessible.',
+				suggestion: 'Add max-width: 100vw or overflow-x: auto to contain within viewport'
+			});
+		}
+	});
+
+	// 4. TEXT CONTRAST: Grey text on dark backgrounds that's hard to read
+	document.querySelectorAll('p, span, li, td, th, label, h1, h2, h3, h4, h5, h6, a, button').forEach(el => {
+		const style = getComputedStyle(el);
+		const color = style.color;
+		// Parse rgba
+		const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+		if (match) {
+			const r = parseInt(match[1]), g = parseInt(match[2]), b = parseInt(match[3]);
+			// Perceived brightness
+			const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+			// On a dark background, text with brightness 80-140 is "too dark grey"
+			// We check if the element is inside a dark container
+			const parentBg = getComputedStyle(el.parentElement || el).backgroundColor;
+			const bgMatch = parentBg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+			if (bgMatch) {
+				const br = parseInt(bgMatch[1]), bg = parseInt(bgMatch[2]), bb = parseInt(bgMatch[3]);
+				const bgBrightness = (br * 299 + bg * 587 + bb * 114) / 1000;
+				if (bgBrightness < 80 && brightness > 60 && brightness < 150 && el.textContent.trim().length > 5) {
 					issues.push({
-						type: 'visual_noise',
+						type: 'contrast',
 						severity: 'warning',
 						element: el.tagName + '.' + (el.className || '').substring(0, 50),
-						description: 'Alert/warning block sits between interactive controls (buttons) and progress bar in the header. This breaks the visual flow of the primary controls.',
-						suggestion: 'Move alerts to a dedicated notification area, toast, or collapse into a small badge'
+						description: 'Low contrast text (brightness ' + Math.round(brightness) + ') on dark background (brightness ' + Math.round(bgBrightness) + '). Text is hard to read: "' + el.textContent.trim().substring(0, 50) + '"',
+						suggestion: 'Increase text color brightness to at least 180 (use rgba(200,210,230,...) or similar)'
 					});
 				}
 			}
+		}
+	});
+
+	// 5. EXCESSIVE SPACING: Large gaps between filter bar and content
+	document.querySelectorAll('ul, .model-panel__list, [class*="list"], [class*="items"]').forEach(list => {
+		const firstItem = list.querySelector(':scope > li, :scope > div, :scope > tr');
+		if (!firstItem) return;
+		const listRect = list.getBoundingClientRect();
+		const firstRect = firstItem.getBoundingClientRect();
+		const gap = firstRect.top - listRect.top;
+
+		// If there's more than 60px gap between list top and first item, that's excessive
+		if (gap > 60 && listRect.height > 100) {
+			issues.push({
+				type: 'spacing',
+				severity: gap > 120 ? 'warning' : 'info',
+				element: list.tagName + '.' + (list.className || '').substring(0, 50),
+				description: 'Excessive gap (' + Math.round(gap) + 'px) between filter bar and first content item. User has to scroll past empty space.',
+				suggestion: 'Reduce padding-top or margin-top on this list to bring content closer to filters'
+			});
 		}
 	});
 

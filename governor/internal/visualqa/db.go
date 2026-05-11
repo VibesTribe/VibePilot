@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -46,6 +47,11 @@ func (d *PGXDB) Close() {
 // Exec executes a query using pgx.
 func (d *PGXDB) Exec(ctx context.Context, query string, args ...interface{}) (interface{}, error) {
 	return d.pool.Exec(ctx, query, args...)
+}
+
+// Query executes a query and returns pgx rows.
+func (d *PGXDB) Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error) {
+	return d.pool.Query(ctx, query, args...)
 }
 
 // SQLDB returns a database/sql DB wrapper around the pgx pool for the baseline.go code

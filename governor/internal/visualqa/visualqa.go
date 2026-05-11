@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type Config struct {
@@ -72,9 +73,9 @@ type PageResult struct {
 }
 
 // DB is the interface the visual QA package needs for persistence.
-// Uses the same pattern as the governor's DB layer.
 type DB interface {
 	Exec(ctx context.Context, query string, args ...interface{}) (interface{}, error)
+	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 }
 
 // VisualQA is the main visual regression testing engine.
@@ -122,6 +123,12 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 		return RunResult{}, fmt.Errorf("[VisualQA] Failed to create temp directory %s: %w", tempRunDir, err)
 	}
 	defer removeDir(tempRunDir)
+
+	// Load false positive patterns from past feedback
+	falsePositives := v.GetFalsePositivePatterns(ctx)
+	if len(falsePositives) > 0 {
+		fmt.Printf("[VisualQA] Loaded %d false-positive patterns from feedback\n", len(falsePositives))
+	}
 
 	// Insert initial run record into DB
 	initialResultsJSON, _ := json.Marshal([]PageResult{})
@@ -253,21 +260,24 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 			if auditErr != nil {
 				fmt.Printf("[VisualQA] Visual audit failed for %s at %dpx: %v\n", pageConfig.Name, viewportWidth, auditErr)
 			} else if len(auditRes.Issues) > 0 {
-				fmt.Printf("[VisualQA] Audit found %d issues for %s at %dpx (severity: %s)\n",
-					len(auditRes.Issues), pageConfig.Name, viewportWidth, auditRes.Severity)
-				for _, ai := range auditRes.Issues {
-					pageResult.UIIssues = append(pageResult.UIIssues, UIIssue{
-						Type:        ai.Type,
-						Severity:    ai.Severity,
-						Description: ai.Description + " Suggestion: " + ai.Suggestion,
-						Element:     ai.Element,
-						Viewport:    viewportWidth,
-					})
-				}
-				// If audit found critical issues, mark page as failed regardless of comparison
-				if auditRes.Severity == "critical" {
-					pageResult.Passed = false
-					if pageResult.Summary == "" || pageResult.Passed {
+				// Filter out known false positives from past feedback
+				auditRes.Issues = filterKnownFalsePositives(auditRes.Issues, falsePositives)
+				if len(auditRes.Issues) > 0 {
+					fmt.Printf("[VisualQA] Audit found %d issues for %s at %dpx (severity: %s)\n",
+						len(auditRes.Issues), pageConfig.Name, viewportWidth, auditRes.Severity)
+					for _, ai := range auditRes.Issues {
+						patternKey := issuePatternKey(ai.Type, ai.Element)
+						pageResult.UIIssues = append(pageResult.UIIssues, UIIssue{
+							Type:        ai.Type,
+							Severity:    ai.Severity,
+							Description: ai.Description + " Suggestion: " + ai.Suggestion,
+							Element:     ai.Element,
+							Viewport:    viewportWidth,
+							PatternKey:  patternKey,
+						})
+					}
+					if auditRes.Severity == "critical" {
+						pageResult.Passed = false
 						pageResult.Summary = "Visual audit found critical issues: " + auditRes.Summary
 					}
 				}
@@ -341,4 +351,103 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 // GetEnabled returns whether VisualQA is enabled.
 func (v *VisualQA) GetEnabled() bool {
 	return v != nil && v.config.Enabled
+}
+
+// issuePatternKey generates a stable pattern key for deduplication and feedback matching.
+// Format: "type:element-class" so similar issues across runs map to the same pattern.
+func issuePatternKey(issueType, element string) string {
+	// Truncate element to first 50 chars and normalize
+	el := element
+	if len(el) > 50 {
+		el = el[:50]
+	}
+	return issueType + ":" + el
+}
+
+// filterKnownFalsePositives removes issues that match previously marked false-positive patterns.
+func filterKnownFalsePositives(issues []AuditIssue, falsePositives map[string]bool) []AuditIssue {
+	if len(falsePositives) == 0 {
+		return issues
+	}
+	var filtered []AuditIssue
+	for _, issue := range issues {
+		key := issuePatternKey(issue.Type, issue.Element)
+		if falsePositives[key] {
+			fmt.Printf("[VisualQA] Suppressing false-positive: %s\n", key)
+			continue
+		}
+		filtered = append(filtered, issue)
+	}
+	return filtered
+}
+
+// RecordIssueFeedback stores user feedback on an issue (confirmed, false_positive, or wont_fix).
+// The pattern_key is used to suppress similar noise in future runs.
+func (v *VisualQA) RecordIssueFeedback(ctx context.Context, runID, issueType, issueElement, issueDescription string, viewport int, verdict, userNote, patternKey string) error {
+	_, err := v.db.Exec(ctx, `
+		INSERT INTO visual_qa_issue_feedback (run_id, issue_type, issue_element, issue_description, viewport, verdict, user_note, pattern_key)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, runID, issueType, issueElement, issueDescription, viewport, verdict, userNote, patternKey)
+	if err != nil {
+		return fmt.Errorf("[VisualQA] Failed to record feedback: %w", err)
+	}
+	fmt.Printf("[VisualQA] Feedback recorded: %s -> %s (pattern: %s)\n", issueType, verdict, patternKey)
+	return nil
+}
+
+// GetIssueFeedback returns all feedback records for calibration.
+func (v *VisualQA) GetIssueFeedback(ctx context.Context) ([]map[string]any, error) {
+	rows, err := v.db.Query(ctx, `
+		SELECT id, run_id, issue_type, issue_element, viewport, verdict, user_note, pattern_key, created_at
+		FROM visual_qa_issue_feedback
+		ORDER BY created_at DESC
+		LIMIT 200
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("[VisualQA] Failed to query feedback: %w", err)
+	}
+	defer rows.Close()
+
+	var results []map[string]any
+	for rows.Next() {
+		var id, runID, issueType, issueElement, verdict, userNote, patternKey, createdAt string
+		var viewport int
+		if err := rows.Scan(&id, &runID, &issueType, &issueElement, &viewport, &verdict, &userNote, &patternKey, &createdAt); err != nil {
+			continue
+		}
+		results = append(results, map[string]any{
+			"id":            id,
+			"run_id":        runID,
+			"issue_type":    issueType,
+			"issue_element": issueElement,
+			"viewport":      viewport,
+			"verdict":       verdict,
+			"user_note":     userNote,
+			"pattern_key":   patternKey,
+			"created_at":    createdAt,
+		})
+	}
+	return results, nil
+}
+
+// GetFalsePositivePatterns returns pattern_keys that have been marked as false_positive.
+func (v *VisualQA) GetFalsePositivePatterns(ctx context.Context) map[string]bool {
+	patterns := make(map[string]bool)
+	rows, err := v.db.Query(ctx, `
+		SELECT DISTINCT pattern_key
+		FROM visual_qa_issue_feedback
+		WHERE verdict = 'false_positive'
+	`)
+	if err != nil {
+		return patterns
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err == nil {
+			patterns[key] = true
+		}
+	}
+	return patterns
 }

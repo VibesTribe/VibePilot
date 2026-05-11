@@ -19,11 +19,12 @@ type CaptureResult struct {
 
 // UIIssue represents a visual or functional issue found during capture.
 type UIIssue struct {
-	Type        string `json:"type"`        // "console_error", "visual", "click_test", "layout"
-	Severity    string `json:"severity"`    // "critical", "warning", "info"
-	Description string `json:"description"` // human-readable description
-	Element     string `json:"element"`     // selector or element name
-	Viewport    int    `json:"viewport"`    // viewport width where found
+	Type        string `json:"type"`         // "console_error", "visual", "click_test", "layout"
+	Severity    string `json:"severity"`     // "critical", "warning", "info"
+	Description string `json:"description"`  // human-readable description
+	Element     string `json:"element"`      // selector or element name
+	Viewport    int    `json:"viewport"`     // viewport width where found
+	PatternKey  string `json:"pattern_key"`  // stable key for feedback matching (type:element)
 }
 
 // UICaptureReport holds the full report from a capture including interactions.
