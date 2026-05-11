@@ -190,6 +190,30 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 					pageResult.Summary = "Automatically approved new baseline."
 					pagesPassed++
 				}
+
+				// Run visual audit even for new baselines to catch pre-existing issues
+				fmt.Printf("[VisualQA] Running visual audit for %s at %dpx...\n", pageConfig.Name, viewportWidth)
+				auditRes, auditErr := v.auditImage(ctx, captureOutputPath, viewportWidth, nil)
+				if auditErr != nil {
+					fmt.Printf("[VisualQA] Visual audit failed for %s at %dpx: %v\n", pageConfig.Name, viewportWidth, auditErr)
+				} else if len(auditRes.Issues) > 0 {
+					fmt.Printf("[VisualQA] Audit found %d issues for %s at %dpx (severity: %s)\n",
+						len(auditRes.Issues), pageConfig.Name, viewportWidth, auditRes.Severity)
+					for _, ai := range auditRes.Issues {
+						pageResult.UIIssues = append(pageResult.UIIssues, UIIssue{
+							Type:        ai.Type,
+							Severity:    ai.Severity,
+							Description: ai.Description + " Suggestion: " + ai.Suggestion,
+							Element:     ai.Element,
+							Viewport:    viewportWidth,
+						})
+					}
+					if auditRes.Severity == "critical" {
+						pageResult.Passed = false
+						pageResult.Summary = "Visual audit found critical issues: " + auditRes.Summary
+					}
+				}
+
 				pageResults = append(pageResults, pageResult)
 				continue
 			}
@@ -220,6 +244,32 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 					pagesPassed++
 				} else {
 					pagesFailed++
+				}
+			}
+
+			// Run standalone visual audit (finds issues baseline comparison misses)
+			fmt.Printf("[VisualQA] Running visual audit for %s at %dpx...\n", pageConfig.Name, viewportWidth)
+			auditRes, auditErr := v.auditImage(ctx, captureOutputPath, viewportWidth, nil)
+			if auditErr != nil {
+				fmt.Printf("[VisualQA] Visual audit failed for %s at %dpx: %v\n", pageConfig.Name, viewportWidth, auditErr)
+			} else if len(auditRes.Issues) > 0 {
+				fmt.Printf("[VisualQA] Audit found %d issues for %s at %dpx (severity: %s)\n",
+					len(auditRes.Issues), pageConfig.Name, viewportWidth, auditRes.Severity)
+				for _, ai := range auditRes.Issues {
+					pageResult.UIIssues = append(pageResult.UIIssues, UIIssue{
+						Type:        ai.Type,
+						Severity:    ai.Severity,
+						Description: ai.Description + " Suggestion: " + ai.Suggestion,
+						Element:     ai.Element,
+						Viewport:    viewportWidth,
+					})
+				}
+				// If audit found critical issues, mark page as failed regardless of comparison
+				if auditRes.Severity == "critical" {
+					pageResult.Passed = false
+					if pageResult.Summary == "" || pageResult.Passed {
+						pageResult.Summary = "Visual audit found critical issues: " + auditRes.Summary
+					}
 				}
 			}
 			pageResults = append(pageResults, pageResult)
