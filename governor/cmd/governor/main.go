@@ -434,6 +434,10 @@ func main() {
 
 			// Set repo path from managed repo
 			vqaCfg.RepoPath = repoPath
+			// Set fix engine source root if not explicitly configured
+			if vqaCfg.FixConfig.SourceRoot == "" && repoPath != "" {
+				vqaCfg.FixConfig.SourceRoot = repoPath
+			}
 
 			// Create DB adapter using the same postgres URL
 			pgURL := cfg.GetPostgresURL()

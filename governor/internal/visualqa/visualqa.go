@@ -23,6 +23,7 @@ type Config struct {
 	TempDir                  string        `json:"temp_dir"`
 	RepoPath                 string        `json:"repo_path"`
 	GeminiVaultKey           string        `json:"gemini_vault_key"`
+	FixConfig                FixConfig     `json:"fix_config"`
 }
 
 type PageConfig struct {
@@ -82,6 +83,7 @@ type VisualQA struct {
 	apiKey     string
 	db         DB
 	lastReport *UICaptureReport // set during captureScreenshot, read by Run
+	fixEngine  *FixEngine
 }
 
 // NewVisualQA creates a new VisualQA instance.
@@ -89,11 +91,20 @@ func NewVisualQA(config Config, apiKey string, db DB) *VisualQA {
 	if db == nil {
 		fmt.Println("[VisualQA] WARNING: DB interface is nil.")
 	}
-	return &VisualQA{
+	vqa := &VisualQA{
 		config:  config,
 		apiKey:  apiKey,
 		db:      db,
 	}
+	// Initialize fix engine if configured
+	if config.FixConfig.Enabled {
+		vqa.fixEngine = NewFixEngine(config.FixConfig)
+		if config.FixConfig.VisionAPIKey == "" && apiKey != "" {
+			vqa.fixEngine.visionAPIKey = apiKey
+		}
+		fmt.Printf("[VisualQA] Fix engine enabled: mode=%s, source=%s\n", config.FixConfig.Mode, config.FixConfig.SourceRoot)
+	}
+	return vqa
 }
 
 // Run executes a full visual QA cycle: capture screenshots, compare to baselines, persist results.
@@ -217,6 +228,37 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 
 	completedAt := time.Now()
 	durationMs := int(completedAt.Sub(startedAt).Milliseconds())
+
+	// Run fix engine on collected UI issues
+	var allFixSuggestions []FixSuggestion
+	if v.fixEngine != nil {
+		for _, pr := range pageResults {
+			if len(pr.UIIssues) > 0 {
+				suggestions, err := v.fixEngine.ProcessIssues(ctx, pr.UIIssues, pr.CapturePath)
+				if err != nil {
+					fmt.Printf("[VisualQA] Fix engine error for %s: %v\n", pr.PageName, err)
+				} else if len(suggestions) > 0 {
+					fmt.Printf("[VisualQA] Fix engine produced %d suggestions for %s at %dpx\n", len(suggestions), pr.PageName, pr.Viewport)
+					allFixSuggestions = append(allFixSuggestions, suggestions...)
+				}
+			}
+		}
+		// Auto-apply fixes if configured
+		if v.config.FixConfig.Mode == "auto_fix" && len(allFixSuggestions) > 0 {
+			results := v.fixEngine.ApplyFixes(ctx, allFixSuggestions)
+			for _, r := range results {
+				if r.Success {
+					fmt.Printf("[VisualQA] Fix applied successfully: %s\n", r.SuggestionID)
+				} else if r.Error != "" {
+					fmt.Printf("[VisualQA] Fix failed for %s: %s\n", r.SuggestionID, r.Error)
+				}
+			}
+		}
+		// Persist fix suggestions
+		if err := v.saveFixSuggestions(ctx, runID, allFixSuggestions); err != nil {
+			fmt.Printf("[VisualQA] Failed to save fix suggestions: %v\n", err)
+		}
+	}
 
 	status := "completed"
 	errorMessage := ""

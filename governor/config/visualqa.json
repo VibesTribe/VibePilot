@@ -17,5 +17,12 @@
   "git_commit_baselines": false,
   "temp_dir": "/tmp/vqa-captures",
   "repo_path": "",
-  "gemini_vault_key": "GEMINI_GENERAL_KEY"
+  "gemini_vault_key": "GEMINI_GENERAL_KEY",
+  "fix_config": {
+    "enabled": true,
+    "mode": "suggest",
+    "source_root": "/home/vibes/vibeflow",
+    "confidence_min": 0.7,
+    "vision_model": "gemini-2.5-flash"
+  }
 }
