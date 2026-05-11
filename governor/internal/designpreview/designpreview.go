@@ -5,151 +5,157 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
-// Config holds the design preview configuration.
+// Config holds design preview configuration.
 type Config struct {
-	Enabled                 bool     `json:"enabled"`
-	TriggerCategories       []string `json:"trigger_categories"`
-	TriggerTags             []string `json:"trigger_tags"`
-	ConnectorID             string   `json:"connector_id"`
-	Model                   string   `json:"model"`
-	DesignOutputDir         string   `json:"design_output_dir"`
-	ManifestFile            string   `json:"manifest_file"`
-	MaxIterations           int      `json:"max_iterations"`
-	GitCommitDesigns        bool     `json:"git_commit_designs"`
-	IncludeBaselineScreenshot bool     `json:"include_baseline_screenshot"`
-	GeminiVaultKey          string   `json:"gemini_vault_key"`
-	RepoPath                string   `json:"repo_path"`
+	Enabled         bool   `json:"enabled"`
+	CoDesignURL     string `json:"codesign_url"`
+	GeminiVaultKey  string `json:"gemini_vault_key"`
+	GeminiModel     string `json:"gemini_model"`
+	OutputDir       string `json:"output_dir"`
+	AutoGenerate    bool   `json:"auto_generate"`
+	RequireApproval bool   `json:"require_approval"`
+	MaxWaitMinutes  int    `json:"max_wait_minutes"`
 }
 
-// DesignReview represents a design review record from the database.
-type DesignReview struct {
-	ID                  string  `json:"id"`
-	TaskID              string  `json:"task_id"`
-	Version             int     `json:"version"`
-	Status              string  `json:"status"`
-	MockupHTMLPath      string  `json:"mockup_html_path"`
-	MockupScreenshotPath string  `json:"mockup_screenshot_path"`
-	DesignPrompt        string  `json:"design_prompt"`
-	ModelID             string  `json:"model_id"`
-	TokensIn            int     `json:"tokens_in"`
-	TokensOut           int     `json:"tokens_out"`
-	HumanFeedback       string  `json:"human_feedback"`
-	ReviewedAt          *time.Time `json:"reviewed_at"`
-	ReviewedBy          string  `json:"reviewed_by"`
-	CreatedAt           time.Time `json:"created_at"`
-}
-
-// DB is the interface the design preview package needs for persistence.
+// DB interface for persistence. Uses the governor's DB layer.
 type DB interface {
-	Exec(ctx context.Context, query string, args ...interface{}) (interface{}, error)
-	Query(ctx context.Context, query string, args ...interface{}) (json.RawMessage, error)
+	Insert(ctx context.Context, table string, data map[string]any) (json.RawMessage, error)
+	Update(ctx context.Context, table, id string, data map[string]any) (json.RawMessage, error)
+	Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error)
 }
 
-// DesignPreviewService is the main design preview engine.
-type DesignPreviewService struct {
+// PreviewStatus represents the state of a design preview.
+type PreviewStatus string
+
+const (
+	StatusPending  PreviewStatus = "pending_approval"
+	StatusApproved PreviewStatus = "approved"
+	StatusRejected PreviewStatus = "rejected"
+)
+
+// DesignPreview manages the pre-execution design review gate.
+// When a UI task reaches the design_review stage, this generates a mockup
+// via Gemini, stores it for dashboard viewing, and waits for human approval.
+type DesignPreview struct {
 	config    Config
-	apiKey    string
-	db        DB
 	generator *Generator
+	db        DB
 }
 
-// NewDesignPreviewService creates a new DesignPreviewService instance.
-func NewDesignPreviewService(config Config, apiKey string, db DB) *DesignPreviewService {
-	return &DesignPreviewService{
+// GenerateRequest is the input for generating a design preview.
+type GenerateRequest struct {
+	TaskID      string `json:"task_id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	TargetURL   string `json:"target_url,omitempty"`
+	DesignHints string `json:"design_hints,omitempty"`
+}
+
+// GenerateResponse is the output of a design preview generation.
+type GenerateResponse struct {
+	PreviewID   string `json:"preview_id"`
+	HTMLContent string `json:"html_content"`
+	FilePath    string `json:"file_path"`
+	Model       string `json:"model"`
+	TokensUsed  int    `json:"tokens_used"`
+}
+
+// NewDesignPreview creates a new DesignPreview instance.
+func NewDesignPreview(config Config, apiKey string, db DB) *DesignPreview {
+	return &DesignPreview{
 		config:    config,
-		apiKey:    apiKey,
-		db:        db,
 		generator: NewGenerator(config, apiKey),
+		db:        db,
 	}
 }
 
-// GetEnabled returns whether the service is enabled.
-func (s *DesignPreviewService) GetEnabled() bool {
-	return s != nil && s.config.Enabled
+// Generate creates a design mockup from a task description.
+func (dp *DesignPreview) Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
+	if !dp.config.Enabled {
+		return nil, fmt.Errorf("[DesignPreview] Design preview is disabled")
+	}
+
+	previewID := uuid.New().String()
+
+	// Use the Generator to call Gemini and produce HTML
+	htmlContent, tokensIn, tokensOut, err := dp.generator.GenerateHTMLMockup(ctx, req.Title, req.Description)
+	if err != nil {
+		return nil, fmt.Errorf("[DesignPreview] Gemini generation failed: %w", err)
+	}
+
+	// Save the HTML file to the repo
+	filePath, err := dp.generator.SaveHTML("", dp.config.OutputDir, req.TaskID, 1, htmlContent)
+	if err != nil {
+		return nil, fmt.Errorf("[DesignPreview] Failed to save mockup: %w", err)
+	}
+
+	// Persist preview record to DB
+	_, err = dp.db.Insert(ctx, "design_previews", map[string]any{
+		"id":           previewID,
+		"task_id":      req.TaskID,
+		"status":       string(StatusPending),
+		"prompt":       fmt.Sprintf("%s: %s", req.Title, req.Description),
+		"html_content": htmlContent,
+		"file_path":    filePath,
+		"version":      1,
+		"created_at":   time.Now().Format(time.RFC3339),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("[DesignPreview] Failed to insert preview record: %w", err)
+	}
+
+	return &GenerateResponse{
+		PreviewID:   previewID,
+		HTMLContent: htmlContent,
+		FilePath:    filePath,
+		Model:       dp.config.GeminiModel,
+		TokensUsed:  tokensIn + tokensOut,
+	}, nil
 }
 
-// GenerateDesign generates an HTML mockup for a task and persists it.
-func (s *DesignPreviewService) GenerateDesign(ctx context.Context, taskID, taskTitle, taskDescription string) (*DesignReview, error) {
-	if !s.config.Enabled {
-		return nil, fmt.Errorf("[DesignPreview] Service is disabled")
-	}
-
-	// Check if a design review already exists for this task
-	existing, _ := s.db.Query(ctx, "SELECT id, version FROM design_reviews WHERE task_id = $1 ORDER BY version DESC LIMIT 1", taskID)
-	if existing != nil {
-		var reviews []struct {
-			ID      string `json:"id"`
-			Version int    `json:"version"`
-		}
-		if json.Unmarshal(existing, &reviews) == nil && len(reviews) > 0 {
-			if reviews[0].Version >= s.config.MaxIterations {
-				return nil, fmt.Errorf("[DesignPreview] Max iterations (%d) reached for task %s", s.config.MaxIterations, taskID)
-			}
-		}
-	}
-
-	// Generate HTML mockup
-	htmlContent, tokensIn, tokensOut, err := s.generator.GenerateHTMLMockup(ctx, taskTitle, taskDescription)
+// Approve marks a design preview as approved.
+func (dp *DesignPreview) Approve(ctx context.Context, previewID, reviewer, notes string) error {
+	_, err := dp.db.Update(ctx, "design_previews", previewID, map[string]any{
+		"status":       string(StatusApproved),
+		"reviewer":     reviewer,
+		"review_notes": notes,
+		"reviewed_at":  time.Now().Format(time.RFC3339),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("[DesignPreview] Failed to generate mockup: %w", err)
+		return fmt.Errorf("[DesignPreview] Failed to approve preview %s: %w", previewID, err)
 	}
-
-	// Persist the HTML file to disk
-	version := 1
-	mockupHTMLPath, err := s.generator.SaveHTML(s.config.RepoPath, s.config.DesignOutputDir, taskID, version, htmlContent)
-	if err != nil {
-		return nil, fmt.Errorf("[DesignPreview] Failed to save HTML: %w", err)
-	}
-
-	// Insert design review record into DB
-	designPrompt := fmt.Sprintf("Generate UI mockup for: %s - %s", taskTitle, taskDescription)
-	var dr DesignReview
-	_, err = s.db.Exec(ctx, `
-		INSERT INTO design_reviews (task_id, version, status, mockup_html_path, design_prompt, model_id, tokens_in, tokens_out)
-		VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7)
-		RETURNING id, task_id, version, status, mockup_html_path, design_prompt, model_id, tokens_in, tokens_out, created_at
-	`, taskID, version, mockupHTMLPath, designPrompt, s.config.Model, tokensIn, tokensOut)
-	if err != nil {
-		return nil, fmt.Errorf("[DesignPreview] Failed to insert design_review: %w", err)
-	}
-
-	dr = DesignReview{
-		TaskID:         taskID,
-		Version:        version,
-		Status:         "pending",
-		MockupHTMLPath: mockupHTMLPath,
-		DesignPrompt:   designPrompt,
-		ModelID:        s.config.Model,
-		TokensIn:       tokensIn,
-		TokensOut:      tokensOut,
-	}
-
-	fmt.Printf("[DesignPreview] Created design review for task %s (version %d)\n", taskID, version)
-	return &dr, nil
+	return nil
 }
 
-// ShouldTriggerDesign returns true if a task should go through design preview
-// based on its category or tags matching the trigger configuration.
-func (s *DesignPreviewService) ShouldTriggerDesign(category string, tags []string) bool {
-	if !s.config.Enabled {
-		return false
+// Reject marks a design preview as rejected with feedback.
+func (dp *DesignPreview) Reject(ctx context.Context, previewID, reviewer, notes string) error {
+	_, err := dp.db.Update(ctx, "design_previews", previewID, map[string]any{
+		"status":       string(StatusRejected),
+		"reviewer":     reviewer,
+		"review_notes": notes,
+		"reviewed_at":  time.Now().Format(time.RFC3339),
+	})
+	if err != nil {
+		return fmt.Errorf("[DesignPreview] Failed to reject preview %s: %w", previewID, err)
 	}
+	return nil
+}
 
-	for _, tc := range s.config.TriggerCategories {
-		if tc == category {
-			return true
-		}
-	}
+// GetEnabled returns whether design preview is enabled.
+func (dp *DesignPreview) GetEnabled() bool {
+	return dp != nil && dp.config.Enabled
+}
 
-	for _, tag := range tags {
-		for _, tt := range s.config.TriggerTags {
-			if tag == tt {
-				return true
-			}
-		}
-	}
+// EnsureDBSchema is a no-op placeholder -- schema created by migration file.
+func EnsureDBSchema() error {
+	return nil
+}
 
-	return false
+// MarshalJSON implements custom JSON for PreviewStatus.
+func (s PreviewStatus) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(s))
 }

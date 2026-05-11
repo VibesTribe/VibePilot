@@ -71,7 +71,7 @@ func (g *Generator) GenerateHTMLMockup(ctx context.Context, taskTitle, taskDescr
 		return "", 0, 0, fmt.Errorf("[DesignPreview] Failed to marshal request body: %w", err)
 	}
 
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", g.config.Model, g.apiKey)
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", g.config.GeminiModel, g.apiKey)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return "", 0, 0, fmt.Errorf("[DesignPreview] Failed to create API request: %w", err)

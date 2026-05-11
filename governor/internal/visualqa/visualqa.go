@@ -58,12 +58,16 @@ type RunResult struct {
 type PageResult struct {
 	PageName    string       `json:"page_name"`
 	Viewport    int          `json:"viewport"`
+	URL         string       `json:"url"`
 	Passed      bool         `json:"passed"`
 	Confidence  float64      `json:"confidence"`
 	Summary     string       `json:"summary"`
 	Differences []Difference `json:"differences"`
+	UIIssues    []UIIssue    `json:"ui_issues"`
 	CapturePath string       `json:"capture_path"`
 	BaselineNew bool         `json:"baseline_new"`
+	LoadTimeMs  int          `json:"load_time_ms"`
+	Title       string       `json:"title"`
 }
 
 // DB is the interface the visual QA package needs for persistence.
@@ -74,9 +78,10 @@ type DB interface {
 
 // VisualQA is the main visual regression testing engine.
 type VisualQA struct {
-	config  Config
-	apiKey string
-	db     DB
+	config     Config
+	apiKey     string
+	db         DB
+	lastReport *UICaptureReport // set during captureScreenshot, read by Run
 }
 
 // NewVisualQA creates a new VisualQA instance.
@@ -145,6 +150,16 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 				continue
 			}
 			pageResult.CapturePath = captureRes.Path
+			pageResult.URL = pageConfig.URL
+			// Pull UI interaction data from capture report
+			if v.lastReport != nil {
+				pageResult.UIIssues = v.lastReport.Issues
+				pageResult.Title = v.lastReport.Title
+				pageResult.LoadTimeMs = v.lastReport.LoadTimeMs
+				if len(v.lastReport.ConsoleErrors) > 0 {
+					fmt.Printf("[VisualQA] Console errors on %s at %dpx: %d\n", pageConfig.Name, viewportWidth, len(v.lastReport.ConsoleErrors))
+				}
+			}
 
 			baselinePath := v.GetBaselinePath(pageConfig.Name, viewportWidth)
 			baselineExists := fileExists(baselinePath)

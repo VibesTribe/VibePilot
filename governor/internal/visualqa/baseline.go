@@ -86,16 +86,18 @@ func (v *VisualQA) SaveBaseline(ctx context.Context, pageName string, viewportWi
 	}
 
 	manifest[pageName][viewportWidth] = BaselineEntry{
-		BaselineFile:      filepath.Base(baselinePath),
-		LastApprovedAt:    time.Now(),
+		BaselineFile:   filepath.Base(baselinePath),
+		LastApprovedAt: time.Now(),
 	}
 
 	if err := v.SaveManifest(manifest); err != nil {
 		return fmt.Errorf("[VisualQA] Failed to save manifest after saving baseline: %w", err)
 	}
 
-	if v.config.GitCommitBaselines {
-		if err := v.gitAddAndCommit(ctx, baselinePath, filepath.Join(v.config.RepoPath, v.config.BaselineDir, v.config.ManifestFile), fmt.Sprintf("feat(visualqa): Add/update baseline for %s_%d", pageName, viewportWidth)); err != nil {
+	if v.config.GitCommitBaselines && v.config.RepoPath != "" {
+		commitMsg := fmt.Sprintf("feat(visualqa): Add/update baseline for %s_%d", pageName, viewportWidth)
+		manifestPath := filepath.Join(v.config.RepoPath, v.config.BaselineDir, v.config.ManifestFile)
+		if err := v.gitAddAndCommit(ctx, []string{baselinePath, manifestPath}, commitMsg); err != nil {
 			return fmt.Errorf("[VisualQA] Failed to commit baseline to git: %w", err)
 		}
 	}
@@ -124,8 +126,10 @@ func (v *VisualQA) ApproveBaseline(ctx context.Context, pageName string, viewpor
 		return fmt.Errorf("[VisualQA] Failed to save manifest after approving baseline: %w", err)
 	}
 
-	if v.config.GitCommitBaselines {
-		if err := v.gitAddAndCommit(ctx, baselinePath, filepath.Join(v.config.RepoPath, v.config.BaselineDir, v.config.ManifestFile), fmt.Sprintf("feat(visualqa): Approve baseline for %s_%d", pageName, viewportWidth)); err != nil {
+	if v.config.GitCommitBaselines && v.config.RepoPath != "" {
+		commitMsg := fmt.Sprintf("feat(visualqa): Approve baseline for %s_%d", pageName, viewportWidth)
+		manifestPath := filepath.Join(v.config.RepoPath, v.config.BaselineDir, v.config.ManifestFile)
+		if err := v.gitAddAndCommit(ctx, []string{baselinePath, manifestPath}, commitMsg); err != nil {
 			return fmt.Errorf("[VisualQA] Failed to commit baseline approval to git: %w", err)
 		}
 	}
@@ -133,28 +137,27 @@ func (v *VisualQA) ApproveBaseline(ctx context.Context, pageName string, viewpor
 	return nil
 }
 
-func (v *VisualQA) gitAddAndCommit(ctx context.Context, files ...string) error {
-	args := []string{"add"}
+// gitAddAndCommit adds files and commits with the given message.
+// files are relative to RepoPath. commitMsg is the commit message.
+func (v *VisualQA) gitAddAndCommit(ctx context.Context, files []string, commitMsg string) error {
+	if v.config.RepoPath == "" {
+		return fmt.Errorf("[VisualQA] RepoPath is empty, cannot git commit")
+	}
+
+	// git add with explicit file paths
+	args := []string{"-C", v.config.RepoPath, "add", "--"}
 	args = append(args, files...)
 	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = v.config.RepoPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git add failed: %v, Output: %s", err, string(output))
 	}
 
-	commitMsg := "feat(visualqa): Update baselines"
-	cmd = exec.CommandContext(ctx, "git", "commit", "-m", commitMsg)
-	cmd.Dir = v.config.RepoPath
+	// git commit with message
+	cmd = exec.CommandContext(ctx, "git", "-C", v.config.RepoPath, "commit", "-m", commitMsg)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		if !bytes.Contains(output, []byte("nothing to commit")) {
 			return fmt.Errorf("git commit failed: %v, Output: %s", err, string(output))
 		}
-	}
-
-	cmd = exec.CommandContext(ctx, "git", "push", "origin", "main")
-	cmd.Dir = v.config.RepoPath
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git push failed: %v, Output: %s", err, string(output))
 	}
 
 	return nil

@@ -50,6 +50,7 @@ type Server struct {
 	configDir     string // governor config directory (e.g. governor/config)
 	creditTracker CreditTracker
 	visualQA      VisualQARunner
+	designPreview DesignPreviewer
 }
 
 type DBQuerier interface {
@@ -145,6 +146,29 @@ func (s *Server) RegisterHandler(eventType string, handler EventHandler) {
 	log.Printf("[Webhooks] Registered handler for: %s", eventType)
 }
 
+// corsMiddleware wraps the entire mux with CORS headers for all /api/ routes.
+// This ensures every endpoint callable from the dashboard (different origin)
+// gets proper Access-Control-Allow-Origin headers. Pre-flight OPTIONS requests
+// are handled automatically without reaching individual handlers.
+func (s *Server) corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Apply CORS to all API routes and status endpoint
+		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/status" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+			w.Header().Set("Access-Control-Max-Age", "86400") // 24h cache preflight
+
+			// Handle preflight OPTIONS immediately
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(s.path, s.handleWebhook)
@@ -166,12 +190,18 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/visualqa/run", s.handleVisualQARun)
 	mux.HandleFunc("/api/visualqa/status", s.handleVisualQAStatus)
 	mux.HandleFunc("/api/visualqa/approve", s.handleVisualQAApprove)
+
+	// Design Preview API
+	mux.HandleFunc("/api/design-preview/generate", s.handleDesignPreviewGenerate)
+	mux.HandleFunc("/api/design-preview/approve", s.handleDesignPreviewApprove)
+	mux.HandleFunc("/api/design-preview/reject", s.handleDesignPreviewReject)
+	mux.HandleFunc("/api/design-preview/list", s.handleDesignPreviewList)
 	mux.HandleFunc("/api/design-reviews", s.handleDesignReviews)
 	mux.HandleFunc("/api/design-reviews/approve", s.handleDesignReviewAction)
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
-		Handler: mux,
+		Handler: s.corsMiddleware(mux),
 	}
 
 	log.Printf("[Webhooks] Server starting on port %d at %s", s.port, s.path)

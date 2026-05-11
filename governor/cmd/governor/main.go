@@ -27,6 +27,8 @@ import (
 
 	pgkb "github.com/vibepilot/governor/internal/kb"
 	"github.com/vibepilot/governor/internal/visualqa"
+
+	"github.com/vibepilot/governor/internal/designpreview"
 )
 
 var (
@@ -448,6 +450,39 @@ func main() {
 		log.Printf("[VisualQA] No config file at %s: %v", vqaConfigPath, err)
 	}
 
+	// ==========================================================================
+	// DesignPreview: Pre-execution design review gate for UI tasks.
+	// Generates HTML mockups via Gemini, human approves before code is written.
+	// ==========================================================================
+	dpConfigPath := filepath.Join(configDir, "designpreview.json")
+	if dpCfgData, err := os.ReadFile(dpConfigPath); err == nil {
+		var dpCfg designpreview.Config
+		if err := json.Unmarshal(dpCfgData, &dpCfg); err == nil && dpCfg.Enabled {
+			dpAPIKey := ""
+			if dpCfg.GeminiVaultKey != "" {
+				if key, err := v.GetSecret(ctx, dpCfg.GeminiVaultKey); err == nil {
+					dpAPIKey = key
+				}
+			}
+			if dpAPIKey != "" {
+				// Ensure output dir is within the repo
+				if dpCfg.OutputDir != "" {
+					dpCfg.OutputDir = filepath.Join(cfg.GetRepoPath(), dpCfg.OutputDir)
+				}
+				if err := designpreview.EnsureDBSchema(); err != nil {
+					log.Printf("[DesignPreview] WARNING: Schema creation failed: %v", err)
+				}
+				dp := designpreview.NewDesignPreview(dpCfg, dpAPIKey, &dpDBAdapter{db: database})
+				webhookServer.SetDesignPreview(&dpServerAdapter{inner: dp})
+				log.Println("[DesignPreview] Enabled, Gemini model:", dpCfg.GeminiModel)
+			} else {
+				log.Printf("[DesignPreview] Disabled: Gemini API key not available")
+			}
+		}
+	} else {
+		log.Printf("[DesignPreview] No config file at %s: %v", dpConfigPath, err)
+	}
+
 	go runProcessingRecovery(ctx, database, cfg)
 
 	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, configDir, contextBuilder)
@@ -791,4 +826,64 @@ func (a *visualQAServerAdapter) GetEnabled() bool {
 
 func (a *visualQAServerAdapter) ApproveBaseline(ctx context.Context, pageName string, viewportWidth int) error {
 	return a.inner.ApproveBaseline(ctx, pageName, viewportWidth)
+}
+
+// vqaDBAdapter is no longer needed - VQA uses its own pgx connection.
+// Keeping the type for compatibility with any remaining references.
+type vqaDBAdapter struct {
+	db db.Database
+}
+
+// dpDBAdapter adapts db.Database to designpreview.DB interface.
+type dpDBAdapter struct {
+	db db.Database
+}
+
+func (a *dpDBAdapter) Insert(ctx context.Context, table string, data map[string]any) (json.RawMessage, error) {
+	return a.db.Insert(ctx, table, data)
+}
+
+func (a *dpDBAdapter) Update(ctx context.Context, table, id string, data map[string]any) (json.RawMessage, error) {
+	return a.db.Update(ctx, table, id, data)
+}
+
+func (a *dpDBAdapter) Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error) {
+	return a.db.Query(ctx, table, filters)
+}
+
+// dpServerAdapter adapts designpreview.DesignPreview to webhooks.DesignPreviewer interface.
+type dpServerAdapter struct {
+	inner *designpreview.DesignPreview
+}
+
+func (a *dpServerAdapter) Generate(ctx context.Context, req webhooks.DesignPreviewRequest) (*webhooks.DesignPreviewResponse, error) {
+	resp, err := a.inner.Generate(ctx, designpreview.GenerateRequest{
+		TaskID:      req.TaskID,
+		Title:       req.Title,
+		Description: req.Description,
+		TargetURL:   req.TargetURL,
+		DesignHints: req.DesignHints,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &webhooks.DesignPreviewResponse{
+		PreviewID:   resp.PreviewID,
+		HTMLContent: resp.HTMLContent,
+		FilePath:    resp.FilePath,
+		Model:       resp.Model,
+		TokensUsed:  resp.TokensUsed,
+	}, nil
+}
+
+func (a *dpServerAdapter) Approve(ctx context.Context, previewID, reviewer, notes string) error {
+	return a.inner.Approve(ctx, previewID, reviewer, notes)
+}
+
+func (a *dpServerAdapter) Reject(ctx context.Context, previewID, reviewer, notes string) error {
+	return a.inner.Reject(ctx, previewID, reviewer, notes)
+}
+
+func (a *dpServerAdapter) GetEnabled() bool {
+	return a.inner.GetEnabled()
 }
