@@ -200,11 +200,48 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 					pageResult.BaselineNew = true
 					pageResult.Summary = "Automatically approved new baseline."
 					pagesPassed++
-				}
+			}
 
-				// Run visual audit even for new baselines to catch pre-existing issues
-				fmt.Printf("[VisualQA] Running visual audit for %s at %dpx...\n", pageConfig.Name, viewportWidth)
-				auditRes, auditErr := v.auditImage(ctx, captureOutputPath, viewportWidth, nil)
+			// DOM-first audit: captureIssues from Playwright contain contrast,
+			// overflow, clipping, stray_text checks. These are free and instant.
+			// Only spend vision API quota on pages where DOM found real problems
+			// that benefit from visual confirmation, or on first-time baselines.
+			domIssueCount := len(captureIssues)
+			hasCritical := false
+			for _, ci := range captureIssues {
+				if ci.Severity == "critical" {
+					hasCritical = true
+					break
+				}
+			}
+
+			needVisionAudit := hasCritical || (domIssueCount > 0 && domIssueCount < 3)
+			// Always audit if no DOM issues (vision might catch things DOM missed)
+			// but only if we haven't burned the daily quota already
+			if domIssueCount == 0 {
+				providers := v.getProviderChain()
+				for _, p := range providers {
+					if p.canMakeRequest() {
+						needVisionAudit = true
+						break
+					}
+				}
+			}
+
+			if needVisionAudit {
+				fmt.Printf("[VisualQA] Running vision audit for %s at %dpx (DOM found %d issues, critical=%v)...\n",
+					pageConfig.Name, viewportWidth, domIssueCount, hasCritical)
+				// Pass DOM issues to vision so it can confirm/refine
+				domAuditForVision := make([]AuditIssue, len(captureIssues))
+				for i, ci := range captureIssues {
+					domAuditForVision[i] = AuditIssue{
+						Type:        ci.Type,
+						Severity:    ci.Severity,
+						Description: ci.Description,
+						Element:     ci.Element,
+					}
+				}
+				auditRes, auditErr := v.auditImage(ctx, captureOutputPath, viewportWidth, domAuditForVision)
 				if auditErr != nil {
 					fmt.Printf("[VisualQA] Visual audit failed for %s at %dpx: %v\n", pageConfig.Name, viewportWidth, auditErr)
 				} else if len(auditRes.Issues) > 0 {
@@ -224,6 +261,10 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 						pageResult.Summary = "Visual audit found critical issues: " + auditRes.Summary
 					}
 				}
+			} else {
+				fmt.Printf("[VisualQA] Skipping vision audit for %s at %dpx (DOM clean, quota preserved)\n",
+					pageConfig.Name, viewportWidth)
+			}
 
 			// Dedup and persist issues to visual_qa_issues table
 			captureIssues = dedupIssues(captureIssues)
@@ -266,33 +307,68 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 				}
 			}
 
-			// Run standalone visual audit (finds issues baseline comparison misses)
-			fmt.Printf("[VisualQA] Running visual audit for %s at %dpx...\n", pageConfig.Name, viewportWidth)
-			auditRes, auditErr := v.auditImage(ctx, captureOutputPath, viewportWidth, nil)
-			if auditErr != nil {
-				fmt.Printf("[VisualQA] Visual audit failed for %s at %dpx: %v\n", pageConfig.Name, viewportWidth, auditErr)
-			} else if len(auditRes.Issues) > 0 {
-				// Filter out known false positives from past feedback
-				auditRes.Issues = filterKnownFalsePositives(auditRes.Issues, falsePositives)
-				if len(auditRes.Issues) > 0 {
-					fmt.Printf("[VisualQA] Audit found %d issues for %s at %dpx (severity: %s)\n",
-						len(auditRes.Issues), pageConfig.Name, viewportWidth, auditRes.Severity)
-					for _, ai := range auditRes.Issues {
-						patternKey := issuePatternKey(ai.Type, ai.Element)
-						captureIssues = append(captureIssues, UIIssue{
-							Type:        ai.Type,
-							Severity:    ai.Severity,
-							Description: ai.Description + " Suggestion: " + ai.Suggestion,
-							Element:     ai.Element,
-							Viewport:    viewportWidth,
-							PatternKey:  patternKey,
-						})
-					}
-					if auditRes.Severity == "critical" {
-						pageResult.Passed = false
-						pageResult.Summary = "Visual audit found critical issues: " + auditRes.Summary
+			// DOM-first audit: check DOM issues before spending vision quota
+			domIssueCount := len(captureIssues)
+			hasCritical := false
+			for _, ci := range captureIssues {
+				if ci.Severity == "critical" {
+					hasCritical = true
+					break
+				}
+			}
+
+			needVisionAudit := hasCritical || (domIssueCount > 0 && domIssueCount < 3)
+			if domIssueCount == 0 {
+				providers := v.getProviderChain()
+				for _, p := range providers {
+					if p.canMakeRequest() {
+						needVisionAudit = true
+						break
 					}
 				}
+			}
+
+			if needVisionAudit {
+				fmt.Printf("[VisualQA] Running vision audit for %s at %dpx (DOM: %d issues, critical=%v)...\n",
+					pageConfig.Name, viewportWidth, domIssueCount, hasCritical)
+				domAuditForVision := make([]AuditIssue, len(captureIssues))
+				for i, ci := range captureIssues {
+					domAuditForVision[i] = AuditIssue{
+						Type:        ci.Type,
+						Severity:    ci.Severity,
+						Description: ci.Description,
+						Element:     ci.Element,
+					}
+				}
+				auditRes, auditErr := v.auditImage(ctx, captureOutputPath, viewportWidth, domAuditForVision)
+				if auditErr != nil {
+					fmt.Printf("[VisualQA] Visual audit failed for %s at %dpx: %v\n", pageConfig.Name, viewportWidth, auditErr)
+				} else if len(auditRes.Issues) > 0 {
+					// Filter out known false positives from past feedback
+					auditRes.Issues = filterKnownFalsePositives(auditRes.Issues, falsePositives)
+					if len(auditRes.Issues) > 0 {
+						fmt.Printf("[VisualQA] Audit found %d issues for %s at %dpx (severity: %s)\n",
+							len(auditRes.Issues), pageConfig.Name, viewportWidth, auditRes.Severity)
+						for _, ai := range auditRes.Issues {
+							patternKey := issuePatternKey(ai.Type, ai.Element)
+							captureIssues = append(captureIssues, UIIssue{
+								Type:        ai.Type,
+								Severity:    ai.Severity,
+								Description: ai.Description + " Suggestion: " + ai.Suggestion,
+								Element:     ai.Element,
+								Viewport:    viewportWidth,
+								PatternKey:  patternKey,
+							})
+						}
+						if auditRes.Severity == "critical" {
+							pageResult.Passed = false
+							pageResult.Summary = "Visual audit found critical issues: " + auditRes.Summary
+						}
+					}
+				}
+			} else {
+				fmt.Printf("[VisualQA] Skipping vision audit for %s at %dpx (DOM clean, quota preserved)\n",
+					pageConfig.Name, viewportWidth)
 			}
 
 			// Dedup and persist issues to visual_qa_issues table
