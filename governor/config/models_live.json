@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-05-12T20:53:13.053561+00:00",
+  "updated": "2026-05-12T21:24:06.261013+00:00",
   "total": 27,
   "models": [
     {
@@ -8,10 +8,10 @@
       "name": "Gemini 3.1 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
-        "reasoning",
-        "vision"
+        "text",
+        "vision",
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -30,8 +30,8 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "reasoning",
-        "vision"
+        "vision",
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -49,8 +49,8 @@
       "name": "Gemini 3 Flash Preview",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -69,8 +69,8 @@
       "name": "Gemini 2.5 Flash",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -108,10 +108,10 @@
       "name": "Gemini 3.1 Pro Preview Custom Tools",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
-        "reasoning",
-        "vision"
+        "text",
+        "vision",
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -148,11 +148,11 @@
       "name": "Gemini Pro Latest",
       "context_length": 1048576,
       "capabilities": [
+        "text",
         "code",
-        "instruction",
         "reasoning",
-        "vision",
-        "text"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -170,8 +170,8 @@
       "name": "Gemini 3.1 Flash Lite",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -189,8 +189,8 @@
       "name": "Gemini 2.0 Flash 001",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -209,8 +209,8 @@
       "name": "Gemini 2.5 Flash-Lite",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -229,8 +229,8 @@
       "name": "Gemini 2.5 Pro",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -249,11 +249,11 @@
       "name": "Gemini Flash-Lite Latest",
       "context_length": 1048576,
       "capabilities": [
+        "text",
         "code",
-        "instruction",
         "reasoning",
-        "vision",
-        "text"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -271,10 +271,10 @@
       "name": "Gemini 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
-        "reasoning",
-        "vision"
+        "text",
+        "vision",
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -292,8 +292,8 @@
       "name": "Gemini 2.0 Flash-Lite 001",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -312,11 +312,11 @@
       "name": "Gemini Flash Latest",
       "context_length": 1048576,
       "capabilities": [
+        "text",
         "code",
-        "instruction",
         "reasoning",
-        "vision",
-        "text"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -334,8 +334,8 @@
       "name": "Gemini 2.0 Flash",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -354,8 +354,8 @@
       "name": "Gemini 2.0 Flash-Lite",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -374,26 +374,7 @@
       "name": "Gemini 3.1 Flash Lite Preview",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "instruction",
-        "vision"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "gemma-4-26b-a4b-it",
-      "name": "Gemma 4 26B A4B IT",
-      "context_length": 262144,
-      "capabilities": [
         "text",
         "vision"
       ],
@@ -428,12 +409,31 @@
       ]
     },
     {
+      "id": "gemma-4-26b-a4b-it",
+      "name": "Gemma 4 26B A4B IT",
+      "context_length": 262144,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
       "id": "gemini-2.5-computer-use-preview-10-2025",
       "name": "Gemini 2.5 Computer Use Preview 10-2025",
       "context_length": 131072,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -453,8 +453,8 @@
       "context_length": 131072,
       "capabilities": [
         "text",
-        "reasoning",
-        "vision"
+        "vision",
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -511,8 +511,8 @@
       "context_length": 131072,
       "capabilities": [
         "text",
-        "reasoning",
-        "vision"
+        "vision",
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
