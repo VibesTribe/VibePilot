@@ -11,20 +11,20 @@ import (
 )
 
 type Config struct {
-	Enabled                  bool          `json:"enabled"`
-	CapturePages             []PageConfig  `json:"capture_pages"`
-	BaselineDir              string        `json:"baseline_dir"`
-	ManifestFile             string        `json:"manifest_file"`
-	ConnectorID              string        `json:"connector_id"`
-	Model                    string        `json:"model"`
-	CaptureTimeoutSeconds    int           `json:"capture_timeout_seconds"`
-	ComparisonTimeoutSeconds int           `json:"comparison_timeout_seconds"`
-	AutoApproveFirstBaseline bool          `json:"auto_approve_first_baseline"`
-	GitCommitBaselines       bool          `json:"git_commit_baselines"`
-	TempDir                  string        `json:"temp_dir"`
-	RepoPath                 string        `json:"repo_path"`
-	GeminiVaultKey           string        `json:"gemini_vault_key"`
-	FixConfig                FixConfig     `json:"fix_config"`
+	Enabled                  bool         `json:"enabled"`
+	CapturePages             []PageConfig `json:"capture_pages"`
+	BaselineDir              string       `json:"baseline_dir"`
+	ManifestFile             string       `json:"manifest_file"`
+	ConnectorID              string       `json:"connector_id"`
+	Model                    string       `json:"model"`
+	CaptureTimeoutSeconds    int          `json:"capture_timeout_seconds"`
+	ComparisonTimeoutSeconds int          `json:"comparison_timeout_seconds"`
+	AutoApproveFirstBaseline bool         `json:"auto_approve_first_baseline"`
+	GitCommitBaselines       bool         `json:"git_commit_baselines"`
+	TempDir                  string       `json:"temp_dir"`
+	RepoPath                 string       `json:"repo_path"`
+	GeminiVaultKey           string       `json:"gemini_vault_key"`
+	FixConfig                FixConfig    `json:"fix_config"`
 }
 
 type PageConfig struct {
@@ -53,6 +53,7 @@ type RunResult struct {
 	PagesChecked int          `json:"pages_checked"`
 	PagesPassed  int          `json:"pages_passed"`
 	PagesFailed  int          `json:"pages_failed"`
+	IssuesFound  int          `json:"issues_found"`
 	PageResults  []PageResult `json:"page_results"`
 	DurationMs   int          `json:"duration_ms"`
 }
@@ -65,7 +66,6 @@ type PageResult struct {
 	Confidence  float64      `json:"confidence"`
 	Summary     string       `json:"summary"`
 	Differences []Difference `json:"differences"`
-	UIIssues    []UIIssue    `json:"ui_issues"`
 	CapturePath string       `json:"capture_path"`
 	BaselineNew bool         `json:"baseline_new"`
 	LoadTimeMs  int          `json:"load_time_ms"`
@@ -141,9 +141,11 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 	}
 
 	var pageResults []PageResult
+	var allIssues []UIIssue // collected across all pages for fix engine
 	pagesChecked := 0
 	pagesPassed := 0
 	pagesFailed := 0
+	totalIssuesFound := 0
 	var overallError error
 
 	for _, pageConfig := range v.config.CapturePages {
@@ -170,8 +172,9 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 			pageResult.CapturePath = captureRes.Path
 			pageResult.URL = pageConfig.URL
 			// Pull UI interaction data from capture report
+			var captureIssues []UIIssue
 			if v.lastReport != nil {
-				pageResult.UIIssues = v.lastReport.Issues
+				captureIssues = v.lastReport.Issues
 				pageResult.Title = v.lastReport.Title
 				pageResult.LoadTimeMs = v.lastReport.LoadTimeMs
 				if len(v.lastReport.ConsoleErrors) > 0 {
@@ -207,7 +210,7 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 					fmt.Printf("[VisualQA] Audit found %d issues for %s at %dpx (severity: %s)\n",
 						len(auditRes.Issues), pageConfig.Name, viewportWidth, auditRes.Severity)
 					for _, ai := range auditRes.Issues {
-						pageResult.UIIssues = append(pageResult.UIIssues, UIIssue{
+						captureIssues = append(captureIssues, UIIssue{
 							Type:        ai.Type,
 							Severity:    ai.Severity,
 							Description: ai.Description + " Suggestion: " + ai.Suggestion,
@@ -220,6 +223,13 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 						pageResult.Summary = "Visual audit found critical issues: " + auditRes.Summary
 					}
 				}
+
+				// Persist issues to visual_qa_issues table
+				for _, issue := range captureIssues {
+					v.insertIssue(ctx, runID, pageConfig.Name, viewportWidth, issue)
+				}
+				totalIssuesFound += len(captureIssues)
+				allIssues = append(allIssues, captureIssues...)
 
 				pageResults = append(pageResults, pageResult)
 				continue
@@ -267,7 +277,7 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 						len(auditRes.Issues), pageConfig.Name, viewportWidth, auditRes.Severity)
 					for _, ai := range auditRes.Issues {
 						patternKey := issuePatternKey(ai.Type, ai.Element)
-						pageResult.UIIssues = append(pageResult.UIIssues, UIIssue{
+						captureIssues = append(captureIssues, UIIssue{
 							Type:        ai.Type,
 							Severity:    ai.Severity,
 							Description: ai.Description + " Suggestion: " + ai.Suggestion,
@@ -282,6 +292,14 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 					}
 				}
 			}
+
+			// Persist issues to visual_qa_issues table
+			for _, issue := range captureIssues {
+				v.insertIssue(ctx, runID, pageConfig.Name, viewportWidth, issue)
+			}
+			totalIssuesFound += len(captureIssues)
+			allIssues = append(allIssues, captureIssues...)
+
 			pageResults = append(pageResults, pageResult)
 		}
 	}
@@ -289,19 +307,15 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 	completedAt := time.Now()
 	durationMs := int(completedAt.Sub(startedAt).Milliseconds())
 
-	// Run fix engine on collected UI issues
+	// Run fix engine on collected issues
 	var allFixSuggestions []FixSuggestion
-	if v.fixEngine != nil {
-		for _, pr := range pageResults {
-			if len(pr.UIIssues) > 0 {
-				suggestions, err := v.fixEngine.ProcessIssues(ctx, pr.UIIssues, pr.CapturePath)
-				if err != nil {
-					fmt.Printf("[VisualQA] Fix engine error for %s: %v\n", pr.PageName, err)
-				} else if len(suggestions) > 0 {
-					fmt.Printf("[VisualQA] Fix engine produced %d suggestions for %s at %dpx\n", len(suggestions), pr.PageName, pr.Viewport)
-					allFixSuggestions = append(allFixSuggestions, suggestions...)
-				}
-			}
+	if v.fixEngine != nil && len(allIssues) > 0 {
+		suggestions, err := v.fixEngine.ProcessIssues(ctx, allIssues, "")
+		if err != nil {
+			fmt.Printf("[VisualQA] Fix engine error: %v\n", err)
+		} else if len(suggestions) > 0 {
+			fmt.Printf("[VisualQA] Fix engine produced %d suggestions\n", len(suggestions))
+			allFixSuggestions = append(allFixSuggestions, suggestions...)
 		}
 		// Auto-apply fixes if configured
 		if v.config.FixConfig.Mode == "auto_fix" && len(allFixSuggestions) > 0 {
@@ -330,9 +344,9 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 	resultsJSON, _ := json.Marshal(pageResults)
 	_, err = v.db.Exec(ctx, `
 		UPDATE visual_qa_runs
-		SET status = $1, pages_checked = $2, pages_passed = $3, pages_failed = $4, results = $5, error_message = $6, completed_at = $7, duration_ms = $8
-		WHERE id = $9
-	`, status, pagesChecked, pagesPassed, pagesFailed, resultsJSON, errorMessage, completedAt, durationMs, runID)
+		SET status = $1, pages_checked = $2, pages_passed = $3, pages_failed = $4, results = $5, error_message = $6, completed_at = $7, duration_ms = $8, issues_found = $9
+		WHERE id = $10
+	`, status, pagesChecked, pagesPassed, pagesFailed, resultsJSON, errorMessage, completedAt, durationMs, totalIssuesFound, runID)
 	if err != nil {
 		fmt.Printf("[VisualQA] Failed to update visual_qa_run %s: %v\n", runID, err)
 	}
@@ -343,9 +357,59 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 		PagesChecked: pagesChecked,
 		PagesPassed:  pagesPassed,
 		PagesFailed:  pagesFailed,
+		IssuesFound:  totalIssuesFound,
 		PageResults:  pageResults,
 		DurationMs:   durationMs,
 	}, overallError
+}
+
+// insertIssue persists a single UI issue to the visual_qa_issues table.
+func (v *VisualQA) insertIssue(ctx context.Context, runID, pageName string, viewport int, issue UIIssue) {
+	if v.db == nil {
+		return
+	}
+	_, err := v.db.Exec(ctx, `
+		INSERT INTO visual_qa_issues (run_id, type, severity, element, description, suggestion, page_name, viewport)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, runID, issue.Type, issue.Severity, issue.Element, issue.Description, "", pageName, viewport)
+	if err != nil {
+		fmt.Printf("[VisualQA] Failed to insert issue: %v\n", err)
+	}
+}
+
+// GetIssuesForRun returns all issues for a given run ID.
+func (v *VisualQA) GetIssuesForRun(ctx context.Context, runID string) ([]map[string]any, error) {
+	rows, err := v.db.Query(ctx, `
+		SELECT id, type, severity, element, description, suggestion, page_name, viewport, created_at
+		FROM visual_qa_issues
+		WHERE run_id = $1
+		ORDER BY created_at ASC
+	`, runID)
+	if err != nil {
+		return nil, fmt.Errorf("[VisualQA] Failed to query issues for run %s: %w", runID, err)
+	}
+	defer rows.Close()
+
+	var results []map[string]any
+	for rows.Next() {
+		var id, issueType, severity, element, description, suggestion, pageName, createdAt string
+		var viewport int
+		if err := rows.Scan(&id, &issueType, &severity, &element, &description, &suggestion, &pageName, &viewport, &createdAt); err != nil {
+			continue
+		}
+		results = append(results, map[string]any{
+			"id":          id,
+			"type":        issueType,
+			"severity":    severity,
+			"element":     element,
+			"description": description,
+			"suggestion":  suggestion,
+			"page_name":   pageName,
+			"viewport":    viewport,
+			"created_at":  createdAt,
+		})
+	}
+	return results, nil
 }
 
 // GetEnabled returns whether VisualQA is enabled.
