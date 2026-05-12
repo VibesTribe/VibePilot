@@ -69,18 +69,18 @@
         "qwen/qwen3-next-80b-a3b-instruct:free",
         "qwen/qwen3-coder:free",
         "openrouter/free",
-        "minimax/minimax-m2.5",
+        "minimaxai/minimax-m2.5",
         "meta-llama/llama-4-scout-17b-16e-instruct",
-        "llama-3.3-70b-versatile",
+        "groq/llama-3.3-70b-versatile",
         "groq/compound",
         "openai/gpt-oss-120b",
         "groq/compound-mini",
-        "llama-3.1-8b-instant",
+        "groq/llama-3.1-8b-instant",
         "meta/llama-3.3-70b-instruct",
         "google/gemma-4-26b-a4b-it:free",
-        "google/gemma-3-27b-it:free",
-        "deepseek-chat",
-        "glm-5"
+        "google/gemma-3-27b-it",
+        "deepseek-ai/deepseek-v4-flash",
+        "z-ai/glm-5.1"
       ]
     },
     "internal_only": {

@@ -80,8 +80,13 @@ func validatePromptsDir(configDir string) int {
 	// Prompts dir is typically at GOVERNOR_PROMPTS_DIR or ../prompts relative to config
 	promptsDir := os.Getenv("GOVERNOR_PROMPTS_DIR")
 	if promptsDir == "" {
-		// Try sibling directory: if config is at ./config, prompts is at ../prompts
-		promptsDir = filepath.Join(filepath.Dir(configDir), "prompts")
+		// Try config/prompts first (standard layout), then ../prompts
+		candidate := filepath.Join(configDir, "prompts")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			promptsDir = candidate
+		} else {
+			promptsDir = filepath.Join(filepath.Dir(configDir), "prompts")
+		}
 	}
 
 	info, err := os.Stat(promptsDir)
