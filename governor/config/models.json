@@ -1,15 +1,16 @@
 {
   "models": [
     {
-      "id": "gemini-3.1-pro-preview",
-      "name": "Gemini 3.1 Pro Preview",
+      "id": "gemini-pro-latest",
+      "name": "Gemini Pro Latest",
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
         "vision",
+        "reasoning",
+        "code",
         "instruction",
-        "text",
-        "reasoning"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -128,14 +129,13 @@
       "status": "active"
     },
     {
-      "id": "gemini-pro-latest",
-      "name": "Gemini Pro Latest",
+      "id": "gemini-3.1-pro-preview",
+      "name": "Gemini 3.1 Pro Preview",
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
-        "code",
         "vision",
+        "instruction",
         "text",
         "reasoning"
       ],
@@ -194,14 +194,13 @@
       "status": "active"
     },
     {
-      "id": "gemini-flash-lite-latest",
-      "name": "Gemini Flash-Lite Latest",
+      "id": "gemini-3-pro-preview",
+      "name": "Gemini 3 Pro Preview",
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
-        "code",
         "vision",
+        "instruction",
         "text",
         "reasoning"
       ],
@@ -212,15 +211,16 @@
       "status": "active"
     },
     {
-      "id": "gemini-3-pro-preview",
-      "name": "Gemini 3 Pro Preview",
+      "id": "gemini-flash-lite-latest",
+      "name": "Gemini Flash-Lite Latest",
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
         "vision",
+        "reasoning",
+        "code",
         "instruction",
-        "text",
-        "reasoning"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -250,11 +250,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
-        "code",
         "vision",
-        "text",
-        "reasoning"
+        "reasoning",
+        "code",
+        "instruction",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
