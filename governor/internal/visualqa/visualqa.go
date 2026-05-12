@@ -224,15 +224,16 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 					}
 				}
 
-				// Persist issues to visual_qa_issues table
-				for _, issue := range captureIssues {
-					v.insertIssue(ctx, runID, pageConfig.Name, viewportWidth, issue)
-				}
-				totalIssuesFound += len(captureIssues)
-				allIssues = append(allIssues, captureIssues...)
+			// Dedup and persist issues to visual_qa_issues table
+			captureIssues = dedupIssues(captureIssues)
+			for _, issue := range captureIssues {
+				v.insertIssue(ctx, runID, pageConfig.Name, viewportWidth, issue)
+			}
+			totalIssuesFound += len(captureIssues)
+			allIssues = append(allIssues, captureIssues...)
 
-				pageResults = append(pageResults, pageResult)
-				continue
+			pageResults = append(pageResults, pageResult)
+			continue
 			}
 
 			if !baselineExists {
@@ -293,7 +294,8 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 				}
 			}
 
-			// Persist issues to visual_qa_issues table
+			// Dedup and persist issues to visual_qa_issues table
+			captureIssues = dedupIssues(captureIssues)
 			for _, issue := range captureIssues {
 				v.insertIssue(ctx, runID, pageConfig.Name, viewportWidth, issue)
 			}
@@ -514,4 +516,23 @@ func (v *VisualQA) GetFalsePositivePatterns(ctx context.Context) map[string]bool
 		}
 	}
 	return patterns
+}
+
+// dedupIssues removes duplicate issues based on type+element+viewport+description (first 80 chars).
+// Prevents the same contrast/overflow warning from being inserted hundreds of times for one page.
+func dedupIssues(issues []UIIssue) []UIIssue {
+	seen := make(map[string]bool)
+	var deduped []UIIssue
+	for _, issue := range issues {
+		desc := issue.Description
+		if len(desc) > 80 {
+			desc = desc[:80]
+		}
+		key := fmt.Sprintf("%s:%s:%d:%s", issue.Type, issue.Element, issue.Viewport, desc)
+		if !seen[key] {
+			seen[key] = true
+			deduped = append(deduped, issue)
+		}
+	}
+	return deduped
 }
