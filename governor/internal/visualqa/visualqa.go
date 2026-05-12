@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -601,10 +603,9 @@ func dedupIssues(issues []UIIssue) []UIIssue {
 	seen := make(map[string]bool)
 	var deduped []UIIssue
 	for _, issue := range issues {
-		desc := issue.Description
-		if len(desc) > 80 {
-			desc = desc[:80]
-		}
+		// Normalize description for dedup: strip quoted text and pixel values
+		// so "brightness 146...read: 'architecture'" and "...'complex'" match
+		desc := normalizeForDedup(issue.Description)
 		key := fmt.Sprintf("%s:%s:%d:%s", issue.Type, issue.Element, issue.Viewport, desc)
 		if !seen[key] {
 			seen[key] = true
@@ -612,4 +613,26 @@ func dedupIssues(issues []UIIssue) []UIIssue {
 		}
 	}
 	return deduped
+}
+
+// normalizeForDedup strips variable parts of descriptions so similar issues
+// (same type, same element, same root cause) map to the same dedup key.
+func normalizeForDedup(desc string) string {
+	// Strip pixel values: "Content is 451px wide but only 317px visible" -> "Content is Npx wide but only Npx visible"
+	re := regexp.MustCompile(`\d+px`)
+	desc = re.ReplaceAllString(desc, "Npx")
+
+	// Strip brightness values: "brightness 146" -> "brightness N"
+	re2 := regexp.MustCompile(`brightness \d+`)
+	desc = re2.ReplaceAllString(desc, "brightness N")
+
+	// Truncate to 80 chars
+	if len(desc) > 80 {
+		desc = desc[:80]
+	}
+	// Strip quoted text at the end: "hard to read: 'whatever'" -> "hard to read"
+	if idx := strings.LastIndex(desc, `"`); idx > 0 {
+		desc = desc[:idx]
+	}
+	return desc
 }
