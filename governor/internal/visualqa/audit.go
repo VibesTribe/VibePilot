@@ -186,6 +186,8 @@ func worstSeverity(issues []AuditIssue) string {
 
 // domAuditScript returns JavaScript that runs DOM-level quality checks inside Playwright.
 // These checks are designed to catch the REAL issues users see, not subpixel noise.
+// Checks: stray text, overflow, viewport extension, contrast, spacing, centering,
+// fixed-overlay clipping, tab overflow, mobile touch targets, text-wrap, breathing room.
 func domAuditScript(viewport int) string {
 	return fmt.Sprintf(`() => {
 	const issues = [];
@@ -199,6 +201,9 @@ func domAuditScript(viewport int) string {
 			if (node.nodeType === 3) {
 				const text = node.textContent.trim();
 				if (/^(undefined|null|NaN|\[object|\{.*\}|=&gt;|function|var |let |const )/.test(text)) {
+					// Skip if inside a script or style tag
+					const tag = el.tagName.toLowerCase();
+					if (tag === 'script' || tag === 'style' || tag === 'noscript') return;
 					issues.push({
 						type: 'stray_text',
 						severity: 'critical',
@@ -227,14 +232,13 @@ func domAuditScript(viewport int) string {
 		}
 	});
 
-	// 2. REAL OVERFLOW: Content significantly wider than its visible area (>20px, not subpixel noise)
+	// 2. REAL OVERFLOW: Content significantly wider than its visible area (>20px)
 	document.querySelectorAll('button, span, div, p, h1, h2, h3, h4, td, th, li, section, article').forEach(el => {
 		if (el.clientWidth <= 0 || el.clientHeight <= 0) return;
 		const overflowX = el.scrollWidth - el.clientWidth;
 		const overflowY = el.scrollHeight - el.clientHeight;
 		const style = getComputedStyle(el);
 
-		// Only flag if content is meaningfully clipped (>20px hidden) AND overflow is hidden
 		if (overflowX > 20 && style.overflow !== 'visible' && style.overflowX !== 'visible') {
 			issues.push({
 				type: 'overflow',
@@ -255,51 +259,43 @@ func domAuditScript(viewport int) string {
 		}
 	});
 
-	// 3. ELEMENTS EXTENDING BEYOND VIEWPORT (the real mobile killer)
+	// 3. ELEMENTS EXTENDING BEYOND VIEWPORT
 	document.querySelectorAll('div, section, table, ul, ol').forEach(el => {
 		const rect = el.getBoundingClientRect();
-		// Skip tiny elements and offscreen elements
 		if (rect.width < 100 || rect.height < 20) return;
 		if (rect.top > window.innerHeight) return;
 
 		const overRight = Math.round(rect.right - vw);
-		const overLeft = Math.round(-rect.left);
-
 		if (overRight > 15) {
 			issues.push({
 				type: 'layout',
 				severity: overRight > 50 ? 'critical' : 'warning',
 				element: el.tagName + '.' + (el.className || '').substring(0, 60),
-				description: 'Element extends ' + overRight + 'px beyond right edge of viewport. Content on the right side is cut off and inaccessible.',
-				suggestion: 'Add max-width: 100vw or overflow-x: auto to contain within viewport'
+				description: 'Element extends ' + overRight + 'px beyond right edge of viewport. Content on the right side is cut off.',
+				suggestion: 'Add max-width: 100vw or overflow-x: auto'
 			});
 		}
 	});
 
-	// 4. TEXT CONTRAST: Grey text on dark backgrounds that's hard to read
+	// 4. TEXT CONTRAST: Grey text on dark backgrounds
 	document.querySelectorAll('p, span, li, td, th, label, h1, h2, h3, h4, h5, h6, a, button').forEach(el => {
 		const style = getComputedStyle(el);
-		const color = style.color;
-		// Parse rgba
-		const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+		const match = style.color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
 		if (match) {
 			const r = parseInt(match[1]), g = parseInt(match[2]), b = parseInt(match[3]);
-			// Perceived brightness
 			const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-			// On a dark background, text with brightness 80-140 is "too dark grey"
-			// We check if the element is inside a dark container
 			const parentBg = getComputedStyle(el.parentElement || el).backgroundColor;
 			const bgMatch = parentBg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
 			if (bgMatch) {
-				const br = parseInt(bgMatch[1]), bg = parseInt(bgMatch[2]), bb = parseInt(bgMatch[3]);
-				const bgBrightness = (br * 299 + bg * 587 + bb * 114) / 1000;
+				const br = parseInt(bgMatch[1]), bg2 = parseInt(bgMatch[2]), bb = parseInt(bgMatch[3]);
+				const bgBrightness = (br * 299 + bg2 * 587 + bb * 114) / 1000;
 				if (bgBrightness < 80 && brightness > 60 && brightness < 150 && el.textContent.trim().length > 5) {
 					issues.push({
 						type: 'contrast',
 						severity: 'warning',
 						element: el.tagName + '.' + (el.className || '').substring(0, 50),
-						description: 'Low contrast text (brightness ' + Math.round(brightness) + ') on dark background (brightness ' + Math.round(bgBrightness) + '). Text is hard to read: "' + el.textContent.trim().substring(0, 50) + '"',
-						suggestion: 'Increase text color brightness to at least 180 (use rgba(200,210,230,...) or similar)'
+						description: 'Low contrast text (brightness ' + Math.round(brightness) + ') on dark background (brightness ' + Math.round(bgBrightness) + ').',
+						suggestion: 'Increase text color brightness to at least 180'
 					});
 				}
 			}
@@ -313,18 +309,175 @@ func domAuditScript(viewport int) string {
 		const listRect = list.getBoundingClientRect();
 		const firstRect = firstItem.getBoundingClientRect();
 		const gap = firstRect.top - listRect.top;
-
-		// If there's more than 60px gap between list top and first item, that's excessive
 		if (gap > 60 && listRect.height > 100) {
 			issues.push({
 				type: 'spacing',
 				severity: gap > 120 ? 'warning' : 'info',
 				element: list.tagName + '.' + (list.className || '').substring(0, 50),
-				description: 'Excessive gap (' + Math.round(gap) + 'px) between filter bar and first content item. User has to scroll past empty space.',
-				suggestion: 'Reduce padding-top or margin-top on this list to bring content closer to filters'
+				description: 'Excessive gap (' + Math.round(gap) + 'px) between filter bar and first content item.',
+				suggestion: 'Reduce padding-top or margin-top on this list'
 			});
 		}
 	});
+
+	// 6. CENTERING CHECK: Elements that look off-center in their container
+	// Flags when left/right margin ratio exceeds 1.5:1 for centered elements
+	document.querySelectorAll('[class*="orbit"], [class*="center"], [class*="hub"], [class*="wheel"], .slice-orbit, [class*="circle"]').forEach(el => {
+		const rect = el.getBoundingClientRect();
+		const parent = el.parentElement;
+		if (!parent) return;
+		const pRect = parent.getBoundingClientRect();
+		const spaceLeft = rect.left - pRect.left;
+		const spaceRight = pRect.right - rect.right;
+		if (spaceLeft > 5 && spaceRight > 5) {
+			const ratio = Math.max(spaceLeft, spaceRight) / Math.min(spaceLeft, spaceRight);
+			if (ratio > 1.5 && rect.width > 30) {
+				issues.push({
+					type: 'alignment',
+					severity: ratio > 2.5 ? 'critical' : 'warning',
+					element: el.tagName + '.' + (el.className || '').substring(0, 60),
+					description: 'Element appears off-center. Left space: ' + Math.round(spaceLeft) + 'px, Right space: ' + Math.round(spaceRight) + 'px (ratio ' + ratio.toFixed(1) + ':1).',
+					suggestion: 'Add equal left/right padding or use flexbox/grid centering'
+				});
+			}
+		}
+	});
+
+	// 7. FIXED OVERLAY CLIPPING: Check fixed/absolute positioned elements (chat panels, FABs, overlays)
+	document.querySelectorAll('*').forEach(el => {
+		const style = getComputedStyle(el);
+		const pos = style.position;
+		if (pos !== 'fixed' && pos !== 'absolute' && pos !== 'sticky') return;
+		const rect = el.getBoundingClientRect();
+		if (rect.width < 20 || rect.height < 20) return;
+
+		// Check if element extends beyond viewport
+		if (rect.right > vw + 5) {
+			issues.push({
+				type: 'layout',
+				severity: 'critical',
+				element: el.tagName + '.' + (el.className || '').substring(0, 60),
+				description: 'Fixed/absolute element extends ' + Math.round(rect.right - vw) + 'px beyond viewport right edge.',
+				suggestion: 'Constrain with right: 0 or max-width: 100vw'
+			});
+		}
+		if (rect.bottom > window.innerHeight + 5) {
+			issues.push({
+				type: 'layout',
+				severity: 'warning',
+				element: el.tagName + '.' + (el.className || '').substring(0, 60),
+				description: 'Fixed/absolute element extends ' + Math.round(rect.bottom - window.innerHeight) + 'px below viewport bottom.',
+				suggestion: 'Constrain with bottom: 0 or max-height'
+			});
+		}
+		// Check child overflow: do children of this fixed element exceed its bounds?
+		el.querySelectorAll('button, input, [class*="input"], [class*="send"], [class*="btn"]').forEach(child => {
+			const cRect = child.getBoundingClientRect();
+			if (cRect.bottom > rect.bottom + 2 || cRect.right > rect.right + 2) {
+				issues.push({
+					type: 'clipping',
+					severity: 'critical',
+					element: child.tagName + '.' + (child.className || '').substring(0, 60),
+					description: 'Interactive element inside fixed overlay is clipped. Element at ' + Math.round(cRect.bottom) + 'px bottom but container ends at ' + Math.round(rect.bottom) + 'px.',
+					suggestion: 'Add flex-shrink: 0 to prevent the element being pushed out, or increase container height'
+				});
+			}
+		});
+	});
+
+	// 8. TAB/MENU OVERFLOW: Horizontal tab bars where total tab width exceeds container
+	document.querySelectorAll('nav, [role="tablist"], [class*="tabs"], [class*="tab-bar"], ul[class*="nav"], [class*="section-tabs"]').forEach(bar => {
+		const style = getComputedStyle(bar);
+		const barRect = bar.getBoundingClientRect();
+		// Only check horizontal layouts
+		if (style.flexWrap === 'wrap' || style.display === 'block') return;
+
+		const tabs = bar.querySelectorAll(':scope > a, :scope > button, :scope > li, :scope > [role="tab"]');
+		if (tabs.length < 2) return;
+
+		let totalWidth = 0;
+		tabs.forEach(tab => { totalWidth += tab.getBoundingClientRect().width; });
+		const barWidth = barRect.width;
+		const overflow = totalWidth - barWidth;
+
+		if (overflow > 10) {
+			issues.push({
+				type: 'overflow',
+				severity: overflow > 50 ? 'critical' : 'warning',
+				element: bar.tagName + '.' + (bar.className || '').substring(0, 60),
+				description: 'Tab bar has ' + tabs.length + ' tabs totaling ' + Math.round(totalWidth) + 'px but container is only ' + Math.round(barWidth) + 'px. ' + Math.round(overflow) + 'px of tabs are clipped and inaccessible.',
+				suggestion: 'Add flex-wrap: wrap, horizontal scroll, or reduce tab count for mobile'
+			});
+		}
+	});
+
+	// 9. MOBILE TOUCH TARGETS: Interactive elements smaller than 44px
+	if (isMobile) {
+		document.querySelectorAll('button, a, input, select, [role="button"], [role="tab"], [onclick]').forEach(el => {
+			const rect = el.getBoundingClientRect();
+			if (rect.width < 1 || rect.height < 1) return;
+			// Skip hidden elements
+			const style = getComputedStyle(el);
+			if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return;
+			// Skip offscreen elements
+			if (rect.top > window.innerHeight || rect.left > vw) return;
+			if (rect.width < 44 || rect.height < 44) {
+				issues.push({
+					type: 'touch_target',
+					severity: (rect.width < 32 || rect.height < 32) ? 'critical' : 'warning',
+					element: el.tagName + '.' + (el.className || '').substring(0, 60),
+					description: 'Touch target too small: ' + Math.round(rect.width) + 'x' + Math.round(rect.height) + 'px (minimum 44x44px). Element text: "' + (el.textContent || '').trim().substring(0, 30) + '"',
+					suggestion: 'Increase element size to at least 44x44px or add padding'
+				});
+			}
+		});
+	}
+
+	// 10. TEXT WRAP ISSUES: Long text without word-break that overflows at mobile widths
+	if (isMobile) {
+		document.querySelectorAll('p, span, div, li, td, th, h1, h2, h3, h4').forEach(el => {
+			if (el.clientWidth <= 0) return;
+			const style = getComputedStyle(el);
+			// Only check block/inline-block elements that don't wrap
+			if (style.whiteSpace === 'nowrap' || style.whiteSpace === 'pre') {
+				const overflow = el.scrollWidth - el.clientWidth;
+				if (overflow > 20) {
+					issues.push({
+						type: 'overflow',
+						severity: overflow > 60 ? 'critical' : 'warning',
+						element: el.tagName + '.' + (el.className || '').substring(0, 60),
+						description: 'Text forced to nowrap is ' + overflow + 'px wider than container. Content is cut off on mobile.',
+						suggestion: 'Remove white-space: nowrap or add text-overflow: ellipsis with overflow: hidden'
+					});
+				}
+			}
+		});
+	}
+
+	// 11. MOBILE BREATHING ROOM: Check top padding on main content area
+	if (isMobile) {
+		const main = document.querySelector('main, [role="main"], .main-content, #root > div, body > div');
+		if (main) {
+			const style = getComputedStyle(main);
+			const topPad = parseInt(style.paddingTop) || 0;
+			const topMargin = parseInt(style.marginTop) || 0;
+			const header = document.querySelector('header, [role="banner"], .header, .mission-header');
+			if (header) {
+				const hRect = header.getBoundingClientRect();
+				const mRect = main.getBoundingClientRect();
+				const gap = mRect.top - hRect.bottom;
+				if (gap < 8 && gap >= 0) {
+					issues.push({
+						type: 'spacing',
+						severity: 'warning',
+						element: 'main-content',
+						description: 'Insufficient spacing after header (' + Math.round(gap) + 'px gap). Content feels cramped on mobile.',
+						suggestion: 'Add padding-top: 16px or margin-top: 16px to main content area'
+					});
+				}
+			}
+		}
+	}
 
 	return issues;
 }`, viewport)
