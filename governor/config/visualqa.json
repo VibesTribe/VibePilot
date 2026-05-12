@@ -5,6 +5,21 @@
       "url": "https://vibeflow-dashboard.vercel.app/",
       "name": "dashboard-home",
       "viewports": [1280, 768, 375]
+    },
+    {
+      "url": "https://graphs.vibestribe.rocks/",
+      "name": "knowledge-hub",
+      "viewports": [1280, 375]
+    },
+    {
+      "url": "https://graphs.vibestribe.rocks/system-map.html",
+      "name": "knowledge-hub-system-map",
+      "viewports": [1280, 375]
+    },
+    {
+      "url": "https://graphs.vibestribe.rocks/todos.html",
+      "name": "knowledge-hub-todos",
+      "viewports": [1280, 375]
     }
   ],
   "baseline_dir": "visualqa/baselines",

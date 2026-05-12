@@ -269,8 +269,8 @@ def capture():
                         "viewport": ` + vw + `
                     })
 
-        # Click dashboard tabs (Logs, Models, Docs, Admin)
-        for btn_text in ["Logs", "Models", "Docs", "Admin"]:
+        # Click dashboard tabs (Logs, Models, Docs, Admin) -- these open modal panels
+        for btn_text in ["Logs", "Docs", "Models", "Admin"]:
             try:
                 el = page.get_by_text(btn_text, exact=True).first
                 if el and el.is_visible():
@@ -279,33 +279,100 @@ def capture():
                     el.click(timeout=3000)
                     page.wait_for_timeout(2000)
                     audit_state(btn_text)
-            except Exception:
-                pass
-
-        # Click stat pills and other interactive buttons
-        interactive_selectors = [
-            "button.mission-header__stat-pill",
-            "button.slice-orbit__center",
-        ]
-        for sel in interactive_selectors:
-            try:
-                els = page.query_selector_all(sel)
-                for idx, el in enumerate(els[:6]):
+                    # If Docs tab was clicked, wait for iframe and audit it
+                    if btn_text == "Docs":
+                        try:
+                            iframe_el = page.query_selector("iframe[title='Knowledge Hub']")
+                            if iframe_el:
+                                iframe = iframe_el.content_frame()
+                                if iframe:
+                                    page.wait_for_timeout(3000)
+                                    # Audit iframe DOM
+                                    iframe_issues = iframe.evaluate("""` + domAuditJS + `""")
+                                    if iframe_issues:
+                                        for ii in iframe_issues:
+                                            issues.append({
+                                                "type": ii.get("type", "visual"),
+                                                "severity": ii.get("severity", "warning"),
+                                                "description": "[Docs iframe] " + ii.get("description", ""),
+                                                "element": ii.get("element", ""),
+                                                "viewport": ` + vw + `
+                                            })
+                        except Exception:
+                            pass
+                    # Close modal before next tab
                     try:
-                        if not el.is_visible():
-                            continue
-                        text = (el.inner_text() or "").strip()[:40].replace("\\n", " ")
-                        if not text:
-                            text = sel.split(".")[-1] + "-" + str(idx)
-                        el.scroll_into_view_if_needed(timeout=2000)
-                        page.wait_for_timeout(100)
-                        el.click(timeout=3000)
-                        page.wait_for_timeout(1500)
-                        audit_state(text)
+                        close_btn = page.query_selector("button.mission-modal__close, [aria-label='Close'], button[class*='close']")
+                        if close_btn and close_btn.is_visible():
+                            close_btn.click(timeout=2000)
+                            page.wait_for_timeout(500)
                     except Exception:
                         pass
             except Exception:
                 pass
+
+        # Click ROI stat pill (opens ROI panel)
+        try:
+            roi_pill = page.query_selector("button.mission-header__stat-pill--tokens, [aria-label*='ROI']")
+            if roi_pill and roi_pill.is_visible():
+                roi_pill.scroll_into_view_if_needed(timeout=2000)
+                page.wait_for_timeout(100)
+                roi_pill.click(timeout=3000)
+                page.wait_for_timeout(2000)
+                audit_state("ROI")
+                # Close modal
+                try:
+                    close_btn = page.query_selector("button.mission-modal__close, [aria-label='Close'], button[class*='close']")
+                    if close_btn and close_btn.is_visible():
+                        close_btn.click(timeout=2000)
+                        page.wait_for_timeout(500)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Click stat pills (status pills along the header)
+        stat_pills = page.query_selector_all("button.mission-header__stat-pill")
+        for idx, pill in enumerate(stat_pills[:6]):
+            try:
+                if not pill.is_visible():
+                    continue
+                text = (pill.inner_text() or "").strip()[:40].replace("\\n", " ")
+                if not text:
+                    text = "stat-pill-" + str(idx)
+                pill.scroll_into_view_if_needed(timeout=2000)
+                page.wait_for_timeout(100)
+                pill.click(timeout=3000)
+                page.wait_for_timeout(1500)
+                audit_state(text)
+                # Close any opened modal
+                try:
+                    close_btn = page.query_selector("button.mission-modal__close, [aria-label='Close'], button[class*='close']")
+                    if close_btn and close_btn.is_visible():
+                        close_btn.click(timeout=2000)
+                        page.wait_for_timeout(500)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        # Click slice orbit center button
+        try:
+            center_btn = page.query_selector("button.slice-orbit__center")
+            if center_btn and center_btn.is_visible():
+                center_btn.scroll_into_view_if_needed(timeout=2000)
+                center_btn.click(timeout=3000)
+                page.wait_for_timeout(1500)
+                audit_state("slice-orbit-center")
+                try:
+                    close_btn = page.query_selector("button.mission-modal__close, [aria-label='Close'], button[class*='close']")
+                    if close_btn and close_btn.is_visible():
+                        close_btn.click(timeout=2000)
+                        page.wait_for_timeout(500)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         # Go back to initial state for final screenshot
         try:
