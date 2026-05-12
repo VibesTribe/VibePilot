@@ -432,6 +432,11 @@ func main() {
 				geminiKey = k
 			}
 
+			// Get OpenRouter API key from vault for fallback vision providers
+			if k, err := v.GetSecret(ctx, "OPENROUTER_API_KEY"); err == nil && k != "" {
+				vqaCfg.OpenRouterKey = k
+			}
+
 			// Set repo path from managed repo
 			vqaCfg.RepoPath = repoPath
 			// Set fix engine source root if not explicitly configured

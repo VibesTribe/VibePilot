@@ -24,6 +24,7 @@ type Config struct {
 	TempDir                  string       `json:"temp_dir"`
 	RepoPath                 string       `json:"repo_path"`
 	GeminiVaultKey           string       `json:"gemini_vault_key"`
+	OpenRouterKey            string       `json:"openrouter_key,omitempty"`
 	FixConfig                FixConfig    `json:"fix_config"`
 }
 

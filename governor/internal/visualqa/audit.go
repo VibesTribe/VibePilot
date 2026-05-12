@@ -1,14 +1,12 @@
 package visualqa
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -34,7 +32,7 @@ type AuditIssue struct {
 // Unlike compareImages, this does NOT need a baseline. It evaluates the page against
 // UI quality rules: alignment, spacing, stray text, overflow, clipping, visual coherence.
 func (v *VisualQA) auditImage(ctx context.Context, screenshotPath string, viewport int, domAuditResults []AuditIssue) (AuditResult, error) {
-	timeout := 45
+	timeout := 90
 	if v.config.ComparisonTimeoutSeconds > 0 {
 		timeout = v.config.ComparisonTimeoutSeconds
 	}
@@ -89,69 +87,60 @@ Return JSON only:
 If the page genuinely looks perfect, return empty issues with severity "clean" and confidence 1.0.
 But default to finding problems. A real QA engineer doesn't say "looks fine" without looking carefully.`
 
-	req := GeminiCompareRequest{
-		Contents: []GeminiContent{
-			{
-				Parts: []GeminiPart{
-					{Text: prompt},
-					{InlineData: &GeminiInlineData{MIMEType: "image/png", Data: imgB64}},
-				},
-			},
-		},
+	// Build provider chain for fallback
+	providers := v.getProviderChain()
+	var lastErr error
+
+	for _, pState := range providers {
+		// Skip providers that 429'd recently
+		if !pState.Last429.IsZero() && time.Since(pState.Last429) < 60*time.Second {
+			continue
+		}
+
+		// Check RPM and RPD limits
+		if !pState.canMakeRequest() {
+			fmt.Printf("[VisualQA] Audit skipping %s (%s): rate limit (RPD %d/%d)\n",
+				pState.Provider.Type, pState.Provider.Model,
+				pState.DayRequests, pState.Provider.RPD)
+			continue
+		}
+
+		result, err := v.callVisionProvider(ctx, pState, prompt, imgB64, "")
+		if err != nil {
+			if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "RESOURCE_EXHAUSTED") {
+				pState.Last429 = time.Now()
+				pState.DayRequests++ // count it against daily quota even on 429
+				fmt.Printf("[VisualQA] Audit provider %s (%s) rate limited, trying next\n",
+					pState.Provider.Type, pState.Provider.Model)
+				lastErr = err
+				continue
+			}
+			fmt.Printf("[VisualQA] Audit provider %s (%s) error: %v\n", pState.Provider.Type, pState.Provider.Model, err)
+			lastErr = err
+			continue
+		}
+
+		pState.RequestTimes = append(pState.RequestTimes, time.Now())
+		pState.DayRequests++
+
+		responseText := extractJSONFromText(result.Text)
+		var auditResult AuditResult
+		if err := json.Unmarshal([]byte(responseText), &auditResult); err != nil {
+			fmt.Printf("[VisualQA] Failed to parse %s audit response: %v\n", pState.Provider.Type, err)
+			lastErr = fmt.Errorf("[VisualQA] Failed to unmarshal audit result from %s: %w", pState.Provider.Type, err)
+			continue
+		}
+
+		// Merge DOM audit issues that the vision model confirmed or that it missed
+		auditResult.Issues = mergeAuditIssues(auditResult.Issues, domAuditResults)
+		auditResult.Severity = worstSeverity(auditResult.Issues)
+		return auditResult, nil
 	}
 
-	reqBody, err := json.Marshal(req)
-	if err != nil {
-		return AuditResult{}, fmt.Errorf("[VisualQA] Failed to marshal audit request: %w", err)
+	if lastErr != nil {
+		return AuditResult{}, fmt.Errorf("[VisualQA] All vision providers failed for audit. Last error: %w", lastErr)
 	}
-
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", v.config.Model, v.apiKey)
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
-	if err != nil {
-		return AuditResult{}, fmt.Errorf("[VisualQA] Failed to create audit HTTP request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	res, err := client.Do(httpReq)
-	if err != nil {
-		return AuditResult{}, fmt.Errorf("[VisualQA] Failed to send audit request: %w", err)
-	}
-	defer res.Body.Close()
-
-	respBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return AuditResult{}, fmt.Errorf("[VisualQA] Failed to read audit response: %w", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return AuditResult{}, fmt.Errorf("[VisualQA] Audit API returned status %d: %s", res.StatusCode, string(respBody))
-	}
-
-	var geminiResp GeminiCompareResponse
-	if err := json.Unmarshal(respBody, &geminiResp); err != nil {
-		return AuditResult{}, fmt.Errorf("[VisualQA] Failed to unmarshal audit response: %w", err)
-	}
-
-	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
-		return AuditResult{}, fmt.Errorf("[VisualQA] No content in audit response")
-	}
-
-	responseText := geminiResp.Candidates[0].Content.Parts[0].Text
-	responseText = extractJSONFromText(responseText)
-
-	var auditResult AuditResult
-	if err := json.Unmarshal([]byte(responseText), &auditResult); err != nil {
-		return AuditResult{}, fmt.Errorf("[VisualQA] Failed to unmarshal audit result: %w, Text: %s", err, responseText)
-	}
-
-	// Merge DOM audit issues that the vision model confirmed or that it missed
-	auditResult.Issues = mergeAuditIssues(auditResult.Issues, domAuditResults)
-
-	// Update overall severity based on merged results
-	auditResult.Severity = worstSeverity(auditResult.Issues)
-
-	return auditResult, nil
+	return AuditResult{}, fmt.Errorf("[VisualQA] No vision providers available for audit")
 }
 
 // mergeAuditIssues combines vision-found issues with DOM-found issues,
