@@ -110,8 +110,8 @@ auxiliary:
     api_key: ''
     base_url: ''
     download_timeout: 30
-    model: models/gemini-2.5-flash
-    provider: gemini
+    model: google/gemma-4-31b-it:free
+    provider: openrouter
     timeout: 120
   web_extract:
     api_key: ''
@@ -194,6 +194,10 @@ fallback_providers:
   provider: groq
 - model: groq/compound-mini
   provider: groq
+- model: openai/gpt-oss-120b
+  provider: nvidia
+- model: z-ai/glm-5.1
+  provider: nvidia
 - model: meta-llama/llama-3.3-70b-instruct:free
   provider: openrouter
 - model: google/gemma-4-31b-it:free
