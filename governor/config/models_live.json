@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-05-13T18:08:15.975759+00:00",
+  "updated": "2026-05-13T18:41:54.718695+00:00",
   "total": 27,
   "models": [
     {
@@ -10,8 +10,8 @@
       "capabilities": [
         "text",
         "reasoning",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -49,8 +49,8 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "vision",
-        "reasoning"
+        "reasoning",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -129,8 +129,8 @@
       "capabilities": [
         "text",
         "reasoning",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -167,11 +167,11 @@
       "name": "Gemini Pro Latest",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
-        "instruction",
         "text",
+        "reasoning",
+        "instruction",
         "code",
-        "reasoning"
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -249,11 +249,11 @@
       "name": "Gemini Flash-Lite Latest",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
-        "instruction",
         "text",
+        "reasoning",
+        "instruction",
         "code",
-        "reasoning"
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -273,8 +273,8 @@
       "capabilities": [
         "text",
         "reasoning",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -312,11 +312,11 @@
       "name": "Gemini Flash Latest",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
-        "instruction",
         "text",
+        "reasoning",
+        "instruction",
         "code",
-        "reasoning"
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -433,8 +433,8 @@
       "context_length": 131072,
       "capabilities": [
         "text",
-        "vision",
-        "reasoning"
+        "reasoning",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -453,8 +453,8 @@
       "context_length": 131072,
       "capabilities": [
         "text",
-        "vision",
-        "reasoning"
+        "reasoning",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,

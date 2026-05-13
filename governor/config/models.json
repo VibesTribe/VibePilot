@@ -8,8 +8,8 @@
       "capabilities": [
         "text",
         "reasoning",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -39,8 +39,8 @@
       "context_limit": 1048576,
       "capabilities": [
         "text",
-        "vision",
-        "reasoning"
+        "reasoning",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -103,8 +103,8 @@
       "capabilities": [
         "text",
         "reasoning",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -133,11 +133,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
-        "instruction",
         "text",
+        "reasoning",
+        "instruction",
         "code",
-        "reasoning"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -199,11 +199,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
-        "instruction",
         "text",
+        "reasoning",
+        "instruction",
         "code",
-        "reasoning"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -219,8 +219,8 @@
       "capabilities": [
         "text",
         "reasoning",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -250,11 +250,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
-        "instruction",
         "text",
+        "reasoning",
+        "instruction",
         "code",
-        "reasoning"
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -347,8 +347,8 @@
       "context_limit": 131072,
       "capabilities": [
         "text",
-        "vision",
-        "reasoning"
+        "reasoning",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -363,8 +363,8 @@
       "context_limit": 131072,
       "capabilities": [
         "text",
-        "vision",
-        "reasoning"
+        "reasoning",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
