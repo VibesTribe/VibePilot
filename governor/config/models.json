@@ -6,9 +6,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "reasoning",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -23,8 +23,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -39,8 +39,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -54,8 +54,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -70,8 +70,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -86,8 +86,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "reasoning",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -102,8 +102,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -118,8 +118,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -149,9 +149,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "reasoning",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -181,11 +181,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "reasoning",
         "instruction",
-        "code",
         "vision",
         "text",
-        "reasoning"
+        "code"
       ],
       "access_via": [
         "gemini-api-general",
@@ -199,8 +199,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -215,11 +215,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "reasoning",
         "instruction",
-        "code",
         "vision",
         "text",
-        "reasoning"
+        "code"
       ],
       "access_via": [
         "gemini-api-general",
@@ -233,9 +233,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "reasoning",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -250,8 +250,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -266,11 +266,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "reasoning",
         "instruction",
-        "code",
         "vision",
         "text",
-        "reasoning"
+        "code"
       ],
       "access_via": [
         "gemini-api-general",
@@ -284,8 +284,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -300,8 +300,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -341,12 +341,12 @@
       "status": "active"
     },
     {
-      "id": "gemini-robotics-er-1.6-preview",
-      "name": "Gemini Robotics-ER 1.6 Preview",
+      "id": "deep-research-preview-04-2026",
+      "name": "Deep Research Preview (Apr-21-2026)",
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -361,8 +361,8 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
         "reasoning",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -392,8 +392,8 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
         "reasoning",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -408,8 +408,8 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
         "instruction",
+        "text",
         "vision"
       ],
       "access_via": [
@@ -419,12 +419,12 @@
       "status": "active"
     },
     {
-      "id": "deep-research-preview-04-2026",
-      "name": "Deep Research Preview (Apr-21-2026)",
+      "id": "gemini-robotics-er-1.6-preview",
+      "name": "Gemini Robotics-ER 1.6 Preview",
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
+        "instruction",
         "vision"
       ],
       "access_via": [
