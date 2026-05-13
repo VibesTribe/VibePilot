@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-05-13T06:41:38.708877+00:00",
+  "updated": "2026-05-13T07:12:14.297936+00:00",
   "total": 27,
   "models": [
     {
@@ -9,9 +9,9 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
+        "instruction",
         "vision",
-        "reasoning",
-        "instruction"
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -25,32 +25,13 @@
       ]
     },
     {
-      "id": "gemini-3.1-flash-lite",
-      "name": "Gemini 3.1 Flash Lite",
-      "context_length": 1048576,
-      "capabilities": [
-        "text",
-        "vision",
-        "instruction"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "gemini"
-      ]
-    },
-    {
       "id": "lyria-3-pro-preview",
       "name": "Lyria 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "reasoning",
-        "vision"
+        "vision",
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -69,8 +50,8 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -89,8 +70,8 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -128,9 +109,9 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
+        "instruction",
         "vision",
-        "reasoning",
-        "instruction"
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -167,10 +148,10 @@
       "name": "Gemini Pro Latest",
       "context_length": 1048576,
       "capabilities": [
-        "text",
-        "reasoning",
-        "instruction",
         "code",
+        "instruction",
+        "reasoning",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -190,8 +171,8 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -205,13 +186,32 @@
       ]
     },
     {
+      "id": "gemini-3.1-flash-lite",
+      "name": "Gemini 3.1 Flash Lite",
+      "context_length": 1048576,
+      "capabilities": [
+        "text",
+        "instruction",
+        "vision"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "gemini"
+      ]
+    },
+    {
       "id": "gemini-2.5-flash-lite",
       "name": "Gemini 2.5 Flash-Lite",
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -230,8 +230,8 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -249,10 +249,10 @@
       "name": "Gemini Flash-Lite Latest",
       "context_length": 1048576,
       "capabilities": [
-        "text",
-        "reasoning",
-        "instruction",
         "code",
+        "instruction",
+        "reasoning",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -272,9 +272,9 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
+        "instruction",
         "vision",
-        "reasoning",
-        "instruction"
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -293,8 +293,8 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -312,10 +312,10 @@
       "name": "Gemini Flash Latest",
       "context_length": 1048576,
       "capabilities": [
-        "text",
-        "reasoning",
-        "instruction",
         "code",
+        "instruction",
+        "reasoning",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -335,8 +335,8 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -355,8 +355,8 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -375,8 +375,8 @@
       "context_length": 1048576,
       "capabilities": [
         "text",
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -428,12 +428,12 @@
       ]
     },
     {
-      "id": "nano-banana-pro-preview",
-      "name": "Nano Banana Pro",
+      "id": "gemini-2.5-computer-use-preview-10-2025",
+      "name": "Gemini 2.5 Computer Use Preview 10-2025",
       "context_length": 131072,
       "capabilities": [
         "text",
-        "reasoning",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -448,12 +448,31 @@
       ]
     },
     {
-      "id": "deep-research-pro-preview-12-2025",
-      "name": "Deep Research Pro Preview (Dec-12-2025)",
+      "id": "nano-banana-pro-preview",
+      "name": "Nano Banana Pro",
       "context_length": 131072,
       "capabilities": [
         "text",
-        "reasoning",
+        "vision",
+        "reasoning"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "deep-research-preview-04-2026",
+      "name": "Deep Research Preview (Apr-21-2026)",
+      "context_length": 131072,
+      "capabilities": [
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -487,12 +506,13 @@
       ]
     },
     {
-      "id": "deep-research-preview-04-2026",
-      "name": "Deep Research Preview (Apr-21-2026)",
+      "id": "deep-research-pro-preview-12-2025",
+      "name": "Deep Research Pro Preview (Dec-12-2025)",
       "context_length": 131072,
       "capabilities": [
         "text",
-        "vision"
+        "vision",
+        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -512,26 +532,6 @@
       "capabilities": [
         "text",
         "vision"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "gemini-2.5-computer-use-preview-10-2025",
-      "name": "Gemini 2.5 Computer Use Preview 10-2025",
-      "context_length": 131072,
-      "capabilities": [
-        "text",
-        "vision",
-        "instruction"
       ],
       "rate_limits": {
         "total_rpm": 60,
