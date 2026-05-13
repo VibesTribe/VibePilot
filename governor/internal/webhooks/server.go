@@ -11,7 +11,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -185,6 +187,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/project-costs", s.handleProjectCosts)
 	mux.HandleFunc("/api/admin/model", s.handleAdminModel)
 	mux.HandleFunc("/api/admin/models", s.handleAdminModels)
+	mux.HandleFunc("/api/admin/system", s.handleAdminSystem)
 	mux.HandleFunc("/api/chat/usage", s.handleChatUsage)
 	mux.HandleFunc("/api/review-queue", s.handleReviewQueue)
 	mux.HandleFunc("/api/visualqa/run", s.handleVisualQARun)
@@ -1958,4 +1961,198 @@ func (s *Server) handleDesignReviewAction(w http.ResponseWriter, r *http.Request
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"status": status, "id": req.ID})
+}
+
+// handleAdminSystem returns system health info for the X220.
+// GET /api/admin/system
+func (s *Server) handleAdminSystem(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	type sysEntry struct {
+		Label  string `json:"label"`
+		Value  string `json:"value"`
+		Detail string `json:"detail,omitempty"`
+		Status string `json:"status,omitempty"`
+	}
+
+	results := []sysEntry{}
+
+	// Disk usage
+	if out, err := exec.Command("df", "-h", "/").Output(); err == nil {
+		lines := splitLines(string(out))
+		if len(lines) >= 2 {
+			fields := splitFields(lines[1])
+			if len(fields) >= 5 {
+				pct := fields[4]
+				status := "ok"
+				if pctInt, _ := strconv.Atoi(strings.TrimRight(pct, "%")); pctInt > 85 {
+					status = "warn"
+				} else if pctInt > 95 {
+					status = "error"
+				}
+				results = append(results, sysEntry{
+					Label:  "Disk (/)",
+					Value:  fields[4] + " used",
+					Detail: fields[1] + " total, " + fields[3] + " available",
+					Status: status,
+				})
+			}
+		}
+	}
+
+	// Memory
+	if out, err := exec.Command("free", "-m").Output(); err == nil {
+		lines := splitLines(string(out))
+		if len(lines) >= 2 {
+			fields := splitFields(lines[1])
+			if len(fields) >= 3 {
+				total, _ := strconv.Atoi(fields[1])
+				used, _ := strconv.Atoi(fields[2])
+				pct := 0
+				if total > 0 {
+					pct = used * 100 / total
+				}
+				status := "ok"
+				if pct > 80 {
+					status = "warn"
+				} else if pct > 95 {
+					status = "error"
+				}
+				results = append(results, sysEntry{
+					Label:  "Memory",
+					Value:  fmt.Sprintf("%d%% used (%dMB / %dMB)", pct, used, total),
+					Detail: fmt.Sprintf("%dMB free", total-used),
+					Status: status,
+				})
+			}
+		}
+		// Swap
+		if len(lines) >= 3 {
+			fields := splitFields(lines[2])
+			if len(fields) >= 3 && fields[1] != "0" {
+				total, _ := strconv.Atoi(fields[1])
+				used, _ := strconv.Atoi(fields[2])
+				pct := 0
+				if total > 0 {
+					pct = used * 100 / total
+				}
+			swapStatus := "ok"
+			if pct > 50 {
+				swapStatus = "warn"
+			}
+			results = append(results, sysEntry{
+				Label:  "Swap",
+				Value:  fmt.Sprintf("%d%% used (%dMB / %dMB)", pct, used, total),
+				Status: swapStatus,
+			})
+			}
+		}
+	}
+
+	// Uptime
+	if out, err := exec.Command("uptime", "-p").Output(); err == nil {
+		results = append(results, sysEntry{
+			Label:  "Uptime",
+			Value:  strings.TrimSpace(string(out)),
+			Status: "ok",
+		})
+	}
+
+	// CPU load
+	if out, err := exec.Command("uptime").Output(); err == nil {
+		line := strings.TrimSpace(string(out))
+		if parts := strings.Split(line, "load average:"); len(parts) > 1 {
+			results = append(results, sysEntry{
+				Label:  "CPU Load",
+				Value:  strings.TrimSpace(parts[1]),
+				Status: "ok",
+			})
+		}
+	}
+
+	// Process count
+	if out, err := exec.Command("ps", "-e", "--no-headers", "-o", "pid,comm,%mem,%cpu", "--sort=-%mem").Output(); err == nil {
+		lines := splitLines(string(out))
+		procCount := len(lines)
+		results = append(results, sysEntry{
+			Label:  "Processes",
+			Value:  fmt.Sprintf("%d running", procCount),
+			Detail: "",
+			Status: "ok",
+		})
+
+		// Top memory processes
+		topProcs := []string{}
+		for i, line := range lines {
+			if i >= 5 {
+				break
+			}
+			fields := splitFields(line)
+			if len(fields) >= 4 {
+				topProcs = append(topProcs, fmt.Sprintf("%s (%s%%)", fields[1], fields[2]))
+			}
+		}
+		if len(topProcs) > 0 {
+			results = append(results, sysEntry{
+				Label:  "Top Memory Users",
+				Value:  strings.Join(topProcs, ", "),
+				Status: "info",
+			})
+		}
+	}
+
+	// Go governor status
+	if out, err := exec.Command("ps", "-e", "-o", "pid,rss,comm", "--sort=-rss").Output(); err == nil {
+		lines := splitLines(string(out))
+		for _, line := range lines {
+			if strings.Contains(line, "governor") {
+				fields := splitFields(line)
+				if len(fields) >= 3 {
+					rssKB, _ := strconv.Atoi(fields[1])
+					results = append(results, sysEntry{
+						Label:  "Governor",
+						Value:  fmt.Sprintf("PID %s — %dMB RAM", fields[0], rssKB/1024),
+						Status: "ok",
+					})
+				}
+				break
+			}
+		}
+	}
+
+	if out, err := exec.Command("ps", "-e", "-o", "pid,rss,comm", "--sort=-rss").Output(); err == nil {
+		lines := splitLines(string(out))
+		for _, line := range lines {
+			if strings.Contains(line, "postgres") {
+				fields := splitFields(line)
+				if len(fields) >= 3 {
+					rssKB, _ := strconv.Atoi(fields[1])
+					results = append(results, sysEntry{
+						Label:  "PostgreSQL",
+						Value:  fmt.Sprintf("PID %s — %dMB RAM", fields[0], rssKB/1024),
+						Status: "ok",
+					})
+				}
+				break
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, results)
+}
+
+func splitLines(s string) []string {
+	return strings.Split(strings.TrimRight(s, "\n"), "\n")
+}
+
+func splitFields(s string) []string {
+	return strings.Fields(s)
 }
