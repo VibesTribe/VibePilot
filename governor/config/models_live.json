@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-05-13T05:07:23.882127+00:00",
+  "updated": "2026-05-13T05:38:38.835613+00:00",
   "total": 27,
   "models": [
     {
@@ -9,8 +9,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
         "reasoning",
+        "vision",
         "text"
       ],
       "rate_limits": {
@@ -108,8 +108,8 @@
       "name": "Lyria 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
         "reasoning",
+        "vision",
         "text"
       ],
       "rate_limits": {
@@ -188,8 +188,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
         "reasoning",
+        "vision",
         "text"
       ],
       "rate_limits": {
@@ -227,11 +227,11 @@
       "name": "Gemini Pro Latest",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "reasoning",
         "vision",
-        "text",
-        "code"
+        "instruction",
+        "code",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -269,11 +269,11 @@
       "name": "Gemini Flash-Lite Latest",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "reasoning",
         "vision",
-        "text",
-        "code"
+        "instruction",
+        "code",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -292,8 +292,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
         "reasoning",
+        "vision",
         "text"
       ],
       "rate_limits": {
@@ -332,11 +332,11 @@
       "name": "Gemini Flash Latest",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "reasoning",
         "vision",
-        "text",
-        "code"
+        "instruction",
+        "code",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -452,8 +452,8 @@
       "name": "Nano Banana Pro",
       "context_length": 131072,
       "capabilities": [
-        "vision",
         "reasoning",
+        "vision",
         "text"
       ],
       "rate_limits": {
@@ -491,8 +491,8 @@
       "name": "Deep Research Pro Preview (Dec-12-2025)",
       "context_length": 131072,
       "capabilities": [
-        "vision",
         "reasoning",
+        "vision",
         "text"
       ],
       "rate_limits": {
