@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-05-13T05:38:38.835613+00:00",
+  "updated": "2026-05-13T06:09:09.881893+00:00",
   "total": 27,
   "models": [
     {
@@ -8,8 +8,8 @@
       "name": "Gemini 3.1 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "reasoning",
+        "instruction",
         "vision",
         "text"
       ],
@@ -187,8 +187,8 @@
       "name": "Gemini 3.1 Pro Preview Custom Tools",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "reasoning",
+        "instruction",
         "vision",
         "text"
       ],
@@ -227,11 +227,11 @@
       "name": "Gemini Pro Latest",
       "context_length": 1048576,
       "capabilities": [
-        "reasoning",
-        "vision",
         "instruction",
+        "text",
         "code",
-        "text"
+        "reasoning",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -269,11 +269,11 @@
       "name": "Gemini Flash-Lite Latest",
       "context_length": 1048576,
       "capabilities": [
-        "reasoning",
-        "vision",
         "instruction",
+        "text",
         "code",
-        "text"
+        "reasoning",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -291,8 +291,8 @@
       "name": "Gemini 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "reasoning",
+        "instruction",
         "vision",
         "text"
       ],
@@ -332,11 +332,11 @@
       "name": "Gemini Flash Latest",
       "context_length": 1048576,
       "capabilities": [
-        "reasoning",
-        "vision",
         "instruction",
+        "text",
         "code",
-        "text"
+        "reasoning",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
