@@ -60,11 +60,11 @@
       ]
     },
     "free_cascade": {
-      "description": "Free-only models in priority order. Only models verified free by TokenFinder. NO paid DeepSeek or Claude.",
+      "description": "Cascade through free API models in priority order. Used when agent has no model pin.",
       "priority": [
         "gemini-2.5-flash-lite",
-        "gemini-3.1-flash-lite",
         "gemini-2.5-flash",
+        "gemini-3.1-flash-lite",
         "qwen/qwen3-coder:free",
         "openrouter/free",
         "groq/llama-3.3-70b-versatile",
