@@ -6,9 +6,137 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "instruction",
+        "vision",
+        "text",
+        "reasoning"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-3.1-flash-lite",
+      "name": "Gemini 3.1 Flash Lite",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "instruction",
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "lyria-3-pro-preview",
+      "name": "Lyria 3 Pro Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "reasoning",
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-3-flash-preview",
+      "name": "Gemini 3 Flash Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "instruction",
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "instruction",
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "benched"
+    },
+    {
+      "id": "lyria-3-clip-preview",
+      "name": "Lyria 3 Clip Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-3.1-pro-preview-customtools",
+      "name": "Gemini 3.1 Pro Preview Custom Tools",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "instruction",
+        "vision",
+        "text",
+        "reasoning"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-robotics-er-1.5-preview",
+      "name": "Gemini Robotics-ER 1.5 Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "instruction",
+        "vision"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-pro-latest",
+      "name": "Gemini Pro Latest",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "code",
         "reasoning",
         "text",
-        "vision",
         "instruction"
       ],
       "access_via": [
@@ -23,27 +151,12 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
+        "instruction",
         "vision",
-        "instruction"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-3.1-flash-lite",
-      "name": "Gemini 3.1 Flash Lite",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "text",
-        "vision",
-        "instruction"
-      ],
-      "access_via": [
         "gemini-api-general"
       ],
       "status": "active"
@@ -54,138 +167,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
-        "vision",
-        "instruction"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-3.1-flash-lite-preview",
-      "name": "Gemini 3.1 Flash Lite Preview",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "text",
-        "vision",
-        "instruction"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "lyria-3-pro-preview",
-      "name": "Lyria 3 Pro Preview",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "reasoning",
-        "text",
-        "vision"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-3-flash-preview",
-      "name": "Gemini 3 Flash Preview",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "text",
-        "vision",
-        "instruction"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-2.5-flash",
-      "name": "Gemini 2.5 Flash",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "text",
-        "vision",
-        "instruction"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "benched"
-    },
-    {
-      "id": "lyria-3-clip-preview",
-      "name": "Lyria 3 Clip Preview",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "text",
-        "vision"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-3.1-pro-preview-customtools",
-      "name": "Gemini 3.1 Pro Preview Custom Tools",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "reasoning",
-        "text",
-        "vision",
-        "instruction"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-robotics-er-1.5-preview",
-      "name": "Gemini Robotics-ER 1.5 Preview",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "vision",
-        "instruction"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-pro-latest",
-      "name": "Gemini Pro Latest",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "text",
         "instruction",
         "vision",
-        "reasoning",
-        "code"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -199,9 +183,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
+        "instruction",
         "vision",
-        "instruction"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -215,11 +199,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
-        "instruction",
         "vision",
+        "code",
         "reasoning",
-        "code"
+        "text",
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -233,10 +217,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
-        "text",
+        "instruction",
         "vision",
-        "instruction"
+        "text",
+        "reasoning"
       ],
       "access_via": [
         "gemini-api-general",
@@ -250,9 +234,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
+        "instruction",
         "vision",
-        "instruction"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -266,11 +250,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
-        "instruction",
         "vision",
+        "code",
         "reasoning",
-        "code"
+        "text",
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -284,9 +268,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
+        "instruction",
         "vision",
-        "instruction"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -300,9 +284,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
+        "instruction",
         "vision",
-        "instruction"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -311,13 +295,14 @@
       "status": "active"
     },
     {
-      "id": "gemma-4-31b-it",
-      "name": "Gemma 4 31B IT",
+      "id": "gemini-3.1-flash-lite-preview",
+      "name": "Gemini 3.1 Flash Lite Preview",
       "provider": "gemini",
-      "context_limit": 262144,
+      "context_limit": 1048576,
       "capabilities": [
-        "text",
-        "vision"
+        "instruction",
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -331,8 +316,8 @@
       "provider": "gemini",
       "context_limit": 262144,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -341,14 +326,13 @@
       "status": "active"
     },
     {
-      "id": "gemini-2.5-computer-use-preview-10-2025",
-      "name": "Gemini 2.5 Computer Use Preview 10-2025",
+      "id": "gemma-4-31b-it",
+      "name": "Gemma 4 31B IT",
       "provider": "gemini",
-      "context_limit": 131072,
+      "context_limit": 262144,
       "capabilities": [
-        "text",
         "vision",
-        "instruction"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -363,23 +347,8 @@
       "context_limit": 131072,
       "capabilities": [
         "reasoning",
-        "text",
-        "vision"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "deep-research-max-preview-04-2026",
-      "name": "Deep Research Max Preview (Apr-21-2026)",
-      "provider": "gemini",
-      "context_limit": 131072,
-      "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -394,8 +363,8 @@
       "context_limit": 131072,
       "capabilities": [
         "reasoning",
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -409,8 +378,8 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
@@ -424,8 +393,39 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "deep-research-max-preview-04-2026",
+      "name": "Deep Research Max Preview (Apr-21-2026)",
+      "provider": "gemini",
+      "context_limit": 131072,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.5-computer-use-preview-10-2025",
+      "name": "Gemini 2.5 Computer Use Preview 10-2025",
+      "provider": "gemini",
+      "context_limit": 131072,
+      "capabilities": [
+        "instruction",
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
