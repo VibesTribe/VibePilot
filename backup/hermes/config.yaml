@@ -1,55 +1,363 @@
-model:
-  provider: zai
-  default: "glm-5.1"
-  auto_approve: true
-
-# Working directory for context file discovery (.hermes.md, AGENTS.md, etc.)
-cwd: "/home/vibes/VibePilot"
-
-# Fallback chain: tried in order when primary is rate-limited or fails
-# Only using genuinely FREE providers
-fallback_providers:
-  # Tier 2: Groq free (fastest, 30 RPM, 14.4K RPD)
-  - provider: groq
-    model: "llama-3.1-8b-instant"
-  # Tier 3: Groq compound (agentic)
-  - provider: groq
-    model: "compound"
-  # Tier 4: NVIDIA NIM (131 models, 12mo free)
-  - provider: nvidia
-    model: "google/gemma-3-4b-it"
-  - provider: nvidia
-    model: "meta/llama-3.3-70b-instruct"
-  # Tier 5: OpenRouter free models (balance at -17c, only $0 models work)
-  - provider: openrouter
-    model: "google/gemma-4-31b-it:free"
-  - provider: openrouter
-    model: "nvidia/nemotron-3-super-120b-a12b:free"
-  - provider: openrouter
-    model: "qwen/qwen3-coder-480b-a35b:free"
-
-
+_config_version: 17
+agent:
+  gateway_notify_interval: 600
+  gateway_timeout: 1800
+  gateway_timeout_warning: 900
+  max_turns: 90
+  restart_drain_timeout: 60
+  service_tier: ''
+  system_prompt: "You are the VibesTribe consultant agent. You help the user research,\
+    \ analyze, and plan features for VibePilot \u2014 an automated software factory.\n\
+    \n## What VibePilot Actually IS (current state, NOT vision)\nVibePilot is an AI-powered\
+    \ task orchestration pipeline. It takes feature requests, runs them through stages\
+    \ (analysis, planning, code generation via GitHub Actions courier agents, review),\
+    \ and produces working code on branches for human review. It has a Go governor,\
+    \ PostgreSQL backend, and a Next.js dashboard for monitoring tasks, ROI, and system\
+    \ health. The dashboard includes this chat interface for consulting with you.\n\
+    \nWhat VibePilot is NOT (these are future vision/roadmap items, do NOT present\
+    \ them as current features):\n- NOT a visual pipeline builder like n8n\n- NOT\
+    \ a drag-and-drop agent orchestrator\n- NOT a multi-agent IDE\nThese are aspirational\
+    \ goals but NOT implemented yet. If asked about these, say they are planned but\
+    \ not yet built.\n\n## Response Speed\n- Keep responses SHORT and direct. 1-3\
+    \ sentences for simple questions.\n- Do NOT call KB tools for simple questions\
+    \ you can answer from the context above.\n- Only use KB tools when the user asks\
+    \ about specific code, files, or technical implementation details.\n- Do NOT do\
+    \ research unless the user explicitly asks for it.\n- For \"what is\" or general\
+    \ questions, answer directly from the context above.\n\n## Your Capabilities\n\
+    - Web search and research\n- Query the VibePilot knowledgebase (use KB MCP tools\
+    \ like mcp_kb_kb_search_knowledge, mcp_kb_kb_search_docs, mcp_kb_kb_context_pack)\n\
+    - Read and write files on the server\n- Run terminal commands (psql, git, etc.)\n\
+    - Extract YouTube video transcripts (use: terminal -> python3 ~/.hermes/skills/media/youtube-content/scripts/extract_transcript.py\
+    \ \"URL\")\n- Browse websites for research\n- Generate TTS audio responses (automatic)\n\
+    \n## Research Workflow\nWhen the user asks you to research something:\n1. Do web\
+    \ research on the topic\n2. Query the KB to understand how VibePilot currently\
+    \ handles related areas\n3. Write findings as markdown to /home/vibes/knowledgebase/research/{topic-slug}.md\n\
+    4. Insert into the research pipeline using a heredoc:\n   ```\n   psql -d vibepilot\
+    \ <<'SQL'\n   INSERT INTO research_suggestions (title, type, complexity, summary,\
+    \ details, findings_path, status)\n   VALUES ('title', 'type', 'complexity', 'summary\
+    \ text', '{\"source\": \"consultant\", \"findings_file\": \"research/topic-slug.md\"\
+    }'::jsonb, 'knowledgebase/research/topic-slug.md', 'pending');\n   SQL\n   ```\n\
+    5. Commit and push to the knowledgebase repo: `cd ~/knowledgebase && git add -A\
+    \ && git commit -m \"research: {topic}\" && git push`\n\nValid research_suggestions\
+    \ types: new_model, new_platform, pricing_change, config_tweak, architecture,\
+    \ new_data_store, security, workflow_change, ui_ux_change, tool_update\nValid\
+    \ complexity: simple (auto-approved), complex (goes to council review), human\
+    \ (requires human decision)\n\n## PRD Submission Workflow\nWhen the user says\
+    \ to implement something or submit a PRD:\n1. Write the PRD using the template\
+    \ at /home/vibes/vibepilot/config/templates/prd-template.md\n2. Save to /home/vibes/vibepilot/docs/prd/{feature-slug}.md\n\
+    3. Commit and push to VibePilot repo: `cd ~/vibepilot && git add -A && git commit\
+    \ -m \"prd: {feature}\" && git push`\n4. Tell the user the PRD is submitted and\
+    \ the pipeline will pick it up\n\n## Guidelines\n- Be conversational and direct.\
+    \ The user is non-technical.\n- Always explain what you found and what you recommend\
+    \ before taking action.\n- When uncertain about complexity, default to \"human\"\
+    \ so the user decides.\n- Use the KB MCP tools to understand the system before\
+    \ making suggestions.\n- If asked about video content, extract the transcript\
+    \ first, then analyze it.\n- Do NOT use markdown formatting (no asterisks, dashes,\
+    \ hash headings). The user reads responses via TTS audio and asterisks/dashes\
+    \ get read aloud. Use plain text with natural sentence flow.\n\n## Consultant\
+    \ Mode\nWhen the user asks you to act as consultant or wants to discuss building\
+    \ something:\n1. Ask about their idea \u2014 features, target users, devices,\
+    \ personal or business\n2. Research competitors, gaps, relevant tech stacks using\
+    \ web search and KB\n3. Make strategic recommendations based on what they know\n\
+    4. Design for longevity \u2014 modular, swappable, production-grade\n5. If they\
+    \ approve, produce a complete PRD using the template at /home/vibes/vibepilot/config/templates/prd-template.md\n\
+    6. Follow the PRD Submission Workflow above to commit and trigger the pipeline\n\
+    7. VibePilot is for ambitious, complex systems \u2014 not simple apps or prototypes\n\
+    The full consultant prompt is at /home/vibes/vibepilot/governor/config/prompts/consultant.md\
+    \ if you need more detail.\n"
+  tool_use_enforcement: auto
+approvals:
+  mode: manual
+  timeout: 60
+auxiliary:
+  approval:
+    api_key: ''
+    base_url: ''
+    model: ''
+    provider: auto
+    timeout: 30
+  compression:
+    api_key: ''
+    base_url: ''
+    model: llama-3.1-8b-instant
+    provider: groq
+    timeout: 120
+  flush_memories:
+    api_key: ''
+    base_url: ''
+    model: llama-3.1-8b-instant
+    provider: groq
+    timeout: 30
+  mcp:
+    api_key: ''
+    base_url: ''
+    model: ''
+    provider: auto
+    timeout: 30
+  session_search:
+    api_key: ''
+    base_url: ''
+    model: ''
+    provider: auto
+    timeout: 30
+  skills_hub:
+    api_key: ''
+    base_url: ''
+    model: ''
+    provider: auto
+    timeout: 30
+  vision:
+    api_key: ''
+    base_url: ''
+    download_timeout: 30
+    model: models/gemini-2.5-flash
+    provider: gemini
+    timeout: 120
+  web_extract:
+    api_key: ''
+    base_url: ''
+    model: ''
+    provider: auto
+    timeout: 360
+browser:
+  allow_private_urls: false
+  camofox:
+    managed_persistence: false
+  command_timeout: 30
+  inactivity_timeout: 120
+  record_sessions: false
+checkpoints:
+  enabled: true
+  max_snapshots: 50
+command_allowlist: []
+compression:
+  enabled: true
+  protect_last_n: 20
+  target_ratio: 0.2
+  threshold: 0.5
+context:
+  engine: compressor
+credential_pool_strategies:
+  gemini: round_robin
+  groq: single
+  nvidia: single
+  openrouter: single
+cron:
+  wrap_response: true
+custom_providers:
+- api_key: sk-dba57cd5a6984b17ab12d4ced0d5dd92
+  base_url: https://api.deepseek.com
+  model: deepseek-v4-flash
+  name: Api.deepseek.com
+cwd: /home/vibes/VibePilot
+delegation:
+  api_key: ''
+  max_concurrent_children: 3
+  max_iterations: 50
+  model: models/gemini-2.5-flash
+  prefill_messages_file: prefill.json
+  provider: gemini
+  reasoning_effort: ''
+discord:
+  allowed_channels: ''
+  auto_thread: true
+  free_response_channels: ''
+  reactions: true
+  require_mention: true
 display:
-  tool_progress: off
-
-providers:
-  zai:
-    base_url: "https://api.z.ai/api/coding/paas/v4"
-  groq:
-    base_url: "https://api.groq.com/openai/v1"
-  nvidia:
-    base_url: "https://integrate.api.nvidia.com/v1"
-
+  bell_on_complete: false
+  busy_input_mode: interrupt
+  compact: false
+  inline_diffs: true
+  interim_assistant_messages: true
+  personality: kawaii
+  platforms: {}
+  resume_display: full
+  show_cost: false
+  show_reasoning: false
+  skin: default
+  streaming: false
+  tool_preview_length: 0
+  tool_progress: false
+  tool_progress_command: false
+  tool_progress_overrides: {}
+fallback_providers:
+- model: models/gemini-2.5-flash-lite
+  provider: gemini
+- model: models/gemini-2.5-flash
+  provider: gemini
+- model: models/gemini-3.1-flash-lite
+  provider: gemini
+- model: qwen/qwen3-coder:free
+  provider: openrouter
+- model: groq/llama-3.3-70b-versatile
+  provider: groq
+- model: groq/compound-mini
+  provider: groq
+- model: meta-llama/llama-3.3-70b-instruct:free
+  provider: openrouter
+- model: google/gemma-4-31b-it:free
+  provider: openrouter
+- model: z-ai/glm-4.5-air:free
+  provider: openrouter
+- model: openrouter/free
+  provider: openrouter
+file_read_max_chars: 100000
+honcho: {}
+human_delay:
+  max_ms: 2500
+  min_ms: 800
+  mode: 'off'
+logging:
+  backup_count: 3
+  level: INFO
+  max_size_mb: 5
+mcp_servers:
+  kb:
+    timeout: 30
+    url: http://127.0.0.1:8901/mcp
+memory:
+  memory_char_limit: 2200
+  memory_enabled: true
+  provider: ''
+  user_char_limit: 1375
+  user_profile_enabled: true
+model:
+  api_key: sk-dba57cd5a6984b17ab12d4ced0d5dd92
+  auto_approve: true
+  base_url: https://api.deepseek.com
+  default: deepseek-v4-flash
+  provider: custom
+network:
+  force_ipv4: false
+personalities: {}
 platform_toolsets:
+  api_server:
+  - memory
+  - web
+  - terminal
+  - file
+  - browser
+  - delegation
+  - tts
+  - vision
+  - session_search
+  - todo
+  - skills
   telegram:
-    - memory
-    - web
-    - terminal
-    - file
-    - browser
-    - delegation
-    - tts
-    - vision
-    - session_search
-    - todo
-    - skills
+  - memory
+  - web
+  - terminal
+  - file
+  - browser
+  - delegation
+  - tts
+  - vision
+  - session_search
+  - todo
+  - skills
+platforms:
+  api_server:
+    enabled: true
+  telegram:
+    enabled: true
+privacy:
+  redact_pii: false
+providers:
+  deepseek:
+    api_key_env: DEEPSEEK_V4_FLASH_KEY
+    base_url: https://api.deepseek.com/v1
+  gemini:
+    api_key_env: GEMINI_API_KEY
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai
+  groq:
+    api_key_env: GROQ_API_KEY
+    base_url: https://api.groq.com/openai/v1
+  nvidia:
+    api_key_env: NVIDIA_API_KEY
+    base_url: https://integrate.api.nvidia.com/v1
+  zai:
+    api_key_env: GLM_API_KEY
+    base_url: https://api.z.ai/api/coding/paas/v4
+quick_commands: {}
+security:
+  redact_secrets: true
+  tirith_enabled: true
+  tirith_fail_open: true
+  tirith_path: tirith
+  tirith_timeout: 5
+  website_blocklist:
+    domains: []
+    enabled: false
+    shared_files: []
+skills:
+  external_dirs: []
+smart_model_routing:
+  cheap_model: {}
+  enabled: false
+  max_simple_chars: 160
+  max_simple_words: 28
+streaming:
+  edit_interval: 1.0
+  enabled: true
+  transport: edit
+stt:
+  enabled: true
+  local:
+    language: ''
+    model: base
+  mistral:
+    model: voxtral-mini-latest
+  openai:
+    model: whisper-1
+  provider: local
+terminal:
+  backend: local
+  container_cpu: 1
+  container_disk: 51200
+  container_memory: 5120
+  container_persistent: true
+  cwd: .
+  daytona_image: nikolaik/python-nodejs:python3.11-nodejs20
+  docker_env: {}
+  docker_forward_env: []
+  docker_image: nikolaik/python-nodejs:python3.11-nodejs20
+  docker_mount_cwd_to_workspace: false
+  docker_volumes: []
+  env_passthrough: []
+  modal_image: nikolaik/python-nodejs:python3.11-nodejs20
+  modal_mode: auto
+  persistent_shell: true
+  singularity_image: docker://nikolaik/python-nodejs:python3.11-nodejs20
+  timeout: 180
+timezone: ''
+toolsets:
+- hermes-cli
+tts:
+  edge:
+    voice: en-US-AriaNeural
+  elevenlabs:
+    model_id: eleven_multilingual_v2
+    voice_id: pNInz6obpgDQGcFmaJgB
+  mistral:
+    model: voxtral-mini-tts-2603
+    voice_id: c69964a6-ab8b-4f8a-9465-ec0925096ec8
+  neutts:
+    device: cpu
+    model: neuphonic/neutts-air-q4-gguf
+    ref_audio: ''
+    ref_text: ''
+  openai:
+    model: gpt-4o-mini-tts
+    voice: alloy
+  provider: edge
+voice:
+  auto_tts: false
+  max_recording_seconds: 120
+  record_key: ctrl+b
+  silence_duration: 3.0
+  silence_threshold: 200
+whatsapp: {}
+onboarding:
+  seen:
+    busy_input_prompt: true
