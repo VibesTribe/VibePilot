@@ -28,6 +28,16 @@ type Config struct {
 	GeminiVaultKey           string       `json:"gemini_vault_key"`
 	OpenRouterKey            string       `json:"openrouter_key,omitempty"`
 	FixConfig                FixConfig    `json:"fix_config"`
+	InteractionDiscovery     InteractionDiscovery `json:"interaction_discovery"`
+}
+
+type InteractionDiscovery struct {
+	MaxClicks           int      `json:"max_clicks"`
+	ExcludeSelectors    []string `json:"exclude_selectors"`
+	ExcludeTextPatterns []string `json:"exclude_text_patterns"`
+	PrioritySelectors   []string `json:"priority_selectors"`
+	CloseModalSelectors []string `json:"close_modal_selectors"`
+	CloseViaEscape      bool     `json:"close_via_escape"`
 }
 
 type PageConfig struct {

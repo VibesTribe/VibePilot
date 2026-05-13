@@ -269,128 +269,183 @@ def capture():
                         "viewport": ` + vw + `
                     })
 
-        # Click dashboard tabs (Logs, Models, Docs, Admin) -- these open modal panels
-        for btn_text in ["Logs", "Docs", "Models", "Admin"]:
+        # UNIVERSAL ELEMENT DISCOVERY & INTERACTION
+        # Find all clickable elements on the page and interact with them
+        # Works on ANY web application, not just VibePilot
+        
+        discovery_config = {
+            "exclude_selectors": [".no-click", ".no-vqa"],
+            "exclude_text": ["Sign Out", "Logout", "Delete Account"],
+            "max_clicks": 12,
+            "priority_selectors": ["button", "a[href]", "[role='button']", "[onclick]", "input[type='submit']", "input[type='button']"],
+            "close_selectors": ["[aria-label='Close']", "button[class*='close']", ".modal-close", "[aria-label*='close i']"],
+            "close_via_escape": True
+        }
+        
+        def discover_clickables(page):
+            \"\"\"Find all interactive elements and return them sorted by relevance.\"\"\"
+            return page.evaluate(f\"\"\"(config) => {{
+                const results = [];
+                const seen = new Set();
+                const exclude = config.exclude_selectors.filter(s => s);
+                const excludeText = config.exclude_text.filter(s => s);
+                const priority = config.priority_selectors || ['button', 'a[href]', '[role=\"button\"]'];
+                
+                document.querySelectorAll(priority.join(',')).forEach(el => {{
+                    const tag = el.tagName.toLowerCase();
+                    const text = (el.textContent || '').trim().substring(0, 60);
+                    const href = el.getAttribute('href') || '';
+                    const role = el.getAttribute('role') || '';
+                    const aria = el.getAttribute('aria-label') || '';
+                    const onclick = el.getAttribute('onclick') || '';
+                    const cls = (el.className || '').substring(0, 40);
+                    
+                    const key = tag + ':' + text + ':' + href;
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    
+                    // Skip excluded selectors
+                    if (exclude.some(s => s && el.matches(s))) return;
+                    // Skip excluded text
+                    if (excludeText.some(t => text.toLowerCase().includes(t.toLowerCase()))) return;
+                    // Skip no-op links
+                    if (href === '#' || href.startsWith('javascript:')) return;
+                    // Skip hidden
+                    if (!el.offsetParent) return;
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width === 0 || rect.height === 0) return;
+                    
+                    // Score: buttons > links > generic, visible text > no text, labeled > unlabeled
+                    let score = 0;
+                    if (tag === 'button') score += 5;
+                    if (role === 'button' || role === 'link') score += 3;
+                    if (text && text.length > 2) score += 3;
+                    if (aria) score += 2;
+                    if (onclick) score += 2;
+                    if (cls && !cls.includes('undefined')) score += 1;
+                    if (href && !href.startsWith('#')) score += 1;
+                    if (rect.width > 30 && rect.height > 30) score += 1; // likely a real UI element
+                    
+                    results.push({{
+                        selector: el.tagName + (el.id ? '#' + el.id : ''),
+                        text: text.substring(0, 40),
+                        href: href,
+                        score: score
+                    }});
+                }});
+                
+                return results.sort((a,b) => b.score - a.score);
+            }}\"\"\", discovery_config)
+        
+        def close_modal(page):
+            \"\"\"Try to close any open modal or dialog.\"\"\"
             try:
-                el = page.get_by_text(btn_text, exact=True).first
-                if el and el.is_visible():
-                    el.scroll_into_view_if_needed(timeout=2000)
-                    page.wait_for_timeout(100)
-                    el.click(timeout=3000)
-                    page.wait_for_timeout(2000)
-                    audit_state(btn_text)
-                    # If Docs tab was clicked, wait for iframe and audit it
-                    if btn_text == "Docs":
-                        try:
-                            iframe_el = page.query_selector("iframe[title='Knowledge Hub']")
-                            if iframe_el:
-                                iframe = iframe_el.content_frame()
-                                if iframe:
-                                    page.wait_for_timeout(3000)
-                                    # Audit iframe DOM
-                                    iframe_issues = iframe.evaluate("""` + domAuditJS + `""")
-                                    if iframe_issues:
-                                        for ii in iframe_issues:
-                                            issues.append({
-                                                "type": ii.get("type", "visual"),
-                                                "severity": ii.get("severity", "warning"),
-                                                "description": "[Docs iframe] " + ii.get("description", ""),
-                                                "element": ii.get("element", ""),
-                                                "viewport": ` + vw + `
-                                            })
-                        except Exception:
-                            pass
-                    # Close modal before next tab
+                for sel in discovery_config["close_selectors"]:
                     try:
-                        close_btn = page.query_selector("button.mission-modal__close, [aria-label='Close'], button[class*='close']")
-                        if close_btn and close_btn.is_visible():
-                            close_btn.click(timeout=2000)
-                            page.wait_for_timeout(500)
-                    except Exception:
+                        btn = page.query_selector(sel)
+                        if btn and btn.is_visible():
+                            btn.click(timeout=2000)
+                            page.wait_for_timeout(300)
+                            return True
+                    except:
                         pass
-            except Exception:
+                if discovery_config["close_via_escape"]:
+                    page.keyboard.press("Escape")
+                    page.wait_for_timeout(300)
+                    return True
+            except:
                 pass
-
-        # Click ROI stat pill (opens ROI panel)
-        try:
-            roi_pill = page.query_selector("button.mission-header__stat-pill--tokens, [aria-label*='ROI']")
-            if roi_pill and roi_pill.is_visible():
-                roi_pill.scroll_into_view_if_needed(timeout=2000)
-                page.wait_for_timeout(100)
-                roi_pill.click(timeout=3000)
-                page.wait_for_timeout(2000)
-                audit_state("ROI")
-                # Close modal
-                try:
-                    close_btn = page.query_selector("button.mission-modal__close, [aria-label='Close'], button[class*='close']")
-                    if close_btn and close_btn.is_visible():
-                        close_btn.click(timeout=2000)
-                        page.wait_for_timeout(500)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-        # Click stat pills (status pills along the header)
-        stat_pills = page.query_selector_all("button.mission-header__stat-pill")
-        for idx, pill in enumerate(stat_pills[:6]):
+            return False
+        
+        def has_open_modal(page):
+            \"\"\"Check if any modal/dialog is open.\"\"\"
+            return page.evaluate(\"\"\"() => {{
+                const modals = document.querySelectorAll('[role=\"dialog\"], .modal, [aria-modal=\"true\"]');
+                for (const m of modals) {{
+                    const r = m.getBoundingClientRect();
+                    if (r.width > 50 && r.height > 20 && r.right > 0) return true;
+                }}
+                return false;
+            }}\"\"\")
+        
+        def audit_iframes(page, label):
+            \"\"\"Audit any iframes on the current page.\"\"\"
             try:
-                if not pill.is_visible():
+                iframes = page.query_selector_all("iframe")
+                for iframe_el in iframes:
+                    try:
+                        frame = iframe_el.content_frame()
+                        if frame:
+                            page.wait_for_timeout(2000)
+                            iframe_issues = frame.evaluate(f\"\"\"` + domAuditJS + `\"\"\")
+                            if iframe_issues:
+                                for ii in iframe_issues:
+                                    issues.append({{
+                                        "type": ii.get("type", "visual"),
+                                        "severity": ii.get("severity", "warning"),
+                                        "description": f"[{label} iframe] {{ii.get('description', '')}}",
+                                        "element": ii.get("element", ""),
+                                        "viewport": ` + vw + `
+                                    }})
+                    except:
+                        pass
+            except:
+                pass
+        
+        # Discover clickable elements
+        clickables = discover_clickables(page)
+        clicked_count = 0
+        max_clicks = discovery_config["max_clicks"]
+        
+        for item in clickables[:max_clicks]:
+            text = item.get("text", "") or ""
+            label = text if text else item.get("selector", "element")
+            if len(label) > 40:
+                label = label[:40]
+            try:
+                # Try to find by text first (most reliable for buttons/links)
+                el = None
+                if text:
+                    el = page.get_by_text(text, exact=True).first
+                if not el or not el.is_visible():
+                    # Fall back to generic button/clickable discovery
+                    el = page.query_selector(f"button:text-is('{text}'):not(:has(button))")
+                if not el or not el.is_visible():
                     continue
-                text = (pill.inner_text() or "").strip()[:40].replace("\\n", " ")
-                if not text:
-                    text = "stat-pill-" + str(idx)
-                pill.scroll_into_view_if_needed(timeout=2000)
+                
+                el.scroll_into_view_if_needed(timeout=2000)
                 page.wait_for_timeout(100)
-                pill.click(timeout=3000)
+                el.click(timeout=3000)
                 page.wait_for_timeout(1500)
-                audit_state(text)
-                # Close any opened modal
-                try:
-                    close_btn = page.query_selector("button.mission-modal__close, [aria-label='Close'], button[class*='close']")
-                    if close_btn and close_btn.is_visible():
-                        close_btn.click(timeout=2000)
-                        page.wait_for_timeout(500)
-                except Exception:
-                    pass
+                
+                clicked_count += 1
+                audit_state(label)
+                audit_iframes(page, label)
+                close_modal(page)
+                page.wait_for_timeout(500)
             except Exception:
                 pass
-
-        # Click slice orbit center button
-        try:
-            center_btn = page.query_selector("button.slice-orbit__center")
-            if center_btn and center_btn.is_visible():
-                center_btn.scroll_into_view_if_needed(timeout=2000)
-                center_btn.click(timeout=3000)
-                page.wait_for_timeout(1500)
-                audit_state("slice-orbit-center")
-                try:
-                    close_btn = page.query_selector("button.mission-modal__close, [aria-label='Close'], button[class*='close']")
-                    if close_btn and close_btn.is_visible():
-                        close_btn.click(timeout=2000)
-                        page.wait_for_timeout(500)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
+        
+        if clicked_count > 0:
+            print(f\"[VQA] Clicked {{clicked_count}} interactive elements on {{title}}\")
+        
         # Go back to initial state for final screenshot
         try:
-            page.reload(wait_until="domcontentloaded", timeout=15000)
+            page.reload(wait_until=\"domcontentloaded\", timeout=15000)
             page.wait_for_timeout(2000)
         except Exception:
             pass
-        page.screenshot(path="` + outputPath + `", full_page=True)
-        sz = os.path.getsize("` + outputPath + `")
+        page.screenshot(path=\"` + outputPath + `\", full_page=True)
+        sz = os.path.getsize(\"` + outputPath + `\")
         if sz < 1000:
-            issues.append({
+            issues.append({{
                 "type": "visual",
                 "severity": "warning",
-                "description": "Screenshot is only " + str(sz) + " bytes, page may be blank",
-                "element": "page",
+                "description": \"Screenshot is only \" + str(sz) + \" bytes, page may be blank\",
+                "element": \"page\",
                 "viewport": ` + vw + `
-            })
-
+            }})
+        
         browser.close()
 
     report = {

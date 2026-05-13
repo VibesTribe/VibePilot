@@ -33,6 +33,14 @@
   "temp_dir": "/tmp/vqa-captures",
   "repo_path": "",
   "gemini_vault_key": "GEMINI_GENERAL_KEY",
+  "interaction_discovery": {
+    "max_clicks": 12,
+    "exclude_selectors": [".no-click", ".no-vqa"],
+    "exclude_text_patterns": ["Sign Out", "Logout", "Delete Account"],
+    "priority_selectors": ["button", "a[href]", "[role='button']", "[onclick]"],
+    "close_modal_selectors": ["[aria-label='Close']", "button[class*='close']", ".mission-modal__close", "[aria-label*='close i']"],
+    "close_via_escape": true
+  },
   "fix_config": {
     "enabled": true,
     "mode": "suggest",
