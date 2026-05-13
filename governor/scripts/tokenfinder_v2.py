@@ -26,10 +26,19 @@ SKIP_PATTERNS = ["embedding", "image", "vision", "tts", "moderation", "rerank",
 
 
 def vault_get(key_name):
-    """Get secret from PostgreSQL vault."""
+    """Get secret from PostgreSQL vault.
+    
+    CRITICAL: Must set GOVERNOR_CONFIG_DIR so the governor binary loads
+    the correct connectors.json. Without this, it falls back to ./config/
+    which may have a different (old-format) copy that crashes the binary.
+    """
     env = os.environ.copy()
     env["VAULT_KEY"] = VAULT_KEY
     env["DATABASE_URL"] = DB_URL
+    env["GOVERNOR_CONFIG_DIR"] = os.environ.get(
+        "GOVERNOR_CONFIG_DIR",
+        "/home/vibes/vibepilot/governor/config"
+    )
     r = subprocess.run([GOVERNOR, "vault", "get", key_name],
                        capture_output=True, text=True, timeout=10, env=env)
     return r.stdout.strip().split("\n")[-1].strip()
@@ -162,7 +171,8 @@ ON CONFLICT (id) DO UPDATE SET
                        THEN EXCLUDED.rate_limits ELSE model_catalog.rate_limits END,
     last_scan_at = EXCLUDED.last_scan_at,
     updated_at = NOW(),
-    consecutive_failures = 0;
+    consecutive_failures = 0,
+    last_success_at = NOW();
 """
 
     try:
@@ -415,7 +425,7 @@ def main():
 
     # ── Credit Balance Check (paid APIs, runs every 30 min) ──
     print(f"\n--- Credit Balance Check ---")
-    for provider_name, key_env in [("DeepSeek", "DEEPSEEK_V4_FLASH_KEY")]:
+    for provider_name, key_env in [("DeepSeek", "deepseek-v4-flash")]:
         api_key = os.environ.get(key_env, "")
         if not api_key:
             api_key = vault_get(key_env) or ""

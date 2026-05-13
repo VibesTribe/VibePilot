@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "codesign_url": "http://localhost:8080",
+  "gemini_vault_key": "GEMINI_GENERAL_KEY",
+  "gemini_model": "gemini-2.5-flash",
+  "output_dir": "designpreview/output",
+  "auto_generate": true,
+  "require_approval": true,
+  "max_wait_minutes": 60
+}
