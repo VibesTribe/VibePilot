@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-05-13T03:34:33.397892+00:00",
+  "updated": "2026-05-13T04:05:09.531414+00:00",
   "total": 27,
   "models": [
     {
@@ -8,10 +8,10 @@
       "name": "Gemini 3.1 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
+        "reasoning",
         "instruction",
-        "vision",
         "text",
-        "reasoning"
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -30,8 +30,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -49,8 +49,8 @@
       "context_length": 1048576,
       "capabilities": [
         "reasoning",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -69,8 +69,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -89,8 +89,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -108,8 +108,8 @@
       "name": "Lyria 3 Clip Preview",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -127,10 +127,10 @@
       "name": "Gemini 3.1 Pro Preview Custom Tools",
       "context_length": 1048576,
       "capabilities": [
+        "reasoning",
         "instruction",
-        "vision",
         "text",
-        "reasoning"
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -167,11 +167,11 @@
       "name": "Gemini Pro Latest",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
-        "code",
         "reasoning",
         "text",
-        "instruction"
+        "instruction",
+        "vision",
+        "code"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -190,8 +190,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -210,8 +210,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -230,8 +230,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -249,11 +249,11 @@
       "name": "Gemini Flash-Lite Latest",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
-        "code",
         "reasoning",
         "text",
-        "instruction"
+        "instruction",
+        "vision",
+        "code"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -271,10 +271,10 @@
       "name": "Gemini 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
+        "reasoning",
         "instruction",
-        "vision",
         "text",
-        "reasoning"
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -293,8 +293,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -312,11 +312,11 @@
       "name": "Gemini Flash Latest",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
-        "code",
         "reasoning",
         "text",
-        "instruction"
+        "instruction",
+        "vision",
+        "code"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -335,8 +335,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -355,8 +355,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -375,8 +375,8 @@
       "context_length": 1048576,
       "capabilities": [
         "instruction",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -394,8 +394,8 @@
       "name": "Gemma 4 26B A4B IT",
       "context_length": 262144,
       "capabilities": [
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -413,8 +413,8 @@
       "name": "Gemma 4 31B IT",
       "context_length": 262144,
       "capabilities": [
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -433,8 +433,8 @@
       "context_length": 131072,
       "capabilities": [
         "reasoning",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -453,8 +453,8 @@
       "context_length": 131072,
       "capabilities": [
         "reasoning",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -491,8 +491,8 @@
       "name": "Deep Research Preview (Apr-21-2026)",
       "context_length": 131072,
       "capabilities": [
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -510,8 +510,8 @@
       "name": "Deep Research Max Preview (Apr-21-2026)",
       "context_length": 131072,
       "capabilities": [
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -530,8 +530,8 @@
       "context_length": 131072,
       "capabilities": [
         "instruction",
-        "vision",
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
