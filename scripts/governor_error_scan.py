@@ -92,52 +92,43 @@ def scan_service_failures(hours):
     for service in SERVICES:
         lines = journal_query(service, hours)
 
-        # Count failures
-        fail_lines = grep_lines(lines, ["Failed with", "exit-code", "failed to", "signal"])
+        # Count only ACTUAL service crashes (systemd exit-code failures)
+        fail_lines = grep_lines(lines, ["Failed with result", "failed to start"])
         failure_count = len(fail_lines)
 
+        # Count only ACTUAL service restarts (systemd Starting + Started paired events)
+        # NOT internal goroutine/bg-task starts
+        systemd_start_lines = [l for l in lines if re.search(r"systemd\[\d+\]: Starting |systemd\[\d+\]: Started ", l)]
+        restart_count = len(systemd_start_lines) // 2  # Each restart has both Starting + Started
+
+        # Count unique PIDs to cross-check
+        pids = set()
+        for l in lines:
+            m = re.search(rf"{re.escape(service)}\[(\d+)\]", l)
+            if m:
+                pids.add(m.group(1))
+
         # Count OOM events
-        oom_lines = grep_lines(lines, ["oom", "out of memory", "killed process", "memory.fail"])
+        oom_lines = grep_lines(lines, ["oom", "out of memory", "killed process"])
         oom_count = len(oom_lines)
 
-        # Count restarts
-        startup_lines = grep_lines(lines, ["Starting ", "started"])
-        restart_count = len(startup_lines)
-
-        # Check for crash clusters (5+ failures in 5 minutes = crash loop)
-        if failure_count > 0:
-            timestamps = []
-            for line in fail_lines:
-                m = re.search(r"\d{2}:\d{2}:\d{2}", line)
-                if m:
-                    timestamps.append(m.group())
-            cluster_count = 0
-            if len(timestamps) >= 5:
-                # Count how many failures happened within a 5-min window
-                for i in range(len(timestamps) - 4):
-                    t_early = timestamps[i].split(":")
-                    t_late = timestamps[i + 4].split(":")
-                    early_min = int(t_early[0]) * 60 + int(t_early[1])
-                    late_min = int(t_late[0]) * 60 + int(t_late[1])
-                    if late_min - early_min <= 5:
-                        cluster_count += 1
-
-            if failure_count >= 3:
-                findings.append({
-                    "type": "service_failure",
+        # Check for crash clusters (3+ unique PIDs in 5 minutes = crash loop)
+        if failure_count >= 3:
+            findings.append({
+                "type": "service_failure",
+                "service": service,
+                "severity": "critical" if restart_count >= 5 else "warning",
+                "evidence": f"{service}: {failure_count} crashes, {restart_count} restarts, {oom_count} OOM events in last {hours}h ({len(pids)} unique PIDs)",
+                "impact": f"{restart_count} service restarts cause ~{restart_count * 2}s of downtime",
+                "crash_loop": restart_count >= 5,
+                "details": {
                     "service": service,
-                    "severity": "critical" if cluster_count >= 3 else "warning",
-                    "evidence": f"{service}: {failure_count} failures, {restart_count} restarts, {oom_count} OOM events in last {hours}h",
-                    "impact": f"{restart_count} service restarts consume ~{restart_count * 2}s of downtime and system resources",
-                    "crash_loop": cluster_count >= 3,
-                    "details": {
-                        "service": service,
-                        "failure_count": failure_count,
-                        "restart_count": restart_count,
-                        "oom_count": oom_count,
-                        "crash_cluster_minutes": cluster_count,
-                    }
-                })
+                    "crash_count": failure_count,
+                    "restart_count": restart_count,
+                    "oom_count": oom_count,
+                    "unique_pids": len(pids),
+                }
+            })
 
         if oom_count >= 2:
             findings.append({
@@ -160,46 +151,48 @@ def scan_hermes_errors(hours):
     lines = journal_query("hermes-gateway", hours)
     findings = []
 
-    # Rate limit errors
-    rl_lines = grep_lines(lines, ["rate limit", "429", "rate_limit"])
-    if len(rl_lines) >= 3:
+    # Rate limit errors — count unique events
+    rl_events = grep_lines(lines, ["RateLimitError", "HTTP 429"])
+    if len(rl_events) >= 3:
         findings.append({
             "type": "rate_limit_flood",
             "service": "hermes-gateway",
             "severity": "warning",
-            "evidence": f"Rate limit errors: {len(rl_lines)} occurrences in last {hours}h",
+            "evidence": f"Rate limit errors: ~{len(rl_events)} API call failures in last {hours}h",
             "impact": "Fallback chain models hitting rate limits causes degraded response times and model switching overhead",
             "details": {
                 "source": "journalctl",
-                "rate_limit_count": len(rl_lines),
+                "rate_limit_api_failures": len(rl_events),
             }
         })
 
-    # Auth/key errors
-    auth_lines = grep_lines(lines, ["invalid api key", "401", "unauthorized", "authentication"])
-    if len(auth_lines) >= 1:
+    # Auth/key errors — count unique events
+    auth_events = grep_lines(lines, ["AuthenticationError", "HTTP 401", "Invalid API Key"])
+    auth_event_count = len(auth_events)
+    if auth_event_count >= 1:
         findings.append({
             "type": "auth_failure",
             "service": "hermes-gateway",
-            "severity": "critical" if len(auth_lines) >= 3 else "warning",
-            "evidence": f"Auth/API key errors: {len(auth_lines)} occurrences in last {hours}h",
+            "severity": "critical" if auth_event_count >= 5 else "warning",
+            "evidence": f"Auth/API key errors: ~{auth_event_count} API call failures in last {hours}h",
             "impact": "Expired or invalid API keys cause fallback cascade failures",
             "details": {
-                "auth_error_count": len(auth_lines),
+                "auth_api_failures": auth_event_count,
             }
         })
 
-    # Fallback cascade chains
-    fallback_lines = grep_lines(lines, ["switching to fallback"])
-    if len(fallback_lines) >= 5:
+    # Fallback cascade chains — count unique events
+    fallback_events = grep_lines(lines, ["switching to fallback"])
+    fallback_event_count = len(fallback_events)
+    if fallback_event_count >= 5:
         findings.append({
             "type": "fallback_cascade",
             "service": "hermes-gateway",
             "severity": "info",
-            "evidence": f"Fallback chain activations: {len(fallback_lines)} in last {hours}h",
+            "evidence": f"Fallback chain activations: ~{fallback_event_count} in last {hours}h",
             "impact": "Frequent fallback switching means primary model is unreliable or rate-limited",
             "details": {
-                "fallback_count": len(fallback_lines),
+                "fallback_count": fallback_event_count,
             }
         })
 
