@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Analyst Proactive — Daily pattern scan + proposal generation
-# Runs as a cron job. Scans task data, generates proposals into research_suggestions.
+# Analyst Proactive — Daily pattern scan + Phase 3 governor error scan
+# Runs as a cron job. Scans task data + system logs, generates proposals.
 # Reuses existing pipeline: simple proposals auto-implement, complex go to council.
 #
 # Install: 0 5 * * * /home/vibes/vibepilot/scripts/analyst_cron.sh >> /tmp/analyst.log 2>&1
@@ -13,26 +13,25 @@ echo "=== Analyst Proactive Scan $(date -Iseconds) ===" >> "$LOG"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Step 1: Run pattern scan
+# Step 1: Run pattern scan (Phase 2)
 echo "--- Running pattern scan ---" >> "$LOG"
 SCAN_OUTPUT=$(python3 "$SCRIPT_DIR/analyst_pattern_scan.py" --hours 24 --json 2>>"$LOG")
 echo "$SCAN_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'  Found {len(d)} findings')" >> "$LOG"
 
-# Step 2: Insert proposals into research_suggestions
-echo "--- Inserting proposals ---" >> "$LOG"
-INSERTED=0
+# Step 2: Insert pattern scan proposals into research_suggestions
+echo "--- Inserting pattern scan proposals ---" >> "$LOG"
 echo "$SCAN_OUTPUT" | python3 -c "
-import sys, json
+import sys, json, subprocess
 findings = json.load(sys.stdin)
+inserted = 0
+deferred = 0
 for f in findings:
     conf = f.get('confidence', 0)
     if conf < 0.6:
-        print(f'  DEFERRED (conf={conf:.2f}): {f[\"proposed_action\"][:60]}')
+        deferred += 1
         continue
 
     complexity = 'simple' if conf >= 0.8 else 'complex'
-
-    import subprocess
     title = f['proposed_action']
     summary = f['evidence']
     details = json.dumps({
@@ -53,9 +52,13 @@ for f in findings:
     r = subprocess.run(['psql', '-d', 'vibepilot', '-c', sql],
                        capture_output=True, text=True, timeout=10)
     if r.returncode == 0:
-        print(f'  INSERTED ({complexity}, conf={conf:.2f}): {title[:60]}')
-    else:
-        print(f'  ERROR: {r.stderr[:100]}')
+        inserted += 1
+
+print(f'  Inserted: {inserted}, Deferred: {deferred}')
 " >> "$LOG" 2>&1
+
+# Step 3: Run governor error scan (Phase 3)
+echo "--- Running governor error scan ---" >> "$LOG"
+python3 "$SCRIPT_DIR/governor_error_scan.py" --hours 24 --insert 2>>"$LOG" || echo "  WARNING: governor scan failed" >> "$LOG"
 
 echo "=== Done $(date -Iseconds) ===" >> "$LOG"
