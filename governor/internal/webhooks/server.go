@@ -1140,6 +1140,10 @@ func (s *Server) handleReviewQueue(w http.ResponseWriter, r *http.Request) {
 		if unmarshalErr := json.Unmarshal(alertData, &alerts); unmarshalErr != nil {
 			log.Printf("[review-queue] credit alert unmarshal error: %v, raw: %s", unmarshalErr, string(alertData))
 		} else {
+			// Send email notification for credit alerts (dedup via review queue cadence)
+			if len(alerts) > 0 {
+				go s.sendCreditAlertEmail(alerts)
+			}
 			for _, alert := range alerts {
 				modelID, _ := alert["model_id"].(string)
 				alertType, _ := alert["alert_type"].(string)
@@ -2154,6 +2158,36 @@ func (s *Server) handleAdminSystem(w http.ResponseWriter, r *http.Request) {
 
 func splitLines(s string) []string {
 	return strings.Split(strings.TrimRight(s, "\n"), "\n")
+}
+
+// sendCreditAlertEmail dispatches an email when check_subscription_thresholds returns alerts.
+// Uses the same notify_email.py script as the credit poller for consistency.
+func (s *Server) sendCreditAlertEmail(alerts []map[string]any) {
+	var lines []string
+	for _, alert := range alerts {
+		modelID, _ := alert["model_id"].(string)
+		alertType, _ := alert["alert_type"].(string)
+		message, _ := alert["message"].(string)
+		currentVal, _ := alert["current_value"].(float64)
+		thresholdVal, _ := alert["threshold_value"].(float64)
+		lines = append(lines, fmt.Sprintf("%s: %s (current: $%.2f, threshold: $%.2f)", modelID, alertType, currentVal, thresholdVal))
+		if message != "" {
+			lines = append(lines, "  "+message)
+		}
+	}
+
+	subject := fmt.Sprintf("[VibePilot] Credit Alert: %d model(s) below threshold", len(alerts))
+	body := "The following models have credit below their alert thresholds:\n\n" +
+		strings.Join(lines, "\n") +
+		"\n\nTop up at the provider's dashboard to avoid service interruption.\n\n— VibePilot Governor"
+
+	script := "/home/vibes/vibepilot/scripts/notify_email.py"
+	cmd := exec.Command("python3", script, "--subject", subject, "--body", body)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("[review-queue] Credit alert email failed: %v — %s", err, string(output))
+	} else {
+		log.Printf("[review-queue] Credit alert email sent for %d alert(s)", len(alerts))
+	}
 }
 
 func splitFields(s string) []string {

@@ -106,3 +106,5 @@ governor/cleanup
 graphify-out/
 governor/bin/
 .code-review-graph/
+scripts/.email_creds.json
+governor/cmd/governor/governor

@@ -146,8 +146,8 @@ func (cp *CreditPoller) pollAll(ctx context.Context) {
 
 		log.Printf("[CreditPoller] %s balance: $%.2f", target.PlatformID, float64(balanceCents)/100)
 
-		// Check threshold and fire alert if needed
-		cp.checkThreshold(target, balanceCents)
+		// Check DB-defined thresholds and fire email alert if any model is below
+		cp.checkDBThresholds(ctx)
 	}
 }
 
@@ -201,6 +201,64 @@ func (cp *CreditPoller) checkThreshold(target *creditPollTarget, balanceCents in
 
 	// Fire email notification in background
 	go cp.sendCreditAlert(target, balanceCents, pctRemaining)
+}
+
+// checkDBThresholds uses check_subscription_thresholds RPC to detect low credit
+// and sends email alerts. This is the primary alert mechanism since the DB holds
+// the authoritative thresholds per model. Dedup: only sends once per 6 hours.
+var lastDBAlertEmail time.Time
+
+func (cp *CreditPoller) checkDBThresholds(ctx context.Context) {
+	if cp.db == nil {
+		return
+	}
+
+	data, err := cp.db.RPC(ctx, "check_subscription_thresholds", map[string]any{})
+	if err != nil {
+		log.Printf("[CreditPoller] check_subscription_thresholds error: %v", err)
+		return
+	}
+
+	if len(data) == 0 || string(data) == "[]" {
+		return // no alerts
+	}
+
+	var alerts []map[string]any
+	if err := json.Unmarshal(data, &alerts); err != nil || len(alerts) == 0 {
+		return
+	}
+
+	// Dedup: only send one email per 6 hours
+	if time.Since(lastDBAlertEmail) < 6*time.Hour {
+		log.Printf("[CreditPoller] Skipping DB threshold email (sent %.0f min ago)", time.Since(lastDBAlertEmail).Minutes())
+		return
+	}
+	lastDBAlertEmail = time.Now()
+
+	// Send email via notify_email.py
+	var lines []string
+	for _, alert := range alerts {
+		modelID, _ := alert["model_id"].(string)
+		alertType, _ := alert["alert_type"].(string)
+		message, _ := alert["message"].(string)
+		lines = append(lines, modelID+": "+alertType)
+		if message != "" {
+			lines = append(lines, "  "+message)
+		}
+	}
+
+	subject := fmt.Sprintf("[VibePilot] Credit Alert: %d model(s) below threshold", len(alerts))
+	body := "The following models have credit below their alert thresholds:\n\n" +
+		strings.Join(lines, "\n") +
+		"\n\nTop up at the provider's dashboard to avoid service interruption.\n\n— VibePilot Governor"
+
+	script := "/home/vibes/vibepilot/scripts/notify_email.py"
+	cmd := exec.Command("python3", script, "--subject", subject, "--body", body)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("[CreditPoller] DB threshold email failed: %v — %s", err, string(output))
+	} else {
+		log.Printf("[CreditPoller] DB threshold alert email sent for %d alert(s)", len(alerts))
+	}
 }
 
 // sendCreditAlert dispatches an email notification for low credit.
