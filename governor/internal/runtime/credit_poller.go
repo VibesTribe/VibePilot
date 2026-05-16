@@ -7,32 +7,46 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
 )
 
+// CreditDB is the minimal DB interface the credit poller needs.
+// Uses the same RPC pattern as the rest of the governor.
+type CreditDB interface {
+	RPC(ctx context.Context, name string, params map[string]interface{}) ([]byte, error)
+}
+
 // CreditPoller periodically checks credit balances for paid API providers
 // and updates the platform tracker V2 with current balances.
-// It follows the same background ticker pattern as ModelScanner.
+// It also syncs the live balance to the models table and fires alerts
+// when credit drops below the configured threshold.
 type CreditPoller struct {
-	mu       sync.RWMutex
-	tracker  *PlatformUsageTrackerV2
-	vault    VaultKeyGetter
-	client   *http.Client
+	mu        sync.RWMutex
+	tracker   *PlatformUsageTrackerV2
+	vault     VaultKeyGetter
+	db        CreditDB
+	client    *http.Client
 	platforms []creditPollTarget
-	interval time.Duration
+	interval  time.Duration
 }
 
 // creditPollTarget defines a provider whose credit balance should be polled.
 type creditPollTarget struct {
-	PlatformID    string // matches connectors.json id
-	BalanceURL    string // API endpoint for balance
-	APIKeyRef     string // vault key reference
-	PollInterval  time.Duration
-	LastBalance   int    // cents
-	LastChecked   time.Time
+	PlatformID        string  // matches connectors.json id
+	ModelID           string  // matches models table id for DB sync
+	BalanceURL        string  // API endpoint for balance
+	APIKeyRef         string  // vault key reference
+	PollInterval      time.Duration
+	LastBalance       int       // cents
+	InitialBalance    int       // cents — first successful poll sets this
+	LastChecked       time.Time
 	AlertThresholdPct float64 // alert at this % of initial credit
+	AlertFired        bool     // dedup: true after first alert fires
+	AlertCooldown     time.Duration // minimum time between repeat alerts
+	LastAlertTime     time.Time
 }
 
 // deepseekBalanceResponse matches the DeepSeek /user/balance API response.
@@ -46,18 +60,21 @@ type deepseekBalanceResponse struct {
 }
 
 // NewCreditPoller creates a credit poller from connector config.
-func NewCreditPoller(tracker *PlatformUsageTrackerV2, vault VaultKeyGetter) *CreditPoller {
+func NewCreditPoller(tracker *PlatformUsageTrackerV2, vault VaultKeyGetter, db CreditDB) *CreditPoller {
 	return &CreditPoller{
 		tracker: tracker,
 		vault:   vault,
+		db:      db,
 		client:  &http.Client{Timeout: 15 * time.Second},
 		platforms: []creditPollTarget{
 			{
 				PlatformID:        "deepseek-api",
+				ModelID:           "deepseek-v4-flash",
 				BalanceURL:        "https://api.deepseek.com/user/balance",
 				APIKeyRef:         "deepseek-v4-flash",
 				PollInterval:      1 * time.Hour,
 				AlertThresholdPct: 0.2, // alert when 20% or less remaining
+				AlertCooldown:     6 * time.Hour,
 			},
 		},
 		interval: 1 * time.Hour, // default check interval
@@ -65,7 +82,6 @@ func NewCreditPoller(tracker *PlatformUsageTrackerV2, vault VaultKeyGetter) *Cre
 }
 
 // StartBackgroundPolling runs periodic credit checks in a goroutine.
-// Follows the same pattern as ModelScanner.StartBackgroundScanner.
 func (cp *CreditPoller) StartBackgroundPolling(ctx context.Context) {
 	if cp.tracker == nil || cp.vault == nil {
 		log.Printf("[CreditPoller] Skipping: tracker or vault not available")
@@ -106,12 +122,22 @@ func (cp *CreditPoller) pollAll(ctx context.Context) {
 		oldBalance := target.LastBalance
 		target.LastBalance = balanceCents
 		target.LastChecked = time.Now()
+
+		// Set initial balance on first successful poll
+		if target.InitialBalance == 0 && balanceCents > 0 {
+			target.InitialBalance = balanceCents
+			log.Printf("[CreditPoller] %s initial balance set: $%.2f", target.PlatformID, float64(balanceCents)/100)
+		}
 		cp.mu.Unlock()
 
-		// Update the platform tracker
+		// Update the in-memory platform tracker
 		if cp.tracker != nil {
 			cp.tracker.UpdateCreditBalance(target.PlatformID, balanceCents)
 		}
+
+		// Sync live balance to DB so dashboard/check_subscription_thresholds sees it
+		// This captures ALL credit consumption (pipeline tasks + Hermes sessions + anything else)
+		cp.syncBalanceToDB(ctx, target, balanceCents)
 
 		if oldBalance != balanceCents {
 			log.Printf("[CreditPoller] %s balance changed: $%.2f -> $%.2f",
@@ -119,6 +145,93 @@ func (cp *CreditPoller) pollAll(ctx context.Context) {
 		}
 
 		log.Printf("[CreditPoller] %s balance: $%.2f", target.PlatformID, float64(balanceCents)/100)
+
+		// Check threshold and fire alert if needed
+		cp.checkThreshold(target, balanceCents)
+	}
+}
+
+// syncBalanceToDB writes the live-polled balance to the models table.
+// This is the source of truth for dashboard ROI and alert RPCs.
+func (cp *CreditPoller) syncBalanceToDB(ctx context.Context, target *creditPollTarget, balanceCents int) {
+	if cp.db == nil || target.ModelID == "" {
+		return
+	}
+
+	balanceUSD := float64(balanceCents) / 100.0
+
+	_, err := cp.db.RPC(ctx, "update_model_credit_balance", map[string]interface{}{
+		"p_model_id":              target.ModelID,
+		"p_credit_remaining_usd":  balanceUSD,
+	})
+	if err != nil {
+		log.Printf("[CreditPoller] ERROR syncing balance to DB for %s: %v", target.ModelID, err)
+	}
+}
+
+// checkThreshold fires an alert when credit drops below the configured threshold.
+// Uses AlertFired + AlertCooldown to avoid spamming.
+func (cp *CreditPoller) checkThreshold(target *creditPollTarget, balanceCents int) {
+	if target.InitialBalance <= 0 || target.AlertThresholdPct <= 0 {
+		return
+	}
+
+	thresholdCents := int(float64(target.InitialBalance) * target.AlertThresholdPct)
+	if balanceCents > thresholdCents {
+		return // still above threshold
+	}
+
+	// Check cooldown — don't alert more than once per cooldown period
+	cp.mu.Lock()
+	if target.AlertFired && time.Since(target.LastAlertTime) < target.AlertCooldown {
+		cp.mu.Unlock()
+		return
+	}
+	target.AlertFired = true
+	target.LastAlertTime = time.Now()
+	cp.mu.Unlock()
+
+	pctRemaining := float64(balanceCents) / float64(target.InitialBalance) * 100
+
+	log.Printf("[CreditPoller] *** CREDIT ALERT *** %s (%s): $%.2f remaining (%.0f%% of initial $%.2f) — below %.0f%% threshold",
+		target.PlatformID, target.ModelID,
+		float64(balanceCents)/100, pctRemaining,
+		float64(target.InitialBalance)/100,
+		target.AlertThresholdPct*100)
+
+	// Fire email notification in background
+	go cp.sendCreditAlert(target, balanceCents, pctRemaining)
+}
+
+// sendCreditAlert dispatches an email notification for low credit.
+func (cp *CreditPoller) sendCreditAlert(target *creditPollTarget, balanceCents int, pctRemaining float64) {
+	subject := fmt.Sprintf("[VibePilot] Credit Alert: %s at %.0f%% ($%.2f remaining)",
+		target.ModelID, pctRemaining, float64(balanceCents)/100)
+
+	body := fmt.Sprintf(
+		"VibePilot Credit Alert\n\n"+
+			"Model: %s\n"+
+			"Provider: %s\n"+
+			"Remaining: $%.2f (%.0f%% of $%.2f)\n"+
+			"Threshold: %.0f%%\n\n"+
+			"This alert fires when credit drops below the threshold.\n"+
+			"Top up at the provider's dashboard to avoid service interruption.\n\n"+
+			"— VibePilot Governor",
+		target.ModelID, target.PlatformID,
+		float64(balanceCents)/100, pctRemaining,
+		float64(target.InitialBalance)/100,
+		target.AlertThresholdPct*100,
+	)
+
+	script := "/home/vibes/vibepilot/scripts/notify_email.py"
+	cmd := exec.Command("python3", script,
+		"--subject", subject,
+		"--body", body,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("[CreditPoller] Email alert failed: %v — %s", err, string(output))
+	} else {
+		log.Printf("[CreditPoller] Credit alert email sent for %s", target.ModelID)
 	}
 }
 

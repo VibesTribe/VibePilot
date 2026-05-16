@@ -1132,12 +1132,15 @@ func (s *Server) handleReviewQueue(w http.ResponseWriter, r *http.Request) {
 
 	// 3. Credit / subscription alerts
 	alertData, err := s.db.RPC(ctx, "check_subscription_thresholds", map[string]any{})
-	if err == nil {
-		var alertResp struct {
-			Alerts []map[string]any `json:"alerts"`
-		}
-		if json.Unmarshal(alertData, &alertResp) == nil {
-			for _, alert := range alertResp.Alerts {
+	if err != nil {
+		log.Printf("[review-queue] credit alert RPC error: %v", err)
+	} else {
+		log.Printf("[review-queue] credit alert RPC returned %d bytes: %s", len(alertData), string(alertData))
+		var alerts []map[string]any
+		if unmarshalErr := json.Unmarshal(alertData, &alerts); unmarshalErr != nil {
+			log.Printf("[review-queue] credit alert unmarshal error: %v, raw: %s", unmarshalErr, string(alertData))
+		} else {
+			for _, alert := range alerts {
 				modelID, _ := alert["model_id"].(string)
 				alertType, _ := alert["alert_type"].(string)
 				message, _ := alert["message"].(string)
