@@ -1,5 +1,18 @@
 # Review Hub: Comprehensive Build Plan
 
+STATUS: Phases 1-3 COMPLETE (May 16, 2026). Phase 4 (inline actions) remains.
+
+## Implementation Summary
+
+What was built:
+- review_items table with type/priority/status columns
+- GET /api/review-queue reads from review_items (unified)
+- PATCH /api/review-queue/:id for approve/reject/defer on any type
+- reviewitems package (internal/reviewitems/) with struct and validation
+- 5 insertion points wired: research, visual_qa, design_preview, council, credit_alert
+- Dashboard MissionHeader renders items grouped by type with color-coded headers and priority badges
+- Contradiction type reserved (no handler exists yet in governor)
+
 ## Goal
 A single unified review queue in the dashboard that aggregates ALL human review needs. Every system that produces reviewable output feeds into one queue with type-specific actions.
 
