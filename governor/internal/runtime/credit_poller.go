@@ -7,10 +7,11 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/vibepilot/governor/internal/notifications"
 )
 
 // CreditDB is the minimal DB interface the credit poller needs.
@@ -31,6 +32,7 @@ type CreditPoller struct {
 	client    *http.Client
 	platforms []creditPollTarget
 	interval  time.Duration
+	alerts    *notifications.AlertDedup // centralized one-email-ever dedup for all alert types
 }
 
 // creditPollTarget defines a provider whose credit balance should be polled.
@@ -66,6 +68,7 @@ func NewCreditPoller(tracker *PlatformUsageTrackerV2, vault VaultKeyGetter, db C
 		vault:   vault,
 		db:      db,
 		client:  &http.Client{Timeout: 15 * time.Second},
+		alerts:  notifications.NewAlertDedup(),
 		platforms: []creditPollTarget{
 			{
 				PlatformID:        "deepseek-api",
@@ -203,83 +206,40 @@ func (cp *CreditPoller) checkThreshold(target *creditPollTarget, balanceCents in
 	go cp.sendCreditAlert(target, balanceCents, pctRemaining)
 }
 
-// checkDBThresholds uses check_subscription_thresholds RPC to detect low credit
-// and sends email alerts. This is the primary alert mechanism since the DB holds
-// the authoritative thresholds per model. Dedup: one email per model per alert,
-// resets when credits are topped back above threshold.
-var emailedAlerts sync.Map // key: model_id, value: alert_type
-
+// checkDBThresholds uses the centralized AlertDedup to check subscription
+// thresholds and send exactly one email per alert. Dedup resets only when
+// credits are topped back above threshold (DB returns no alerts).
 func (cp *CreditPoller) checkDBThresholds(ctx context.Context) {
 	if cp.db == nil {
 		return
 	}
 
-	data, err := cp.db.RPC(ctx, "check_subscription_thresholds", map[string]any{})
-	if err != nil {
-		log.Printf("[CreditPoller] check_subscription_thresholds error: %v", err)
-		return
-	}
-
-	// If no alerts, clear all dedup state (credits have been topped up)
-	if len(data) == 0 || string(data) == "[]" {
-		emailedAlerts.Range(func(key, _ any) bool {
-			emailedAlerts.Delete(key)
-			return true
-		})
-		return
-	}
-
-	var alerts []map[string]any
-	if err := json.Unmarshal(data, &alerts); err != nil || len(alerts) == 0 {
-		return
-	}
-
-	// Filter out alerts we already emailed about
-	var newAlerts []map[string]any
-	for _, alert := range alerts {
-		modelID, _ := alert["model_id"].(string)
-		alertType, _ := alert["alert_type"].(string)
-		dedupKey := modelID + ":" + alertType
-		if _, alreadySent := emailedAlerts.Load(dedupKey); alreadySent {
-			continue
-		}
-		newAlerts = append(newAlerts, alert)
-		emailedAlerts.Store(dedupKey, true)
-	}
-
-	if len(newAlerts) == 0 {
-		return // all alerts already emailed
-	}
-	alerts = newAlerts
-
-	// Send email via notify_email.py
-	var lines []string
-	for _, alert := range alerts {
-		modelID, _ := alert["model_id"].(string)
-		alertType, _ := alert["alert_type"].(string)
-		message, _ := alert["message"].(string)
-		lines = append(lines, modelID+": "+alertType)
-		if message != "" {
-			lines = append(lines, "  "+message)
-		}
-	}
-
-	subject := fmt.Sprintf("[VibePilot] Credit Alert: %d model(s) below threshold", len(alerts))
-	body := "The following models have credit below their alert thresholds:\n\n" +
-		strings.Join(lines, "\n") +
-		"\n\nTop up at the provider's dashboard to avoid service interruption.\n\n— VibePilot Governor"
-
-	script := "/home/vibes/vibepilot/scripts/notify_email.py"
-	cmd := exec.Command("python3", script, "--subject", subject, "--body", body)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		log.Printf("[CreditPoller] DB threshold email failed: %v — %s", err, string(output))
-	} else {
-		log.Printf("[CreditPoller] DB threshold alert email sent for %d alert(s)", len(alerts))
+	// Delegate to the centralized alert system
+	count := cp.alerts.CheckAndAlert(ctx, creditDBWrapper{db: cp.db})
+	if count > 0 {
+		log.Printf("[CreditPoller] DB threshold alert email sent for %d alert(s)", count)
 	}
 }
 
+// creditDBWrapper adapts CreditDB to the notifications.DBQuerier interface.
+type creditDBWrapper struct {
+	db CreditDB
+}
+
+func (w creditDBWrapper) RPC(ctx context.Context, name string, params map[string]any) ([]byte, error) {
+	// Convert map[string]any to map[string]interface{} for CreditDB compatibility
+	converted := make(map[string]interface{}, len(params))
+	for k, v := range params {
+		converted[k] = v
+	}
+	return w.db.RPC(ctx, name, converted)
+}
+
 // sendCreditAlert dispatches an email notification for low credit.
+// Uses centralized AlertDedup to guarantee exactly one email per alert.
 func (cp *CreditPoller) sendCreditAlert(target *creditPollTarget, balanceCents int, pctRemaining float64) {
+	dedupKey := "pct_threshold:" + target.ModelID
+
 	subject := fmt.Sprintf("[VibePilot] Credit Alert: %s at %.0f%% ($%.2f remaining)",
 		target.ModelID, pctRemaining, float64(balanceCents)/100)
 
@@ -298,14 +258,7 @@ func (cp *CreditPoller) sendCreditAlert(target *creditPollTarget, balanceCents i
 		target.AlertThresholdPct*100,
 	)
 
-	script := "/home/vibes/vibepilot/scripts/notify_email.py"
-	cmd := exec.Command("python3", script,
-		"--subject", subject,
-		"--body", body,
-	)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		log.Printf("[CreditPoller] Email alert failed: %v — %s", err, string(output))
-	} else {
+	if sent := cp.alerts.SendEmailIfNew(dedupKey, subject, body); sent {
 		log.Printf("[CreditPoller] Credit alert email sent for %s", target.ModelID)
 	}
 }
