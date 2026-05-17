@@ -249,6 +249,17 @@ func (h *GitHubWebhookHandler) checkAndCreateResearch(ctx context.Context, file,
 
 	log.Printf("[GitHub Webhooks] Created research suggestion for: %s", file)
 
+	// Also insert into review_items for the unified review hub
+	h.db.Insert(ctx, "review_items", map[string]any{
+		"type":       "research",
+		"source_id":  file,
+		"title":      title,
+		"summary":    "Research report auto-detected from knowledgebase push: " + file,
+		"payload":    details,
+		"status":     "pending",
+		"priority":   "medium",
+	})
+
 	// Record event for dashboard timeline
 	h.db.Insert(ctx, "orchestrator_events", map[string]any{
 		"event_type": "research_committed",

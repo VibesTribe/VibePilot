@@ -108,6 +108,21 @@ func (dp *DesignPreview) Generate(ctx context.Context, req GenerateRequest) (*Ge
 		return nil, fmt.Errorf("[DesignPreview] Failed to insert preview record: %w", err)
 	}
 
+	// Insert into review_items for unified review hub
+	dp.db.Insert(ctx, "review_items", map[string]any{
+		"type":      "design_preview",
+		"source_id": previewID,
+		"title":     "Design Preview: " + req.Title,
+		"summary":   fmt.Sprintf("Task %s — mockup generated, awaiting approval", req.TaskID),
+		"payload": map[string]any{
+			"task_id":    req.TaskID,
+			"file_path":  filePath,
+			"model":      dp.config.GeminiModel,
+		},
+		"status":   "pending",
+		"priority": "medium",
+	})
+
 	return &GenerateResponse{
 		PreviewID:   previewID,
 		HTMLContent: htmlContent,

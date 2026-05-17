@@ -90,6 +90,10 @@ func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 			"p_status":       "pending_human",
 			"p_review_notes": map[string]any{"reason": "complexity=human, requires human decision"},
 		})
+		// Insert into review_items for unified review hub
+		hTitle := getString(suggestion, "title")
+		hSummary := getString(suggestion, "summary")
+		h.insertReviewItem(ctx, "research", suggestionID, hTitle, hSummary, "high")
 		return
 
 	case "complex":
@@ -227,6 +231,7 @@ func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 					"urgency":   review.Urgency,
 				},
 			})
+			h.insertReviewItem(ctx, "research", suggestionID, suggestionTitle(ctx, h.database, suggestionID), review.Reasoning, "high")
 		}
 
 		return nil
@@ -443,6 +448,7 @@ func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 				"note":              "Council could not reach consensus, escalating to human",
 			},
 		})
+		h.insertReviewItem(ctx, "council", suggestionID, "Council split: "+suggestionTitle(ctx, h.database, suggestionID), fmt.Sprintf("Council could not reach consensus. Concerns: %v", allConcerns), "high")
 		log.Printf("[ResearchCouncil] %s needs human review", truncateID(suggestionID))
 	}
 }
@@ -460,4 +466,56 @@ func setupResearchHandlers(
 ) {
 	handler := NewResearchHandler(database, factory, pool, connRouter, cfg, usageTracker, actionApplier)
 	handler.Register(router)
+}
+
+// insertReviewItem adds a review item to the unified review queue.
+// Errors are logged but do not interrupt the calling flow.
+func (h *ResearchHandler) insertReviewItem(ctx context.Context, itemType, sourceID, title, summary, priority string) {
+	// Dedup: skip if a pending review item already exists for this source
+	existing, err := h.database.Query(ctx, "review_items", map[string]any{
+		"type":      itemType,
+		"source_id": sourceID,
+		"status":    "pending",
+	})
+	if err == nil {
+		var items []map[string]any
+		if json.Unmarshal(existing, &items) == nil && len(items) > 0 {
+			log.Printf("[ResearchHandler] Skipping duplicate review_item: %s/%s already pending", itemType, truncateID(sourceID))
+			return
+		}
+	}
+
+	_, err = h.database.Insert(ctx, "review_items", map[string]any{
+		"type":     itemType,
+		"source_id": sourceID,
+		"title":    title,
+		"summary":  summary,
+		"payload":  map[string]any{},
+		"status":   "pending",
+		"priority": priority,
+	})
+	if err != nil {
+		log.Printf("[ResearchHandler] Failed to insert review_item for %s %s: %v", itemType, sourceID, err)
+	} else {
+		log.Printf("[ResearchHandler] Review item created: %s/%s", itemType, truncateID(sourceID))
+	}
+}
+
+// suggestionTitle fetches the title of a research suggestion by ID.
+func suggestionTitle(ctx context.Context, database db.Database, id string) string {
+	data, err := database.Query(ctx, "research_suggestions", map[string]any{
+		"id":    id,
+		"limit": 1,
+	})
+	if err != nil {
+		return id
+	}
+	var rows []map[string]any
+	if err := json.Unmarshal(data, &rows); err != nil || len(rows) == 0 {
+		return id
+	}
+	if title, ok := rows[0]["title"].(string); ok {
+		return title
+	}
+	return id
 }

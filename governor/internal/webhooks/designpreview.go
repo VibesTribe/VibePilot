@@ -73,6 +73,33 @@ func (s *Server) handleDesignPreviewGenerate(w http.ResponseWriter, r *http.Requ
 	}
 
 	log.Printf("[DesignPreview] Generated preview %s for task %s (%d tokens)", resp.PreviewID, req.TaskID, resp.TokensUsed)
+
+	// Insert into unified review_items for the review hub
+	if s.db != nil {
+		existing, _ := s.db.Query(r.Context(), "review_items", map[string]any{
+			"type":      "design_preview",
+			"source_id": resp.PreviewID,
+			"status":    "pending",
+		})
+		var dupes []map[string]any
+		if existing == nil || json.Unmarshal(existing, &dupes) != nil || len(dupes) == 0 {
+			payload, _ := json.Marshal(map[string]any{
+				"task_id":    req.TaskID,
+				"file_path":  resp.FilePath,
+				"model":      resp.Model,
+			})
+			s.db.Insert(r.Context(), "review_items", map[string]any{
+				"type":      "design_preview",
+				"source_id": resp.PreviewID,
+				"title":     "Design preview: " + req.Title,
+				"summary":   fmt.Sprintf("Design mockup generated (%d tokens). Awaiting review.", resp.TokensUsed),
+				"payload":   string(payload),
+				"status":    "pending",
+				"priority":  "medium",
+			})
+		}
+	}
+
 	writeJSON(w, http.StatusOK, resp)
 }
 

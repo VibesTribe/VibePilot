@@ -442,6 +442,24 @@ func (v *VisualQA) Run(ctx context.Context, triggeredBy, triggerDetail string) (
 		fmt.Printf("[VisualQA] Failed to update visual_qa_run %s: %v\n", runID, err)
 	}
 
+	// Insert review_item if there are issues that need human attention
+	if status == "completed" && totalIssuesFound > 0 && pagesFailed > 0 {
+		priority := "medium"
+		if totalIssuesFound >= 5 || pagesFailed >= 3 {
+			priority = "high"
+		}
+		_, _ = v.db.Exec(ctx, `
+			INSERT INTO review_items (type, source_id, title, summary, payload, status, priority)
+			VALUES ('visual_qa', $1, $2, $3, $4, 'pending', $5)`,
+			runID,
+			fmt.Sprintf("Visual QA: %d issue(s) found across %d page(s)", totalIssuesFound, pagesFailed),
+			fmt.Sprintf("Checked %d pages, %d passed, %d failed with %d total issues.", pagesChecked, pagesPassed, pagesFailed, totalIssuesFound),
+			fmt.Sprintf(`{"run_id":"%s","pages_checked":%d,"pages_passed":%d,"pages_failed":%d,"issues_found":%d,"triggered_by":"%s"}`, runID, pagesChecked, pagesPassed, pagesFailed, totalIssuesFound, triggeredBy),
+			priority,
+		)
+		fmt.Printf("[VisualQA] Review item created for run %s (%d issues)\n", runID, totalIssuesFound)
+	}
+
 	return RunResult{
 		RunID:        runID,
 		TriggeredBy:  triggeredBy,

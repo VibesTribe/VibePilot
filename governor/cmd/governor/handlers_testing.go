@@ -176,6 +176,8 @@ func (h *TestingHandler) handleTaskTesting(event runtime.Event) {
 			if err := h.createReviewFile(ctx, taskID, task); err != nil {
 				log.Printf("[Testing] Failed to create review file for task %s: %v", truncateID(taskID), err)
 			}
+			// Insert into unified review_items table
+			h.insertReviewItemForTask(ctx, taskID, task)
 		} else {
 			log.Printf("[Testing] Task %s → COMPLETE (testing passed)", truncateID(taskID))
 
@@ -1448,4 +1450,46 @@ func (h *TestingHandler) commitAndPushReviewFile(ctx context.Context, taskID str
 
 	log.Printf("[Testing] Committed and pushed review file for task %s", truncateID(taskID))
 	return nil
+}
+
+// insertReviewItemForTask creates a review_item when a task enters human_review.
+func (h *TestingHandler) insertReviewItemForTask(ctx context.Context, taskID string, task map[string]any) {
+	title := getString(task, "title")
+	if title == "" {
+		title = "Visual QA Review"
+	}
+	summary := getString(task, "summary")
+	taskNumber := getString(task, "task_number")
+
+	// Dedup: skip if already pending
+	existing, err := h.database.Query(ctx, "review_items", map[string]any{
+		"type":      "visual_qa",
+		"source_id": taskID,
+		"status":    "pending",
+	})
+	if err == nil {
+		var items []map[string]any
+		if json.Unmarshal(existing, &items) == nil && len(items) > 0 {
+			return
+		}
+	}
+
+	payload, _ := json.Marshal(map[string]any{
+		"task_number": taskNumber,
+	})
+
+	_, err = h.database.Insert(ctx, "review_items", map[string]any{
+		"type":      "visual_qa",
+		"source_id": taskID,
+		"title":     title,
+		"summary":   summary,
+		"payload":   string(payload),
+		"status":    "pending",
+		"priority":  "high",
+	})
+	if err != nil {
+		log.Printf("[Testing] Failed to insert review_item for visual_qa %s: %v", truncateID(taskID), err)
+	} else {
+		log.Printf("[Testing] Review item created: visual_qa/%s", truncateID(taskID))
+	}
 }

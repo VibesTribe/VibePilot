@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vibepilot/governor/internal/reviewitems"
 	"github.com/vibepilot/governor/internal/runtime"
 )
 
@@ -58,6 +59,8 @@ type Server struct {
 type DBQuerier interface {
 	RPC(ctx context.Context, name string, params map[string]interface{}) ([]byte, error)
 	Query(ctx context.Context, table string, filters map[string]any) (json.RawMessage, error)
+	Insert(ctx context.Context, table string, data map[string]any) (json.RawMessage, error)
+	Update(ctx context.Context, table, id string, data map[string]any) (json.RawMessage, error)
 }
 
 type EventHandler func(ctx context.Context, payload *Payload) error
@@ -200,6 +203,10 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/design-preview/generate", s.handleDesignPreviewGenerate)
 	mux.HandleFunc("/api/design-preview/approve", s.handleDesignPreviewApprove)
 	mux.HandleFunc("/api/design-preview/reject", s.handleDesignPreviewReject)
+
+	// Review Items API (unified review hub)
+	mux.HandleFunc("/api/review-items", s.handleReviewItems)
+	mux.HandleFunc("/api/review-items/", s.handleReviewItemByID)
 	mux.HandleFunc("/api/design-preview/list", s.handleDesignPreviewList)
 	mux.HandleFunc("/api/design-reviews", s.handleDesignReviews)
 	mux.HandleFunc("/api/design-reviews/approve", s.handleDesignReviewAction)
@@ -1027,13 +1034,15 @@ func (s *Server) handleProjectAlerts(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf(`{"alerts": %s}`, data)))
 }
 
-// handleReviewQueue returns a unified list of items needing human review
-// across three categories: research reports, visual QA tasks, and credit alerts.
-// GET /api/review-queue
+// handleReviewQueue returns pending items from the unified review_items table.
+// GET /api/review-queue[?status=pending&credit_alerts=1]
+//
+// When credit_alerts=1, also runs the subscription threshold check RPC and
+// injects any live credit alerts (these are ephemeral, not stored in review_items).
 func (s *Server) handleReviewQueue(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, PATCH, OPTIONS")
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -1046,128 +1055,124 @@ func (s *Server) handleReviewQueue(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	ctx := r.Context()
 
-	type ReviewItem struct {
-		ID          string `json:"id"`
-		Category    string `json:"category"`
-		Title       string `json:"title"`
-		Summary     string `json:"summary"`
-		Status      string `json:"status"`
-		ReviewURL   string `json:"review_url"`
-		CreatedAt   string `json:"created_at,omitempty"`
-		CouncilNote string `json:"council_notes,omitempty"`
+	// Read query params for filtering
+	status := r.URL.Query().Get("status")
+	itemType := r.URL.Query().Get("type")
+	includeCreditAlerts := r.URL.Query().Get("credit_alerts") == "1"
+
+	if status == "" {
+		status = "pending"
 	}
 
-	var items []ReviewItem
-
-	// 1. Research suggestions needing human review (council escalated)
-	researchResult, err := s.db.Query(ctx, "research_suggestions", map[string]any{
-		"status": "pending_human",
-		"limit":  50,
-	})
-	if err == nil {
-		var rows []map[string]any
-		if json.Unmarshal(researchResult, &rows) == nil {
-			for _, row := range rows {
-				id, _ := row["id"].(string)
-				title, _ := row["title"].(string)
-				summary, _ := row["summary"].(string)
-				findingsPath, _ := row["findings_path"].(string)
-				createdAt, _ := row["created_at"].(string)
-
-				councilNote := ""
-				if notes, ok := row["review_notes"].(map[string]any); ok {
-					if noteBytes, err := json.Marshal(notes); err == nil {
-						councilNote = string(noteBytes)
-					}
-				}
-
-				reviewURL := "/research/" + id
-				if findingsPath != "" {
-					reviewURL = "https://github.com/VibesTribe/knowledgebase/blob/main/" + findingsPath
-				}
-
-				items = append(items, ReviewItem{
-					ID:          id,
-					Category:    "research",
-					Title:       title,
-					Summary:     summary,
-					Status:      "pending_human",
-					ReviewURL:   reviewURL,
-					CreatedAt:   createdAt,
-					CouncilNote: councilNote,
-				})
-			}
-		}
+	// Fetch from unified review_items table
+	filters := map[string]any{
+		"status": status,
+		"order":  "priority.desc,created_at.desc",
+	}
+	if itemType != "" {
+		filters["type"] = itemType
 	}
 
-	// 2. Tasks needing human visual QA review
-	taskResult, err := s.db.Query(ctx, "tasks", map[string]any{
-		"status": "human_review",
-		"limit":  50,
-	})
-	if err == nil {
-		var rows []map[string]any
-		if json.Unmarshal(taskResult, &rows) == nil {
-			for _, row := range rows {
-				id, _ := row["id"].(string)
-				title, _ := row["title"].(string)
-				summary, _ := row["summary"].(string)
-				createdAt, _ := row["created_at"].(string)
-				if title == "" {
-					title = "Visual QA Review"
-				}
-
-				items = append(items, ReviewItem{
-					ID:        id,
-					Category:  "task",
-					Title:     title,
-					Summary:   summary,
-					Status:    "human_review",
-					ReviewURL: "/tasks/" + id,
-					CreatedAt: createdAt,
-				})
-			}
-		}
-	}
-
-	// 3. Credit / subscription alerts
-	alertData, err := s.db.RPC(ctx, "check_subscription_thresholds", map[string]any{})
+	dbItems, err := s.db.Query(ctx, "review_items", filters)
 	if err != nil {
-		log.Printf("[review-queue] credit alert RPC error: %v", err)
-	} else {
-		var alerts []map[string]any
-		if unmarshalErr := json.Unmarshal(alertData, &alerts); unmarshalErr != nil {
-			log.Printf("[review-queue] credit alert unmarshal error: %v", unmarshalErr)
-		} else {
-			// Email is handled by credit_poller's checkDBThresholds with proper dedup.
-			// Do NOT send email here -- this endpoint is polled every 60 seconds by the dashboard.
-			for _, alert := range alerts {
-				modelID, _ := alert["model_id"].(string)
-				alertType, _ := alert["alert_type"].(string)
-				message, _ := alert["message"].(string)
-				if message == "" {
-					message = alertType + " alert for " + modelID
-				}
+		log.Printf("[review-queue] query error: %v", err)
+		dbItems = json.RawMessage("[]")
+	}
 
-				items = append(items, ReviewItem{
-					ID:        modelID + "-" + alertType,
-					Category:  "credit_alert",
-					Title:     modelID + " " + alertType,
-					Summary:   message,
-					Status:    "alert",
-					ReviewURL: "/admin#credits",
-				})
+	var items []reviewitems.ReviewItem
+	if json.Unmarshal(dbItems, &items) != nil {
+		items = []reviewitems.ReviewItem{}
+	}
+
+	// Back-compat: also include live credit alerts from the RPC when requested
+	// (these are ephemeral threshold checks, not persisted in review_items)
+	type compatAlert struct {
+		ID        string `json:"id"`
+		Category  string `json:"category"`
+		Title     string `json:"title"`
+		Summary   string `json:"summary"`
+		Status    string `json:"status"`
+		ReviewURL string `json:"review_url"`
+	}
+	var alerts []compatAlert
+	if includeCreditAlerts {
+		alertData, rpcErr := s.db.RPC(ctx, "check_subscription_thresholds", map[string]any{})
+		if rpcErr != nil {
+			log.Printf("[review-queue] credit alert RPC error: %v", rpcErr)
+		} else {
+			var rawAlerts []map[string]any
+			if json.Unmarshal(alertData, &rawAlerts) == nil {
+				for _, a := range rawAlerts {
+					modelID, _ := a["model_id"].(string)
+					alertType, _ := a["alert_type"].(string)
+					message, _ := a["message"].(string)
+					if message == "" {
+						message = alertType + " alert for " + modelID
+					}
+					alerts = append(alerts, compatAlert{
+						ID:        modelID + "-" + alertType,
+						Category:  "credit_alert",
+						Title:     modelID + " " + alertType,
+						Summary:   message,
+						Status:    "alert",
+						ReviewURL: "/admin#credits",
+					})
+				}
 			}
 		}
 	}
 
-	if items == nil {
-		items = []ReviewItem{}
+	// Build response: merge review_items + ephemeral credit alerts
+	type responseItem struct {
+		reviewitems.ReviewItem
+		Category  string `json:"category"` // back-compat alias for type
+		ReviewURL string `json:"review_url,omitempty"`
+	}
+
+	combined := make([]responseItem, 0, len(items)+len(alerts))
+	for _, item := range items {
+		ri := responseItem{
+			ReviewItem: item,
+			Category:   item.Type, // back-compat: dashboard uses "category"
+		}
+		// Derive review URL from payload or source_id
+		if item.Type == "research" {
+			var payload map[string]any
+			if json.Unmarshal(item.Payload, &payload) == nil {
+				if fp, ok := payload["findings_path"].(string); ok && fp != "" {
+					ri.ReviewURL = "https://github.com/VibesTribe/knowledgebase/blob/main/" + fp
+				}
+			}
+			if ri.ReviewURL == "" {
+				ri.ReviewURL = "/research/" + item.SourceID
+			}
+		} else if item.Type == "task_review" || item.Type == "visual_qa" {
+			ri.ReviewURL = "/tasks/" + item.SourceID
+		} else if item.Type == "credit_alert" {
+			ri.ReviewURL = "/admin#credits"
+		}
+		combined = append(combined, ri)
+	}
+	// Append ephemeral credit alerts (not in review_items)
+	for _, a := range alerts {
+		combined = append(combined, responseItem{
+			ReviewItem: reviewitems.ReviewItem{
+				ID:       a.ID,
+				Type:     "credit_alert",
+				SourceID: a.ID,
+				Title:    a.Title,
+				Summary:  a.Summary,
+				Status:   a.Status,
+				Priority: "high",
+			},
+			Category:  "credit_alert",
+			ReviewURL: a.ReviewURL,
+		})
 	}
 
 	responseBytes, _ := json.Marshal(map[string]any{
-		"items": items,
-		"count": len(items),
+		"items": combined,
+		"count": len(combined),
 	})
 	w.Write(responseBytes)
 }
@@ -2159,4 +2164,109 @@ func splitLines(s string) []string {
 
 func splitFields(s string) []string {
 	return strings.Fields(s)
+}
+
+// handleReviewItems returns all pending review items, optionally filtered by type or status.
+// GET /api/review-items?type=research&status=pending
+func (s *Server) handleReviewItems(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "GET only", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.db == nil {
+		writeJSON(w, http.StatusOK, []any{})
+		return
+	}
+
+	itemType := r.URL.Query().Get("type")
+	status := r.URL.Query().Get("status")
+
+	filters := map[string]any{
+		"order": "priority.asc,created_at.desc",
+		"limit": 100,
+	}
+	if status != "" {
+		filters["status"] = status
+	} else {
+		filters["status"] = "pending"
+	}
+	if itemType != "" {
+		filters["type"] = itemType
+	}
+
+	data, err := s.db.Query(r.Context(), "review_items", filters)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+}
+
+// handleReviewItemByID updates a single review item's status.
+// PATCH /api/review-items/{id} with {"status": "approved", "notes": "..."}
+func (s *Server) handleReviewItemByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch && r.Method != http.MethodGet {
+		http.Error(w, "GET/PATCH only", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.db == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"error": "DB not available"})
+		return
+	}
+
+	// Extract ID from path: /api/review-items/{id}
+	id := strings.TrimPrefix(r.URL.Path, "/api/review-items/")
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing item ID"})
+		return
+	}
+
+	// GET single item
+	if r.Method == http.MethodGet {
+		data, err := s.db.Query(r.Context(), "review_items", map[string]any{"id": id})
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
+		return
+	}
+
+	// PATCH: update status
+	var req struct {
+		Status string `json:"status"`
+		Notes  string `json:"notes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON"})
+		return
+	}
+
+	validStatuses := map[string]bool{
+		"pending": true, "approved": true, "rejected": true,
+		"deferred": true, "flagged": true, "resolved": true,
+	}
+	if !validStatuses[req.Status] {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid status: " + req.Status})
+		return
+	}
+
+	now := time.Now()
+	data := map[string]any{
+		"status":      req.Status,
+		"human_notes": req.Notes,
+		"reviewed_at": now,
+		"reviewed_by": "human",
+		"updated_at":  now,
+	}
+
+	result, err := s.db.Update(r.Context(), "review_items", id, data)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(result)
 }
