@@ -1,0 +1,121 @@
+{
+  "youtube_channels": [
+    {
+      "name": "Andrej Karpathy",
+      "channel_id": "UCPk6atehJrNC6cefoUesntA",
+      "url": "https://www.youtube.com/@AndrejKarpathy/videos",
+      "tier": 2,
+      "notes": "Foundational ML concepts, ex-Tesla AI director, OpenAI founder"
+    },
+    {
+      "name": "Indy Dev Dan",
+      "channel_id": "UCPhRVcTjifmFKi7Yi6B6qJg",
+      "url": "https://www.youtube.com/@IndyDevDan/videos",
+      "tier": 2,
+      "notes": "Hands-on AI agent building with Claude, practical tutorials"
+    },
+    {
+      "name": "Latent Space Podcast",
+      "channel_id": "UCsEh_Tn_Ja0KQRPCMksJcpQ",
+      "url": "https://www.youtube.com/@LatentSpacePodcast/videos",
+      "tier": 2,
+      "notes": "Technical AI engineer interviews, builders not theorists"
+    },
+    {
+      "name": "Anthropic",
+      "channel_id": "UCLB7AzV7cLqB7I5Vic5IZdg",
+      "url": "https://www.youtube.com/@AnthropicAI/videos",
+      "tier": 2,
+      "notes": "Official Anthropic channel, frontier AI updates"
+    },
+    {
+      "name": "Y Combinator",
+      "channel_id": "UCcefcZFCup6sRk52GBYX3jQ",
+      "url": "https://www.youtube.com/@ycombinator/videos",
+      "tier": 2,
+      "notes": "What AI startups are actually building"
+    },
+    {
+      "name": "Simon Willison",
+      "channel_id": "UCuoKuARi4ud0 porous",
+      "url": "https://www.youtube.com/@simonwillison/videos",
+      "tier": 2,
+      "notes": "LLM tooling, web engineering, datasette"
+    },
+    {
+      "name": "Hamel Husain",
+      "channel_id": "UCELtTFipkyY7QI0xO7CbYvQ",
+      "url": "https://www.youtube.com/@hamelhusain/videos",
+      "tier": 2,
+      "notes": "Technical lectures from real-world AI engineers"
+    }
+  ],
+  "web_sources": [
+    {
+      "name": "r/LocalLLaMA",
+      "url": "https://www.reddit.com/r/LocalLLaMA/hot/",
+      "tier": 1,
+      "type": "reddit",
+      "notes": "Best mix of new models, open-source, hardware news"
+    },
+    {
+      "name": "Hugging Face Trending",
+      "url": "https://huggingface.co/models?sort=trending",
+      "tier": 1,
+      "type": "website",
+      "notes": "Trending models, new releases"
+    },
+    {
+      "name": "Simon Willison Blog",
+      "url": "https://simonwillison.com/",
+      "tier": 1,
+      "type": "blog",
+      "notes": "AI tools, LLMs, web engineering analysis"
+    },
+    {
+      "name": "Hacker News AI",
+      "url": "https://news.ycombinator.com/",
+      "tier": 2,
+      "type": "aggregator",
+      "notes": "Scan for AI-related stories",
+      "filter": "ai,llm,model,agent,free,tier"
+    },
+    {
+      "name": "aienginee.rs",
+      "url": "https://aienginee.rs/",
+      "tier": 2,
+      "type": "newsletter",
+      "notes": "Hands-on LLMs, APIs, prompt engineering"
+    },
+    {
+      "name": "OpenRouter Models",
+      "url": "https://openrouter.ai/models",
+      "tier": 1,
+      "type": "api",
+      "notes": "Check for new free models and pricing changes"
+    }
+  ],
+  "tool_repos": [
+    {
+      "name": "Hermes Agent",
+      "url": "https://github.com/nicepkg/hermes",
+      "notes": "Check for new releases, features, breaking changes"
+    },
+    {
+      "name": "Go",
+      "url": "https://go.dev/dl/",
+      "notes": "Check for new stable releases"
+    },
+    {
+      "name": "Ollama",
+      "url": "https://github.com/ollama/ollama/releases",
+      "notes": "Local model runner updates"
+    }
+  ],
+  "settings": {
+    "max_daily_findings": 15,
+    "min_relevance_score": 4,
+    "rejected_cooldown_days": 30,
+    "request_delay_seconds": 3
+  }
+}
