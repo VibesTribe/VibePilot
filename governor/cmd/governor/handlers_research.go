@@ -645,6 +645,102 @@ func setupResearchHandlers(
 ) {
 	handler := NewResearchHandler(database, factory, pool, connRouter, cfg, usageTracker, actionApplier)
 	handler.Register(router)
+
+	// Recover stale council_review items left from previous crash/restart
+	handler.recoverStaleCouncilReviews(ctx)
+}
+
+// recoverStaleCouncilReviews finds research_suggestions stuck in council_review
+// status for more than 10 minutes and re-triggers the council review process.
+func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
+	stale, err := h.database.Query(ctx, "research_suggestions", map[string]any{
+		"status": "council_review",
+	})
+	if err != nil {
+		log.Printf("[ResearchRecovery] Failed to query stale council_review items: %v", err)
+		return
+	}
+
+	var items []map[string]any
+	if json.Unmarshal(stale, &items) != nil || len(items) == 0 {
+		return
+	}
+
+	for _, item := range items {
+		id, _ := item["id"].(string)
+		title, _ := item["title"].(string)
+
+		// Check if the item has been stale for more than 10 minutes
+		updatedAt, _ := item["updated_at"].(string)
+		if updatedAt == "" {
+			continue
+		}
+
+		staleAge := 10 * time.Minute
+		// Parse the timestamp (format varies by driver)
+		var t time.Time
+		for _, layout := range []string{
+			"2006-01-02T15:04:05.999999999Z07:00",
+			"2006-01-02T15:04:05Z07:00",
+			"2006-01-02 15:04:05.999999999 -0700 MST",
+			time.RFC3339Nano,
+			time.RFC3339,
+		} {
+			if parsed, err := time.Parse(layout, updatedAt); err == nil {
+				t = parsed
+				break
+			}
+		}
+
+		if t.IsZero() {
+			log.Printf("[ResearchRecovery] Cannot parse timestamp for %s: %s", truncateID(id), updatedAt)
+			continue
+		}
+
+		age := time.Since(t)
+		if age < staleAge {
+			log.Printf("[ResearchRecovery] %s (%s) still fresh (age: %s), skipping", truncateID(id), title, age)
+			continue
+		}
+
+		log.Printf("[ResearchRecovery] Recovering stale council_review item: %s (%s), age: %s", truncateID(id), title, age)
+
+		// Find or create the daily report for this item, then re-trigger council review
+		findingsPath, _ := item["findings_path"].(string)
+		detailsRaw, _ := item["details"]
+		var details map[string]any
+		if detailsRaw != nil {
+			switch d := detailsRaw.(type) {
+			case map[string]any:
+				details = d
+			default:
+				details = map[string]any{}
+			}
+		}
+
+		if findingsPath != "" {
+			reportID := h.findOrCreateDailyReport(ctx, findingsPath, details)
+			if reportID != "" {
+				// Add this item to the report
+				summary, _ := item["summary"].(string)
+				findingType, _ := item["type"].(string)
+				h.addReportItem(ctx, reportID, id, title, summary, findingType, details)
+
+				// Check if the report is ready for review and route it
+				h.checkAndRouteReport(ctx, reportID)
+				log.Printf("[ResearchRecovery] Re-routed item %s to report %s", truncateID(id), truncateID(reportID))
+			}
+		} else {
+			// No findings path -- reset to pending so it gets re-processed
+			h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
+				"p_id":     id,
+				"p_status": "pending",
+			})
+			log.Printf("[ResearchRecovery] Reset item %s to pending (no findings_path)", truncateID(id))
+		}
+	}
+
+	log.Printf("[ResearchRecovery] Scan complete, checked %d items", len(items))
 }
 
 // insertReviewItem adds a review item to the unified review queue.
