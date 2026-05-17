@@ -155,6 +155,10 @@ var defaultRPCAllowlist = map[string]bool{
 	"delete_alert_sent":     true,
 	"delete_all_alert_sent": true,
 	"get_alert_sent_log":    true,
+
+	// Simple credit alert system (one email per purchase cycle)
+	"get_models_needing_credit_alert": true,
+	"reset_credit_alert_if_topped_up": true,
 	"create_project_snapshot":     true,
 	"record_internal_run":         true,
 

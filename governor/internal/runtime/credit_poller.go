@@ -30,9 +30,8 @@ type CreditPoller struct {
 	vault     VaultKeyGetter
 	db        CreditDB
 	client    *http.Client
-	platforms []creditPollTarget
 	interval  time.Duration
-	alerts    *notifications.AlertDedup // centralized one-email-ever dedup for all alert types
+	platforms []creditPollTarget
 }
 
 // creditPollTarget defines a provider whose credit balance should be polled.
@@ -69,7 +68,6 @@ func NewCreditPoller(tracker *PlatformUsageTrackerV2, vault VaultKeyGetter, db C
 		vault:   vault,
 		db:      db,
 		client:  &http.Client{Timeout: 15 * time.Second},
-		alerts:  notifications.NewAlertDedup(),
 		platforms: []creditPollTarget{
 			{
 				PlatformID:        "deepseek-api",
@@ -84,71 +82,6 @@ func NewCreditPoller(tracker *PlatformUsageTrackerV2, vault VaultKeyGetter, db C
 		},
 		interval: 30 * time.Minute, // base tick: evaluate which providers need polling
 	}
-}
-
-// InitAlertDedupDB initializes the alert dedup system with DB persistence.
-// This MUST be called before StartBackgroundPolling to ensure dedup state
-// survives governor restarts and prevents duplicate email floods.
-func (cp *CreditPoller) InitAlertDedupDB(ctx context.Context, db CreditDB) {
-	if db == nil {
-		return
-	}
-	// Adapt CreditDB to the DBInserter interface for alert_sent_log persistence
-	inserter := &creditDBInserter{db: db}
-
-	// Load existing alert keys from DB using the alert_sent_log table
-	querier := func(ctx context.Context, query string, args ...interface{}) ([]string, error) {
-		data, err := db.RPC(ctx, "get_alert_sent_log", map[string]any{})
-		if err != nil {
-			log.Printf("[CreditPoller] InitAlertDedupDB: could not load alert_sent_log: %v", err)
-			return nil, nil // non-fatal: just won't preload dedup
-		}
-		if len(data) == 0 || string(data) == "[]" {
-			return nil, nil
-		}
-		var rows []map[string]string
-		if err := json.Unmarshal(data, &rows); err != nil {
-			return nil, nil
-		}
-		var keys []string
-		for _, r := range rows {
-			if k, ok := r["key"]; ok {
-				keys = append(keys, k)
-			}
-		}
-		return keys, nil
-	}
-	cp.alerts.SetDBWithLoad(ctx, inserter, querier)
-	log.Printf("[CreditPoller] Alert dedup initialized with DB persistence")
-}
-
-// creditDBInserter adapts CreditDB to the DBInserter interface.
-type creditDBInserter struct {
-	db CreditDB
-}
-
-func (c *creditDBInserter) Exec(ctx context.Context, query string, args ...interface{}) (interface{}, error) {
-	// Route INSERT/DELETE on alert_sent_log through RPC calls
-	q := strings.TrimSpace(query)
-	if strings.HasPrefix(q, "INSERT") {
-		// Extract key from VALUES ($1, NOW())
-		if len(args) > 0 {
-			key, _ := args[0].(string)
-			_, err := c.db.RPC(ctx, "record_alert_sent", map[string]any{"p_key": key})
-			return nil, err
-		}
-	} else if strings.HasPrefix(q, "DELETE") {
-		if len(args) > 0 {
-			// Delete specific key
-			key, _ := args[0].(string)
-			_, err := c.db.RPC(ctx, "delete_alert_sent", map[string]any{"p_key": key})
-			return nil, err
-		}
-		// Delete all
-		_, err := c.db.RPC(ctx, "delete_all_alert_sent", map[string]any{})
-		return nil, err
-	}
-	return nil, nil
 }
 
 // shouldPoll determines if a provider needs polling based on usage recency.
@@ -257,8 +190,8 @@ func (cp *CreditPoller) pollAll(ctx context.Context) {
 
 		log.Printf("[CreditPoller] %s balance: $%.2f", target.PlatformID, float64(balanceCents)/100)
 
-		// Check DB-defined thresholds and fire email alert if any model is below
-		cp.checkDBThresholds(ctx)
+		// Check DB-defined thresholds and fire ONE email per credit purchase cycle
+		cp.checkCreditAlerts(ctx)
 	}
 }
 
@@ -282,94 +215,66 @@ func (cp *CreditPoller) syncBalanceToDB(ctx context.Context, target *creditPollT
 
 // checkThreshold fires an alert when credit drops below the configured threshold.
 // Uses AlertFired + AlertCooldown to avoid spamming.
-func (cp *CreditPoller) checkThreshold(target *creditPollTarget, balanceCents int) {
-	if target.InitialBalance <= 0 || target.AlertThresholdPct <= 0 {
-		return
-	}
-
-	thresholdCents := int(float64(target.InitialBalance) * target.AlertThresholdPct)
-	if balanceCents > thresholdCents {
-		return // still above threshold
-	}
-
-	// Check cooldown — don't alert more than once per cooldown period
-	cp.mu.Lock()
-	if target.AlertFired && time.Since(target.LastAlertTime) < target.AlertCooldown {
-		cp.mu.Unlock()
-		return
-	}
-	target.AlertFired = true
-	target.LastAlertTime = time.Now()
-	cp.mu.Unlock()
-
-	pctRemaining := float64(balanceCents) / float64(target.InitialBalance) * 100
-
-	log.Printf("[CreditPoller] *** CREDIT ALERT *** %s (%s): $%.2f remaining (%.0f%% of initial $%.2f) — below %.0f%% threshold",
-		target.PlatformID, target.ModelID,
-		float64(balanceCents)/100, pctRemaining,
-		float64(target.InitialBalance)/100,
-		target.AlertThresholdPct*100)
-
-	// Fire email notification in background
-	go cp.sendCreditAlert(target, balanceCents, pctRemaining)
-}
-
-// checkDBThresholds uses the centralized AlertDedup to check subscription
-// thresholds and send exactly one email per alert. Dedup resets only when
-// credits are topped back above threshold (DB returns no alerts).
-func (cp *CreditPoller) checkDBThresholds(ctx context.Context) {
+// checkCreditAlerts uses a single DB column (credit_alert_sent) to guarantee
+// exactly ONE email per credit purchase cycle. No in-memory state. Survives restarts.
+// The RPC get_models_needing_credit_alert() atomically checks threshold AND marks sent.
+// The flag resets only when credits are topped back above threshold (reset_credit_alert_if_topped_up).
+func (cp *CreditPoller) checkCreditAlerts(ctx context.Context) {
 	if cp.db == nil {
 		return
 	}
 
-	// Delegate to the centralized alert system
-	count := cp.alerts.CheckAndAlert(ctx, creditDBWrapper{db: cp.db})
-	if count > 0 {
-		log.Printf("[CreditPoller] DB threshold alert email sent for %d alert(s)", count)
+	// First, reset alerts for any models that have been topped up
+	cp.db.RPC(ctx, "reset_credit_alert_if_topped_up", map[string]interface{}{})
+
+	// Then, atomically find models that need alerting AND mark them sent
+	data, err := cp.db.RPC(ctx, "get_models_needing_credit_alert", map[string]interface{}{})
+	if err != nil {
+		log.Printf("[CreditPoller] checkCreditAlerts error: %v", err)
+		return
 	}
-}
-
-// creditDBWrapper adapts CreditDB to the notifications.DBQuerier interface.
-type creditDBWrapper struct {
-	db CreditDB
-}
-
-func (w creditDBWrapper) RPC(ctx context.Context, name string, params map[string]any) ([]byte, error) {
-	// Convert map[string]any to map[string]interface{} for CreditDB compatibility
-	converted := make(map[string]interface{}, len(params))
-	for k, v := range params {
-		converted[k] = v
+	if len(data) == 0 || string(data) == "[]" {
+		return
 	}
-	return w.db.RPC(ctx, name, converted)
-}
 
-// sendCreditAlert dispatches an email notification for low credit.
-// Uses centralized AlertDedup to guarantee exactly one email per alert.
-func (cp *CreditPoller) sendCreditAlert(target *creditPollTarget, balanceCents int, pctRemaining float64) {
-	dedupKey := "pct_threshold:" + target.ModelID
-
-	subject := fmt.Sprintf("[VibePilot] Credit Alert: %s at %.0f%% ($%.2f remaining)",
-		target.ModelID, pctRemaining, float64(balanceCents)/100)
-
-	body := fmt.Sprintf(
-		"VibePilot Credit Alert\n\n"+
-			"Model: %s\n"+
-			"Provider: %s\n"+
-			"Remaining: $%.2f (%.0f%% of $%.2f)\n"+
-			"Threshold: %.0f%%\n\n"+
-			"This alert fires when credit drops below the threshold.\n"+
-			"Top up at the provider's dashboard to avoid service interruption.\n\n"+
-			"— VibePilot Governor",
-		target.ModelID, target.PlatformID,
-		float64(balanceCents)/100, pctRemaining,
-		float64(target.InitialBalance)/100,
-		target.AlertThresholdPct*100,
-	)
-
-	if sent := cp.alerts.SendEmailIfNew(dedupKey, subject, body); sent {
-		log.Printf("[CreditPoller] Credit alert email sent for %s", target.ModelID)
+	var alerts []struct {
+		ModelID   string  `json:"model_id"`
+		Remaining float64 `json:"remaining"`
+		Msg       string  `json:"msg"`
 	}
+	if err := json.Unmarshal(data, &alerts); err != nil || len(alerts) == 0 {
+		return
+	}
+
+	// Build one email with all alerts
+	var lines []string
+	for _, a := range alerts {
+		lines = append(lines, fmt.Sprintf("- %s: $%.2f remaining", a.ModelID, a.Remaining))
+		lines = append(lines, "  "+a.Msg)
+	}
+
+	subject := fmt.Sprintf("[VibePilot] Credit Alert: %d model(s) below threshold", len(alerts))
+	body := "The following models have credit below their alert thresholds:\n\n" +
+		strings.Join(lines, "\n") +
+		"\n\nTop up at the provider's dashboard to avoid service interruption.\n\n" +
+		"You will NOT receive another alert until credits are topped up.\n\n" +
+		"— VibePilot Governor"
+
+	// Fire email directly - the DB already marked them as sent, so this is safe
+	if err := notifications.SendEmailUnconditional(subject, body); err != nil {
+		log.Printf("[CreditPoller] Failed to send credit alert email: %v", err)
+		// Un-mark so it retries next cycle
+		for _, a := range alerts {
+			cp.db.RPC(ctx, "update_model", map[string]interface{}{
+				"p_id":     a.ModelID,
+				"p_updates": map[string]any{"credit_alert_sent": false},
+			})
+		}
+		return
+	}
+	log.Printf("[CreditPoller] Credit alert email sent for %d model(s)", len(alerts))
 }
+
 
 func (cp *CreditPoller) pollProvider(ctx context.Context, target *creditPollTarget) (int, error) {
 	switch target.PlatformID {
