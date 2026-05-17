@@ -205,8 +205,9 @@ func (cp *CreditPoller) checkThreshold(target *creditPollTarget, balanceCents in
 
 // checkDBThresholds uses check_subscription_thresholds RPC to detect low credit
 // and sends email alerts. This is the primary alert mechanism since the DB holds
-// the authoritative thresholds per model. Dedup: only sends once per 6 hours.
-var lastDBAlertEmail time.Time
+// the authoritative thresholds per model. Dedup: one email per model per alert,
+// resets when credits are topped back above threshold.
+var emailedAlerts sync.Map // key: model_id, value: alert_type
 
 func (cp *CreditPoller) checkDBThresholds(ctx context.Context) {
 	if cp.db == nil {
@@ -219,8 +220,13 @@ func (cp *CreditPoller) checkDBThresholds(ctx context.Context) {
 		return
 	}
 
+	// If no alerts, clear all dedup state (credits have been topped up)
 	if len(data) == 0 || string(data) == "[]" {
-		return // no alerts
+		emailedAlerts.Range(func(key, _ any) bool {
+			emailedAlerts.Delete(key)
+			return true
+		})
+		return
 	}
 
 	var alerts []map[string]any
@@ -228,12 +234,23 @@ func (cp *CreditPoller) checkDBThresholds(ctx context.Context) {
 		return
 	}
 
-	// Dedup: only send one email per 6 hours
-	if time.Since(lastDBAlertEmail) < 6*time.Hour {
-		log.Printf("[CreditPoller] Skipping DB threshold email (sent %.0f min ago)", time.Since(lastDBAlertEmail).Minutes())
-		return
+	// Filter out alerts we already emailed about
+	var newAlerts []map[string]any
+	for _, alert := range alerts {
+		modelID, _ := alert["model_id"].(string)
+		alertType, _ := alert["alert_type"].(string)
+		dedupKey := modelID + ":" + alertType
+		if _, alreadySent := emailedAlerts.Load(dedupKey); alreadySent {
+			continue
+		}
+		newAlerts = append(newAlerts, alert)
+		emailedAlerts.Store(dedupKey, true)
 	}
-	lastDBAlertEmail = time.Now()
+
+	if len(newAlerts) == 0 {
+		return // all alerts already emailed
+	}
+	alerts = newAlerts
 
 	// Send email via notify_email.py
 	var lines []string
