@@ -252,6 +252,37 @@ func ParseCouncilVote(output string) (*CouncilVote, error) {
 	return &v, nil
 }
 
+// ParseReportCouncilVotes parses per-item council votes from a report review.
+// Expects JSON like: {"items": [{"sort_order": 0, "vote": "approve", "reasoning": "...", "concerns": []}, ...]}
+// Returns map keyed by sort_order.
+func ParseReportCouncilVotes(output string) map[int]map[string]any {
+	jsonStr := extractJSON(output)
+
+	var wrapper struct {
+		Items []map[string]any `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(jsonStr), &wrapper); err != nil {
+		// Fallback: try parsing as array directly
+		var items []map[string]any
+		if err := json.Unmarshal([]byte(jsonStr), &items); err != nil {
+			return map[int]map[string]any{}
+		}
+		wrapper.Items = items
+	}
+
+	result := make(map[int]map[string]any)
+	for _, item := range wrapper.Items {
+		sortOrder := 0
+		if so, ok := item["sort_order"].(float64); ok {
+			sortOrder = int(so)
+		} else if idx, ok := item["index"].(float64); ok {
+			sortOrder = int(idx)
+		}
+		result[sortOrder] = item
+	}
+	return result
+}
+
 func ParsePlannerOutput(output string) (*PlannerOutput, error) {
 	var p PlannerOutput
 	jsonStr := extractJSON(output)

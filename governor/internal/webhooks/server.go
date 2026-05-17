@@ -207,6 +207,9 @@ func (s *Server) Start(ctx context.Context) error {
 	// Review Items API (unified review hub)
 	mux.HandleFunc("/api/review-items", s.handleReviewItems)
 	mux.HandleFunc("/api/review-items/", s.handleReviewItemByID)
+	mux.HandleFunc("/api/research-reports", s.handleResearchReports)
+	mux.HandleFunc("/api/research-reports/", s.handleResearchReportByID)
+	mux.HandleFunc("/api/report-items/", s.handleReportItemDecision)
 	mux.HandleFunc("/api/design-preview/list", s.handleDesignPreviewList)
 	mux.HandleFunc("/api/design-reviews", s.handleDesignReviews)
 	mux.HandleFunc("/api/design-reviews/approve", s.handleDesignReviewAction)
@@ -2199,8 +2202,28 @@ func (s *Server) handleReviewItems(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(data)
+
+	// Enrich items with review_url from payload.decision_doc_path or payload.findings_path
+	var enriched []map[string]any
+	if err := json.Unmarshal(data, &enriched); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
+		return
+	}
+	kbBase := "https://knowledge.vibestribe.rocks"
+	for i := range enriched {
+		reviewURL := ""
+		if payload, ok := enriched[i]["payload"].(map[string]any); ok {
+			if dp, ok := payload["decision_doc_path"].(string); ok && dp != "" {
+				reviewURL = kbBase + "/" + dp
+			} else if fp, ok := payload["findings_path"].(string); ok && fp != "" {
+				reviewURL = kbBase + "/" + fp
+			}
+		}
+		enriched[i]["review_url"] = reviewURL
+	}
+
+	writeJSON(w, http.StatusOK, enriched)
 }
 
 // handleReviewItemByID updates a single review item's status.
@@ -2267,6 +2290,202 @@ func (s *Server) handleReviewItemByID(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
+
+	// On approval of research/council items: update research_suggestion status
+	// and emit event for consultant to create PRD
+	if req.Status == "approved" {
+		// Fetch the item to check type and source_id
+		itemData, _ := s.db.Query(r.Context(), "review_items", map[string]any{"id": id})
+		var items []map[string]any
+		if json.Unmarshal(itemData, &items) == nil && len(items) > 0 {
+			item := items[0]
+			itemType, _ := item["type"].(string)
+			sourceID, _ := item["source_id"].(string)
+			if (itemType == "research" || itemType == "council") && sourceID != "" {
+				// Update research_suggestion status
+				_, _ = s.db.RPC(r.Context(), "update_research_suggestion_status", map[string]any{
+					"p_id":     sourceID,
+					"p_status": "approved",
+					"p_review_notes": map[string]any{
+						"approved_by": "human",
+						"review_item": id,
+						"notes":       req.Notes,
+					},
+				})
+				log.Printf("[review-items] Research %s approved by human, triggering consultant", sourceID)
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(result)
+}
+
+// handleResearchReports lists all research reports.
+func (s *Server) handleResearchReports(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	filters := map[string]any{"limit": 50}
+	if status := r.URL.Query().Get("status"); status != "" {
+		filters["status"] = status
+	}
+	if reportType := r.URL.Query().Get("type"); reportType != "" {
+		filters["report_type"] = reportType
+	}
+
+	data, err := s.db.Query(r.Context(), "research_reports", filters)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	// Enrich each report with item counts
+	var reports []map[string]any
+	if json.Unmarshal(data, &reports) == nil {
+		for i := range reports {
+			reportID, _ := reports[i]["id"].(string)
+			itemData, _ := s.db.Query(r.Context(), "research_report_items", map[string]any{
+				"report_id": reportID,
+			})
+			var items []map[string]any
+			if json.Unmarshal(itemData, &items) == nil {
+				approved, watch, rejected, undecided := 0, 0, 0, 0
+				for _, item := range items {
+					switch item["human_decision"] {
+					case "approve":
+						approved++
+					case "watch":
+						watch++
+					case "reject":
+						rejected++
+					default:
+						undecided++
+					}
+				}
+				reports[i]["item_counts"] = map[string]any{
+					"total":     len(items),
+					"approved":  approved,
+					"watch":     watch,
+					"rejected":  rejected,
+					"undecided": undecided,
+				}
+			}
+			// Add review_url
+			reviewURL := ""
+			if dp, ok := reports[i]["decision_doc_path"].(string); ok && dp != "" {
+				reviewURL = "https://knowledge.vibestribe.rocks/" + dp
+			} else if fp, ok := reports[i]["findings_path"].(string); ok && fp != "" {
+				reviewURL = "https://knowledge.vibestribe.rocks/" + fp
+			}
+			reports[i]["review_url"] = reviewURL
+		}
+	}
+
+	writeJSON(w, http.StatusOK, reports)
+}
+
+// handleResearchReportByID returns a single report with all its items.
+func (s *Server) handleResearchReportByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	id := strings.TrimPrefix(r.URL.Path, "/api/research-reports/")
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "report id required"})
+		return
+	}
+
+	data, err := s.db.RPC(r.Context(), "get_report_for_review", map[string]any{
+		"p_report_id": id,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+}
+
+// handleReportItemDecision sets the human decision on a report item.
+// PATCH /api/report-items/{id}  body: {"decision": "approve|watch|reject", "notes": "..."}
+func (s *Server) handleReportItemDecision(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	id := strings.TrimPrefix(r.URL.Path, "/api/report-items/")
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "item id required"})
+		return
+	}
+
+	var req struct {
+		Decision string `json:"decision"`
+		Notes    string `json:"notes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+		return
+	}
+
+	if req.Decision != "approve" && req.Decision != "watch" && req.Decision != "reject" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "decision must be approve, watch, or reject"})
+		return
+	}
+
+	result, err := s.db.RPC(r.Context(), "set_report_item_decision", map[string]any{
+		"p_item_id":  id,
+		"p_decision": req.Decision,
+		"p_notes":    req.Notes,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	// Check if the report is now fully decided (all items have decisions)
+	var item map[string]any
+	if json.Unmarshal(result, &item) == nil {
+		if reportID, ok := item["report_id"].(string); ok && reportID != "" {
+			undecided, _ := s.db.RPC(r.Context(), "report_undecided_count", map[string]any{
+				"p_report_id": reportID,
+			})
+			count := 0
+			if undecided != nil {
+				json.Unmarshal(undecided, &count)
+			}
+			if count == 0 {
+				// All items decided. Mark report and trigger PRD generation.
+				log.Printf("[report-items] Report %s fully decided, triggering PRD generation", reportID)
+				// Update report status
+				s.db.RPC(r.Context(), "update_report_status", map[string]any{
+					"p_id":     reportID,
+					"p_status": "decided",
+				})
+				// Create review item for PRD generation
+				s.db.Insert(r.Context(), "review_items", map[string]any{
+					"type":     "research",
+					"source_id": reportID,
+					"title":    "Generate PRD from approved research items",
+					"summary":  fmt.Sprintf("All items decided. Approved items ready for PRD."),
+					"status":   "pending",
+					"priority": "high",
+					"payload": map[string]any{
+						"report_id":    reportID,
+						"report_type":  "daily_scan",
+						"action":       "generate_prd",
+					},
+				})
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "decision": req.Decision})
 }

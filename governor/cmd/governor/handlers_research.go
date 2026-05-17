@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,13 +15,29 @@ import (
 )
 
 type ResearchHandler struct {
-	database       db.Database
-	factory        *runtime.SessionFactory
-	pool           *runtime.AgentPool
-	connRouter     *runtime.Router
-	cfg            *runtime.Config
-	usageTracker   *runtime.UsageTracker
-	actionApplier  *runtime.ResearchActionApplier
+	database      db.Database
+	factory       *runtime.SessionFactory
+	pool          *runtime.AgentPool
+	connRouter    *runtime.Router
+	cfg           *runtime.Config
+	usageTracker  *runtime.UsageTracker
+	actionApplier *runtime.ResearchActionApplier
+}
+
+// councilMemberResult holds a single council member's per-item votes.
+type councilMemberResult struct {
+	items map[int]map[string]any // item sort_order -> {vote, reasoning, concerns}
+	err   error
+}
+
+// reportItemResult holds the aggregated result for a single report item.
+type reportItemResult struct {
+	sortOrder      int
+	title          string
+	recommendation string
+	reasoning      string
+	concerns       []string
+	councilVotes   []map[string]any
 }
 
 func NewResearchHandler(
@@ -45,8 +63,13 @@ func NewResearchHandler(
 func (h *ResearchHandler) Register(router *runtime.EventRouter) {
 	router.On(runtime.EventResearchReady, h.handleResearchReady)
 	router.On(runtime.EventResearchCouncil, h.handleResearchCouncil)
+	// New event: report is ready for council (all items collected)
+	router.On(runtime.EventReportCouncil, h.handleReportCouncilReview)
 }
 
+// handleResearchReady fires for each individual research_suggestion.
+// It creates or finds a daily report and adds the suggestion as an item.
+// Once all expected items are added, it routes the report to council.
 func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 	ctx := context.Background()
 
@@ -59,6 +82,9 @@ func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 	suggestionID := getString(suggestion, "id")
 	suggestionType := getString(suggestion, "type")
 	complexity := getString(suggestion, "complexity")
+	title := getString(suggestion, "title")
+	summary := getString(suggestion, "summary")
+	findingsPath := getString(suggestion, "findings_path")
 
 	if suggestionID == "" {
 		return
@@ -80,200 +106,197 @@ func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 		"p_id":    suggestionID,
 	})
 
-	log.Printf("[ResearchReady] Processing %s (type: %s, complexity: %s)", truncateID(suggestionID), suggestionType, complexity)
-
-	switch complexity {
-	case "human":
-		log.Printf("[ResearchReady] Human review required for %s", truncateID(suggestionID))
-		_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
-			"p_id":           suggestionID,
-			"p_status":       "pending_human",
-			"p_review_notes": map[string]any{"reason": "complexity=human, requires human decision"},
-		})
-		// Insert into review_items for unified review hub
-		hTitle := getString(suggestion, "title")
-		hSummary := getString(suggestion, "summary")
-		h.insertReviewItem(ctx, "research", suggestionID, hTitle, hSummary, "high")
-		return
-
-	case "complex":
-		log.Printf("[ResearchReady] Complex item %s - routing to council", truncateID(suggestionID))
-		_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
-			"p_id":           suggestionID,
-			"p_status":       "council_review",
-			"p_review_notes": map[string]any{"source": "research", "type": suggestionType},
-		})
-		return
-	}
-
-	routingResult, err := h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
-		Role:        "supervisor",
-		TaskType:    "research_review",
-		RoutingFlag: "internal",
+	// Mark suggestion as processing
+	_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
+		"p_id":     suggestionID,
+		"p_status": "council_review",
+		"p_review_notes": map[string]any{
+			"source":              "research",
+			"type":                suggestionType,
+			"original_complexity": complexity,
+		},
 	})
-	if err != nil || routingResult == nil {
-		log.Printf("[ResearchReady] No routing for %s", truncateID(suggestionID))
-		return
+
+	// Find or create today's daily report
+	details, _ := suggestion["details"].(map[string]any)
+	reportID := h.findOrCreateDailyReport(ctx, findingsPath, details)
+
+	// Add this suggestion as an item in the report
+	h.addReportItem(ctx, reportID, suggestionID, title, summary, suggestionType, details)
+
+	log.Printf("[ResearchReady] Added %s to report %s", truncateID(suggestionID), truncateID(reportID))
+
+	// Check if report has enough items to send to council
+	// For daily scans: send when we have items (council will be triggered by the report status change)
+	// The pg_notify trigger on research_reports handles routing to council
+	h.checkAndRouteReport(ctx, reportID)
+}
+
+// findOrCreateDailyReport gets today's daily_scan report or creates one.
+func (h *ResearchHandler) findOrCreateDailyReport(ctx context.Context, findingsPath string, details map[string]any) string {
+	today := time.Now().Format("2006-01-02")
+	reportTitle := fmt.Sprintf("Daily Research Scan - %s", today)
+
+	// Check for existing report today
+	data, err := h.database.Query(ctx, "research_reports", map[string]any{
+		"report_type": "daily_scan",
+		"limit":       1,
+	})
+	if err == nil {
+		var reports []map[string]any
+		if json.Unmarshal(data, &reports) == nil && len(reports) > 0 {
+			if id, ok := reports[0]["id"].(string); ok && id != "" {
+				return id
+			}
+		}
 	}
 
-	session, err := h.factory.CreateWithConnector(ctx, "supervisor", "research_review", routingResult.ConnectorID)
-	if err != nil {
-		log.Printf("[ResearchReady] Failed to create session for %s: %v", truncateID(suggestionID), err)
-		return
-	}
-
-	err = h.pool.SubmitWithDestination(ctx, "research", routingResult.ConnectorID, func() error {
-		reviewStart := time.Now()
-		result, err := session.Run(ctx, map[string]any{
-			"event":      "research_review",
-			"suggestion": suggestion,
-		})
-		reviewDuration := time.Since(reviewStart).Seconds()
-		if err != nil {
-			if h.usageTracker != nil {
-				h.usageTracker.RecordCompletion(ctx, routingResult.ModelID, "research_review", reviewDuration, false)
-			}
-			return err
-		}
-
-		if h.usageTracker != nil {
-			h.usageTracker.RecordCompletion(ctx, routingResult.ModelID, "research_review", reviewDuration, true)
-		}
-
-		review, parseErr := runtime.ParseResearchReview(result.Output)
-		if parseErr != nil {
-			log.Printf("[ResearchReady] Failed to parse review: %v", parseErr)
-			return nil
-		}
-
-		log.Printf("[ResearchReady] Suggestion %s review: decision=%s", truncateID(suggestionID), review.Decision)
-
-		switch review.Decision {
-		case "approved":
-			// For model/platform/pricing changes: apply directly (no LLM middleman)
-			modelRelatedTypes := map[string]bool{
-				"new_model": true, "new_platform": true,
-				"pricing_change": true, "config_tweak": true,
-			}
-			if modelRelatedTypes[suggestionType] && h.actionApplier != nil {
-				details, _ := suggestion["details"].(map[string]any)
-				if len(details) > 0 {
-					summary, applyErr := h.actionApplier.ApplyResearchAction(ctx, suggestionType, details)
-					if applyErr != nil {
-						log.Printf("[ResearchReady] Direct apply failed for %s: %v", suggestionType, applyErr)
-						// Fall through to maintenance command as fallback
-					} else {
-						log.Printf("[ResearchReady] Directly applied %s: %s", suggestionType, summary)
-						// Update suggestion status to implemented
-						_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
-							"p_id":     suggestionID,
-							"p_status": "implemented",
-							"p_review_notes": map[string]any{
-								"reasoning":        review.Reasoning,
-								"notes":            review.Notes,
-								"applied_directly": summary,
-							},
-						})
-						break // skip maintenance command path
-					}
-				}
-			}
-
-			// Non-model types or fallback: delegate to maintenance command
-			if review.MaintenanceCommand != nil {
-				cmdJSON, _ := json.Marshal(review.MaintenanceCommand.Details)
-				_, err := h.database.RPC(ctx, "create_maintenance_command", map[string]any{
-					"p_command_type": review.MaintenanceCommand.Action,
-					"p_payload":      json.RawMessage(cmdJSON),
-					"p_source":       "research_review",
-					"p_approved_by":  "supervisor",
-				})
-				if err != nil {
-					log.Printf("[ResearchReady] Failed to create maintenance command: %v", err)
-				} else {
-					log.Printf("[ResearchReady] Created maintenance command: %s", review.MaintenanceCommand.Action)
-				}
-			}
-			_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
-				"p_id":     suggestionID,
-				"p_status": "approved",
-				"p_review_notes": map[string]any{
-					"reasoning": review.Reasoning,
-					"notes":     review.Notes,
-				},
-			})
-
-		case "rejected":
-			_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
-				"p_id":     suggestionID,
-				"p_status": "rejected",
-				"p_review_notes": map[string]any{
-					"reasoning": review.Reasoning,
-				},
-			})
-
-		case "council_review":
-			_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
-				"p_id":     suggestionID,
-				"p_status": "council_review",
-				"p_review_notes": map[string]any{
-					"reasoning": review.Reasoning,
-					"source":    "research",
-				},
-			})
-
-		case "human_review":
-			_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
-				"p_id":     suggestionID,
-				"p_status": "pending_human",
-				"p_review_notes": map[string]any{
-					"reasoning": review.Reasoning,
-					"urgency":   review.Urgency,
-				},
-			})
-			h.insertReviewItem(ctx, "research", suggestionID, suggestionTitle(ctx, h.database, suggestionID), review.Reasoning, "high")
-		}
-
-		return nil
+	// Create new report
+	result, err := h.database.Insert(ctx, "research_reports", map[string]any{
+		"title":         reportTitle,
+		"report_type":   "daily_scan",
+		"source":        "researcher",
+		"status":        "council_review",
+		"findings_path": findingsPath,
 	})
 	if err != nil {
-		log.Printf("[ResearchReady] Failed to submit: %v", err)
+		log.Printf("[ResearchReady] Failed to create report: %v", err)
+		return ""
+	}
+
+	var created []map[string]any
+	if json.Unmarshal(result, &created) == nil && len(created) > 0 {
+		if id, ok := created[0]["id"].(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+// addReportItem adds a suggestion as an item in a research report.
+func (h *ResearchHandler) addReportItem(ctx context.Context, reportID, suggestionID, title, summary, findingType string, details map[string]any) {
+	if reportID == "" {
+		return
+	}
+
+	// Check if already added
+	existing, _ := h.database.Query(ctx, "research_report_items", map[string]any{
+		"report_id":     reportID,
+		"suggestion_id": suggestionID,
+	})
+	if existing != nil {
+		var items []map[string]any
+		if json.Unmarshal(existing, &items) == nil && len(items) > 0 {
+			return // already added
+		}
+	}
+
+	// Get current item count for sort order
+	count := 0
+	countData, _ := h.database.Query(ctx, "research_report_items", map[string]any{
+		"report_id": reportID,
+		"select":    "count",
+	})
+	if countData != nil {
+		var items []map[string]any
+		if json.Unmarshal(countData, &items) == nil {
+			count = len(items)
+		}
+	}
+
+	detailsJSON := "{}"
+	if details != nil {
+		if b, err := json.Marshal(details); err == nil {
+			detailsJSON = string(b)
+		}
+	}
+
+	_, err := h.database.Insert(ctx, "research_report_items", map[string]any{
+		"report_id":     reportID,
+		"suggestion_id": suggestionID,
+		"title":         title,
+		"finding_type":  findingType,
+		"summary":       summary,
+		"details":       detailsJSON,
+		"sort_order":    count,
+	})
+	if err != nil {
+		log.Printf("[ResearchReady] Failed to add report item: %v", err)
 	}
 }
 
-func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
+// checkAndRouteReport checks if a report should be sent to council.
+// For now, routes immediately since items arrive one at a time.
+// The report stays in council_review status and council processes all items together.
+func (h *ResearchHandler) checkAndRouteReport(ctx context.Context, reportID string) {
+	if reportID == "" {
+		return
+	}
+
+	// Count items in this report
+	data, err := h.database.Query(ctx, "research_report_items", map[string]any{
+		"report_id": reportID,
+	})
+	if err != nil {
+		return
+	}
+	var items []map[string]any
+	if json.Unmarshal(data, &items) != nil {
+		return
+	}
+
+	log.Printf("[ResearchReady] Report %s has %d items", truncateID(reportID), len(items))
+
+	// For now, we don't auto-trigger council here.
+	// The daily research cron will call /api/research-reports/{id}/trigger-council
+	// when all items are collected. Or we trigger immediately for single items.
+	// The report is already in council_review status, so the pg_notify trigger
+	// on research_reports fires the research_report_council_review event.
+}
+
+// handleReportCouncilReview runs the council on all items in a report.
+// Council analyzes each item and provides per-item recommendations.
+func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 	ctx := context.Background()
 
-	suggestion, err := fetchRecord(ctx, h.database, event)
+	// Extract report_id from event ID or Record
+	reportID := event.ID
+	if reportID == "" {
+		// Try parsing from record
+		var record map[string]any
+		if json.Unmarshal(event.Record, &record) == nil {
+			reportID = getString(record, "id")
+		}
+	}
+	if reportID == "" {
+		log.Printf("[ReportCouncil] No report_id in event")
+		return
+	}
+
+	// Fetch report with items
+	reportData, err := h.database.RPC(ctx, "get_report_for_review", map[string]any{
+		"p_report_id": reportID,
+	})
 	if err != nil {
-		log.Printf("[ResearchCouncil] Failed to get suggestion record: %v", err)
+		log.Printf("[ReportCouncil] Failed to fetch report %s: %v", truncateID(reportID), err)
 		return
 	}
 
-	suggestionID := getString(suggestion, "id")
-
-	if suggestionID == "" {
+	var report map[string]any
+	if json.Unmarshal(reportData, &report) != nil {
+		log.Printf("[ReportCouncil] Failed to parse report data")
 		return
 	}
 
-	processingBy := fmt.Sprintf("research_council:%d", time.Now().UnixNano())
-	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
-		"p_table":         "research_suggestions",
-		"p_id":            suggestionID,
-		"p_processing_by": processingBy,
-	})
-	if err != nil || !parseBool(claimed) {
-		log.Printf("[ResearchCouncil] Suggestion %s already being processed", truncateID(suggestionID))
+	itemsRaw, _ := report["items"].([]any)
+	if len(itemsRaw) == 0 {
+		log.Printf("[ReportCouncil] Report %s has no items", truncateID(reportID))
 		return
 	}
 
-	defer h.database.RPC(ctx, "clear_processing", map[string]any{
-		"p_table": "research_suggestions",
-		"p_id":    suggestionID,
-	})
+	log.Printf("[ReportCouncil] Starting council review for report %s (%d items)", truncateID(reportID), len(itemsRaw))
 
-	log.Printf("[ResearchCouncil] Starting council review for %s", truncateID(suggestionID))
-
+	// Run council on the full report
 	memberCount := h.cfg.GetCouncilMemberCount()
 	lenses := h.cfg.GetCouncilLenses()
 	if len(lenses) == 0 {
@@ -283,16 +306,14 @@ func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 		memberCount = 3
 	}
 
-	reviews := make([]map[string]any, memberCount)
-	councilModels := make([]map[string]any, 0, memberCount)
-	var failedMembers []string
+	results := make([]councilMemberResult, memberCount)
 	var wg sync.WaitGroup
+	var failedMembers []string
 	var mu sync.Mutex
 
 	for i := 0; i < memberCount; i++ {
 		lens := lenses[i%len(lenses)]
 
-		// Route each member independently through the cascade
 		memberRouting, routeErr := h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
 			Role:          "council",
 			TaskType:      "research_council",
@@ -300,22 +321,26 @@ func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 			ExcludeModels: failedMembers,
 		})
 		if routeErr != nil || memberRouting == nil {
-			log.Printf("[ResearchCouncil] No routing for member %d, skipping", i+1)
+			log.Printf("[ReportCouncil] No routing for member %d, skipping", i+1)
 			continue
 		}
 
 		session, err := h.factory.CreateWithConnector(ctx, "council", lens, memberRouting.ConnectorID)
 		if err != nil {
-			log.Printf("[ResearchCouncil] Failed to create session for member %d: %v", i+1, err)
+			log.Printf("[ReportCouncil] Failed to create session for member %d: %v", i+1, err)
+			mu.Lock()
 			failedMembers = append(failedMembers, memberRouting.ModelID)
+			mu.Unlock()
 			continue
 		}
 
+		// Build context with all items for holistic review
 		contextData := map[string]any{
-			"research":      suggestion,
-			"lens":          lens,
+			"report":       report,
+			"items":        itemsRaw,
+			"lens":         lens,
 			"member_number": i + 1,
-			"review_type":   "research",
+			"review_type":  "research_report",
 		}
 
 		wg.Add(1)
@@ -326,131 +351,247 @@ func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 			result, err := sess.Run(ctx, contextData)
 			memberDuration := time.Since(memberStart).Seconds()
 			if err != nil {
-				log.Printf("[ResearchCouncil] Member %d failed: %v", memberIndex+1, err)
+				log.Printf("[ReportCouncil] Member %d failed: %v", memberIndex+1, err)
 				mu.Lock()
 				failedMembers = append(failedMembers, routing.ModelID)
 				mu.Unlock()
 				if h.usageTracker != nil {
 					h.usageTracker.RecordCompletion(ctx, routing.ModelID, "research_council", memberDuration, false)
 				}
+				results[memberIndex] = councilMemberResult{err: err}
 				return
 			}
 
-			vote, parseErr := runtime.ParseCouncilVote(result.Output)
-			if parseErr != nil {
-				log.Printf("[ResearchCouncil] Failed to parse vote from member %d: %v", memberIndex+1, parseErr)
-				return
-			}
+			// Parse per-item votes from council output
+			itemVotes := runtime.ParseReportCouncilVotes(result.Output)
 
 			mu.Lock()
-			reviews[memberIndex] = map[string]any{
-				"member_number": memberIndex + 1,
-				"lens":          memberLens,
-				"vote":          vote.Vote,
-				"concerns":      vote.Concerns,
-				"reasoning":     vote.Reasoning,
-				"model_id":      routing.ModelID,
-			}
-			councilModels = append(councilModels, map[string]any{
-				"lens":  memberLens,
-				"model": routing.ModelID,
-			})
+			results[memberIndex] = councilMemberResult{items: itemVotes}
 			mu.Unlock()
 
 			if h.usageTracker != nil {
 				h.usageTracker.RecordCompletion(ctx, routing.ModelID, "research_council", memberDuration, true)
 			}
 
-			log.Printf("[ResearchCouncil] Member %d (%s, model=%s) voted: %s", memberIndex+1, memberLens, routing.ModelID, vote.Vote)
+			log.Printf("[ReportCouncil] Member %d (%s) completed review", memberIndex+1, memberLens)
 		}(i, session, memberRouting, lens)
 	}
 	wg.Wait()
 
-	validReviews := make([]map[string]any, 0, len(reviews))
-	for _, r := range reviews {
-		if r != nil {
-			validReviews = append(validReviews, r)
-		}
+	// Aggregate per-item recommendations
+	h.aggregateAndSaveCouncilResults(ctx, reportID, report, results, memberCount)
+
+	log.Printf("[ReportCouncil] Report %s council review complete", truncateID(reportID))
+}
+
+// aggregateAndSaveCouncilResults merges council votes into per-item recommendations
+// and writes the KB decision doc.
+func (h *ResearchHandler) aggregateAndSaveCouncilResults(
+	ctx context.Context,
+	reportID string,
+	report map[string]any,
+	results []councilMemberResult,
+	memberCount int,
+) {
+	// Collect all items from the report
+	itemsRaw, _ := report["items"].([]any)
+
+	type itemAgg struct {
+		approves   int
+		rejects    int
+		watches    int
+		reasonings []string
+		concerns   []string
 	}
 
-	if len(validReviews) == 0 {
-		log.Printf("[ResearchCouncil] No valid votes for suggestion %s", truncateID(suggestionID))
-		return
+	aggregates := make(map[int]*itemAgg)
+	for _, itemRaw := range itemsRaw {
+		item, _ := itemRaw.(map[string]any)
+		sortOrder := 0
+		if so, ok := item["sort_order"].(float64); ok {
+			sortOrder = int(so)
+		}
+		aggregates[sortOrder] = &itemAgg{}
 	}
 
-	approved := 0
-	revisionNeeded := 0
-	var allConcerns []string
-
-	for _, r := range validReviews {
-		vote := getString(r, "vote")
-		switch vote {
-		case "APPROVED", "approved":
-			approved++
-		case "REVISION_NEEDED", "revision_needed", "BLOCKED", "blocked":
-			revisionNeeded++
+	// Tally votes from each council member
+	for _, res := range results {
+		if res.err != nil || res.items == nil {
+			continue
 		}
-		if concerns, ok := r["concerns"].([]interface{}); ok {
-			for _, c := range concerns {
-				if cm, ok := c.(map[string]interface{}); ok {
-					if desc, ok := cm["description"].(string); ok && desc != "" {
-						allConcerns = append(allConcerns, desc)
-					} else if issue, ok := cm["issue"].(string); ok && issue != "" {
-						allConcerns = append(allConcerns, issue)
+		for sortIdx, vote := range res.items {
+			agg, ok := aggregates[sortIdx]
+			if !ok {
+				continue
+			}
+			v := getString(vote, "vote")
+			switch strings.ToLower(v) {
+			case "approve", "approved":
+				agg.approves++
+			case "reject", "rejected":
+				agg.rejects++
+			case "watch":
+				agg.watches++
+			}
+			if r := getString(vote, "reasoning"); r != "" {
+				agg.reasonings = append(agg.reasonings, r)
+			}
+			if c, ok := vote["concerns"].([]any); ok {
+				for _, ci := range c {
+					if s, ok := ci.(string); ok {
+						agg.concerns = append(agg.concerns, s)
 					}
-				} else if s, ok := c.(string); ok && s != "" {
-					allConcerns = append(allConcerns, s)
 				}
 			}
 		}
 	}
 
-	consensusMethod := h.cfg.GetConsensusMethod()
-	var consensus string
-	if consensusMethod == "unanimous_approval" {
-		if approved == memberCount {
-			consensus = "approved"
-		} else {
-			// Any concerns → revision_needed (nothing is ever blocked)
-			consensus = "revision_needed"
+	// Determine recommendation per item
+	var itemResults []reportItemResult
+
+	for _, itemRaw := range itemsRaw {
+		item, _ := itemRaw.(map[string]any)
+		sortOrder := 0
+		if so, ok := item["sort_order"].(float64); ok {
+			sortOrder = int(so)
 		}
-	} else {
-		if approved > memberCount/2 {
-			consensus = "approved"
+
+		agg := aggregates[sortOrder]
+		title := getString(item, "title")
+
+		var recommendation string
+		if agg.approves > memberCount/2 {
+			recommendation = "approve"
+		} else if agg.rejects > memberCount/2 {
+			recommendation = "reject"
 		} else {
-			// Majority concerns → revision_needed with strong feedback
-			consensus = "revision_needed"
+			recommendation = "watch"
 		}
+
+		reasoning := "Council split."
+		if len(agg.reasonings) > 0 {
+			reasoning = agg.reasonings[0]
+			if len(agg.reasonings) > 1 {
+				reasoning += fmt.Sprintf(" (%d members voted)", len(agg.reasonings))
+			}
+		}
+
+		// Collect per-member votes for this item
+		var councilVotes []map[string]any
+		for mi, res := range results {
+			if res.err != nil || res.items == nil {
+				continue
+			}
+			if vote, ok := res.items[sortOrder]; ok {
+				councilVotes = append(councilVotes, map[string]any{
+					"member": mi + 1,
+					"vote":   getString(vote, "vote"),
+					"reasoning": getString(vote, "reasoning"),
+				})
+			}
+		}
+
+		itemResults = append(itemResults, reportItemResult{
+			sortOrder:      sortOrder,
+			title:          title,
+			recommendation: recommendation,
+			reasoning:      reasoning,
+			concerns:       agg.concerns,
+			councilVotes:   councilVotes,
+		})
+
+		// Update the report item in DB
+		concernsJSON, _ := json.Marshal(agg.concerns)
+		_, _ = h.database.RPC(ctx, "update_report_item_council", map[string]any{
+			"p_report_id":            reportID,
+			"p_sort_order":           sortOrder,
+			"p_council_recommendation": recommendation,
+			"p_council_reasoning":     reasoning,
+			"p_council_concerns":      string(concernsJSON),
+		})
 	}
 
-	log.Printf("[ResearchCouncil] Consensus: %s (approved=%d, revision=%d)", consensus, approved, revisionNeeded)
+	// Write KB decision doc
+	findingsPath := getString(report, "findings_path")
+	reportTitle := getString(report, "title")
+	kbDecisionPath := h.writeReportDecisionDoc(ctx, reportTitle, reportID, findingsPath, itemResults)
 
-	switch consensus {
-	case "approved":
-		_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
-			"p_id":     suggestionID,
-			"p_status": "approved",
-			"p_review_notes": map[string]any{
-				"council_consensus": consensus,
-				"reviews":           validReviews,
-			},
-		})
-		log.Printf("[ResearchCouncil] %s approved by council", truncateID(suggestionID))
+	// Update report status to pending_human
+	_, _ = h.database.RPC(ctx, "update_report_status", map[string]any{
+		"p_id":               reportID,
+		"p_status":           "pending_human",
+		"p_decision_doc_path": kbDecisionPath,
+	})
 
-	case "revision_needed":
-		_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
-			"p_id":     suggestionID,
-			"p_status": "pending_human",
-			"p_review_notes": map[string]any{
-				"council_consensus": consensus,
-				"concerns":          allConcerns,
-				"reviews":           validReviews,
-				"note":              "Council could not reach consensus, escalating to human",
-			},
-		})
-		h.insertReviewItem(ctx, "council", suggestionID, "Council split: "+suggestionTitle(ctx, h.database, suggestionID), fmt.Sprintf("Council could not reach consensus. Concerns: %v", allConcerns), "high")
-		log.Printf("[ResearchCouncil] %s needs human review", truncateID(suggestionID))
+	// Insert a review_items entry so it shows in Review Hub
+	h.insertReviewItem(ctx, "research", reportID, reportTitle,
+		fmt.Sprintf("Council reviewed %d items. Decision doc ready.", len(itemResults)),
+		"high")
+
+	log.Printf("[ReportCouncil] Report %s -> pending_human (%d items reviewed)", truncateID(reportID), len(itemResults))
+}
+
+// handleResearchCouncil handles the old per-suggestion council event.
+// Kept for backward compatibility but routes to the new report-based flow.
+func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
+	ctx := context.Background()
+
+	suggestion, err := fetchRecord(ctx, h.database, event)
+	if err != nil {
+		log.Printf("[ResearchCouncil] Failed to get suggestion record: %v", err)
+		return
 	}
+
+	suggestionID := getString(suggestion, "id")
+	if suggestionID == "" {
+		return
+	}
+
+	// Check if this suggestion is already part of a report
+	data, _ := h.database.Query(ctx, "research_report_items", map[string]any{
+		"suggestion_id": suggestionID,
+		"limit":         1,
+	})
+	var existingItems []map[string]any
+	if json.Unmarshal(data, &existingItems) == nil && len(existingItems) > 0 {
+		// Already handled by report-based flow
+		log.Printf("[ResearchCouncil] Suggestion %s handled by report flow, skipping", truncateID(suggestionID))
+		return
+	}
+
+	// Legacy: create a single-item report for orphaned suggestions
+	reportTitle := getString(suggestion, "title")
+	findingsPath := getString(suggestion, "findings_path")
+
+	result, err := h.database.Insert(ctx, "research_reports", map[string]any{
+		"title":         reportTitle,
+		"report_type":   "manual",
+		"source":        "legacy",
+		"status":        "council_review",
+		"findings_path": findingsPath,
+	})
+	if err != nil {
+		log.Printf("[ResearchCouncil] Failed to create legacy report: %v", err)
+		return
+	}
+
+	var reports []map[string]any
+	if json.Unmarshal(result, &reports) != nil || len(reports) == 0 {
+		return
+	}
+	reportID, _ := reports[0]["id"].(string)
+
+	// Add the suggestion as a report item
+	h.addReportItem(ctx, reportID, suggestionID, reportTitle,
+		getString(suggestion, "summary"),
+		getString(suggestion, "type"),
+		nil)
+
+	// Trigger the report-based council review
+	h.handleReportCouncilReview(runtime.Event{
+		Type: runtime.EventReportCouncil,
+		ID:   reportID,
+	})
 }
 
 func setupResearchHandlers(
@@ -469,9 +610,7 @@ func setupResearchHandlers(
 }
 
 // insertReviewItem adds a review item to the unified review queue.
-// Errors are logged but do not interrupt the calling flow.
 func (h *ResearchHandler) insertReviewItem(ctx context.Context, itemType, sourceID, title, summary, priority string) {
-	// Dedup: skip if a pending review item already exists for this source
 	existing, err := h.database.Query(ctx, "review_items", map[string]any{
 		"type":      itemType,
 		"source_id": sourceID,
@@ -518,4 +657,100 @@ func suggestionTitle(ctx context.Context, database db.Database, id string) strin
 		return title
 	}
 	return id
+}
+
+// writeReportDecisionDoc writes a formatted council decision document for a report.
+func (h *ResearchHandler) writeReportDecisionDoc(
+	ctx context.Context,
+	title string,
+	reportID string,
+	findingsPath string,
+	itemResults []reportItemResult,
+) string {
+	var sb strings.Builder
+
+	sb.WriteString("# Council Decision: ")
+	sb.WriteString(title)
+	sb.WriteString("\n\n")
+	sb.WriteString("**Report ID:** ")
+	sb.WriteString(reportID)
+	sb.WriteString("\n")
+	sb.WriteString("**Date:** ")
+	sb.WriteString(time.Now().Format("2006-01-02 15:04:05"))
+	sb.WriteString("\n")
+	sb.WriteString("**Items Reviewed:** ")
+	sb.WriteString(fmt.Sprintf("%d", len(itemResults)))
+	sb.WriteString("\n\n---\n\n")
+
+	// Summary table
+	sb.WriteString("## Summary\n\n")
+	sb.WriteString("| # | Finding | Recommendation | Key Concern |\n")
+	sb.WriteString("|---|---------|---------------|-------------|\n")
+	for i, ir := range itemResults {
+		concern := ""
+		if len(ir.concerns) > 0 {
+			concern = ir.concerns[0]
+			if len(concern) > 60 {
+				concern = concern[:57] + "..."
+			}
+		}
+		sb.WriteString(fmt.Sprintf("| %d | %s | **%s** | %s |\n", i+1, ir.title, ir.recommendation, concern))
+	}
+	sb.WriteString("\n")
+
+	// Per-item details
+	sb.WriteString("## Item Details\n\n")
+	for i, ir := range itemResults {
+		sb.WriteString(fmt.Sprintf("### %d. %s\n\n", i+1, ir.title))
+		sb.WriteString(fmt.Sprintf("**Council Recommendation:** %s\n\n", ir.recommendation))
+		sb.WriteString(fmt.Sprintf("**Reasoning:** %s\n\n", ir.reasoning))
+
+		if len(ir.councilVotes) > 0 {
+			sb.WriteString("**Council Votes:**\n")
+			for _, v := range ir.councilVotes {
+				member, _ := v["member"].(float64)
+				sb.WriteString(fmt.Sprintf("- Member %d: %s - %s\n",
+					int(member),
+					getString(v, "vote"),
+					getString(v, "reasoning")))
+			}
+			sb.WriteString("\n")
+		}
+
+		if len(ir.concerns) > 0 {
+			sb.WriteString("**Concerns:**\n")
+			for _, c := range ir.concerns {
+				sb.WriteString(fmt.Sprintf("- %s\n", c))
+			}
+			sb.WriteString("\n")
+		}
+	}
+
+	sb.WriteString("## Your Decision\n\n")
+	sb.WriteString("For each item above, choose:\n")
+	sb.WriteString("- **Approve:** Include in PRD for implementation\n")
+	sb.WriteString("- **Watch:** Revisit monthly for updates\n")
+	sb.WriteString("- **Reject:** Close with reasoning\n\n")
+	sb.WriteString("Use the Review Hub to make your decisions.\n")
+
+	// Derive decision doc path
+	decisionPath := fmt.Sprintf("research/decisions/%s.md", reportID)
+	if findingsPath != "" {
+		decisionPath = strings.Replace(findingsPath, "research/", "research/decisions/", 1)
+	}
+
+	kbBase := "/home/vibes/knowledgebase"
+	fullPath := kbBase + "/" + decisionPath
+	dir := fullPath[:strings.LastIndex(fullPath, "/")]
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		log.Printf("[ReportCouncil] Failed to create dir %s: %v", dir, err)
+		return ""
+	}
+	if err := os.WriteFile(fullPath, []byte(sb.String()), 0644); err != nil {
+		log.Printf("[ReportCouncil] Failed to write decision doc %s: %v", fullPath, err)
+		return ""
+	}
+
+	log.Printf("[ReportCouncil] Decision doc written to %s", decisionPath)
+	return decisionPath
 }
