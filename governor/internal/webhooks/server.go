@@ -2410,6 +2410,59 @@ func (s *Server) handleResearchReportByID(w http.ResponseWriter, r *http.Request
 
 	// RPC returns jsonb as [{"get_report_for_review": {...}}] via rowsToJSON. Unwrap.
 	reportJSON := unwrapRPCResult(data, "get_report_for_review")
+
+	// If no result, try looking up by suggestion_id.
+	// review_items.source_id points to research_suggestions.id.
+	// First check if a compiled research_report exists via research_report_items.
+	if len(reportJSON) == 0 || string(reportJSON) == "null" || string(reportJSON) == "{}" {
+		riData, riErr := s.db.Query(r.Context(), "research_report_items", map[string]any{
+			"suggestion_id": id,
+			"limit":         1,
+		})
+		if riErr == nil {
+			var items []map[string]any
+			if json.Unmarshal(riData, &items) == nil && len(items) > 0 {
+				if reportID, ok := items[0]["report_id"].(string); ok && reportID != "" {
+					data2, err2 := s.db.RPC(r.Context(), "get_report_for_review", map[string]any{
+						"p_report_id": reportID,
+					})
+					if err2 == nil {
+						reportJSON = unwrapRPCResult(data2, "get_report_for_review")
+					}
+				}
+			}
+		}
+	}
+
+	// Still no result? Return the suggestion directly from research_suggestions.
+	if len(reportJSON) == 0 || string(reportJSON) == "null" || string(reportJSON) == "{}" {
+		sugData, sugErr := s.db.Query(r.Context(), "research_suggestions", map[string]any{
+			"id": id,
+		})
+		if sugErr == nil {
+			var sugs []map[string]any
+			if json.Unmarshal(sugData, &sugs) == nil && len(sugs) > 0 {
+				// Wrap in a report-like structure so the frontend can render it
+				sug := sugs[0]
+				report := map[string]any{
+					"id":               sug["id"],
+					"source":           sug["title"],
+					"title":            sug["title"],
+					"summary":          sug["summary"],
+					"details":          sug["details"],
+					"findings_path":    sug["findings_path"],
+					"type":             sug["type"],
+					"complexity":       sug["complexity"],
+					"status":           sug["status"],
+					"is_raw_suggestion": true,
+				}
+				if b, err := json.Marshal(report); err == nil {
+					reportJSON = b
+				}
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(reportJSON)
 }

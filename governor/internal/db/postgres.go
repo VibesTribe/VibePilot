@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -663,9 +664,16 @@ func convertValue(v any) any {
 			return nil
 		}
 		return val.Bool
+	case time.Time:
+		// pgx sometimes returns bare time.Time instead of pgtype.Timestamptz.
+		return val.Format(time.RFC3339Nano)
 	case fmt.Stringer:
 		return val.String()
 	default:
+		rv := reflect.TypeOf(v)
+		if rv != nil && rv.String() == "time.Time" {
+			return v.(time.Time).Format(time.RFC3339Nano)
+		}
 		return v
 	}
 }
