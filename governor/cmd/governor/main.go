@@ -507,6 +507,7 @@ func main() {
 	// Poller syncs live balance to DB and fires email alerts when credit is low.
 	if v2tracker := usageTracker.GetPlatformTrackerV2(); v2tracker != nil && v != nil {
 		creditPoller := runtime.NewCreditPoller(v2tracker, v, database)
+		creditPoller.InitAlertDedupDB(ctx, database)
 		creditPoller.StartBackgroundPolling(ctx)
 		log.Println("[CreditPoller] Started background credit polling")
 	}

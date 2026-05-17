@@ -149,6 +149,12 @@ var defaultRPCAllowlist = map[string]bool{
 	"calc_run_costs":              true,
 	"aggregate_task_costs":        true,
 	"check_subscription_thresholds": true,
+
+	// Alert dedup persistence
+	"record_alert_sent":     true,
+	"delete_alert_sent":     true,
+	"delete_all_alert_sent": true,
+	"get_alert_sent_log":    true,
 	"create_project_snapshot":     true,
 	"record_internal_run":         true,
 

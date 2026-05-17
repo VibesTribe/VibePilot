@@ -86,6 +86,71 @@ func NewCreditPoller(tracker *PlatformUsageTrackerV2, vault VaultKeyGetter, db C
 	}
 }
 
+// InitAlertDedupDB initializes the alert dedup system with DB persistence.
+// This MUST be called before StartBackgroundPolling to ensure dedup state
+// survives governor restarts and prevents duplicate email floods.
+func (cp *CreditPoller) InitAlertDedupDB(ctx context.Context, db CreditDB) {
+	if db == nil {
+		return
+	}
+	// Adapt CreditDB to the DBInserter interface for alert_sent_log persistence
+	inserter := &creditDBInserter{db: db}
+
+	// Load existing alert keys from DB using the alert_sent_log table
+	querier := func(ctx context.Context, query string, args ...interface{}) ([]string, error) {
+		data, err := db.RPC(ctx, "get_alert_sent_log", map[string]any{})
+		if err != nil {
+			log.Printf("[CreditPoller] InitAlertDedupDB: could not load alert_sent_log: %v", err)
+			return nil, nil // non-fatal: just won't preload dedup
+		}
+		if len(data) == 0 || string(data) == "[]" {
+			return nil, nil
+		}
+		var rows []map[string]string
+		if err := json.Unmarshal(data, &rows); err != nil {
+			return nil, nil
+		}
+		var keys []string
+		for _, r := range rows {
+			if k, ok := r["key"]; ok {
+				keys = append(keys, k)
+			}
+		}
+		return keys, nil
+	}
+	cp.alerts.SetDBWithLoad(ctx, inserter, querier)
+	log.Printf("[CreditPoller] Alert dedup initialized with DB persistence")
+}
+
+// creditDBInserter adapts CreditDB to the DBInserter interface.
+type creditDBInserter struct {
+	db CreditDB
+}
+
+func (c *creditDBInserter) Exec(ctx context.Context, query string, args ...interface{}) (interface{}, error) {
+	// Route INSERT/DELETE on alert_sent_log through RPC calls
+	q := strings.TrimSpace(query)
+	if strings.HasPrefix(q, "INSERT") {
+		// Extract key from VALUES ($1, NOW())
+		if len(args) > 0 {
+			key, _ := args[0].(string)
+			_, err := c.db.RPC(ctx, "record_alert_sent", map[string]any{"p_key": key})
+			return nil, err
+		}
+	} else if strings.HasPrefix(q, "DELETE") {
+		if len(args) > 0 {
+			// Delete specific key
+			key, _ := args[0].(string)
+			_, err := c.db.RPC(ctx, "delete_alert_sent", map[string]any{"p_key": key})
+			return nil, err
+		}
+		// Delete all
+		_, err := c.db.RPC(ctx, "delete_all_alert_sent", map[string]any{})
+		return nil, err
+	}
+	return nil, nil
+}
+
 // shouldPoll determines if a provider needs polling based on usage recency.
 // If the model was used in the last 24h, use active interval. Otherwise use idle interval.
 func (cp *CreditPoller) shouldPoll(target *creditPollTarget) bool {

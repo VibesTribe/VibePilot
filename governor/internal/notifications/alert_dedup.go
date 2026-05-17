@@ -208,6 +208,9 @@ func (d *AlertDedup) CheckAndAlert(ctx context.Context, db DBQuerier) int {
 		strings.Join(lines, "\n") +
 		"\n\nTop up at the provider's dashboard to avoid service interruption.\n\n" + "\u2014 VibePilot Governor"
 
-	_ = SendEmailUnconditional(subject, body)
+	// Use the dedup-keyed send to prevent repeat emails after restarts
+	if !d.SendEmailIfNew("credit-threshold-alert", subject, body) {
+		log.Printf("[Notify] CheckAndAlert: credit-threshold-alert already sent, skipping")
+	}
 	return len(newAlerts)
 }
