@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/vibepilot/governor/internal/db"
@@ -282,9 +281,14 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 		return
 	}
 
+	// pgx RPC wraps jsonb results as [{"fn_name":{...}}] -- unwrap.
+	reportData = unwrapRPCResult(reportData, "get_report_for_review")
+
+	log.Printf("[ReportCouncil] After unwrap, data length=%d, first200=%s", len(reportData), string(reportData[:min(len(reportData), 200)]))
+
 	var report map[string]any
 	if json.Unmarshal(reportData, &report) != nil {
-		log.Printf("[ReportCouncil] Failed to parse report data")
+		log.Printf("[ReportCouncil] Failed to parse report data (%d bytes): %s", len(reportData), string(reportData[:min(len(reportData), 300)]))
 		return
 	}
 
@@ -294,9 +298,11 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 		return
 	}
 
-	log.Printf("[ReportCouncil] Starting council review for report %s (%d items)", truncateID(reportID), len(itemsRaw))
+	log.Printf("[ReportCouncil] Starting sequential council review for report %s (%d items)", truncateID(reportID), len(itemsRaw))
 
-	// Run council on the full report
+	// Load the original research report content so council members can read it
+	reportContent := h.loadReportContent(ctx, report)
+
 	memberCount := h.cfg.GetCouncilMemberCount()
 	lenses := h.cfg.GetCouncilLenses()
 	if len(lenses) == 0 {
@@ -306,19 +312,20 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 		memberCount = 3
 	}
 
+	// SEQUENTIAL council: run member 1, wait, then member 2, wait, then member 3.
+	// No goroutines, no mutex, no races. Each member sees full report + prior member comments.
 	results := make([]councilMemberResult, memberCount)
-	var wg sync.WaitGroup
-	var failedMembers []string
-	var mu sync.Mutex
+	var failedModels []string
 
 	for i := 0; i < memberCount; i++ {
 		lens := lenses[i%len(lenses)]
+		log.Printf("[ReportCouncil] Running member %d/%d (lens: %s)", i+1, memberCount, lens)
 
 		memberRouting, routeErr := h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
 			Role:          "council",
 			TaskType:      "research_council",
 			RoutingFlag:   "internal",
-			ExcludeModels: failedMembers,
+			ExcludeModels: failedModels,
 		})
 		if routeErr != nil || memberRouting == nil {
 			log.Printf("[ReportCouncil] No routing for member %d, skipping", i+1)
@@ -328,60 +335,91 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 		session, err := h.factory.CreateWithConnector(ctx, "council", lens, memberRouting.ConnectorID)
 		if err != nil {
 			log.Printf("[ReportCouncil] Failed to create session for member %d: %v", i+1, err)
-			mu.Lock()
-			failedMembers = append(failedMembers, memberRouting.ModelID)
-			mu.Unlock()
+			failedModels = append(failedModels, memberRouting.ModelID)
 			continue
 		}
 
-		// Build context with all items for holistic review
+		// Build context: full report, original content, and prior member votes for context
 		contextData := map[string]any{
-			"report":       report,
-			"items":        itemsRaw,
-			"lens":         lens,
-			"member_number": i + 1,
-			"review_type":  "research_report",
+			"report":          report,
+			"items":           itemsRaw,
+			"original_report": reportContent,
+			"lens":            lens,
+			"member_number":   i + 1,
+			"total_members":   memberCount,
+			"review_type":     "research_report",
+		}
+		// Feed prior members' votes so later members can build on them
+		if i > 0 {
+			var priorVotes []map[string]any
+			for pi, pr := range results[:i] {
+				if pr.err != nil {
+					priorVotes = append(priorVotes, map[string]any{"member": pi + 1, "error": pr.err.Error()})
+					continue
+				}
+				if pr.items != nil {
+					priorVotes = append(priorVotes, map[string]any{"member": pi + 1, "votes": pr.items})
+				}
+			}
+			if len(priorVotes) > 0 {
+				contextData["prior_member_votes"] = priorVotes
+			}
 		}
 
-		wg.Add(1)
-		go func(memberIndex int, sess *runtime.Session, routing *runtime.RoutingResult, memberLens string) {
-			defer wg.Done()
+		memberStart := time.Now()
+		result, runErr := session.Run(ctx, contextData)
+		memberDuration := time.Since(memberStart).Seconds()
 
-			memberStart := time.Now()
-			result, err := sess.Run(ctx, contextData)
-			memberDuration := time.Since(memberStart).Seconds()
-			if err != nil {
-				log.Printf("[ReportCouncil] Member %d failed: %v", memberIndex+1, err)
-				mu.Lock()
-				failedMembers = append(failedMembers, routing.ModelID)
-				mu.Unlock()
-				if h.usageTracker != nil {
-					h.usageTracker.RecordCompletion(ctx, routing.ModelID, "research_council", memberDuration, false)
-				}
-				results[memberIndex] = councilMemberResult{err: err}
-				return
-			}
-
-			// Parse per-item votes from council output
-			itemVotes := runtime.ParseReportCouncilVotes(result.Output)
-
-			mu.Lock()
-			results[memberIndex] = councilMemberResult{items: itemVotes}
-			mu.Unlock()
-
+		if runErr != nil {
+			log.Printf("[ReportCouncil] Member %d failed: %v", i+1, runErr)
+			failedModels = append(failedModels, memberRouting.ModelID)
 			if h.usageTracker != nil {
-				h.usageTracker.RecordCompletion(ctx, routing.ModelID, "research_council", memberDuration, true)
+				h.usageTracker.RecordCompletion(ctx, memberRouting.ModelID, "research_council", memberDuration, false)
 			}
+			results[i] = councilMemberResult{err: runErr}
+			continue
+		}
 
-			log.Printf("[ReportCouncil] Member %d (%s) completed review", memberIndex+1, memberLens)
-		}(i, session, memberRouting, lens)
+		// Parse per-item votes from council output
+		itemVotes := runtime.ParseReportCouncilVotes(result.Output)
+		results[i] = councilMemberResult{items: itemVotes}
+
+		if h.usageTracker != nil {
+			h.usageTracker.RecordCompletion(ctx, memberRouting.ModelID, "research_council", memberDuration, true)
+		}
+
+		log.Printf("[ReportCouncil] Member %d/%d (%s) completed review", i+1, memberCount, lens)
 	}
-	wg.Wait()
 
 	// Aggregate per-item recommendations
 	h.aggregateAndSaveCouncilResults(ctx, reportID, report, results, memberCount)
 
-	log.Printf("[ReportCouncil] Report %s council review complete", truncateID(reportID))
+	log.Printf("[ReportCouncil] Report %s council review complete (%d/%d members succeeded)",
+		truncateID(reportID), memberCount-len(failedModels), memberCount)
+}
+
+// loadReportContent reads the original research findings file so council can review it.
+func (h *ResearchHandler) loadReportContent(ctx context.Context, report map[string]any) string {
+	findingsPath := getString(report, "findings_path")
+	if findingsPath == "" {
+		return ""
+	}
+	// Strip knowledgebase/ prefix if present to avoid doubling
+	kbBase := "/home/vibes/knowledgebase"
+	cleanPath := strings.TrimPrefix(findingsPath, "knowledgebase/")
+	cleanPath = strings.TrimPrefix(cleanPath, "/")
+	fullPath := kbBase + "/" + cleanPath
+	data, err := os.ReadFile(fullPath)
+	if err != nil {
+		log.Printf("[ReportCouncil] Could not read original report at %s: %v", fullPath, err)
+		return ""
+	}
+	content := string(data)
+	// Cap at 8000 chars to avoid blowing up context
+	if len(content) > 8000 {
+		content = content[:8000] + "\n...[truncated]"
+	}
+	return content
 }
 
 // aggregateAndSaveCouncilResults merges council votes into per-item recommendations
@@ -733,10 +771,12 @@ func (h *ResearchHandler) writeReportDecisionDoc(
 	sb.WriteString("- **Reject:** Close with reasoning\n\n")
 	sb.WriteString("Use the Review Hub to make your decisions.\n")
 
-	// Derive decision doc path
+	// Derive decision doc path (strip knowledgebase/ prefix to avoid doubling)
 	decisionPath := fmt.Sprintf("research/decisions/%s.md", reportID)
 	if findingsPath != "" {
-		decisionPath = strings.Replace(findingsPath, "research/", "research/decisions/", 1)
+		clean := strings.TrimPrefix(findingsPath, "knowledgebase/")
+		clean = strings.TrimPrefix(clean, "/")
+		decisionPath = strings.Replace(clean, "research/", "research/decisions/", 1)
 	}
 
 	kbBase := "/home/vibes/knowledgebase"

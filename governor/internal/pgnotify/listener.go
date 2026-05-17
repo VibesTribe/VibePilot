@@ -88,17 +88,45 @@ func (l *Listener) listenLoop(ctx context.Context) {
 		log.Printf("[PGNotify] Failed to parse config for listen connection: %v", err)
 		return
 	}
-	listenConn, err := pgx.ConnectConfig(ctx, listenCfg)
+
+	// Dial and LISTEN, with retries. Returns nil connection only if ctx cancelled.
+	dialAndListen := func() (*pgx.Conn, error) {
+		for attempt := 0; ; attempt++ {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-l.doneChan:
+				return nil, fmt.Errorf("done")
+			default:
+			}
+			conn, err := pgx.ConnectConfig(ctx, listenCfg)
+			if err != nil {
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				backoff := time.Duration(min(attempt+1, 10)) * 2 * time.Second
+				log.Printf("[PGNotify] Dial failed (attempt %d): %v, retrying in %v...", attempt+1, err, backoff)
+				time.Sleep(backoff)
+				continue
+			}
+			if _, err := conn.Exec(ctx, "LISTEN vp_changes"); err != nil {
+				conn.Close(ctx)
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				log.Printf("[PGNotify] LISTEN failed (attempt %d): %v, retrying...", attempt+1, err)
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			return conn, nil
+		}
+	}
+
+	listenConn, err := dialAndListen()
 	if err != nil {
-		log.Printf("[PGNotify] Failed to connect for listening: %v", err)
 		return
 	}
 	defer listenConn.Close(ctx)
-
-	if _, err := listenConn.Exec(ctx, "LISTEN vp_changes"); err != nil {
-		log.Printf("[PGNotify] Failed to LISTEN vp_changes: %v", err)
-		return
-	}
 	log.Printf("[PGNotify] Listening for NOTIFY events on vp_changes")
 
 	for {
@@ -119,7 +147,16 @@ func (l *Listener) listenLoop(ctx context.Context) {
 				return
 			}
 			log.Printf("[PGNotify] Wait error: %v, reconnecting...", err)
+
+			// Close dead connection and re-dial
+			listenConn.Close(ctx)
 			time.Sleep(2 * time.Second)
+			listenConn, err = dialAndListen()
+			if err != nil {
+				log.Printf("[PGNotify] Reconnect failed, stopping listener: %v", err)
+				return
+			}
+			log.Printf("[PGNotify] Reconnected and LISTENing on vp_changes")
 			continue
 		}
 
@@ -210,6 +247,12 @@ func (l *Listener) mapEvent(p notifyPayload) *runtime.Event {
 			eventType = runtime.EventResearchReady
 		case "council_review":
 			eventType = runtime.EventResearchCouncil
+		}
+
+	case p.Table == "research_reports":
+		// Report-based council review: fires when report status changes to council_review
+		if p.Status == "council_review" {
+			eventType = runtime.EventReportCouncil
 		}
 
 	case p.Table == "maintenance_commands":

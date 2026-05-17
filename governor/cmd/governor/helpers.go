@@ -211,3 +211,17 @@ func recordModelFailure(ctx context.Context, database db.Database, modelID, task
 		log.Printf("[Learning] Failed to record model failure: %v", err)
 	}
 }
+
+// unwrapRPCResult extracts the inner JSON from the pgx RPC array wrapper.
+// RPC calls to jsonb-returning functions produce [{"fn_name": {...}}] via rowsToJSON.
+// This unwraps to just the inner object, or returns original data if format doesn't match.
+func unwrapRPCResult(data []byte, funcName string) []byte {
+	var arr []map[string]json.RawMessage
+	if err := json.Unmarshal(data, &arr); err != nil || len(arr) != 1 {
+		return data
+	}
+	if inner, ok := arr[0][funcName]; ok {
+		return inner
+	}
+	return data
+}

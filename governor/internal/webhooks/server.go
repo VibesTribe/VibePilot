@@ -2210,7 +2210,7 @@ func (s *Server) handleReviewItems(w http.ResponseWriter, r *http.Request) {
 		w.Write(data)
 		return
 	}
-	kbBase := "https://knowledge.vibestribe.rocks"
+	kbBase := "https://graphs.vibestribe.rocks"
 	for i := range enriched {
 		reviewURL := ""
 		if payload, ok := enriched[i]["payload"].(map[string]any); ok {
@@ -2376,9 +2376,9 @@ func (s *Server) handleResearchReports(w http.ResponseWriter, r *http.Request) {
 			// Add review_url
 			reviewURL := ""
 			if dp, ok := reports[i]["decision_doc_path"].(string); ok && dp != "" {
-				reviewURL = "https://knowledge.vibestribe.rocks/" + dp
+				reviewURL = "https://graphs.vibestribe.rocks/" + dp
 			} else if fp, ok := reports[i]["findings_path"].(string); ok && fp != "" {
-				reviewURL = "https://knowledge.vibestribe.rocks/" + fp
+				reviewURL = "https://graphs.vibestribe.rocks/" + fp
 			}
 			reports[i]["review_url"] = reviewURL
 		}
@@ -2408,8 +2408,10 @@ func (s *Server) handleResearchReportByID(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// RPC returns jsonb as [{"get_report_for_review": {...}}] via rowsToJSON. Unwrap.
+	reportJSON := unwrapRPCResult(data, "get_report_for_review")
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(data)
+	w.Write(reportJSON)
 }
 
 // handleReportItemDecision sets the human decision on a report item.
@@ -2488,4 +2490,18 @@ func (s *Server) handleReportItemDecision(w http.ResponseWriter, r *http.Request
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "decision": req.Decision})
+}
+
+// unwrapRPCResult extracts the inner JSON from the RPC array wrapper.
+// RPC calls to jsonb-returning functions produce [{"fn_name": {...}}] via rowsToJSON.
+// This unwraps to just the inner object, or returns original data if format doesn't match.
+func unwrapRPCResult(data []byte, funcName string) []byte {
+	var arr []map[string]json.RawMessage
+	if err := json.Unmarshal(data, &arr); err != nil || len(arr) != 1 {
+		return data
+	}
+	if inner, ok := arr[0][funcName]; ok {
+		return inner
+	}
+	return data
 }

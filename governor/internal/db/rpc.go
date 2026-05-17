@@ -52,6 +52,7 @@ var defaultRPCAllowlist = map[string]bool{
 	"update_model_usage":          true,
 	"deduct_model_credit":        true,
 	"update_model_credit_balance": true,
+	"get_model_last_used":         true,
 	"increment_platform_usage":   true,
 	"upsert_platform_usage":      true,
 	"get_all_platform_usage":     true,
@@ -189,6 +190,13 @@ var defaultRPCAllowlist = map[string]bool{
 
 	// Dashboard chat usage (ROI tracking)
 	"record_chat_usage": true,
+
+	// Research report pipeline
+	"get_report_for_review":       true,
+	"update_report_item_council":  true,
+	"update_report_status":        true,
+	"set_report_item_decision":    true,
+	"mark_report_if_decided":      true,
 }
 
 type RPCAllowlist struct {

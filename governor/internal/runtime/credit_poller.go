@@ -41,7 +41,8 @@ type creditPollTarget struct {
 	ModelID           string  // matches models table id for DB sync
 	BalanceURL        string  // API endpoint for balance
 	APIKeyRef         string  // vault key reference
-	PollInterval      time.Duration
+	PollInterval      time.Duration // active polling interval (when recently used)
+	IdleInterval      time.Duration // slow check interval (when idle)
 	LastBalance       int       // cents
 	InitialBalance    int       // cents — first successful poll sets this
 	LastChecked       time.Time
@@ -75,13 +76,50 @@ func NewCreditPoller(tracker *PlatformUsageTrackerV2, vault VaultKeyGetter, db C
 				ModelID:           "deepseek-v4-flash",
 				BalanceURL:        "https://api.deepseek.com/user/balance",
 				APIKeyRef:         "deepseek-v4-flash",
-				PollInterval:      1 * time.Hour,
-				AlertThresholdPct: 0.2, // alert when 20% or less remaining
-				AlertCooldown:     6 * time.Hour,
+				PollInterval:      2 * time.Hour,  // active: check every 2h when recently used
+				IdleInterval:      24 * time.Hour,  // idle: check once per day when not used
+				AlertThresholdPct: 0.2,             // alert when 20% or less remaining
+				AlertCooldown:     24 * time.Hour,
 			},
 		},
-		interval: 1 * time.Hour, // default check interval
+		interval: 30 * time.Minute, // base tick: evaluate which providers need polling
 	}
+}
+
+// shouldPoll determines if a provider needs polling based on usage recency.
+// If the model was used in the last 24h, use active interval. Otherwise use idle interval.
+func (cp *CreditPoller) shouldPoll(target *creditPollTarget) bool {
+	if target.LastChecked.IsZero() {
+		return true // never checked
+	}
+
+	// Check if model was recently used by querying DB
+	activeInterval := target.PollInterval
+	if cp.db != nil {
+		ctx := context.Background()
+		data, err := cp.db.RPC(ctx, "get_model_last_used", map[string]interface{}{
+			"p_model_id": target.ModelID,
+		})
+		if err == nil && len(data) > 0 {
+			var result []map[string]interface{}
+			if json.Unmarshal(data, &result) == nil && len(result) > 0 {
+				if lastUsed, ok := result[0]["last_run_at"].(string); ok && lastUsed != "" {
+					if t, err := time.Parse(time.RFC3339, lastUsed); err == nil {
+						sinceUse := time.Since(t)
+						if sinceUse < 24*time.Hour {
+							// Recently used: poll at active interval
+							activeInterval = target.PollInterval
+						} else {
+							// Idle: poll at slow idle interval
+							activeInterval = target.IdleInterval
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return time.Since(target.LastChecked) >= activeInterval
 }
 
 // StartBackgroundPolling runs periodic credit checks in a goroutine.
@@ -115,6 +153,11 @@ func (cp *CreditPoller) StartBackgroundPolling(ctx context.Context) {
 func (cp *CreditPoller) pollAll(ctx context.Context) {
 	for i := range cp.platforms {
 		target := &cp.platforms[i]
+
+		// Skip providers that don't need polling yet (usage-aware)
+		if !cp.shouldPoll(target) {
+			continue
+		}
 		balanceCents, err := cp.pollProvider(ctx, target)
 		if err != nil {
 			log.Printf("[CreditPoller] Failed to poll %s: %v", target.PlatformID, err)

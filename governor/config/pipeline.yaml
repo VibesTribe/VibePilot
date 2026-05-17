@@ -127,6 +127,11 @@ pipeline:
       handler: none (no router.On registration)
       handler_file: N/A
 
+    - event: research_report_council_review
+      constant: EventReportCouncil
+      handler: handleReportCouncilReview
+      handler_file: cmd/governor/handlers_research.go
+
     - event: research_council
       constant: EventResearchCouncil
       source_table: research_suggestions
@@ -241,6 +246,6 @@ pipeline:
 
   # Statistics (auto-calculated)
   stats:
-    total_events: 41
-    with_handlers: 9
+    total_events: 42
+    with_handlers: 10
     without_handlers: 32

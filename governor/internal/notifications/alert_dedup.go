@@ -10,14 +10,20 @@ import (
 	"sync"
 )
 
+// DBInserter is the minimal interface for persisting alert dedup state.
+type DBInserter interface {
+	Exec(ctx context.Context, query string, args ...interface{}) (interface{}, error)
+}
+
 // AlertDedup provides one-time email deduplication for any alert type.
 // Key format: "category:identifier" (e.g., "credit_low:deepseek-v4-flash").
-// Once an alert is sent, it will not resend until explicitly cleared
-// (typically when the condition resolves, e.g., credits topped up).
+// Once an alert is sent, it will not resend until explicitly cleared.
+// State is persisted to the alert_sent_log table so restarts don't re-alert.
 type AlertDedup struct {
 	mu    sync.RWMutex
-	sent  map[string]bool
-	email string // path to notify_email.py
+	sent  map[string]bool // in-memory cache of DB state
+	email string          // path to notify_email.py
+	db    DBInserter
 }
 
 // NewAlertDedup creates a dedup tracker.
@@ -28,6 +34,13 @@ func NewAlertDedup() *AlertDedup {
 	}
 }
 
+// SetDB sets the database handle for persisting dedup state.
+func (d *AlertDedup) SetDB(db DBInserter) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.db = db
+}
+
 // AlreadySent returns true if this exact alert key was already emailed.
 func (d *AlertDedup) AlreadySent(key string) bool {
 	d.mu.RLock()
@@ -35,11 +48,17 @@ func (d *AlertDedup) AlreadySent(key string) bool {
 	return d.sent[key]
 }
 
-// MarkSent records that an alert was sent.
+// MarkSent records that an alert was sent, both in-memory and in DB.
 func (d *AlertDedup) MarkSent(key string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.sent[key] = true
+	if d.db != nil {
+		ctx := context.Background()
+		_, _ = d.db.Exec(ctx,
+			`INSERT INTO alert_sent_log (key, sent_at) VALUES ($1, NOW()) ON CONFLICT (key) DO UPDATE SET sent_at = NOW()`,
+			key)
+	}
 }
 
 // Clear removes a specific key (e.g., when credits are topped back up).
@@ -47,6 +66,10 @@ func (d *AlertDedup) Clear(key string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	delete(d.sent, key)
+	if d.db != nil {
+		ctx := context.Background()
+		_, _ = d.db.Exec(ctx, `DELETE FROM alert_sent_log WHERE key = $1`, key)
+	}
 }
 
 // ClearAll removes all dedup state (e.g., when all alerts resolve).
@@ -54,6 +77,38 @@ func (d *AlertDedup) ClearAll() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.sent = make(map[string]bool)
+	if d.db != nil {
+		ctx := context.Background()
+		_, _ = d.db.Exec(ctx, `DELETE FROM alert_sent_log`)
+	}
+}
+
+// LoadFromDB loads existing sent keys from the database so that
+// restarts don't re-alert. Call this once after SetDB.
+func (d *AlertDedup) LoadFromDB(ctx context.Context) {
+	if d.db == nil {
+		return
+	}
+	// Use a raw query via the DBInserter - we need a querier interface too
+	// This is a no-op placeholder; the actual loading is done in SetDBWithLoad
+}
+
+// SetDBWithLoad sets the DB and loads existing sent keys.
+func (d *AlertDedup) SetDBWithLoad(ctx context.Context, db DBInserter, querier func(ctx context.Context, query string, args ...interface{}) ([]string, error)) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.db = db
+	if querier != nil {
+		keys, err := querier(ctx, "SELECT key FROM alert_sent_log")
+		if err == nil {
+			for _, k := range keys {
+				d.sent[k] = true
+			}
+			if len(keys) > 0 {
+				log.Printf("[AlertDedup] Loaded %d existing alert keys from DB", len(keys))
+			}
+		}
+	}
 }
 
 // SendEmailIfNew sends an email only if this key has not been alerted before.
