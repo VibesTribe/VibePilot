@@ -7,7 +7,6 @@
     {"id":"planner","name":"Planner","model":"","prompt":"planner.md","capabilities":["file_access"],"default_connector":"","description":"Breaks PRD into tasks","context_policy":"full_map"},
     {"id":"supervisor","name":"Supervisor","model":"","prompt":"supervisor.md","capabilities":["file_access","kb_access"],"default_connector":"","description":"Quality gate","context_policy":"kb_pack"},
     {"id":"council","name":"Council","model":"","prompt":"council.md","capabilities":["file_access","web_access"],"default_connector":"","description":"Deep review","context_policy":"council"},
-    {"id":"research_council","name":"Research Council","model":"","prompt":"research_council.md","capabilities":["file_access","web_access","kb_access"],"default_connector":"","description":"Evaluates research suggestions against system constraints","context_policy":"council"},
     {"id":"orchestrator","name":"Vibes","model":"","prompt":"orchestrator.md","capabilities":[],"default_connector":"","description":"Human interface","context_policy":"file_tree"},
     {"id":"maintenance","name":"Maintenance","model":"","prompt":"maintenance.md","capabilities":["git_access","file_access","sandbox_execution"],"default_connector":"","description":"Code changes","context_policy":"file_tree"},
     {"id":"researcher","name":"Researcher","model":"","prompt":"system_researcher.md","capabilities":["web_access","kb_access"],"default_connector":"","description":"System improvements","context_policy":"kb_pack"},
