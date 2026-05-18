@@ -1142,8 +1142,21 @@ func (s *Server) handleReviewQueue(w http.ResponseWriter, r *http.Request) {
 		if item.Type == "research" {
 			var payload map[string]any
 			if json.Unmarshal(item.Payload, &payload) == nil {
-				if fp, ok := payload["findings_path"].(string); ok && fp != "" {
-					ri.ReviewURL = "https://github.com/VibesTribe/knowledgebase/blob/main/" + fp
+				// Check payload.review_url first (already a full URL)
+				if ru, ok := payload["review_url"].(string); ok && ru != "" && !strings.HasPrefix(ru, "/home/") {
+					ri.ReviewURL = ru
+				}
+				// Then decision_doc_path
+				if ri.ReviewURL == "" {
+					if dp, ok := payload["decision_doc_path"].(string); ok && dp != "" && !strings.HasPrefix(dp, "/home/") {
+						ri.ReviewURL = "https://github.com/VibesTribe/knowledgebase/blob/main/" + dp
+					}
+				}
+				// Then findings_path
+				if ri.ReviewURL == "" {
+					if fp, ok := payload["findings_path"].(string); ok && fp != "" && !strings.HasPrefix(fp, "/home/") {
+						ri.ReviewURL = "https://github.com/VibesTribe/knowledgebase/blob/main/" + fp
+					}
 				}
 			}
 			if ri.ReviewURL == "" {
@@ -2203,7 +2216,9 @@ func (s *Server) handleReviewItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enrich items with review_url from payload.decision_doc_path or payload.findings_path
+	// Enrich items with review_url from payload fields.
+	// Priority: payload.review_url > payload.decision_doc_path > payload.findings_path
+	// Skip absolute local paths (e.g. /home/vibes/...) that would produce broken URLs.
 	var enriched []map[string]any
 	if err := json.Unmarshal(data, &enriched); err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -2214,10 +2229,23 @@ func (s *Server) handleReviewItems(w http.ResponseWriter, r *http.Request) {
 	for i := range enriched {
 		reviewURL := ""
 		if payload, ok := enriched[i]["payload"].(map[string]any); ok {
-			if dp, ok := payload["decision_doc_path"].(string); ok && dp != "" {
-				reviewURL = kbBase + "/" + dp
-			} else if fp, ok := payload["findings_path"].(string); ok && fp != "" {
-				reviewURL = kbBase + "/" + fp
+			if ru, ok := payload["review_url"].(string); ok && ru != "" {
+				// payload.review_url is already a full URL or relative path
+				if strings.HasPrefix(ru, "http://") || strings.HasPrefix(ru, "https://") {
+					reviewURL = ru
+				} else if !strings.HasPrefix(ru, "/home/") && !strings.HasPrefix(ru, "/etc/") {
+					reviewURL = ru // relative path, use as-is
+				}
+			}
+			if reviewURL == "" {
+				if dp, ok := payload["decision_doc_path"].(string); ok && dp != "" && !strings.HasPrefix(dp, "/home/") {
+					reviewURL = kbBase + "/" + dp
+				}
+			}
+			if reviewURL == "" {
+				if fp, ok := payload["findings_path"].(string); ok && fp != "" && !strings.HasPrefix(fp, "/home/") {
+					reviewURL = kbBase + "/" + fp
+				}
 			}
 		}
 		enriched[i]["review_url"] = reviewURL
@@ -2455,6 +2483,53 @@ func (s *Server) handleResearchReportByID(w http.ResponseWriter, r *http.Request
 					"complexity":       sug["complexity"],
 					"status":           sug["status"],
 					"is_raw_suggestion": true,
+				}
+				if b, err := json.Marshal(report); err == nil {
+					reportJSON = b
+				}
+			}
+		}
+	}
+
+	// Final fallback: return the review_item itself using its own data.
+	if len(reportJSON) == 0 || string(reportJSON) == "null" || string(reportJSON) == "{}" {
+		riData, riErr := s.db.Query(r.Context(), "review_items", map[string]any{
+			"source_id": id,
+			"limit":     1,
+		})
+		if riErr == nil {
+			var riItems []map[string]any
+			if json.Unmarshal(riData, &riItems) == nil && len(riItems) > 0 {
+				ri := riItems[0]
+				payload, _ := ri["payload"].(map[string]any)
+				if payload == nil {
+					// payload might be a JSON string, try unmarshalling
+					if raw, ok := ri["payload"]; ok {
+						if b, err := json.Marshal(raw); err == nil {
+							var m map[string]any
+							if json.Unmarshal(b, &m) == nil {
+								payload = m
+							}
+						}
+					}
+				}
+				report := map[string]any{
+					"id":               ri["id"],
+					"source":           ri["title"],
+					"title":            ri["title"],
+					"summary":          ri["summary"],
+					"details":          payload,
+					"findings_path":    "",
+					"type":             ri["type"],
+					"complexity":       "medium",
+					"status":           ri["status"],
+					"is_raw_suggestion": true,
+					"is_orphan":        true,
+				}
+				if payload != nil {
+					if fp, ok := payload["findings_path"].(string); ok {
+						report["findings_path"] = fp
+					}
 				}
 				if b, err := json.Marshal(report); err == nil {
 					reportJSON = b
