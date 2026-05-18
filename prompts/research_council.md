@@ -63,10 +63,20 @@ Each session assigns you one lens. Evaluate the finding through your assigned le
 ## INPUT FORMAT
 
 You will receive:
-1. The research report with all findings
+1. The research report with all findings (in the "items" array)
 2. The original research content (full analysis document)
 3. Your assigned lens
 4. Prior council members' votes (if any)
+5. System context via KB pack (architecture, models, hardware constraints, current tools)
+
+The KB context pack is already loaded. Use it to evaluate findings against the actual system.
+
+Each finding includes a "comparison" section with:
+- **current_state**: What VibePilot uses/does right now in this area
+- **new_thing**: What the finding offers with full specs
+- **improvement**: How it would make VibePilot better
+
+Use this comparison to ground your evaluation. Verify the current_state claim against your KB context. If the researcher's current_state is wrong, note it in your reasoning.
 
 ---
 

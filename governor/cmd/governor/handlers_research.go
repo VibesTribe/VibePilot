@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -64,6 +65,8 @@ func (h *ResearchHandler) Register(router *runtime.EventRouter) {
 	router.On(runtime.EventResearchCouncil, h.handleResearchCouncil)
 	// New event: report is ready for council (all items collected)
 	router.On(runtime.EventReportCouncil, h.handleReportCouncilReview)
+	// Human approved research -> route to consultant for PRD creation
+	router.On(runtime.EventResearchApproved, h.handleResearchApproved)
 }
 
 // handleResearchReady fires for each individual research_suggestion.
@@ -639,6 +642,237 @@ func (h *ResearchHandler) handleResearchCouncil(event runtime.Event) {
 		Type: runtime.EventReportCouncil,
 		ID:   reportID,
 	})
+}
+
+// handleResearchApproved fires when a human approves a research suggestion in Review Hub.
+// It routes the approved item to the consultant agent to create a PRD, which then
+// enters the normal planning pipeline (consultant -> PRD -> planner -> tasks).
+func (h *ResearchHandler) handleResearchApproved(event runtime.Event) {
+	ctx := context.Background()
+
+	suggestion, err := fetchRecord(ctx, h.database, event)
+	if err != nil {
+		log.Printf("[ResearchApproved] Failed to get suggestion record: %v", err)
+		return
+	}
+
+	suggestionID := getString(suggestion, "id")
+	title := getString(suggestion, "title")
+	summary := getString(suggestion, "summary")
+	findingsPath := getString(suggestion, "findings_path")
+	suggestionType := getString(suggestion, "type")
+	details, _ := suggestion["details"].(map[string]any)
+
+	if suggestionID == "" {
+		return
+	}
+
+	// Prevent double-processing
+	processingBy := fmt.Sprintf("consultant:%d", time.Now().UnixNano())
+	claimed, err := h.database.RPC(ctx, "set_processing", map[string]any{
+		"p_table":         "research_suggestions",
+		"p_id":            suggestionID,
+		"p_processing_by": processingBy,
+	})
+	if err != nil || !parseBool(claimed) {
+		log.Printf("[ResearchApproved] Suggestion %s already being processed", truncateID(suggestionID))
+		return
+	}
+
+	defer h.database.RPC(ctx, "clear_processing", map[string]any{
+		"p_table": "research_suggestions",
+		"p_id":    suggestionID,
+	})
+
+	// Load the original research findings
+	researchContent := h.loadReportContent(ctx, map[string]any{"findings_path": findingsPath})
+
+	// Load current system context so the consultant knows what we have now
+	kbContext := ""
+	if h.actionApplier != nil {
+		// Use the context builder if available
+		kbContext = h.loadKBContext(ctx, suggestionType)
+	}
+
+	// Build consultant context
+	consultantContext := map[string]any{
+		"action":           "generate_prd",
+		"source":           "research_approved",
+		"suggestion_id":    suggestionID,
+		"title":            title,
+		"summary":          summary,
+		"type":             suggestionType,
+		"details":          details,
+		"research_content": researchContent,
+		"current_system":   kbContext,
+	}
+
+	// Route to consultant agent
+	routingResult, routeErr := h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+		Role:        "consultant",
+		TaskType:    "research_prd",
+		RoutingFlag: "internal",
+	})
+	if routeErr != nil || routingResult == nil {
+		log.Printf("[ResearchApproved] No routing for consultant, trying planner role: %v", routeErr)
+		// Fallback to any available internal model
+		routingResult, routeErr = h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
+			Role:        "analyst",
+			TaskType:    "research_prd",
+			RoutingFlag: "internal",
+		})
+		if routeErr != nil || routingResult == nil {
+			log.Printf("[ResearchApproved] No available model for consultant PRD generation")
+			return
+		}
+	}
+
+	session, err := h.factory.CreateWithConnector(ctx, "consultant", "research_prd", routingResult.ConnectorID)
+	if err != nil {
+		log.Printf("[ResearchApproved] Failed to create consultant session: %v", err)
+		return
+	}
+
+	start := time.Now()
+	result, runErr := session.Run(ctx, consultantContext)
+	duration := time.Since(start).Seconds()
+
+	if runErr != nil {
+		log.Printf("[ResearchApproved] Consultant session failed: %v", runErr)
+		if h.usageTracker != nil {
+			h.usageTracker.RecordCompletion(ctx, routingResult.ModelID, "consultant", duration, false)
+		}
+		return
+	}
+
+	if h.usageTracker != nil {
+		h.usageTracker.RecordCompletion(ctx, routingResult.ModelID, "consultant", duration, true)
+	}
+
+	// Extract PRD from result
+	prdContent := result.Output
+	if prdContent == "" {
+		log.Printf("[ResearchApproved] Consultant returned empty output for %s", truncateID(suggestionID))
+		return
+	}
+
+	// Write PRD to disk
+	slug := slugFromTitle(title)
+	prdPath := fmt.Sprintf("docs/prd/%s.md", slug)
+	repoBase := "/home/vibes/vibepilot"
+	fullPath := repoBase + "/" + prdPath
+	if err := os.MkdirAll(fullPath[:strings.LastIndex(fullPath, "/")], 0755); err != nil {
+		log.Printf("[ResearchApproved] Failed to create PRD dir: %v", err)
+		return
+	}
+	if err := os.WriteFile(fullPath, []byte(prdContent), 0644); err != nil {
+		log.Printf("[ResearchApproved] Failed to write PRD: %v", err)
+		return
+	}
+
+	// Commit and push
+	commitMsg := fmt.Sprintf("prd: %s (from approved research)", title)
+	cmd := fmt.Sprintf("cd %s && git add %s && git commit -m %s && git push",
+		repoBase, prdPath, shellQuote(commitMsg))
+	if output, err := execCommand("bash", "-c", cmd); err != nil {
+		log.Printf("[ResearchApproved] Git push failed: %v, output: %s", err, string(output))
+		// Still continue - the PRD is on disk and can be committed later
+	} else {
+		log.Printf("[ResearchApproved] PRD committed and pushed: %s", prdPath)
+	}
+
+	// Create plan via RPC (triggers the planner pipeline)
+	_, _ = h.database.RPC(ctx, "create_plan", map[string]any{
+		"p_project_id": nil,
+		"p_prd_path":   prdPath,
+		"p_plan_path":  nil,
+	})
+
+	// Update suggestion status to 'prd_created'
+	_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
+		"p_id":     suggestionID,
+		"p_status": "prd_created",
+		"p_review_notes": map[string]any{
+			"approved_by": "human",
+			"prd_path":    prdPath,
+			"triggered_at": time.Now().Format(time.RFC3339),
+		},
+	})
+
+	log.Printf("[ResearchApproved] PRD created for '%s' at %s, plan triggered", title, prdPath)
+}
+
+// slugFromTitle creates a URL/filename-safe slug from a title.
+func slugFromTitle(title string) string {
+	slug := strings.ToLower(title)
+	// Replace spaces and special chars with hyphens
+	slug = strings.ReplaceAll(slug, " ", "-")
+	// Remove non-alphanumeric chars (keep hyphens)
+	var cleaned strings.Builder
+	for _, r := range slug {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			cleaned.WriteRune(r)
+		}
+	}
+	slug = cleaned.String()
+	// Collapse multiple hyphens
+	for strings.Contains(slug, "--") {
+		slug = strings.ReplaceAll(slug, "--", "-")
+	}
+	slug = strings.Trim(slug, "-")
+	if len(slug) > 60 {
+		slug = slug[:60]
+	}
+	if slug == "" {
+		slug = fmt.Sprintf("research-prd-%d", time.Now().Unix())
+	}
+	return slug
+}
+
+// shellQuote wraps a string in single quotes for safe shell interpolation.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+// execCommand runs a command and returns combined output.
+func execCommand(name string, args ...string) ([]byte, error) {
+	cmd := exec.Command(name, args...)
+	return cmd.CombinedOutput()
+}
+
+// loadKBContext loads relevant KB context for a given research type so the
+// consultant knows what the system currently has.
+func (h *ResearchHandler) loadKBContext(ctx context.Context, researchType string) string {
+	// Query KB for current system state relevant to this research type
+	data, err := h.database.RPC(ctx, "kb_context_pack", map[string]any{
+		"p_topic":  researchType,
+		"p_limit":  10,
+	})
+	if err != nil || data == nil {
+		return ""
+	}
+	result := unwrapRPCResult(data, "kb_context_pack")
+	var pack map[string]any
+	if json.Unmarshal(result, &pack) != nil {
+		return ""
+	}
+	// Extract relevant sections
+	sections, _ := pack["sections"].([]any)
+	var sb strings.Builder
+	for _, sec := range sections {
+		s, ok := sec.(map[string]any)
+		if !ok {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("## %s\n", getString(s, "title")))
+		sb.WriteString(getString(s, "content"))
+		sb.WriteString("\n\n")
+	}
+	context := sb.String()
+	if len(context) > 6000 {
+		context = context[:6000] + "\n...[truncated]"
+	}
+	return context
 }
 
 func setupResearchHandlers(

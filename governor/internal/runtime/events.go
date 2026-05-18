@@ -21,6 +21,7 @@ const (
 	EventResearchReady    EventType = "research_ready"
 	EventResearchCouncil  EventType = "research_council"
 	EventReportCouncil    EventType = "research_report_council_review" // report-based council review
+	EventResearchApproved EventType = "research_approved" // human approved -> consultant creates PRD
 	EventMaintenanceCmd   EventType = "maintenance_command"
 	EventPRDReady         EventType = "prd_ready" // consultant finalizes PRD → triggers pipeline
 	EventTestResults      EventType = "test_results"

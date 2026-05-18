@@ -174,6 +174,13 @@ Before doing ANY research, you MUST load and understand VibePilot's current syst
 
         "relevance": "high",
         "relevance_reason": "Analyze against system context loaded from researcher_context.md. Explain why this matters for VibePilot specifically.",
+
+        "comparison": {
+          "current_state": "What VibePilot currently uses for this capability. Be specific: model names, tools, approaches, and their limitations.",
+          "proposed_change": "What this new thing is and its full specs relevant to VibePilot.",
+          "improvement_case": "How this specifically improves on what we have now. What problem does it solve? What limitation does it remove?"
+        },
+
         "action_suggested": "add_to_registry",
         "priority": 1,
 
@@ -264,7 +271,26 @@ Before doing ANY research, you MUST load and understand VibePilot's current syst
 
 Each finding in your output will be submitted as a `research_suggestion` entry with its own findings document in the knowledgebase. The council will review each item and recommend approve/watch/reject.
 
-Make sure EVERY finding includes:
+## MANDATORY: COMPARISON FORMAT FOR EVERY FINDING
+
+Every single finding MUST include a structured comparison so humans and council can understand WHY this was suggested. For each finding, you must provide:
+
+1. **current_state** - What VibePilot uses/does RIGHT NOW for this area. Be specific (model names, tools, approaches, limitations).
+2. **proposed_change** - What the new thing IS (the model, platform, tool, or approach you found). Full specs.
+3. **improvement_case** - Specifically HOW this would make VibePilot better than what we have now. What problem does it solve? What limitation does it remove? What cost does it reduce?
+
+### Example:
+```
+Finding: Qwen3-235B-A22B on OpenRouter
+- current_state: We route coding tasks to DeepSeek via NVIDIA NIM (free tier, 15 req/day, slow). DeepSeek is our best free coder but has no room for scale.
+- proposed_change: Qwen3-235B MoE model, free on OpenRouter, 128K context, ranked #8 on LM Arena for coding. Available NOW, no credit needed.
+- improvement_case: Replaces DeepSeek for coding tasks with a model ranked higher, no daily request limits, no NVIDIA NIM bottleneck. Could handle 5x more coding tasks without hitting limits.
+```
+
+### Why This Matters
+The human who reads your research is non-technical. They need to understand: "What do I have now? What is this new thing? Why should I care?" Without all three pieces, they cannot make an informed decision. Council members also need this to evaluate whether the change is genuinely better than the status quo.
+
+Make sure EVERY finding also includes:
 1. **relevance_reason** - Why this matters for VibePilot specifically (not generic)
 2. **notes** - System-aware analysis considering hardware, cost, and architecture
 3. **source_urls** - Verifiable sources for the claim

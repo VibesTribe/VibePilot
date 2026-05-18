@@ -270,7 +270,19 @@ Make sure EVERY finding includes:
 3. **source_urls** - Verifiable sources for the claim
 4. **action_suggested** - What VibePilot should do about it
 
-For architecture findings, include:
+### MANDATORY: Current State vs New Thing vs Improvement
+
+Every single finding MUST include a "comparison" section with three parts:
+
+1. **current_state**: What VibePilot uses or does right now in this area. Name the specific model, tool, connector, workflow, or code path. Example: "Currently uses deepseek-v4-flash via NVIDIA NIM for code generation tasks, limited to 500 req/day on free tier with frequent 429 errors during peak hours."
+
+2. **new_thing**: What the finding offers. Full specs, access method, limits, cost. Example: "Kimi K2.5 offers free API with 1000 req/day, 128K context, OpenAI-compatible endpoint, strong coding benchmarks (ELO 1240)."
+
+3. **improvement**: Exactly how this would make VibePilot better. Be specific about what changes: "Would replace NVIDIA NIM fallback for coding tasks, doubling daily capacity from 500 to 1000 requests, reducing 429 errors, and providing 2x larger context window for complex code generation. Implementation: add to connectors.json as new destination, update routing.json to prefer for coding task types."
+
+This comparison is read by both the council AND the human reviewer. If you cannot describe all three parts, you do not understand the finding well enough to submit it.
+
+For architecture findings, also include:
 - **system_impact** - What files/configs need to change
 - **hardware_requirement** - X220-compatible?
 - **implementation_effort** - low/medium/high

@@ -247,6 +247,8 @@ func (l *Listener) mapEvent(p notifyPayload) *runtime.Event {
 			eventType = runtime.EventResearchReady
 		case "council_review":
 			eventType = runtime.EventResearchCouncil
+		case "approved":
+			eventType = runtime.EventResearchApproved
 		}
 
 	case p.Table == "research_reports":
