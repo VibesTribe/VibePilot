@@ -506,12 +506,21 @@ func (h *ResearchHandler) aggregateAndSaveCouncilResults(
 			recommendation = "watch"
 		}
 
-		reasoning := "Council split."
+		reasoning := "Council did not produce detailed reasoning."
 		if len(agg.reasonings) > 0 {
-			reasoning = agg.reasonings[0]
-			if len(agg.reasonings) > 1 {
-				reasoning += fmt.Sprintf(" (%d members voted)", len(agg.reasonings))
+			// Combine all member reasoning into a readable summary
+			if len(agg.reasonings) == 1 {
+				reasoning = agg.reasonings[0]
+			} else {
+				var parts []string
+				for mi, r := range agg.reasonings {
+					parts = append(parts, fmt.Sprintf("Member %d: %s", mi+1, r))
+				}
+				reasoning = strings.Join(parts, " | ")
 			}
+		} else if agg.approves > 0 || agg.rejects > 0 || agg.watches > 0 {
+			reasoning = fmt.Sprintf("Council voted: %d approve, %d watch, %d reject (no detailed reasoning provided).",
+				agg.approves, agg.watches, agg.rejects)
 		}
 
 		// Collect per-member votes for this item
@@ -860,12 +869,12 @@ func (h *ResearchHandler) writeReportDecisionDoc(
 		}
 	}
 
-	sb.WriteString("## Your Decision\n\n")
-	sb.WriteString("For each item above, choose:\n")
-	sb.WriteString("- **Approve:** Include in PRD for implementation\n")
-	sb.WriteString("- **Watch:** Revisit monthly for updates\n")
-	sb.WriteString("- **Reject:** Close with reasoning\n\n")
-	sb.WriteString("Use the Review Hub to make your decisions.\n")
+	sb.WriteString("## Your Decision\n\n");
+	sb.WriteString("For each item above, choose:\n");
+	sb.WriteString("- **Approve:** Include in PRD for implementation\n");
+	sb.WriteString("- **Watch:** Revisit monthly for updates\n");
+	sb.WriteString("- **Reject:** Close with reasoning\n\n");
+	sb.WriteString("**Decide online:** Open this report in the [Knowledge Hub](https://graphs.vibestribe.rocks) Research section to use the interactive decision buttons.\n");
 
 	// Derive decision doc path (strip knowledgebase/ prefix to avoid doubling)
 	decisionPath := fmt.Sprintf("research/decisions/%s.md", reportID)
