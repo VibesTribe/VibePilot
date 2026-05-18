@@ -2227,6 +2227,12 @@ func (s *Server) handleReviewItems(w http.ResponseWriter, r *http.Request) {
 	}
 	kbBase := "https://graphs.vibestribe.rocks"
 	for i := range enriched {
+		// Skip review_url for research items - dashboard uses inline ResearchReportPanel
+		// which provides interactive Approve/Watch/Reject buttons and shows Knowledge Hub
+		// links internally via decision_doc_path/findings_path.
+		if itemType, _ := enriched[i]["type"].(string); itemType == "research" {
+			continue
+		}
 		reviewURL := ""
 		if payload, ok := enriched[i]["payload"].(map[string]any); ok {
 			if ru, ok := payload["review_url"].(string); ok && ru != "" {
