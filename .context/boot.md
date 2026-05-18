@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-05-18T04:45:12Z | Commit: 4fdea0c4 | Branch: main
+# Generated: 2026-05-18T04:48:54Z | Commit: 8f5df30e | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -171,8 +171,9 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Codebase Structure (auto-discovered)
 - governor/cmd/cleanup/ (1 files, 1 funcs, 0 types)
 - governor/cmd/encrypt_secret/ (1 files, 1 funcs, 0 types)
-- governor/cmd/governor/ (18 files, 170 funcs, 20 types)
+- governor/cmd/governor/ (18 files, 182 funcs, 22 types)
 - governor/cmd/migrate_vault/ (1 files, 5 funcs, 1 types)
+- governor/cmd/vault_decrypt/ (1 files, 1 funcs, 0 types)
 - governor/cmd/vault_encrypt/ (1 files, 1 funcs, 0 types)
 - governor/internal/connectors/ (2 files, 33 funcs, 10 types)
 - governor/internal/core/ (4 files, 35 funcs, 27 types)
@@ -185,13 +186,15 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - governor/internal/maintenance/ (3 files, 31 funcs, 7 types)
 - governor/internal/mcp/ (3 files, 23 funcs, 4 types)
 - governor/internal/memory/ (2 files, 19 funcs, 5 types)
+- governor/internal/notifications/ (1 files, 12 funcs, 4 types)
 - governor/internal/pgnotify/ (1 files, 4 funcs, 3 types)
-- governor/internal/runtime/ (19 files, 316 funcs, 133 types)
+- governor/internal/reviewitems/ (1 files, 4 funcs, 1 types)
+- governor/internal/runtime/ (19 files, 320 funcs, 134 types)
 - governor/internal/security/ (1 files, 3 funcs, 3 types)
 - governor/internal/tools/ (7 files, 50 funcs, 22 types)
 - governor/internal/vault/ (1 files, 20 funcs, 4 types)
 - governor/internal/visualqa/ (7 files, 60 funcs, 38 types)
-- governor/internal/webhooks/ (6 files, 82 funcs, 18 types)
+- governor/internal/webhooks/ (6 files, 88 funcs, 18 types)
 - governor/pkg/types/ (1 files, 0 funcs, 9 types)
 ## Config: JSON (auto-discovered)
   config/agents.json - Agent configurations. Empty model field = use cascade routing from routing.json free_cascade strategy. context_policy: full_map=entire codebase, file_tree=section headers only, targeted=specific task files only, none=no codebase context.
@@ -217,8 +220,10 @@ Runtime: Go binary (governor). Event-driven via Supabase.
   config/prompts/maintenance.md - Maintenance Agent
   config/prompts/orchestrator.md - Orchestrator Agent
   config/prompts/planner.md - Planner Agent
+  config/prompts/research_council.md - RESEARCH COUNCIL MEMBER AGENT
   config/prompts/researcher.md - Researcher Agent
   config/prompts/supervisor.md - Supervisor Agent
+  config/prompts/system_researcher.md - SYSTEM RESEARCH AGENT - Full Prompt
   config/prompts/tester_code.md - Code Tester Agent
   config/prompts/vibes.md - Vibes Agent
 
@@ -226,7 +231,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 4fdea0c4
+- Commit: 8f5df30e
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)
