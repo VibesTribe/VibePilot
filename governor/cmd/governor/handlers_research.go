@@ -332,7 +332,7 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 			continue
 		}
 
-		session, err := h.factory.CreateWithConnector(ctx, "council", lens, memberRouting.ConnectorID)
+		session, err := h.factory.CreateWithConnector(ctx, "research_council", lens, memberRouting.ConnectorID)
 		if err != nil {
 			log.Printf("[ReportCouncil] Failed to create session for member %d: %v", i+1, err)
 			failedModels = append(failedModels, memberRouting.ModelID)
