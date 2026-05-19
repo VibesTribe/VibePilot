@@ -205,8 +205,10 @@ var defaultRPCAllowlist = map[string]bool{
 	"get_report_for_review":       true,
 	"update_report_item_council":  true,
 	"update_report_status":        true,
-	"set_report_item_decision":    true,
-	"mark_report_if_decided":      true,
+	"set_report_item_decision":       true,
+	"resolve_review_items_by_source": true,
+	"report_undecided_count":         true,
+	"mark_report_if_decided":         true,
 }
 
 type RPCAllowlist struct {
