@@ -2605,11 +2605,10 @@ func (s *Server) handleReportItemDecision(w http.ResponseWriter, r *http.Request
 					"p_id":     reportID,
 					"p_status": "decided",
 				})
-				// Resolve the parent review_item so it leaves the review queue
-				s.db.Exec(r.Context(),
-					"UPDATE review_items SET status = 'resolved' WHERE source_id = $1 AND status IN ('pending', 'deferred')",
-					reportID,
-				)
+				// Resolve the parent review_item so it leaves the review queue (matches by source_id)
+				s.db.RPC(r.Context(), "resolve_review_items_by_source", map[string]any{
+					"p_source_id": reportID,
+				})
 				// Create review item for PRD generation
 				s.db.Insert(r.Context(), "review_items", map[string]any{
 					"type":     "research",
