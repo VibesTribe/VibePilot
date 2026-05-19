@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-05-19T03:56:37Z | Commit: 0ad56b2a | Branch: main
+# Generated: 2026-05-19T04:45:17Z | Commit: 5ed650e5 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -171,7 +171,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 ## Codebase Structure (auto-discovered)
 - governor/cmd/cleanup/ (1 files, 1 funcs, 0 types)
 - governor/cmd/encrypt_secret/ (1 files, 1 funcs, 0 types)
-- governor/cmd/governor/ (18 files, 182 funcs, 22 types)
+- governor/cmd/governor/ (18 files, 188 funcs, 22 types)
 - governor/cmd/migrate_vault/ (1 files, 5 funcs, 1 types)
 - governor/cmd/vault_decrypt/ (1 files, 1 funcs, 0 types)
 - governor/cmd/vault_encrypt/ (1 files, 1 funcs, 0 types)
@@ -231,7 +231,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 0ad56b2a
+- Commit: 5ed650e5
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)

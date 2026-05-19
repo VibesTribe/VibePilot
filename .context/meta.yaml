@@ -1,9 +1,9 @@
 # Auto-generated. DO NOT EDIT.
-commit: 0ad56b2a
+commit: 5ed650e5
 branch: main
-generated: 2026-05-19T03:56:37Z
+generated: 2026-05-19T04:45:17Z
 boot_md_bytes: 14009
-map_md_bytes: 86717
+map_md_bytes: 86959
 has_index_db: true
 has_knowledge_db: true
 indexes:
