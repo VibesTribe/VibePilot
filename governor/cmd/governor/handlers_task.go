@@ -130,6 +130,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	// DEPENDENCY GATE: Block tasks whose dependencies aren't complete
 	if deps, ok := task["dependencies"].([]any); ok && len(deps) > 0 {
 		allComplete := true
+		anyFailed := false
 		for _, dep := range deps {
 			depNum, _ := dep.(string)
 			if depNum == "" {
@@ -147,18 +148,28 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 			var depTasks []map[string]any
 			if json.Unmarshal(depRows, &depTasks) == nil && len(depTasks) > 0 {
 				depStatus, _ := depTasks[0]["status"].(string)
+				if depStatus == "failed" {
+					log.Printf("[TaskAvailable] Task %s: dependency %s failed, cascading failure", taskNumber, depNum)
+					anyFailed = true
+					allComplete = false
+					break
+				}
 				if depStatus != "merged" && depStatus != "complete" && depStatus != "completed" {
-					log.Printf("[TaskAvailable] Task %s: dependency %s not complete (status=%s), reverting to pending", taskNumber, depNum, depStatus)
+					log.Printf("[TaskAvailable] Task %s: dependency %s not complete (status=%s), blocking dispatch", taskNumber, depNum, depStatus)
 					allComplete = false
 					break
 				}
 			}
 		}
 		if !allComplete {
-			h.database.RPC(ctx, "transition_task", map[string]any{
-				"p_task_id":    taskID,
-				"p_new_status": "pending",
-			})
+			if anyFailed {
+				h.database.RPC(ctx, "transition_task", map[string]any{
+					"p_task_id":        taskID,
+					"p_new_status":     "failed",
+					"p_failure_reason": "DEPENDENCY_FAILED: upstream dependency failed, cascade",
+				})
+			}
+			// Task already pending or blocked — do NOT transition, do NOT loop
 			return
 		}
 		log.Printf("[TaskAvailable] Task %s: all dependencies complete, proceeding", taskNumber)
