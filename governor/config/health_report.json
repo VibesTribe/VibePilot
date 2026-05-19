@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-14T10:00:33.755144+00:00",
+  "timestamp": "2026-05-19T05:30:01.646472+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,8 +11,8 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 364,
-      "free": 30
+      "models": 356,
+      "free": 28
     }
   },
   "health_checks": {
@@ -178,11 +178,6 @@
       "cooldown_state": "ready"
     },
     "deepseek-v3": {
-      "status": "active",
-      "cooldown_until": "none",
-      "cooldown_state": "ready"
-    },
-    "deepseek-v4-flash": {
       "status": "active",
       "cooldown_until": "none",
       "cooldown_state": "ready"
