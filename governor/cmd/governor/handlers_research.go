@@ -213,6 +213,11 @@ func (h *ResearchHandler) addReportItem(ctx context.Context, reportID, suggestio
 		}
 	}
 
+	// Extract comparison fields from researcher output
+	currentState := extractComparisonField(details, "current_state")
+	newThing := extractComparisonField(details, "new_thing")
+	improvement := extractComparisonField(details, "improvement")
+
 	_, err := h.database.Insert(ctx, "research_report_items", map[string]any{
 		"report_id":     reportID,
 		"suggestion_id": suggestionID,
@@ -220,6 +225,9 @@ func (h *ResearchHandler) addReportItem(ctx context.Context, reportID, suggestio
 		"finding_type":  findingType,
 		"summary":       summary,
 		"details":       detailsJSON,
+		"current_state": currentState,
+		"new_thing":     newThing,
+		"improvement":   improvement,
 		"sort_order":    count,
 	})
 	if err != nil {
@@ -306,6 +314,16 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 	// Load the original research report content so council members can read it
 	reportContent := h.loadReportContent(ctx, report)
 
+	// Load current system context so council can evaluate findings against reality
+	var systemContext string
+	if reportItems, ok := itemsRaw[0].(map[string]any); ok {
+		itemType, _ := reportItems["finding_type"].(string)
+		if itemType == "" {
+			itemType = "architecture"
+		}
+		systemContext = h.loadKBContext(ctx, itemType)
+	}
+
 	memberCount := h.cfg.GetCouncilMemberCount()
 	lenses := h.cfg.GetCouncilLenses()
 	if len(lenses) == 0 {
@@ -342,11 +360,12 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 			continue
 		}
 
-		// Build context: full report, original content, and prior member votes for context
+		// Build context: full report, original content, system context, and prior member votes for context
 		contextData := map[string]any{
 			"report":          report,
 			"items":           itemsRaw,
 			"original_report": reportContent,
+			"system_context":  systemContext,
 			"lens":            lens,
 			"member_number":   i + 1,
 			"total_members":   memberCount,
@@ -574,9 +593,22 @@ func (h *ResearchHandler) aggregateAndSaveCouncilResults(
 	})
 
 	// Insert a review_items entry so it shows in Review Hub
+	// Include item summaries with comparison data in the payload
+	var reviewPayload []map[string]any
+	for _, ir := range itemResults {
+		reviewPayload = append(reviewPayload, map[string]any{
+			"title":          ir.title,
+			"recommendation": ir.recommendation,
+			"reasoning":      ir.reasoning,
+		})
+	}
+	reviewSummary := fmt.Sprintf("Council reviewed %d items. Decision doc ready.", len(itemResults))
 	h.insertReviewItem(ctx, "research", reportID, reportTitle,
-		fmt.Sprintf("Council reviewed %d items. Decision doc ready.", len(itemResults)),
-		"high")
+		reviewSummary, "high", map[string]any{
+			"items":         reviewPayload,
+			"decision_doc":  kbDecisionPath,
+			"report_id":     reportID,
+		})
 
 	log.Printf("[ReportCouncil] Report %s -> pending_human (%d items reviewed)", truncateID(reportID), len(itemResults))
 }
@@ -840,6 +872,25 @@ func execCommand(name string, args ...string) ([]byte, error) {
 	return cmd.CombinedOutput()
 }
 
+// extractComparisonField extracts a comparison field (current_state, new_thing, improvement)
+// from the details map. Handles both string values and nested "comparison" objects.
+func extractComparisonField(details map[string]any, field string) string {
+	if details == nil {
+		return ""
+	}
+	// Try direct field first
+	if v, ok := details[field].(string); ok && v != "" {
+		return v
+	}
+	// Try nested under "comparison"
+	if comp, ok := details["comparison"].(map[string]any); ok {
+		if v, ok := comp[field].(string); ok && v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 // loadKBContext loads relevant KB context for a given research type so the
 // consultant knows what the system currently has.
 func (h *ResearchHandler) loadKBContext(ctx context.Context, researchType string) string {
@@ -987,7 +1038,7 @@ func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
 }
 
 // insertReviewItem adds a review item to the unified review queue.
-func (h *ResearchHandler) insertReviewItem(ctx context.Context, itemType, sourceID, title, summary, priority string) {
+func (h *ResearchHandler) insertReviewItem(ctx context.Context, itemType, sourceID, title, summary, priority string, payload ...map[string]any) {
 	existing, err := h.database.Query(ctx, "review_items", map[string]any{
 		"type":      itemType,
 		"source_id": sourceID,
@@ -1001,12 +1052,19 @@ func (h *ResearchHandler) insertReviewItem(ctx context.Context, itemType, source
 		}
 	}
 
+	var payloadData map[string]any
+	if len(payload) > 0 {
+		payloadData = payload[0]
+	} else {
+		payloadData = map[string]any{}
+	}
+
 	_, err = h.database.Insert(ctx, "review_items", map[string]any{
 		"type":     itemType,
 		"source_id": sourceID,
 		"title":    title,
 		"summary":  summary,
-		"payload":  map[string]any{},
+		"payload":  payloadData,
 		"status":   "pending",
 		"priority": priority,
 	})

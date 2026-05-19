@@ -2598,13 +2598,18 @@ func (s *Server) handleReportItemDecision(w http.ResponseWriter, r *http.Request
 				json.Unmarshal(undecided, &count)
 			}
 			if count == 0 {
-				// All items decided. Mark report and trigger PRD generation.
-				log.Printf("[report-items] Report %s fully decided, triggering PRD generation", reportID)
+				// All items decided. Mark report, resolve parent review_item, trigger PRD generation.
+				log.Printf("[report-items] Report %s fully decided, resolving parent review_item and triggering PRD generation", reportID)
 				// Update report status
 				s.db.RPC(r.Context(), "update_report_status", map[string]any{
 					"p_id":     reportID,
 					"p_status": "decided",
 				})
+				// Resolve the parent review_item so it leaves the review queue
+				s.db.Exec(r.Context(),
+					"UPDATE review_items SET status = 'resolved' WHERE source_id = $1 AND status IN ('pending', 'deferred')",
+					reportID,
+				)
 				// Create review item for PRD generation
 				s.db.Insert(r.Context(), "review_items", map[string]any{
 					"type":     "research",
