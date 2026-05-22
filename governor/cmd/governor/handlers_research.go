@@ -328,7 +328,7 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 	memberCount := h.cfg.GetCouncilMemberCount()
 	lenses := h.cfg.GetCouncilLenses()
 	if len(lenses) == 0 {
-		lenses = []string{"user_alignment", "architecture", "feasibility"}
+		lenses = []string{"user_alignment", "architecture", "feasibility", "build_vs_adopt"}
 	}
 	if memberCount <= 0 {
 		memberCount = 3

@@ -87,7 +87,7 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 		memberCount = 3
 	}
 	if len(lenses) == 0 {
-		lenses = []string{"user_alignment", "architecture", "feasibility"}
+		lenses = []string{"user_alignment", "architecture", "feasibility", "build_vs_adopt"}
 	}
 
 	var prdContent string
