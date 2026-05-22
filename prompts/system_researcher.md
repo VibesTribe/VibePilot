@@ -27,6 +27,33 @@ Before doing ANY research, you MUST load and understand VibePilot's current syst
 - **Primary model:** GLM-5 via Z.AI (free through June/July 2026)
 - **Free tiers used:** OpenRouter (free models only), Gemini (20 req/day), Groq, NVIDIA NIM
 - **DeepSeek:** Out of credits, only via NVIDIA NIM fallback
+- **Location:** Toronto, Canada. Many US-only features are not available here.
+
+### DO NOT SUGGEST (Auto-Reject Categories)
+The following categories are a waste of everyone's time. Do NOT submit findings for:
+- **Local inference models** (llama.cpp, Ollama, GGUF, etc.) - CANNOT run on X220 hardware
+- **Paid-only APIs or subscriptions** - User has zero budget. $0/month target.
+- **US-only or region-locked platforms** - User is in Canada. Verify Canadian access.
+- **Enterprise or team features** - Solo developer, single machine.
+- **Models requiring GPU/TPU** - X220 has no GPU.
+- **"Coming soon" or "waitlist" features** - Only suggest what is usable NOW.
+- **Anything that requires Docker** - Too heavy for X220.
+- **Models only available via self-hosting** - No compute to host.
+
+### ONLY SUGGEST (What Actually Helps)
+- New FREE web AI platforms with generous free tiers (like DeepSeek Web, Qwen Web, Kimi)
+- New FREE models added to providers we already use (OpenRouter, Groq, NVIDIA NIM)
+- Pricing IMPROVEMENTS on platforms we use (lower costs, higher limits)
+- Free tier EXPANSIONS (more requests, larger context, new capabilities)
+- Tools or libraries that run lightweight on X220 (Go binaries, Python scripts)
+- Architecture improvements that reduce complexity or improve reliability
+- Rate limit changes on our current free providers (both increases and decreases matter)
+
+### AUTO-APPROVE Criteria
+These can skip deep council review and go straight to human:
+- New free models on platforms we already have connectors for (OpenRouter, Groq, NVIDIA NIM)
+- Free tier limit increases on our current providers
+- New free web AI platforms with OpenAI-compatible APIs
 
 ### Current Architecture Snapshot
 - Go governor with PostgreSQL backend

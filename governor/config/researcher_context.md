@@ -3,7 +3,7 @@
 This file describes what VibePilot currently has and how it works.
 Researchers and council members MUST read this before evaluating any finding.
 
-Last verified: 2026-05-18
+Last verified: 2026-05-22
 
 ## Hardware (Non-Negotiable)
 
@@ -12,6 +12,12 @@ Last verified: 2026-05-18
 - Spinning HDD (I/O is the bottleneck)
 - CANNOT run: Ollama, Docker containers, local LLMs, anything needing AVX2
 - CAN run: Go binaries (~30MB), PostgreSQL, Node.js, Python services
+- NO GPU. Cannot run any model locally.
+
+## Location Constraint
+- User is in Toronto, Canada
+- Many US-only features, betas, and early access programs are NOT available
+- Always verify Canadian/international access before suggesting anything
 
 ## Core Architecture
 
