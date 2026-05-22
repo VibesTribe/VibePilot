@@ -140,9 +140,10 @@ func (h *ResearchHandler) findOrCreateDailyReport(ctx context.Context, findingsP
 	today := time.Now().Format("2006-01-02")
 	reportTitle := fmt.Sprintf("Daily Research Scan - %s", today)
 
-	// Check for existing report today
+	// Check for existing report today — must be today's date, not just any daily_scan
 	data, err := h.database.Query(ctx, "research_reports", map[string]any{
 		"report_type": "daily_scan",
+		"created_at":  "gte." + today,
 		"limit":       1,
 	})
 	if err == nil {
@@ -154,12 +155,14 @@ func (h *ResearchHandler) findOrCreateDailyReport(ctx context.Context, findingsP
 		}
 	}
 
-	// Create new report
+	// Create new report in "collecting" status — we'll change to council_review
+	// AFTER items are added, to avoid race condition where pg_notify fires
+	// the council event before items exist.
 	result, err := h.database.Insert(ctx, "research_reports", map[string]any{
 		"title":         reportTitle,
 		"report_type":   "daily_scan",
 		"source":        "researcher",
-		"status":        "council_review",
+		"status":        "collecting",
 		"findings_path": findingsPath,
 	})
 	if err != nil {
@@ -258,11 +261,35 @@ func (h *ResearchHandler) checkAndRouteReport(ctx context.Context, reportID stri
 
 	log.Printf("[ResearchReady] Report %s has %d items", truncateID(reportID), len(items))
 
-	// For now, we don't auto-trigger council here.
-	// The daily research cron will call /api/research-reports/{id}/trigger-council
-	// when all items are collected. Or we trigger immediately for single items.
-	// The report is already in council_review status, so the pg_notify trigger
-	// on research_reports fires the research_report_council_review event.
+	// After adding items, promote report from "collecting" to "council_review"
+	// with a short delay to batch items that arrive in rapid succession.
+	// Only promotes if report is still in "collecting" status (idempotent).
+	if len(items) > 0 {
+		go func() {
+			time.Sleep(3 * time.Second)
+			// Only promote if still in "collecting" — avoids duplicate council runs
+			currentData, err := h.database.Query(context.Background(), "research_reports", map[string]any{
+				"id":     reportID,
+				"select": "status",
+			})
+			if err == nil {
+				var reports []map[string]any
+				if json.Unmarshal(currentData, &reports) == nil && len(reports) > 0 {
+					if status, _ := reports[0]["status"].(string); status != "collecting" {
+						log.Printf("[ResearchReady] Report %s already promoted (status=%s), skipping", truncateID(reportID), status)
+						return
+					}
+				}
+			}
+			log.Printf("[ResearchReady] Promoting report %s to council_review", truncateID(reportID))
+			_, err = h.database.Update(context.Background(), "research_reports", reportID, map[string]any{
+				"status": "council_review",
+			})
+			if err != nil {
+				log.Printf("[ResearchReady] Failed to promote report %s to council_review: %v", truncateID(reportID), err)
+			}
+		}()
+	}
 }
 
 // handleReportCouncilReview runs the council on all items in a report.
