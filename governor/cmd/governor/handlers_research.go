@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vibepilot/governor/internal/db"
@@ -892,24 +893,35 @@ func extractComparisonField(details map[string]any, field string) string {
 }
 
 // loadKBContext loads relevant KB context for a given research type so the
-// consultant knows what the system currently has.
+// consultant knows what the system currently has. Includes live system state.
 func (h *ResearchHandler) loadKBContext(ctx context.Context, researchType string) string {
-	// Query KB for current system state relevant to this research type
+	var sb strings.Builder
+
+	// Inject live system state from generate_system_context.py
+	if liveCtx := h.loadLiveSystemContext(); liveCtx != "" {
+		sb.WriteString("## LIVE SYSTEM STATE\n\n")
+		sb.WriteString("This is the current live state of the system, generated just now.\n")
+		sb.WriteString("Use this to understand what is actually installed, running, and available.\n")
+		sb.WriteString("Do NOT suggest anything that conflicts with these constraints.\n\n")
+		sb.WriteString(liveCtx)
+		sb.WriteString("\n\n")
+	}
+
+	// Then add KB context pack
 	data, err := h.database.RPC(ctx, "kb_context_pack", map[string]any{
 		"p_topic":  researchType,
 		"p_limit":  10,
 	})
 	if err != nil || data == nil {
-		return ""
+		return sb.String()
 	}
 	result := unwrapRPCResult(data, "kb_context_pack")
 	var pack map[string]any
 	if json.Unmarshal(result, &pack) != nil {
-		return ""
+		return sb.String()
 	}
 	// Extract relevant sections
 	sections, _ := pack["sections"].([]any)
-	var sb strings.Builder
 	for _, sec := range sections {
 		s, ok := sec.(map[string]any)
 		if !ok {
@@ -920,10 +932,48 @@ func (h *ResearchHandler) loadKBContext(ctx context.Context, researchType string
 		sb.WriteString("\n\n")
 	}
 	context := sb.String()
-	if len(context) > 6000 {
-		context = context[:6000] + "\n...[truncated]"
+	if len(context) > 8000 {
+		context = context[:8000] + "\n...[truncated]"
 	}
 	return context
+}
+
+// loadLiveSystemContext runs the system context generator and returns the JSON output.
+// Caches result for 5 minutes to avoid hammering the system.
+var (
+	liveContextCache     string
+	liveContextCacheTime time.Time
+	liveContextMu        sync.Mutex
+)
+
+func (h *ResearchHandler) loadLiveSystemContext() string {
+	liveContextMu.Lock()
+	defer liveContextMu.Unlock()
+
+	// Cache for 5 minutes
+	if time.Since(liveContextCacheTime) < 5*time.Minute && liveContextCache != "" {
+		return liveContextCache
+	}
+
+	scriptPath := "/home/vibes/vibepilot/scripts/generate_system_context.py"
+	ctx2, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx2, "python3", scriptPath)
+	out, err := cmd.Output()
+	if err != nil {
+		log.Printf("[loadLiveSystemContext] Failed to run system context script: %v", err)
+		return ""
+	}
+
+	result := string(out)
+	if len(result) > 4000 {
+		result = result[:4000] + "\n...[truncated]"
+	}
+
+	liveContextCache = result
+	liveContextCacheTime = time.Now()
+	log.Printf("[loadLiveSystemContext] Generated fresh system context (%d bytes)", len(result))
+	return result
 }
 
 func setupResearchHandlers(
