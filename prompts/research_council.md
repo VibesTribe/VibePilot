@@ -58,13 +58,13 @@ Each session assigns you one lens. Evaluate the finding through your assigned le
 - Is this a subscription trap (cheap intro, expensive later)?
 - Does it replace something more expensive we already use?
 
-### Lens 4: Build vs Adopt (Can We Build Our Own?)
-- Is this an open-source tool or approach we could study and reimplement?
-- Could we build a lighter custom version in Go or Python that fits our stack?
-- Would building our own give us more control, better integration, or lower maintenance?
-- Is the third-party tool overengineered for our needs? Could we extract just the useful idea?
-- What would the custom implementation look like? Rough scope estimate.
-- Prefer building our own over adopting external dependencies when the scope is manageable.
+### Lens 4: Build vs Adopt (What's the Right Approach?)
+- Can we use this tool directly as-is? If it works and fits, just use it. Don't reinvent wheels.
+- Is the tool too heavy or complex for our needs? Then consider a lighter custom version.
+- Building our own is NOT the default. Only recommend it when existing tools genuinely won't work AND the scope is small enough to actually succeed.
+- Be honest about build risk. Custom tools can fail or take too long. If an existing tool works, use it.
+- If recommending build: estimate realistic scope and risk. If recommending adopt: verify it actually runs on our hardware and licensing is compatible.
+- Consider hybrid: use the tool for inspiration but adopt it directly if it fits.
 
 ---
 

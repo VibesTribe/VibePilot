@@ -55,7 +55,7 @@ The following categories are a waste of everyone's time. Do NOT submit findings 
 - Open-source tools with MIT or Apache 2.0 licenses (generous free tier or self-hostable on X220)
 - Better Claude Code or OpenCode patterns for courier agents
 - PostgreSQL performance tuning, pgvector optimization, or schema improvements
-- Interesting open-source projects or tools we could learn from and BUILD OUR OWN VERSION of in Go or Python, adapted to our constraints and integrated into our stack. We don't adopt third-party tools wholesale. We study their approach, extract the useful ideas, and build a lightweight custom version that fits our system.
+- Interesting open-source projects or tools worth adopting directly if they fit, or studying for approaches we could adapt. Don't default to building our own. If an existing tool works and runs on our hardware with compatible licensing, just use it. Only suggest building custom when no existing tool fits.
 
 ### Stack Updates to Monitor
 Check for new releases, breaking changes, and security patches for ALL of these:
