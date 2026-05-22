@@ -43,6 +43,13 @@ def psql_rows(query):
 
 now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+# Load the static system context (what each thing does and why)
+try:
+    with open("/home/vibes/vibepilot/governor/config/system_context.md") as f:
+        static_context = f.read().strip()
+except:
+    static_context = "# system_context.md not found"
+
 data = {
     "generated_at": now,
     "generated_by": "generate_system_context.py",
@@ -132,5 +139,7 @@ data["research_pipeline"] = {
     "pending_human": psql_int("SELECT COUNT(*) FROM research_reports WHERE status='pending_human';"),
     "review_items": psql_int("SELECT COUNT(*) FROM review_items WHERE status='pending';"),
 }
+
+data["system_context"] = static_context
 
 print(json.dumps(data, indent=2))
