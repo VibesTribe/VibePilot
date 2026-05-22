@@ -56,13 +56,24 @@ data = {
 
     "hardware": {
         "machine": "ThinkPad X220",
-        "cpu": run("grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2 | xargs"),
+        "cpu": "Intel(R) Core(TM) i5-2520M CPU @ 2.50GHz",
+        "cpu_cores": run_int("nproc"),
         "has_avx2": "avx2" in run("grep '^flags' /proc/cpuinfo | head -1"),
         "has_gpu": False,
         "ram_total_gb": run_int("free -g | awk '/^Mem:/{print $2}'"),
+        "ram_used_gb": run_int("free -g | awk '/^Mem:/{print $3}'"),
         "ram_available_gb": run_int("free -g | awk '/^Mem:/{print $7}'"),
+        "ram_used_pct": run_int("free | awk '/^Mem:/{printf \"%d\", $3/$2*100}'"),
+        "swap_total_gb": run_int("free -g | awk '/^Swap:/{print $2}'"),
+        "swap_used_gb": run_int("free -g | awk '/^Swap:/{print $3}'"),
+        "disk_total_gb": run_int("df -BG / | awk 'NR==2{print $2}' | tr -d G"),
         "disk_used_pct": run_int("df / | awk 'NR==2{print $5}' | tr -d %"),
         "load_1min": run_float("cut -d' ' -f1 /proc/loadavg"),
+        "load_5min": run_float("cut -d' ' -f2 /proc/loadavg"),
+        "top_processes": run("ps aux --sort=-%mem | head -6 | tail -5 | awk '{printf \"%s(%.0f%%RAM %.0f%%CPU) \", $11, $4, $3}'").strip(),
+        "governor_mem_mb": run_int("ps aux | grep 'governor/governor' | grep -v grep | awk '{printf \"%.0f\", $6/1024}'"),
+        "hermes_mem_mb": run_int("ps aux | grep 'hermes' | grep -v grep | awk '{sum+=$6} END{printf \"%.0f\",sum/1024}'"),
+        "postgres_mem_mb": run_int("ps aux | grep postgres | grep -v grep | awk '{sum+=$6} END{printf \"%.0f\",sum/1024}'"),
     },
 
     "software": {
