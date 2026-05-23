@@ -944,26 +944,40 @@ func (h *ResearchHandler) loadKBContext(ctx context.Context, researchType string
 
 	// Then add KB context pack
 	data, err := h.database.RPC(ctx, "kb_context_pack", map[string]any{
-		"p_topic":  researchType,
-		"p_limit":  10,
+		"p_query":        researchType,
+		"p_repo_id":      "",
+		"p_limit":        10,
+		"p_use_semantic": false,
 	})
 	if err != nil || data == nil {
 		return sb.String()
 	}
 	result := unwrapRPCResult(data, "kb_context_pack")
-	var pack map[string]any
-	if json.Unmarshal(result, &pack) != nil {
+	// RPC returns array of {section, content} objects
+	var sections []map[string]any
+	if json.Unmarshal(result, &sections) != nil {
 		return sb.String()
 	}
-	// Extract relevant sections
-	sections, _ := pack["sections"].([]any)
 	for _, sec := range sections {
-		s, ok := sec.(map[string]any)
-		if !ok {
+		sectionName := getString(sec, "section")
+		contentRaw := sec["content"]
+		if contentRaw == nil {
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("## %s\n", getString(s, "title")))
-		sb.WriteString(getString(s, "content"))
+		// Content can be string, array, or object -- serialize non-strings
+		var contentStr string
+		switch v := contentRaw.(type) {
+		case string:
+			contentStr = v
+		default:
+			b, _ := json.Marshal(v)
+			contentStr = string(b)
+		}
+		if contentStr == "" || contentStr == "null" {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("## %s\n", sectionName))
+		sb.WriteString(contentStr)
 		sb.WriteString("\n\n")
 	}
 	context := sb.String()
