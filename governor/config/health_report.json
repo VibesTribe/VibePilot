@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-23T05:30:02.018402+00:00",
+  "timestamp": "2026-05-23T10:01:35.001930+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -100,8 +100,8 @@
         "veo-3.1-lite-generate-preview",
         "gemini-2.5-flash-native-audio-latest",
         "gemini-2.5-flash-native-audio-preview-09-2025",
-        "llama-3.1-8b-instant",
-        "meta-llama/llama-prompt-guard-2-22m"
+        "groq/compound",
+        "whisper-large-v3"
       ]
     }
   ],
