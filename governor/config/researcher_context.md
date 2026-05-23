@@ -99,6 +99,26 @@ Last verified: 2026-05-22
 - Web destinations: $0 (browser automation via courier agents)
 - Total monthly cost target: $0
 
+## Full Technology Stack (Track Updates For These)
+- Go 1.24.3 (governor binary, all backend logic)
+- PostgreSQL 16.13 with pgvector 0.6.0, pg_trgm 1.6 (all state, semantic search)
+- Node.js v24.14.1, npm 11.14.1 (dashboard builds)
+- Next.js (Vercel dashboard, auto-deploys from GitHub)
+- Hermes Agent v0.9.0 (multi-platform agent gateway, chat/CLI)
+- Playwright 1.60.0 (courier browser automation, visual QA)
+- cloudflared 2026.3.0 (tunnel exposing api.vibestribe.rocks)
+- pgx v5.9.2 (Go PostgreSQL driver)
+- mcp-go v0.47.1 (MCP server SDK for KB access)
+- Vercel CLI 50.44.0 (dashboard hosting)
+- Python 3.12.3 (scripts, skills, tools)
+- Git 2.43.0 (version control, worktrees for courier)
+
+## Tool License Requirements
+- All tools must be free-tier or open-source with MIT/Apache 2.0 license
+- We do not use paid SaaS tools or subscription services (except Z.AI Pro which is free through mid-2026)
+- Self-hosted tools must run on X220 (Go binaries, Python, lightweight Node.js only)
+- No Docker, no Kubernetes, no cloud VMs
+
 ## What We Do NOT Have (Do Not Recommend These)
 - No paid API keys (ever)
 - No local model inference (hardware cannot support it)

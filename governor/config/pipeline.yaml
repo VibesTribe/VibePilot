@@ -129,7 +129,14 @@ pipeline:
 
     - event: research_report_council_review
       constant: EventReportCouncil
+      source_table: research_reports
       handler: handleReportCouncilReview
+      handler_file: cmd/governor/handlers_research.go
+
+    - event: research_approved
+      constant: EventResearchApproved
+      source_table: research_suggestions
+      handler: handleResearchApproved
       handler_file: cmd/governor/handlers_research.go
 
     - event: research_council
@@ -246,6 +253,6 @@ pipeline:
 
   # Statistics (auto-calculated)
   stats:
-    total_events: 42
-    with_handlers: 10
+    total_events: 43
+    with_handlers: 11
     without_handlers: 32

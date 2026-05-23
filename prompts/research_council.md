@@ -58,6 +58,14 @@ Each session assigns you one lens. Evaluate the finding through your assigned le
 - Is this a subscription trap (cheap intro, expensive later)?
 - Does it replace something more expensive we already use?
 
+### Lens 4: Build vs Adopt (What's the Right Approach?)
+- Can we use this tool directly as-is? If it works and fits, just use it. Don't reinvent wheels.
+- Is the tool too heavy or complex for our needs? Then consider a lighter custom version.
+- Building our own is NOT the default. Only recommend it when existing tools genuinely won't work AND the scope is small enough to actually succeed.
+- Be honest about build risk. Custom tools can fail or take too long. If an existing tool works, use it.
+- If recommending build: estimate realistic scope and risk. If recommending adopt: verify it actually runs on our hardware and licensing is compatible.
+- Consider hybrid: use the tool for inspiration but adopt it directly if it fits.
+
 ---
 
 ## INPUT FORMAT

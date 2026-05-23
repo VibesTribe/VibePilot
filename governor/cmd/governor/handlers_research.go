@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vibepilot/governor/internal/db"
@@ -108,10 +109,10 @@ func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 		"p_id":    suggestionID,
 	})
 
-	// Mark suggestion as processing
+	// Mark suggestion as in_review (part of a report, awaiting council)
 	_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
 		"p_id":     suggestionID,
-		"p_status": "council_review",
+		"p_status": "in_review",
 		"p_review_notes": map[string]any{
 			"source":              "research",
 			"type":                suggestionType,
@@ -134,44 +135,43 @@ func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 	h.checkAndRouteReport(ctx, reportID)
 }
 
-// findOrCreateDailyReport gets today's daily_scan report or creates one.
+// findOrCreateDailyReport atomically gets or creates today's daily_scan report.
+// Uses a PostgreSQL function to prevent race conditions when multiple suggestions
+// arrive simultaneously (prevents duplicate reports).
 func (h *ResearchHandler) findOrCreateDailyReport(ctx context.Context, findingsPath string, details map[string]any) string {
 	today := time.Now().Format("2006-01-02")
 	reportTitle := fmt.Sprintf("Daily Research Scan - %s", today)
 
-	// Check for existing report today
-	data, err := h.database.Query(ctx, "research_reports", map[string]any{
-		"report_type": "daily_scan",
-		"limit":       1,
+	// Atomic find-or-create via DB function. No race condition possible.
+	data, err := h.database.RPC(ctx, "find_or_create_daily_report", map[string]any{
+		"p_report_type":   "daily_scan",
+		"p_title":         reportTitle,
+		"p_source":        "researcher",
+		"p_findings_path": findingsPath,
 	})
-	if err == nil {
-		var reports []map[string]any
-		if json.Unmarshal(data, &reports) == nil && len(reports) > 0 {
-			if id, ok := reports[0]["id"].(string); ok && id != "" {
+	if err != nil {
+		log.Printf("[ResearchReady] Failed to find/create daily report: %v", err)
+		return ""
+	}
+
+	// pgx RPC wraps result as [{"find_or_create_daily_report": "uuid"}]
+	result := unwrapRPCResult(data, "find_or_create_daily_report")
+	var reportID string
+	if json.Unmarshal(result, &reportID) == nil && reportID != "" {
+		return reportID
+	}
+
+	// Fallback: try parsing as array with object containing id
+	var wrapper []map[string]any
+	if json.Unmarshal(data, &wrapper) == nil && len(wrapper) > 0 {
+		for _, v := range wrapper {
+			if id, ok := v["find_or_create_daily_report"].(string); ok && id != "" {
 				return id
 			}
 		}
 	}
 
-	// Create new report
-	result, err := h.database.Insert(ctx, "research_reports", map[string]any{
-		"title":         reportTitle,
-		"report_type":   "daily_scan",
-		"source":        "researcher",
-		"status":        "council_review",
-		"findings_path": findingsPath,
-	})
-	if err != nil {
-		log.Printf("[ResearchReady] Failed to create report: %v", err)
-		return ""
-	}
-
-	var created []map[string]any
-	if json.Unmarshal(result, &created) == nil && len(created) > 0 {
-		if id, ok := created[0]["id"].(string); ok {
-			return id
-		}
-	}
+	log.Printf("[ResearchReady] Unexpected result from find_or_create_daily_report: %s", string(data))
 	return ""
 }
 
@@ -257,11 +257,35 @@ func (h *ResearchHandler) checkAndRouteReport(ctx context.Context, reportID stri
 
 	log.Printf("[ResearchReady] Report %s has %d items", truncateID(reportID), len(items))
 
-	// For now, we don't auto-trigger council here.
-	// The daily research cron will call /api/research-reports/{id}/trigger-council
-	// when all items are collected. Or we trigger immediately for single items.
-	// The report is already in council_review status, so the pg_notify trigger
-	// on research_reports fires the research_report_council_review event.
+	// After adding items, promote report from "collecting" to "council_review"
+	// with a short delay to batch items that arrive in rapid succession.
+	// Only promotes if report is still in "collecting" status (idempotent).
+	if len(items) > 0 {
+		go func() {
+			time.Sleep(3 * time.Second)
+			// Only promote if still in "collecting" — avoids duplicate council runs
+			currentData, err := h.database.Query(context.Background(), "research_reports", map[string]any{
+				"id":     reportID,
+				"select": "status",
+			})
+			if err == nil {
+				var reports []map[string]any
+				if json.Unmarshal(currentData, &reports) == nil && len(reports) > 0 {
+					if status, _ := reports[0]["status"].(string); status != "collecting" {
+						log.Printf("[ResearchReady] Report %s already promoted (status=%s), skipping", truncateID(reportID), status)
+						return
+					}
+				}
+			}
+			log.Printf("[ResearchReady] Promoting report %s to council_review", truncateID(reportID))
+			_, err = h.database.Update(context.Background(), "research_reports", reportID, map[string]any{
+				"status": "council_review",
+			})
+			if err != nil {
+				log.Printf("[ResearchReady] Failed to promote report %s to council_review: %v", truncateID(reportID), err)
+			}
+		}()
+	}
 }
 
 // handleReportCouncilReview runs the council on all items in a report.
@@ -327,7 +351,7 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 	memberCount := h.cfg.GetCouncilMemberCount()
 	lenses := h.cfg.GetCouncilLenses()
 	if len(lenses) == 0 {
-		lenses = []string{"user_alignment", "architecture", "feasibility"}
+		lenses = []string{"user_alignment", "architecture", "feasibility", "build_vs_adopt"}
 	}
 	if memberCount <= 0 {
 		memberCount = 3
@@ -413,11 +437,23 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 		log.Printf("[ReportCouncil] Member %d/%d (%s) completed review", i+1, memberCount, lens)
 	}
 
+	// Check if ALL members failed -- don't fake results, leave for recovery retry
+	succeededCount := memberCount - len(failedModels)
+	if succeededCount == 0 {
+		log.Printf("[ReportCouncil] ALL %d members failed for report %s. Leaving in council_review for recovery retry.", memberCount, truncateID(reportID))
+		// Set council_notes to indicate failure so recovery knows to retry
+		_, _ = h.database.RPC(ctx, "update_report_council_notes", map[string]any{
+			"p_report_id": reportID,
+			"p_notes":     map[string]any{"council_failed": true, "reason": "all_members_failed", "failed_at": time.Now().Format(time.RFC3339)},
+		})
+		return
+	}
+
 	// Aggregate per-item recommendations
 	h.aggregateAndSaveCouncilResults(ctx, reportID, report, results, memberCount)
 
 	log.Printf("[ReportCouncil] Report %s council review complete (%d/%d members succeeded)",
-		truncateID(reportID), memberCount-len(failedModels), memberCount)
+		truncateID(reportID), succeededCount, memberCount)
 }
 
 // loadReportContent reads the original research findings file so council can review it.
@@ -609,6 +645,18 @@ func (h *ResearchHandler) aggregateAndSaveCouncilResults(
 			"decision_doc":  kbDecisionPath,
 			"report_id":     reportID,
 		})
+
+	// Update all suggestions in this report to "pending_human" so recovery
+	// doesn't pick them up again and they show as awaiting human decision
+	for _, itemRaw := range itemsRaw {
+		item, _ := itemRaw.(map[string]any)
+		if suggestionID := getString(item, "suggestion_id"); suggestionID != "" {
+			_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
+				"p_id":     suggestionID,
+				"p_status": "pending_human",
+			})
+		}
+	}
 
 	log.Printf("[ReportCouncil] Report %s -> pending_human (%d items reviewed)", truncateID(reportID), len(itemResults))
 }
@@ -892,38 +940,101 @@ func extractComparisonField(details map[string]any, field string) string {
 }
 
 // loadKBContext loads relevant KB context for a given research type so the
-// consultant knows what the system currently has.
+// consultant knows what the system currently has. Includes live system state.
 func (h *ResearchHandler) loadKBContext(ctx context.Context, researchType string) string {
-	// Query KB for current system state relevant to this research type
+	var sb strings.Builder
+
+	// Inject live system state from generate_system_context.py
+	if liveCtx := h.loadLiveSystemContext(); liveCtx != "" {
+		sb.WriteString("## LIVE SYSTEM STATE\n\n")
+		sb.WriteString("This is the current live state of the system, generated just now.\n")
+		sb.WriteString("Use this to understand what is actually installed, running, and available.\n")
+		sb.WriteString("Do NOT suggest anything that conflicts with these constraints.\n\n")
+		sb.WriteString(liveCtx)
+		sb.WriteString("\n\n")
+	}
+
+	// Then add KB context pack
 	data, err := h.database.RPC(ctx, "kb_context_pack", map[string]any{
-		"p_topic":  researchType,
-		"p_limit":  10,
+		"p_query":        researchType,
+		"p_repo_id":      "",
+		"p_limit":        10,
+		"p_use_semantic": false,
 	})
 	if err != nil || data == nil {
-		return ""
+		return sb.String()
 	}
 	result := unwrapRPCResult(data, "kb_context_pack")
-	var pack map[string]any
-	if json.Unmarshal(result, &pack) != nil {
-		return ""
+	// RPC returns array of {section, content} objects
+	var sections []map[string]any
+	if json.Unmarshal(result, &sections) != nil {
+		return sb.String()
 	}
-	// Extract relevant sections
-	sections, _ := pack["sections"].([]any)
-	var sb strings.Builder
 	for _, sec := range sections {
-		s, ok := sec.(map[string]any)
-		if !ok {
+		sectionName := getString(sec, "section")
+		contentRaw := sec["content"]
+		if contentRaw == nil {
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("## %s\n", getString(s, "title")))
-		sb.WriteString(getString(s, "content"))
+		// Content can be string, array, or object -- serialize non-strings
+		var contentStr string
+		switch v := contentRaw.(type) {
+		case string:
+			contentStr = v
+		default:
+			b, _ := json.Marshal(v)
+			contentStr = string(b)
+		}
+		if contentStr == "" || contentStr == "null" {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("## %s\n", sectionName))
+		sb.WriteString(contentStr)
 		sb.WriteString("\n\n")
 	}
 	context := sb.String()
-	if len(context) > 6000 {
-		context = context[:6000] + "\n...[truncated]"
+	if len(context) > 8000 {
+		context = context[:8000] + "\n...[truncated]"
 	}
 	return context
+}
+
+// loadLiveSystemContext runs the system context generator and returns the JSON output.
+// Caches result for 5 minutes to avoid hammering the system.
+var (
+	liveContextCache     string
+	liveContextCacheTime time.Time
+	liveContextMu        sync.Mutex
+)
+
+func (h *ResearchHandler) loadLiveSystemContext() string {
+	liveContextMu.Lock()
+	defer liveContextMu.Unlock()
+
+	// Cache for 5 minutes
+	if time.Since(liveContextCacheTime) < 5*time.Minute && liveContextCache != "" {
+		return liveContextCache
+	}
+
+	scriptPath := "/home/vibes/vibepilot/scripts/generate_system_context.py"
+	ctx2, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx2, "python3", scriptPath)
+	out, err := cmd.Output()
+	if err != nil {
+		log.Printf("[loadLiveSystemContext] Failed to run system context script: %v", err)
+		return ""
+	}
+
+	result := string(out)
+	if len(result) > 4000 {
+		result = result[:4000] + "\n...[truncated]"
+	}
+
+	liveContextCache = result
+	liveContextCacheTime = time.Now()
+	log.Printf("[loadLiveSystemContext] Generated fresh system context (%d bytes)", len(result))
+	return result
 }
 
 func setupResearchHandlers(
@@ -947,11 +1058,13 @@ func setupResearchHandlers(
 // recoverStaleCouncilReviews finds research_suggestions stuck in council_review
 // status for more than 10 minutes and re-triggers the council review process.
 func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
+	// Only recover suggestions stuck at "in_review" (not council_review, those are
+	// handled by the report-level pg_notify trigger).
 	stale, err := h.database.Query(ctx, "research_suggestions", map[string]any{
-		"status": "council_review",
+		"status": "in_review",
 	})
 	if err != nil {
-		log.Printf("[ResearchRecovery] Failed to query stale council_review items: %v", err)
+		log.Printf("[ResearchRecovery] Failed to query stale in_review items: %v", err)
 		return
 	}
 
@@ -960,9 +1073,22 @@ func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
 		return
 	}
 
+	recovered := 0
 	for _, item := range items {
 		id, _ := item["id"].(string)
 		title, _ := item["title"].(string)
+
+		// Skip suggestions that already have report_items -- they've been processed
+		existingItems, _ := h.database.Query(ctx, "research_report_items", map[string]any{
+			"suggestion_id": id,
+		})
+		if existingItems != nil {
+			var reportItems []map[string]any
+			if json.Unmarshal(existingItems, &reportItems) == nil && len(reportItems) > 0 {
+				log.Printf("[ResearchRecovery] Skipping %s (%s) -- already in report_items", truncateID(id), title)
+				continue
+			}
+		}
 
 		// Check if the item has been stale for more than 10 minutes
 		updatedAt, _ := item["updated_at"].(string)
@@ -997,7 +1123,7 @@ func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
 			continue
 		}
 
-		log.Printf("[ResearchRecovery] Recovering stale council_review item: %s (%s), age: %s", truncateID(id), title, age)
+		log.Printf("[ResearchRecovery] Recovering stale in_review item: %s (%s), age: %s", truncateID(id), title, age)
 
 		// Find or create the daily report for this item, then re-trigger council review
 		findingsPath, _ := item["findings_path"].(string)
@@ -1023,6 +1149,7 @@ func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
 				// Check if the report is ready for review and route it
 				h.checkAndRouteReport(ctx, reportID)
 				log.Printf("[ResearchRecovery] Re-routed item %s to report %s", truncateID(id), truncateID(reportID))
+				recovered++
 			}
 		} else {
 			// No findings path -- reset to pending so it gets re-processed
@@ -1034,7 +1161,7 @@ func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
 		}
 	}
 
-	log.Printf("[ResearchRecovery] Scan complete, checked %d items", len(items))
+	log.Printf("[ResearchRecovery] Scan complete, recovered %d/%d items", recovered, len(items))
 }
 
 // insertReviewItem adds a review item to the unified review queue.

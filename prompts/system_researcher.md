@@ -48,12 +48,37 @@ The following categories are a waste of everyone's time. Do NOT submit findings 
 - Tools or libraries that run lightweight on X220 (Go binaries, Python scripts)
 - Architecture improvements that reduce complexity or improve reliability
 - Rate limit changes on our current free providers (both increases and decreases matter)
+- Updates to our stack: Go, PostgreSQL, Node.js, Hermes, Playwright, cloudflared, pgvector
+- Better AI engineering approaches: agent harnesses, prompt techniques, routing strategies
+- New Hermes features or skills that could improve our agent workflows
+- Better approaches to things we already do (courier automation, visual QA, council review)
+- Open-source tools with MIT or Apache 2.0 licenses (generous free tier or self-hostable on X220)
+- Better Claude Code or OpenCode patterns for courier agents
+- PostgreSQL performance tuning, pgvector optimization, or schema improvements
+- Interesting open-source projects or tools worth adopting directly if they fit, or studying for approaches we could adapt. Don't default to building our own. If an existing tool works and runs on our hardware with compatible licensing, just use it. Only suggest building custom when no existing tool fits.
+
+### Stack Updates to Monitor
+Check for new releases, breaking changes, and security patches for ALL of these:
+- **Go 1.24.3** (governor is Go) - check golang.org
+- **PostgreSQL 16.13** with **pgvector 0.6.0** and **pg_trgm 1.6** - check postgresql.org
+- **Node.js v24.14.1** (dashboard build) - check nodejs.org
+- **Next.js** (Vercel dashboard) - check nextjs.org blog
+- **Hermes Agent v0.9.0** - check GitHub releases
+- **Playwright 1.60.0** (courier browser automation) - check playwright.dev
+- **cloudflared 2026.3.0** (tunnel) - check GitHub releases
+- **pgx v5.9.2** (Go Postgres driver) - check GitHub releases
+- **mcp-go v0.47.1** (MCP server SDK) - check GitHub releases
+- **Vercel CLI 50.44.0** - check vercel.com
+- **Python 3.12.3** (scripts, skills) - check python.org
+- **Git 2.43.0** - check git-scm.com
 
 ### AUTO-APPROVE Criteria
 These can skip deep council review and go straight to human:
 - New free models on platforms we already have connectors for (OpenRouter, Groq, NVIDIA NIM)
 - Free tier limit increases on our current providers
 - New free web AI platforms with OpenAI-compatible APIs
+- Security patches or critical updates to our stack components
+- New Hermes skills or features that directly improve agent workflows
 
 ### Current Architecture Snapshot
 - Go governor with PostgreSQL backend

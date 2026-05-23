@@ -1027,7 +1027,7 @@ func (c *Config) GetOnMaxRoundsAction() string {
 
 func (c *Config) GetCouncilLenses() []string {
 	if c.PlanLifecycle == nil || c.PlanLifecycle.CouncilRules.Lenses == nil {
-		return []string{"user_alignment", "architecture", "feasibility"}
+		return []string{"user_alignment", "architecture", "feasibility", "build_vs_adopt"}
 	}
 	return c.PlanLifecycle.CouncilRules.Lenses
 }
