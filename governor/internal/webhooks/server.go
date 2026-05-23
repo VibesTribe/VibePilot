@@ -2347,6 +2347,22 @@ func (s *Server) handleReviewItemByID(w http.ResponseWriter, r *http.Request) {
 					},
 				})
 				log.Printf("[review-items] Research %s approved by human, triggering consultant", sourceID)
+
+				// Emit EventResearchApproved so the consultant handler can create a PRD
+				if s.router != nil {
+					// Fetch the suggestion record for the event payload
+					sugData, _ := s.db.Query(r.Context(), "research_suggestions", map[string]any{"id": sourceID})
+					var record json.RawMessage
+					if sugData != nil {
+						record = sugData
+					}
+					s.router.Route(runtime.Event{
+						Type:   runtime.EventResearchApproved,
+						ID:     sourceID,
+						Record: record,
+					})
+					log.Printf("[review-items] Emitted EventResearchApproved for %s", sourceID)
+				}
 			}
 		}
 	}

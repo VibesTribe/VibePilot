@@ -202,9 +202,10 @@ var defaultRPCAllowlist = map[string]bool{
 	"record_chat_usage": true,
 
 	// Research report pipeline
-	"get_report_for_review":       true,
-	"update_report_item_council":  true,
-	"update_report_status":        true,
+	"get_report_for_review":         true,
+	"update_report_item_council":    true,
+	"update_report_status":          true,
+	"update_report_council_notes":   true,
 	"set_report_item_decision":       true,
 	"resolve_review_items_by_source": true,
 	"report_undecided_count":         true,

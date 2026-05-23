@@ -437,11 +437,23 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 		log.Printf("[ReportCouncil] Member %d/%d (%s) completed review", i+1, memberCount, lens)
 	}
 
+	// Check if ALL members failed -- don't fake results, leave for recovery retry
+	succeededCount := memberCount - len(failedModels)
+	if succeededCount == 0 {
+		log.Printf("[ReportCouncil] ALL %d members failed for report %s. Leaving in council_review for recovery retry.", memberCount, truncateID(reportID))
+		// Set council_notes to indicate failure so recovery knows to retry
+		_, _ = h.database.RPC(ctx, "update_report_council_notes", map[string]any{
+			"p_report_id": reportID,
+			"p_notes":     map[string]any{"council_failed": true, "reason": "all_members_failed", "failed_at": time.Now().Format(time.RFC3339)},
+		})
+		return
+	}
+
 	// Aggregate per-item recommendations
 	h.aggregateAndSaveCouncilResults(ctx, reportID, report, results, memberCount)
 
 	log.Printf("[ReportCouncil] Report %s council review complete (%d/%d members succeeded)",
-		truncateID(reportID), memberCount-len(failedModels), memberCount)
+		truncateID(reportID), succeededCount, memberCount)
 }
 
 // loadReportContent reads the original research findings file so council can review it.
@@ -1046,11 +1058,13 @@ func setupResearchHandlers(
 // recoverStaleCouncilReviews finds research_suggestions stuck in council_review
 // status for more than 10 minutes and re-triggers the council review process.
 func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
+	// Only recover suggestions stuck at "in_review" (not council_review, those are
+	// handled by the report-level pg_notify trigger).
 	stale, err := h.database.Query(ctx, "research_suggestions", map[string]any{
-		"status": "council_review",
+		"status": "in_review",
 	})
 	if err != nil {
-		log.Printf("[ResearchRecovery] Failed to query stale council_review items: %v", err)
+		log.Printf("[ResearchRecovery] Failed to query stale in_review items: %v", err)
 		return
 	}
 
@@ -1059,9 +1073,22 @@ func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
 		return
 	}
 
+	recovered := 0
 	for _, item := range items {
 		id, _ := item["id"].(string)
 		title, _ := item["title"].(string)
+
+		// Skip suggestions that already have report_items -- they've been processed
+		existingItems, _ := h.database.Query(ctx, "research_report_items", map[string]any{
+			"suggestion_id": id,
+		})
+		if existingItems != nil {
+			var reportItems []map[string]any
+			if json.Unmarshal(existingItems, &reportItems) == nil && len(reportItems) > 0 {
+				log.Printf("[ResearchRecovery] Skipping %s (%s) -- already in report_items", truncateID(id), title)
+				continue
+			}
+		}
 
 		// Check if the item has been stale for more than 10 minutes
 		updatedAt, _ := item["updated_at"].(string)
@@ -1096,7 +1123,7 @@ func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
 			continue
 		}
 
-		log.Printf("[ResearchRecovery] Recovering stale council_review item: %s (%s), age: %s", truncateID(id), title, age)
+		log.Printf("[ResearchRecovery] Recovering stale in_review item: %s (%s), age: %s", truncateID(id), title, age)
 
 		// Find or create the daily report for this item, then re-trigger council review
 		findingsPath, _ := item["findings_path"].(string)
@@ -1122,6 +1149,7 @@ func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
 				// Check if the report is ready for review and route it
 				h.checkAndRouteReport(ctx, reportID)
 				log.Printf("[ResearchRecovery] Re-routed item %s to report %s", truncateID(id), truncateID(reportID))
+				recovered++
 			}
 		} else {
 			// No findings path -- reset to pending so it gets re-processed
@@ -1133,7 +1161,7 @@ func (h *ResearchHandler) recoverStaleCouncilReviews(ctx context.Context) {
 		}
 	}
 
-	log.Printf("[ResearchRecovery] Scan complete, checked %d items", len(items))
+	log.Printf("[ResearchRecovery] Scan complete, recovered %d/%d items", recovered, len(items))
 }
 
 // insertReviewItem adds a review item to the unified review queue.
