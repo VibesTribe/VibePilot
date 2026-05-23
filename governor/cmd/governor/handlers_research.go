@@ -109,10 +109,10 @@ func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 		"p_id":    suggestionID,
 	})
 
-	// Mark suggestion as processing
+	// Mark suggestion as in_review (part of a report, awaiting council)
 	_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
 		"p_id":     suggestionID,
-		"p_status": "council_review",
+		"p_status": "in_review",
 		"p_review_notes": map[string]any{
 			"source":              "research",
 			"type":                suggestionType,
@@ -135,47 +135,43 @@ func (h *ResearchHandler) handleResearchReady(event runtime.Event) {
 	h.checkAndRouteReport(ctx, reportID)
 }
 
-// findOrCreateDailyReport gets today's daily_scan report or creates one.
+// findOrCreateDailyReport atomically gets or creates today's daily_scan report.
+// Uses a PostgreSQL function to prevent race conditions when multiple suggestions
+// arrive simultaneously (prevents duplicate reports).
 func (h *ResearchHandler) findOrCreateDailyReport(ctx context.Context, findingsPath string, details map[string]any) string {
 	today := time.Now().Format("2006-01-02")
 	reportTitle := fmt.Sprintf("Daily Research Scan - %s", today)
 
-	// Check for existing report today — must be today's date, not just any daily_scan
-	data, err := h.database.Query(ctx, "research_reports", map[string]any{
-		"report_type": "daily_scan",
-		"created_at":  "gte." + today,
-		"limit":       1,
+	// Atomic find-or-create via DB function. No race condition possible.
+	data, err := h.database.RPC(ctx, "find_or_create_daily_report", map[string]any{
+		"p_report_type":   "daily_scan",
+		"p_title":         reportTitle,
+		"p_source":        "researcher",
+		"p_findings_path": findingsPath,
 	})
-	if err == nil {
-		var reports []map[string]any
-		if json.Unmarshal(data, &reports) == nil && len(reports) > 0 {
-			if id, ok := reports[0]["id"].(string); ok && id != "" {
+	if err != nil {
+		log.Printf("[ResearchReady] Failed to find/create daily report: %v", err)
+		return ""
+	}
+
+	// pgx RPC wraps result as [{"find_or_create_daily_report": "uuid"}]
+	result := unwrapRPCResult(data, "find_or_create_daily_report")
+	var reportID string
+	if json.Unmarshal(result, &reportID) == nil && reportID != "" {
+		return reportID
+	}
+
+	// Fallback: try parsing as array with object containing id
+	var wrapper []map[string]any
+	if json.Unmarshal(data, &wrapper) == nil && len(wrapper) > 0 {
+		for _, v := range wrapper {
+			if id, ok := v["find_or_create_daily_report"].(string); ok && id != "" {
 				return id
 			}
 		}
 	}
 
-	// Create new report in "collecting" status — we'll change to council_review
-	// AFTER items are added, to avoid race condition where pg_notify fires
-	// the council event before items exist.
-	result, err := h.database.Insert(ctx, "research_reports", map[string]any{
-		"title":         reportTitle,
-		"report_type":   "daily_scan",
-		"source":        "researcher",
-		"status":        "collecting",
-		"findings_path": findingsPath,
-	})
-	if err != nil {
-		log.Printf("[ResearchReady] Failed to create report: %v", err)
-		return ""
-	}
-
-	var created []map[string]any
-	if json.Unmarshal(result, &created) == nil && len(created) > 0 {
-		if id, ok := created[0]["id"].(string); ok {
-			return id
-		}
-	}
+	log.Printf("[ResearchReady] Unexpected result from find_or_create_daily_report: %s", string(data))
 	return ""
 }
 
@@ -637,6 +633,18 @@ func (h *ResearchHandler) aggregateAndSaveCouncilResults(
 			"decision_doc":  kbDecisionPath,
 			"report_id":     reportID,
 		})
+
+	// Update all suggestions in this report to "pending_human" so recovery
+	// doesn't pick them up again and they show as awaiting human decision
+	for _, itemRaw := range itemsRaw {
+		item, _ := itemRaw.(map[string]any)
+		if suggestionID := getString(item, "suggestion_id"); suggestionID != "" {
+			_, _ = h.database.RPC(ctx, "update_research_suggestion_status", map[string]any{
+				"p_id":     suggestionID,
+				"p_status": "pending_human",
+			})
+		}
+	}
 
 	log.Printf("[ReportCouncil] Report %s -> pending_human (%d items reviewed)", truncateID(reportID), len(itemResults))
 }
