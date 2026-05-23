@@ -407,6 +407,18 @@ Once Fix #1 builds successfully:
 
 Zero dashboard changes required - respects "sacred territory" constraint.
 
+## Research Pipeline Fixes (2026-05-22)
+
+Three critical bugs causing empty reports and silent council failure:
+1. INVALID DB STATUSES: Go code wrote "in_report" and "council_reviewed" to research_suggestions but CHECK constraint only allows pending/ready/in_review/council_review/approved/rejected/implemented/pending_human/watching/prd_created. RPC silently failed, suggestions stuck forever. Fixed to "in_review" and "pending_human".
+2. KB CONTEXT PACK RPC PARAM MISMATCH: loadKBContext called kb_context_pack with (p_topic, p_limit) but SQL function signature is (p_query, p_repo_id, p_limit, p_use_semantic). Council members NEVER received system context. Fixed parameter names.
+3. KB CONTEXT PACK RESULT PARSING: RPC returns [{section, content}] array, not {sections: [...]} object. Parse was wrong type, silently returned empty. Fixed to parse as array.
+4. Cleanup: Archived 5 duplicate individual reports (content was in Daily Scan). Disabled duplicate cron and broken researcher-parameters cron (script missing).
+
+Verification: `psql -d vibepilot -c "SELECT status, count(*) FROM research_suggestions GROUP BY status;"` should show no invalid statuses.
+`curl http://localhost:8080/api/review-items?status=pending` returns pending review items.
+Next daily run at 06:00 will be the first full test of the corrected pipeline.
+
 ## Learning System (FIXED 2026-04-27, commit 0f65f686)
 All learning RPCs now wired into handlers:
 - **Supervisor rules**: `record_supervisor_rule` + `create_rule_from_rejection` called on supervisor fail/needs_revision
