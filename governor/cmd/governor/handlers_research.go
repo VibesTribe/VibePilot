@@ -193,18 +193,19 @@ func (h *ResearchHandler) addReportItem(ctx context.Context, reportID, suggestio
 		}
 	}
 
-	// Get current item count for sort order
-	count := 0
-	countData, _ := h.database.Query(ctx, "research_report_items", map[string]any{
+	// Get next sort_order by counting existing items for this report
+	sortOrder := 0
+	existingItems, _ := h.database.Query(ctx, "research_report_items", map[string]any{
 		"report_id": reportID,
-		"select":    "count",
+		"select":    "id",
 	})
-	if countData != nil {
+	if existingItems != nil {
 		var items []map[string]any
-		if json.Unmarshal(countData, &items) == nil {
-			count = len(items)
+		if json.Unmarshal(existingItems, &items) == nil {
+			sortOrder = len(items)
 		}
 	}
+	log.Printf("[ResearchReady] Adding item '%s' to report %s with sort_order=%d", truncateID(title), truncateID(reportID), sortOrder)
 
 	detailsJSON := "{}"
 	if details != nil {
@@ -228,7 +229,7 @@ func (h *ResearchHandler) addReportItem(ctx context.Context, reportID, suggestio
 		"current_state": currentState,
 		"new_thing":     newThing,
 		"improvement":   improvement,
-		"sort_order":    count,
+		"sort_order":    sortOrder,
 	})
 	if err != nil {
 		log.Printf("[ResearchReady] Failed to add report item: %v", err)
@@ -258,11 +259,13 @@ func (h *ResearchHandler) checkAndRouteReport(ctx context.Context, reportID stri
 	log.Printf("[ResearchReady] Report %s has %d items", truncateID(reportID), len(items))
 
 	// After adding items, promote report from "collecting" to "council_review"
-	// with a short delay to batch items that arrive in rapid succession.
+	// with a delay to batch items that arrive in rapid succession.
 	// Only promotes if report is still in "collecting" status (idempotent).
 	if len(items) > 0 {
+		// Use a longer delay for the first few items to allow batch collection
+		batchDelay := 5 * time.Second
 		go func() {
-			time.Sleep(3 * time.Second)
+			time.Sleep(batchDelay)
 			// Only promote if still in "collecting" — avoids duplicate council runs
 			currentData, err := h.database.Query(context.Background(), "research_reports", map[string]any{
 				"id":     reportID,
@@ -428,6 +431,14 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 
 		// Parse per-item votes from council output
 		itemVotes := runtime.ParseReportCouncilVotes(result.Output)
+		if len(itemVotes) == 0 {
+			outputPreview := result.Output
+			if len(outputPreview) > 200 {
+				outputPreview = outputPreview[:200] + "..."
+			}
+			log.Printf("[ReportCouncil] WARNING: Member %d returned no parseable votes. Output length=%d, first200=%s",
+				i+1, len(result.Output), outputPreview)
+		}
 		results[i] = councilMemberResult{items: itemVotes}
 
 		if h.usageTracker != nil {
@@ -482,6 +493,8 @@ func (h *ResearchHandler) loadReportContent(ctx context.Context, report map[stri
 
 // aggregateAndSaveCouncilResults merges council votes into per-item recommendations
 // and writes the KB decision doc.
+// Handles partial council failures gracefully: items with no votes get "watch" with
+// a clear explanation. Items where some members voted use majority of available votes.
 func (h *ResearchHandler) aggregateAndSaveCouncilResults(
 	ctx context.Context,
 	reportID string,
@@ -493,11 +506,12 @@ func (h *ResearchHandler) aggregateAndSaveCouncilResults(
 	itemsRaw, _ := report["items"].([]any)
 
 	type itemAgg struct {
-		approves   int
-		rejects    int
-		watches    int
-		reasonings []string
-		concerns   []string
+		approves    int
+		rejects     int
+		watches     int
+		reasonings  []string
+		concerns    []string
+		voteCount   int // how many members actually voted on this item
 	}
 
 	aggregates := make(map[int]*itemAgg)
@@ -510,6 +524,14 @@ func (h *ResearchHandler) aggregateAndSaveCouncilResults(
 		aggregates[sortOrder] = &itemAgg{}
 	}
 
+	// Count how many members produced usable results
+	succeededMembers := 0
+	for _, res := range results {
+		if res.err == nil && res.items != nil && len(res.items) > 0 {
+			succeededMembers++
+		}
+	}
+
 	// Tally votes from each council member
 	for _, res := range results {
 		if res.err != nil || res.items == nil {
@@ -518,16 +540,24 @@ func (h *ResearchHandler) aggregateAndSaveCouncilResults(
 		for sortIdx, vote := range res.items {
 			agg, ok := aggregates[sortIdx]
 			if !ok {
+				log.Printf("[ReportCouncil] Warning: council voted on sort_order %d which doesn't exist in report items", sortIdx)
 				continue
 			}
 			v := getString(vote, "vote")
 			switch strings.ToLower(v) {
 			case "approve", "approved":
 				agg.approves++
+				agg.voteCount++
 			case "reject", "rejected":
 				agg.rejects++
+				agg.voteCount++
 			case "watch":
 				agg.watches++
+				agg.voteCount++
+			default:
+				log.Printf("[ReportCouncil] Warning: unknown vote '%s' for sort_order %d, counting as watch", v, sortIdx)
+				agg.watches++
+				agg.voteCount++
 			}
 			if r := getString(vote, "reasoning"); r != "" {
 				agg.reasonings = append(agg.reasonings, r)
@@ -556,29 +586,36 @@ func (h *ResearchHandler) aggregateAndSaveCouncilResults(
 		title := getString(item, "title")
 
 		var recommendation string
-		if agg.approves > memberCount/2 {
-			recommendation = "approve"
-		} else if agg.rejects > memberCount/2 {
-			recommendation = "reject"
-		} else {
-			recommendation = "watch"
-		}
+		var reasoning string
 
-		reasoning := "Council did not produce detailed reasoning."
-		if len(agg.reasonings) > 0 {
-			// Combine all member reasoning into a readable summary
-			if len(agg.reasonings) == 1 {
-				reasoning = agg.reasonings[0]
+		if agg.voteCount == 0 {
+			// No member voted on this item -- council parsing failed for it
+			recommendation = "watch"
+			reasoning = fmt.Sprintf("Council did not produce a vote for this item (%d/%d members returned results). Defaulting to watch for manual review.", succeededMembers, memberCount)
+		} else {
+			// Use majority of actual votes cast
+			if agg.approves > agg.rejects && agg.approves >= agg.watches {
+				recommendation = "approve"
+			} else if agg.rejects > agg.approves && agg.rejects >= agg.watches {
+				recommendation = "reject"
 			} else {
-				var parts []string
-				for mi, r := range agg.reasonings {
-					parts = append(parts, fmt.Sprintf("Member %d: %s", mi+1, r))
-				}
-				reasoning = strings.Join(parts, " | ")
+				recommendation = "watch"
 			}
-		} else if agg.approves > 0 || agg.rejects > 0 || agg.watches > 0 {
-			reasoning = fmt.Sprintf("Council voted: %d approve, %d watch, %d reject (no detailed reasoning provided).",
-				agg.approves, agg.watches, agg.rejects)
+
+			if len(agg.reasonings) > 0 {
+				if len(agg.reasonings) == 1 {
+					reasoning = agg.reasonings[0]
+				} else {
+					var parts []string
+					for mi, r := range agg.reasonings {
+						parts = append(parts, fmt.Sprintf("Member %d: %s", mi+1, r))
+					}
+					reasoning = strings.Join(parts, " | ")
+				}
+			} else if agg.voteCount > 0 {
+				reasoning = fmt.Sprintf("Council voted: %d approve, %d watch, %d reject (no detailed reasoning provided).",
+					agg.approves, agg.watches, agg.rejects)
+			}
 		}
 
 		// Collect per-member votes for this item
@@ -589,8 +626,8 @@ func (h *ResearchHandler) aggregateAndSaveCouncilResults(
 			}
 			if vote, ok := res.items[sortOrder]; ok {
 				councilVotes = append(councilVotes, map[string]any{
-					"member": mi + 1,
-					"vote":   getString(vote, "vote"),
+					"member":   mi + 1,
+					"vote":     getString(vote, "vote"),
 					"reasoning": getString(vote, "reasoning"),
 				})
 			}
@@ -607,13 +644,18 @@ func (h *ResearchHandler) aggregateAndSaveCouncilResults(
 
 		// Update the report item in DB
 		concernsJSON, _ := json.Marshal(agg.concerns)
-		_, _ = h.database.RPC(ctx, "update_report_item_council", map[string]any{
+		_, err := h.database.RPC(ctx, "update_report_item_council", map[string]any{
 			"p_report_id":            reportID,
 			"p_sort_order":           sortOrder,
 			"p_council_recommendation": recommendation,
 			"p_council_reasoning":     reasoning,
 			"p_council_concerns":      string(concernsJSON),
 		})
+		if err != nil {
+			log.Printf("[ReportCouncil] Failed to update report item sort_order=%d: %v", sortOrder, err)
+		} else {
+			log.Printf("[ReportCouncil] Item '%s' (sort_order=%d): %s (%d/%d votes)", title, sortOrder, recommendation, agg.voteCount, memberCount)
+		}
 	}
 
 	// Write KB decision doc
