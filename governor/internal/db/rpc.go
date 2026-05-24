@@ -81,6 +81,7 @@ var defaultRPCAllowlist = map[string]bool{
 	// Research flow
 	"create_research_suggestion":        true,
 	"update_research_suggestion_status": true,
+	"find_or_create_daily_report":       true,
 
 	// Maintenance
 	"create_maintenance_command": true,
