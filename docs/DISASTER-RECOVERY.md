@@ -154,7 +154,10 @@ vibepilot-governor --help || echo "Binary works (may not have --help flag)"
 STEP 7: SET UP HERMES AGENT
 ==================================================================
 
-# Clone hermes-agent
+# Create hermes directory structure
+mkdir -p ~/.hermes/memories ~/.hermes/skills ~/.hermes/cron
+
+# Clone hermes-agent (the engine)
 cd ~/.hermes
 git clone https://github.com/outsourc-e/hermes-agent.git
 cd hermes-agent
@@ -163,16 +166,33 @@ cd hermes-agent
 python3 -m venv venv
 source venv/bin/activate
 pip install -e .
-
-# Deactivate
 deactivate
 
-# Restore Hermes configuration
-# Copy from vibes-agent-context repo:
-cp ~/vibes-agent-context/hermes-config/* ~/.hermes/ 2>/dev/null
+# RESTORE HERMES CONFIG FROM GITHUB
+cd ~/vibes-agent-context
 
-# Or recreate manually:
-# See "Hermes Configuration Files" section below for what goes where
+# Config files (model routing, providers, fallbacks)
+cp hermes-config/config.yaml ~/.hermes/
+cp hermes-config/auth.json ~/.hermes/
+
+# Cron jobs (tokenfinder, memory sync, KB sync, etc.)
+cp hermes-config/cron/jobs.json ~/.hermes/cron/
+
+# Skills (184 skill files across 31 categories)
+# This is your accumulated agent knowledge
+rsync -a skills/ ~/.hermes/skills/
+
+# Memory (cross-session knowledge, user preferences)
+cp memories/MEMORY.md ~/.hermes/memories/
+cp memories/USER.md ~/.hermes/memories/
+
+# Create .env from template and fill in your API keys
+cp hermes-config/.env.template ~/.hermes/.env
+nano ~/.hermes/.env  # Fill in all the *** values with real keys
+# See "SECRETS YOU NEED" section below
+
+# Verify Hermes can start
+~/.hermes/hermes-agent/venv/bin/python -m hermes_cli.main --help
 
 ==================================================================
 STEP 8: SET UP SYSTEMD SERVICES
@@ -366,29 +386,18 @@ vercel link
 vercel --prod
 
 ==================================================================
-STEP 13: RESTORE HERMES MEMORY
+STEP 13: RESTORE HERMES MEMORY AND SKILLS
 ==================================================================
 
-# Memory files are in vibes-agent-context repo
-cp ~/vibes-agent-context/memories/MEMORY.md ~/.hermes/memories/
-cp ~/vibes-agent-context/memories/USER.md ~/.hermes/memories/
+This step is now part of Step 7 (Hermes setup).
+The vibes-agent-context repo contains:
+  memories/MEMORY.md    -- agent cross-session knowledge
+  memories/USER.md      -- user preferences and profile
+  skills/ (184 files)   -- all agent skill files
+  hermes-config/        -- config.yaml, auth.json, cron/jobs.json
 
-==================================================================
-STEP 14: SET UP HERMES CRON JOBS
-==================================================================
-
-# Hermes has its own cron system in ~/.hermes/cron/
-# The main file is jobs.json
-# These auto-sync memories, run token finder, etc.
-# Copy from the repo or recreate:
-
-# sync-memories: every 30 min
-# tokenfinder-v2: every 30 min
-# kb-quick-sync: hourly
-# kb-full-sync: every 4h
-# vibepilot-context-sync: every 6h
-# model-health-check: daily at 6am
-# kb-doc-expiry: weekly Monday 9am
+These are auto-synced every 30 minutes via sync_memories.sh.
+On a fresh restore, just copy them in Step 7.
 
 ==================================================================
 SECRETS YOU NEED (NOT in GitHub)
