@@ -214,6 +214,14 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/design-reviews", s.handleDesignReviews)
 	mux.HandleFunc("/api/design-reviews/approve", s.handleDesignReviewAction)
 
+	// Task lifecycle control: pause, resume, kill, pause-all, clear-all
+	mux.HandleFunc("/api/task/pause", s.handleTaskPause)
+	mux.HandleFunc("/api/task/resume", s.handleTaskResume)
+	mux.HandleFunc("/api/task/kill", s.handleTaskKill)
+	mux.HandleFunc("/api/tasks/pause-all", s.handleTasksPauseAll)
+	mux.HandleFunc("/api/tasks/clear-all", s.handleTasksClearAll)
+	mux.HandleFunc("/api/tasks/active", s.handleTasksActive)
+
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
 		Handler: s.corsMiddleware(mux),
