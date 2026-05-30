@@ -1,0 +1,15 @@
+[Unit]
+Description=Knowledge Hub API Server (Flask)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/vibes/knowledgebase
+ExecStart=/usr/bin/python3 /home/vibes/knowledgebase/server.py
+Environment=KNOWLEDGE_HUB_PORT=8888
+Environment=KNOWLEDGE_HUB_HOST=127.0.0.1
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

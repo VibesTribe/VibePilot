@@ -1,0 +1,15 @@
+tunnel: vibes
+credentials-file: /home/vibes/.cloudflared/b3105abc-2e6b-4268-8feb-d447d1553e4d.json
+
+ingress:
+  - hostname: vibes.vibestribe.rocks
+    service: http://localhost:8090
+  - hostname: api.vibestribe.rocks
+    service: http://localhost:8642
+  - hostname: studio.vibestribe.rocks
+    service: http://localhost:3002
+  - hostname: webhooks.vibestribe.rocks
+    service: http://localhost:8080
+  - hostname: graphs.vibestribe.rocks
+    service: http://localhost:8888
+  - service: http_status:404

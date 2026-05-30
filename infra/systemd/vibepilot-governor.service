@@ -1,0 +1,22 @@
+[Unit]
+Description=VibePilot Go Governor Service
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/vibes/vibepilot/governor
+ExecStart=/home/vibes/vibepilot/governor/governor
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vibepilot-governor
+Environment="DATABASE_URL=postgres://vibes@/vibepilot?host=/var/run/postgresql"
+Environment="GOVERNOR_CONFIG_DIR=/home/vibes/vibepilot/governor/config"
+Environment="GOVERNOR_PROMPTS_DIR=/home/vibes/vibepilot/prompts"
+Environment="HOME=/home/vibes"
+Environment="PATH=/home/vibes/.local/bin:/usr/local/go/bin:/home/vibes/go/bin:/usr/local/bin:/usr/bin:/bin"
+
+[Install]
+WantedBy=default.target

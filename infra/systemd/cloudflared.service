@@ -1,0 +1,11 @@
+[Unit]
+Description=Cloudflare Tunnel (vibes)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/cloudflared tunnel run vibes
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
