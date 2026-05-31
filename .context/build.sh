@@ -17,7 +17,7 @@ echo "[.context] Building knowledge layer at $COMMIT..."
 HAS_LEAN_CTX=true
 HAS_MUNCH=true
 command -v lean-ctx >/dev/null 2>&1 || HAS_LEAN_CTX=false
-command -v jcodemunch-mcp >/dev/null 2>&1 || HAS_MUNCH=false
+command -v python3 >/dev/null 2>&1 || HAS_MUNCH=false
 
 # ============================================================
 # 1. map.md
@@ -37,20 +37,18 @@ else
 fi
 
 # ============================================================
-# 2. index.db (jCodeMunch - code symbols)
+# 2. index.db (vibemunch - universal code indexer)
 # ============================================================
 if [ "$HAS_MUNCH" = true ]; then
-    echo "[.context] Generating index.db (jCodeMunch)..."
-    jcodemunch-mcp index "$REPO_ROOT" >/dev/null 2>&1 || true
-    MUNCH_DB=$(ls -t ~/.code-index/local-VibePilot-*.db 2>/dev/null | head -1)
-    if [ -n "$MUNCH_DB" ]; then
-        cp "$MUNCH_DB" "$CTX_DIR/index.db"
+    echo "[.context] Generating index.db (vibemunch)..."
+    python3 "$CTX_DIR/tools/vibemunch.py" "$REPO_ROOT" 2>/dev/null
+    if [ -f "$CTX_DIR/index.db" ]; then
         echo "[.context] index.db: $(du -sh "$CTX_DIR/index.db" | cut -f1)"
     else
-        echo "[.context] SKIP index.db (jCodeMunch index failed)"
+        echo "[.context] SKIP index.db (vibemunch failed)"
     fi
 else
-    echo "[.context] SKIP index.db (jCodeMunch not found). Run .context/tools/install.sh"
+    echo "[.context] SKIP index.db (python3 not found)"
 fi
 
 # ============================================================
