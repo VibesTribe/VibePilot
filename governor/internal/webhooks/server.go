@@ -223,7 +223,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/tasks/active", s.handleTasksActive)
 
 	s.server = &http.Server{
-		Addr:    fmt.Sprintf("0.0.0.0:%d", s.port),
+		Addr:    fmt.Sprintf("127.0.0.1:%d", s.port),
 		Handler: s.corsMiddleware(mux),
 	}
 
