@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-14T10:00:33.755144+00:00",
+  "timestamp": "2026-06-04T10:01:37.472892+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,8 +11,8 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 364,
-      "free": 30
+      "models": 343,
+      "free": 25
     }
   },
   "health_checks": {
@@ -21,17 +21,7 @@
       "status": "skip",
       "provider": "gemini"
     },
-    "gemini-3.1-flash-lite-preview": {
-      "alive": null,
-      "status": "skip",
-      "provider": "gemini"
-    },
     "gemini-3-flash-preview": {
-      "alive": null,
-      "status": "skip",
-      "provider": "gemini"
-    },
-    "gemini-2.5-flash": {
       "alive": null,
       "status": "skip",
       "provider": "gemini"
@@ -51,24 +41,9 @@
       "status": "ok",
       "provider": "openrouter"
     },
-    "minimaxai/minimax-m2.5": {
-      "alive": false,
-      "status": "HTTP 400: {\"error\":{\"message\":\"minimaxai/minimax-m2.5 is not a valid model ID\",\"code\":400},\"user_id\":\"user_3CdMRRHo4N09mdBX77OuOG9Ihkq\"}",
-      "provider": "nvidia"
-    },
-    "meta-llama/llama-4-scout-17b-16e-instruct": {
-      "alive": true,
-      "status": "ok",
-      "provider": "groq"
-    },
     "groq/llama-3.3-70b-versatile": {
       "alive": false,
       "status": "HTTP 404: {\"error\":{\"message\":\"The model `groq/llama-3.3-70b-versatile` does not exist or you do not have access to it.\",\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}\n",
-      "provider": "groq"
-    },
-    "groq/compound": {
-      "alive": true,
-      "status": "ok",
       "provider": "groq"
     },
     "openai/gpt-oss-120b": {
@@ -76,30 +51,15 @@
       "status": "ok",
       "provider": "nvidia"
     },
-    "groq/compound-mini": {
-      "alive": true,
-      "status": "ok",
-      "provider": "groq"
-    },
     "groq/llama-3.1-8b-instant": {
       "alive": false,
       "status": "HTTP 404: {\"error\":{\"message\":\"The model `groq/llama-3.1-8b-instant` does not exist or you do not have access to it.\",\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}\n",
       "provider": "groq"
     },
-    "meta/llama-3.3-70b-instruct": {
-      "alive": false,
-      "status": "HTTP 400: {\"error\":{\"message\":\"meta/llama-3.3-70b-instruct is not a valid model ID\",\"code\":400},\"user_id\":\"user_3CdMRRHo4N09mdBX77OuOG9Ihkq\"}",
-      "provider": "nvidia"
-    },
     "google/gemma-4-26b-a4b-it:free": {
       "alive": true,
-      "status": "rate_limited_but_alive",
-      "provider": "openrouter"
-    },
-    "google/gemma-3-27b-it": {
-      "alive": true,
       "status": "ok",
-      "provider": "nvidia"
+      "provider": "openrouter"
     },
     "deepseek-ai/deepseek-v4-flash": {
       "alive": false,
@@ -115,13 +75,17 @@
   "changes": [
     {
       "action": "new_free_models",
-      "count": 28,
+      "count": 29,
       "models": [
+        "gemini-2.5-flash",
         "gemini-2.5-flash-preview-tts",
         "gemini-2.5-pro-preview-tts",
         "gemini-2.5-flash-image",
+        "gemini-3.1-flash-lite-preview",
         "gemini-3-pro-image-preview",
+        "gemini-3-pro-image",
         "gemini-3.1-flash-image-preview",
+        "gemini-3.1-flash-image",
         "gemini-3.1-flash-tts-preview",
         "imagen-4.0-generate-001",
         "imagen-4.0-ultra-generate-001",
@@ -132,11 +96,7 @@
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
-        "gemini-2.5-flash-native-audio-latest",
-        "gemini-2.5-flash-native-audio-preview-09-2025",
-        "gemini-2.5-flash-native-audio-preview-12-2025",
-        "gemini-3.1-flash-live-preview",
-        "llama-3.1-8b-instant"
+        "meta-llama/llama-prompt-guard-2-22m"
       ]
     }
   ],
@@ -178,11 +138,6 @@
       "cooldown_state": "ready"
     },
     "deepseek-v3": {
-      "status": "active",
-      "cooldown_until": "none",
-      "cooldown_state": "ready"
-    },
-    "deepseek-v4-flash": {
       "status": "active",
       "cooldown_until": "none",
       "cooldown_state": "ready"
