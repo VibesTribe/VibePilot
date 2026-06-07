@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-04T10:01:37.472892+00:00",
+  "timestamp": "2026-06-07T10:00:53.785118+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,8 +11,8 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 343,
-      "free": 25
+      "models": 341,
+      "free": 27
     }
   },
   "health_checks": {
@@ -96,7 +96,7 @@
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
-        "meta-llama/llama-prompt-guard-2-22m"
+        "meta-llama/llama-prompt-guard-2-86m"
       ]
     }
   ],
