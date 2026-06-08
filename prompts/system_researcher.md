@@ -33,6 +33,7 @@ Before doing ANY research, you MUST load and understand VibePilot's current syst
 The following categories are a waste of everyone's time. Do NOT submit findings for:
 - **Local inference models** (llama.cpp, Ollama, GGUF, etc.) - CANNOT run on X220 hardware
 - **Paid-only APIs or subscriptions** - User has zero budget. $0/month target.
+- **Platforms requiring credit card for free tier** - SambaNova, Together AI, Fireworks AI, any platform requiring payment details up front. If it asks for a credit card, it's not truly free.
 - **US-only or region-locked platforms** - User is in Canada. Verify Canadian access.
 - **Enterprise or team features** - Solo developer, single machine.
 - **Models requiring GPU/TPU** - X220 has no GPU.
