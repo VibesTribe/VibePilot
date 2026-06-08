@@ -14,8 +14,9 @@ VibePilot is an automated software factory running on an X220 laptop.
 - **Machine:** ThinkPad X220, i5-2520M CPU (AVX-only, no AVX2)
 - **RAM:** 16GB (shared across all services)
 - **Storage:** Spinning disk HDD (I/O is the bottleneck)
-- **Cannot run:** Ollama, heavy local models, large Docker containers
+- **Cannot run:** Ollama, heavy local models, large Docker containers, ANY local model inference
 - **Can run:** Go binaries, PostgreSQL, Node.js, Python services
+- **ALL AI model access is via remote APIs or browser automation. There is NO local model inference capability. Do not suggest or assume any local model (Ollama, llama.cpp, GGUF, etc.).**
 
 ### Cost Constraints (Non-Negotiable)
 - **Free-tier-first policy:** Never recommend paid API usage unless the benefit is extreme and proven
@@ -23,11 +24,20 @@ VibePilot is an automated software factory running on an X220 laptop.
 - **Free API tiers in use:** OpenRouter (free models only), Gemini (free tier, 20 req/day), Groq (free tier), NVIDIA NIM (free tier)
 - **DeepSeek API:** Out of credits, only available via NVIDIA NIM fallback
 - **No paid OpenRouter credits** ever
+- **No credit card required platforms** -- SambaNova, Together AI, Fireworks AI etc. require credit cards and are blacklisted
+
+### Model & Platform Registry (Source of Truth)
+- **model_catalog table** is the single source of truth for available models. Check it before making claims about what models are available.
+- **14 active courier web platforms:** ChatGPT Web, Claude Web, Gemini Web, DeepSeek Web, Qwen Web, Mistral Le Chat, NoteGPT, Kimi AI, HuggingChat, Google AI Studio, Poe, Chatbox AI, AiZolo, Perplexity
+- **Active API providers:** OpenRouter, Groq, Gemini API (4 project keys), NVIDIA NIM (disabled)
+- **Inactive:** DeepSeek API (out of credits), Claude Code CLI, OpenCode CLI, Kimi CLI
+- **TokenFinder scans OpenRouter, Groq, NVIDIA, Gemini twice daily.** New model discoveries are automatic. Do NOT suggest "we should add model X" if it's already in model_catalog.
+- When verifying a researcher's `current_state` claim, check against THIS list, not assumptions.
 
 ### Architecture Decisions
 - **Go governor** - single binary, low memory, PostgreSQL backend
 - **Next.js/Vercel dashboard** - read-only, auto-deploys from GitHub
-- **Knowledge base** - GitHub-hosted markdown with MCP server for queries
+- **Knowledge base** - PostgreSQL-backed (jCodeMunch + pgvector), NOT SQLite or vibemunch
 - **Cloudflare tunnel** - exposes local services (api.vibestribe.rocks, graphs.vibestribe.rocks)
 - **Council review** - 3 lenses, sequential, before human approval
 
