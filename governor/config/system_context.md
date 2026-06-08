@@ -30,11 +30,17 @@ Postgres-backed code intelligence. Stores code symbols, doc sections, architectu
 
 ## AI Model Access (How We Get AI Output)
 
-### Free Web Platforms (courier/browser automation)
-DeepSeek Web, ChatGPT Web, Claude Web, Gemini Web, Kimi Web, Qwen Web, Poe. Accessed via Playwright browser automation. Free tier, rate limited per platform. These are the workhorses for code generation tasks.
+### Free Web Platforms (courier/browser automation via Playwright)
+14 active web connectors: DeepSeek Web, ChatGPT Web, Claude Web, Gemini Web, Kimi Web, Qwen Web, Poe, Google AI Studio, HuggingChat, Mistral Le Chat, Perplexity, AiZolo, Chatbox AI, NoteGPT (DeepSeek). Free tier, rate limited per platform. These are the workhorses for code generation and research tasks.
 
 ### Free API Access
-OpenRouter (free models only, hard rule), Groq (free tier), NVIDIA NIM (free tier), Gemini API (20 req/day per key, 3 keys). Used for lighter tasks, routing decisions, quick analysis.
+OpenRouter (free models only, hard rule), Groq (free tier), Gemini API (4 connectors: general, courier, researcher, visual — 20 req/day per key, 3 keys). DeepSeek API inactive (out of credits). NVIDIA NIM API disabled. Used for lighter tasks, routing decisions, quick analysis.
+
+### CLI Agents (inactive, available for activation)
+Claude Code CLI, OpenCode CLI, Kimi CLI. These are code-focused CLI agents that can be enabled for specific task types.
+
+### Active Agent Gateway
+Hermes Agent v0.16.0 — used for consultant chat, research agents, and multi-platform orchestration.
 
 ### Primary Agent Model
 GLM-5 via Z.AI Pro subscription. Free through mid-2026. 900M context. Used for this consultant chat, Hermes agent sessions, and most agentic work.
