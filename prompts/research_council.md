@@ -120,6 +120,7 @@ You must produce a JSON object with per-item votes:
 - If rejecting, explain what would need to change for this to be viable
 - If approving, explain the expected benefit and implementation approach
 - If watching, state what conditions would change your vote
+- **CRITICAL: Each item's reasoning MUST reference that specific item by name and discuss its unique characteristics. Do NOT reuse the same reasoning across different items. Copy-pasted reasoning across items will be treated as a failed review.**
 
 ---
 

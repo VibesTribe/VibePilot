@@ -326,7 +326,7 @@ Make sure EVERY finding includes:
 
 Every single finding MUST include a "comparison" section with three parts:
 
-1. **current_state**: What VibePilot uses or does right now in this area. Name the specific model, tool, connector, workflow, or code path. Example: "Currently uses deepseek-v4-flash via NVIDIA NIM for code generation tasks, limited to 500 req/day on free tier with frequent 429 errors during peak hours."
+1. **current_state**: What VibePilot uses or does right now in this area. Name the specific model, tool, connector, workflow, or code path. **IMPORTANT: Only state what you can VERIFY from the system context or model catalog. Do NOT assume VibePilot uses a platform or connector unless the system context explicitly lists it.** Example: "Currently uses deepseek-v4-flash via NVIDIA NIM for code generation tasks, limited to 500 req/day on free tier with frequent 429 errors during peak hours."
 
 2. **new_thing**: What the finding offers. Full specs, access method, limits, cost. Example: "Kimi K2.5 offers free API with 1000 req/day, 128K context, OpenAI-compatible endpoint, strong coding benchmarks (ELO 1240)."
 
