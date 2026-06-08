@@ -60,10 +60,10 @@ The following categories are a waste of everyone's time. Do NOT submit findings 
 ### Stack Updates to Monitor
 Check for new releases, breaking changes, and security patches for ALL of these:
 - **Go 1.24.3** (governor is Go) - check golang.org
-- **PostgreSQL 16.13** with **pgvector 0.6.0** and **pg_trgm 1.6** - check postgresql.org
+- **PostgreSQL 16.14** with **pgvector 0.6.0** and **pg_trgm 1.6** - check postgresql.org
 - **Node.js v24.14.1** (dashboard build) - check nodejs.org
 - **Next.js** (Vercel dashboard) - check nextjs.org blog
-- **Hermes Agent v0.9.0** - check GitHub releases
+- **Hermes Agent v0.16.0** - check GitHub releases
 - **Playwright 1.60.0** (courier browser automation) - check playwright.dev
 - **cloudflared 2026.3.0** (tunnel) - check GitHub releases
 - **pgx v5.9.2** (Go Postgres driver) - check GitHub releases

@@ -10,10 +10,10 @@ VibePilot is an automated software factory. It takes feature requests (PRDs), an
 ### Governor (Go binary)
 The brain. Written in Go 1.24, compiled to a single ~30MB binary. Runs as a persistent process on the X220. Handles all orchestration: receiving PRDs, routing through pipeline stages, dispatching tasks to AI models, managing state transitions, running council reviews. Uses pgx v5.9.2 for Postgres and mcp-go v0.47.1 for KB access. Chosen because Go binaries are lightweight, fast startup, no runtime dependencies.
 
-### PostgreSQL 16.13
+### PostgreSQL 16.14
 All state lives here. 100+ tables. Single database called "vibepilot". Uses pgvector 0.6.0 for semantic search across KB documents and code symbols. Uses pg_trgm 1.6 for fuzzy text search. Chosen because it handles everything: relational data, vector search, JSON, full-text search. No need for Redis, Elasticsearch, or separate vector DB.
 
-### Hermes Agent v0.9.0
+### Hermes Agent v0.16.0
 Multi-platform AI agent gateway. Handles Telegram, Discord, and CLI interfaces. Routes messages to AI models, manages conversation context, provides tool access (terminal, browser, file I/O, web search). Config at ~/.hermes/config.yaml. This consultant chat runs through Hermes. Chosen because it provides unified agent interface across all platforms with built-in tools and skill system.
 
 ### Next.js Dashboard (Vercel)

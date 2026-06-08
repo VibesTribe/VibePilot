@@ -101,10 +101,10 @@ Last verified: 2026-05-22
 
 ## Full Technology Stack (Track Updates For These)
 - Go 1.24.3 (governor binary, all backend logic)
-- PostgreSQL 16.13 with pgvector 0.6.0, pg_trgm 1.6 (all state, semantic search)
+- PostgreSQL 16.14 with pgvector 0.6.0, pg_trgm 1.6 (all state, semantic search)
 - Node.js v24.14.1, npm 11.14.1 (dashboard builds)
 - Next.js (Vercel dashboard, auto-deploys from GitHub)
-- Hermes Agent v0.9.0 (multi-platform agent gateway, chat/CLI)
+- Hermes Agent v0.16.0 (multi-platform agent gateway, chat/CLI)
 - Playwright 1.60.0 (courier browser automation, visual QA)
 - cloudflared 2026.3.0 (tunnel exposing api.vibestribe.rocks)
 - pgx v5.9.2 (Go PostgreSQL driver)
