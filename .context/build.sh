@@ -116,7 +116,7 @@ $(echo "$SECTION_CONSTRAINTS")
 
 ## What Is VibePilot
 Sovereign AI execution engine. Transforms PRDs -> production code via multi-agent orchestration.
-Runtime: Go binary (governor). Event-driven via Supabase.
+Runtime: Go binary (governor). Event-driven via PostgreSQL (pg_notify).
 
 ## Codebase Structure (auto-discovered)
 $(echo -e "$SECTION_TREE")

@@ -64,7 +64,7 @@ Confirm  → Human or Council majority confirms
 ## Agent Handoff Protocol
 
 ```
-1. Update Supabase (status + handoff JSON)
+1. Update PostgreSQL (status + handoff JSON)
 2. Write summary: done, changed, concerns, next
 3. Next agent reads: task, DECISION_LOG, SESSION_LOG
 4. Acknowledge before starting
@@ -91,7 +91,7 @@ pending → planning → reviewing → approved → executing → verifying → 
 ```
 ☐ All env vars in .env.example
 ☐ setup.sh works on fresh machine
-☐ Supabase data exported
+☐ PostgreSQL data backed up
 ☐ GitHub fully synced
 ☐ SESSION_LOG updated
 ```
@@ -124,7 +124,7 @@ GLM-5 primary = cheapest for most tasks
 
 ```
 Human escalation: task_packets with message_type: 'escalation'
-System down: Check Supabase status, GitHub status
+System down: Check PostgreSQL status, GitHub status
 Context lost: Re-read SESSION_LOG.md + DECISION_LOG.md
 ```
 

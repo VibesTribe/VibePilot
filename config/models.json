@@ -1,7 +1,7 @@
 {
   "$schema": "./schemas/models.schema.json",
   "version": "2.0",
-  "description": "Model profiles with rate limits, costs, and recovery config. Source of truth synced to Supabase.",
+  "description": "Model profiles with rate limits, costs, and recovery config. Managed by governor.",
   "models": [
     {
       "id": "glm-5",

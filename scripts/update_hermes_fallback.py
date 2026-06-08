@@ -10,9 +10,7 @@ Run: python3 update_hermes_fallback.py [--dry-run]
 Kanban: ID 97 - Build auto-update script for Hermes fallback chain
 """
 
-import json
 import os
-import re
 import subprocess
 import sys
 import yaml
@@ -169,7 +167,7 @@ def fetch_active_models():
     SELECT id, name, provider,
            COALESCE(array_to_string(capabilities, ','), '') AS capabilities
     FROM model_catalog
-    WHERE status = 'active'
+    WHERE status IN ('active', 'benched')
       AND is_free = true
     ORDER BY provider, id;
     """
@@ -189,36 +187,44 @@ def generate_fallback_yaml(models):
 
 
 def replace_fallback_in_config(yaml_entries, dry_run=False):
-    """Replace the fallback_providers section in config.yaml."""
+    """Replace the fallback_providers section in config.yaml.
+    
+    Uses full YAML parse-dump for reliability. Preserves non-standard
+    entries (like providers: {}) via string post-processing.
+    """
     with open(HERMES_CONFIG, "r") as f:
         config_text = f.read()
 
-    # Generate new fallback YAML block
-    new_fallback = yaml.dump(
-        yaml_entries,
-        default_flow_style=False,
-        sort_keys=False,
-        indent=0,
-        width=120,
-    ).strip()
-
-    # Build the replacement text
-    new_section = f"fallback_providers:\n{new_fallback}\n"
-
-    # Find and replace the fallback_providers section
-    # Original format: dashes at column 0, provider at column 2
-    pattern = r"^fallback_providers:\n(- model: .*\n  provider: .*\n?)*"
-    match = re.search(pattern, config_text, re.MULTILINE)
-    if not match:
-        print("ERROR: Could not find fallback_providers section in config.yaml", file=sys.stderr)
+    # Use full YAML round-trip for reliable replacement
+    try:
+        config_data = yaml.safe_load(config_text)
+    except yaml.YAMLError as e:
+        print(f"ERROR: Current config.yaml is already invalid YAML: {e}", file=sys.stderr)
         sys.exit(1)
 
-    full_old_block = match.group(0)
-    new_config_text = config_text.replace(full_old_block, new_section, 1)
+    # Replace the fallback_providers section
+    config_data["fallback_providers"] = yaml_entries
+
+    # Dump with clean formatting (2-space indent for nested)
+    new_config_text = yaml.dump(
+        config_data,
+        default_flow_style=False,
+        sort_keys=False,
+        width=120,
+        allow_unicode=True,
+    )
+
+    # Restore empty-dict shorthand: YAML turns "key: {}" into "key: {}" 
+    # which is fine, but ensure consistent style
+    # Ensure trailing newline
+    if not new_config_text.endswith("\n"):
+        new_config_text += "\n"
 
     if dry_run:
         print("=== DRY RUN - would write ===")
-        print(new_section)
+        for entry in yaml_entries:
+            print(f"  - model: {entry['model']}")
+            print(f"    provider: {entry['provider']}")
         print("=== END ===")
         return
 
@@ -240,8 +246,12 @@ def replace_fallback_in_config(yaml_entries, dry_run=False):
         print("Config YAML valid")
     except yaml.YAMLError as e:
         print(f"WARNING: New config YAML invalid, restoring backup: {e}", file=sys.stderr)
+        # Restore from backup properly
         with open(backup_path, "r") as f:
-            os.rename(backup_path, HERMES_CONFIG)
+            backup_content = f.read()
+        with open(HERMES_CONFIG, "w") as f:
+            f.write(backup_content)
+        print("Restored backup.", file=sys.stderr)
         sys.exit(1)
 
 

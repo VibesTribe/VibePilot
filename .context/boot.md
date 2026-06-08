@@ -1,5 +1,5 @@
 # VibePilot Bootstrap
-# Generated: 2026-05-31T16:45:51Z | Commit: 444e056 | Branch: main
+# Generated: 2026-06-01T04:19:18Z | Commit: 6e00087 | Branch: main
 # AUTO-GENERATED. DO NOT EDIT. Run .context/build.sh to regenerate.
 # Recovery: clone repo, bash .context/tools/install.sh, bash .context/build.sh
 
@@ -20,46 +20,38 @@ and cleanup work.
 - **Modular and agnostic** -- swap any component in a day. No vendor dependency.
 - **Config-driven** -- everything configurable via JSON in config/. Nothing baked in.
 - **Reversible** -- every change can be undone. No one-way doors.
-- **Recoverable** -- GitHub + Supabase = full rebuild anywhere, any device.
+- **Recoverable** -- GitHub + PostgreSQL = full rebuild anywhere, any device.
 
 ## Absolute Rules (the DO NOT)
 
 1. **NEVER hardcode anything.** Every hardcoded value eventually requires undoing a mess.
    Models, connectors, routing, agents -- all in config JSON files.
 
-2. **NEVER hunt for .env files.** Credentials live in Supabase vault. Period.
-   Agents have burned 30+ minutes searching for .env files that don't exist,
-   then another 30 figuring out vault access. Use vault. First time. Every time.
+2. **NEVER hunt for .env files.** Credentials live in the PostgreSQL vault table.
+   The Go governor reads secrets from the vault (encrypted with VAULT_KEY).
+   Use the vault. First time. Every time.
 
 3. **NEVER guess -- check first.** Guessing creates cleanup work.
    Read the existing code, query knowledge.db, check what's there before inventing.
 
 4. **Schema migrations have ONE path. Use it. No exceptions.**
-   Supabase REST API cannot run DDL (CREATE TABLE, ALTER, CREATE FUNCTION). No amount of
-   clever curl, REST calls, RPC tricks, or workarounds will change this. They ALL fail for DDL.
-   Agents have wasted entire sessions trying every possible method before finally doing it right.
+   PostgreSQL migrations go through the governor's migration system.
    
    The ONLY working path. Every step is mandatory:
    
-   a) Find next number: `ls ~/VibePilot/docs/supabase-schema/` -- use the NEXT unused number.
-      Do NOT reuse an existing number. Do NOT guess -- ls first.
+   a) Create the migration SQL file in the appropriate directory.
    
-   b) Write the file: `~/VibePilot/docs/supabase-schema/NNN_name.sql`
-      Must include DROP FUNCTION/CREATE OR REPLACE for idempotency.
-      Must include DROP POLICY IF EXISTS before any CREATE POLICY.
+   b) Apply via the governor's built-in migration runner, or psql directly.
    
    c) Commit and push to GitHub main:
       `cd ~/VibePilot && git add -A && git commit -m "..." && git push`
    
    d) Pull into running copy: `cd ~/vibepilot && git pull`
    
-   e) Tell the human EXACTLY what to do. Not "apply the migration" -- give them:
-      - The direct GitHub link: https://github.com/VibesTribe/VibePilot/blob/main/docs/supabase-schema/NNN_name.sql
-      - Clear instruction: "Copy the SQL from this file, paste into Supabase Dashboard > SQL Editor, click Run"
-      - Do NOT assume they'll figure it out. Do NOT skip this step. Do NOT move on until confirmed.
+   e) Verify the migration applied: check PostgreSQL directly.
    
-   Do NOT attempt REST, curl, RPC, psql, or any other method for DDL. They waste time and tokens.
-   Do NOT skip the GitHub link. If it's not on GitHub with the right number, it won't get applied.
+   Do NOT attempt Supabase REST API, Supabase Dashboard, or any Supabase methods.
+   Supabase is NOT USED. PostgreSQL runs locally, managed by the Go governor.
 
 5. **ALWAYS push to GitHub.** Local-only work gets lost.
    This has caused more lost work than anything else.
@@ -76,10 +68,9 @@ and cleanup work.
 
 7. **Go SERVES VibePilot's design. It does NOT invent new processes.**
    Go is the plumbing that makes VibePilot's actual processes run.
-   It writes to Supabase in the format the dashboard expects.
+   It writes to PostgreSQL in the format the dashboard expects.
    Do NOT rewrite Go with hallucinated processes that aren't in the spec.
-   Do NOT modify Supabase schema to accommodate hallucinated Go code.
-   Supabase is the contract. Dashboard shows what VibePilot state IS.
+   PostgreSQL is the contract. Dashboard shows what VibePilot state IS.
    Go conforms to both, not the other way around.
 
 ## Operational Rules (the DO)
@@ -131,7 +122,7 @@ When you need more than these basics:
 - Architecture details: sqlite3 .context/knowledge.db "SELECT title,content FROM rules WHERE priority='high'"
 - All prompts: sqlite3 .context/knowledge.db "SELECT name,role FROM prompts"
 - Search docs: sqlite3 .context/knowledge.db "SELECT title,file_path FROM docs WHERE title LIKE '%<topic>%'"
-- Full code map: cat .context/map.md
+- Code symbols, imports, call graphs: jCodeMunch MCP tools (mcp_jcodemunch_*)
 - Context layer explained: docs/CONTEXT_KNOWLEDGE_LAYER.md
 
 ## Post-Task Update Discipline (NON-OPTIONAL)
@@ -166,7 +157,7 @@ The prevention system only works if we maintain the prevention system.
 
 ## What Is VibePilot
 Sovereign AI execution engine. Transforms PRDs -> production code via multi-agent orchestration.
-Runtime: Go binary (governor). Event-driven via Supabase.
+Runtime: Go binary (governor). Event-driven via PostgreSQL (pg_notify).
 
 ## Codebase Structure (auto-discovered)
 - governor/cmd/cleanup/ (1 files, 1 funcs, 0 types)
@@ -202,7 +193,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
   config/destinations.json - WHERE tasks execute. CLI, Web platforms, API endpoints. All swappable.
   config/kilo-session.json - keys: max_sessions, max_concurrent_tasks_per_session, notes, memory_per_session_mb, reason
   config/maintenance_commands.json - Maintenance command configuration. Defines allowed git operations and validation rules.
-  config/models.json - Model profiles with rate limits, costs, and recovery config. Source of truth synced to Supabase.
+  config/models.json - Model profiles with rate limits, costs, and recovery config. Managed by governor.
   config/plan_lifecycle.json - Plan lifecycle configuration - states, transitions, revision rules, complexity detection, consensus rules. All configurable.
   config/platforms.json - Web platforms and API models for VibePilot routing. Updated April 8, 2026 with verified OpenRouter data.
   config/roles.json - WHAT job is being done. Roles are job definitions. Model and destination assigned by orchestrator at runtime.
@@ -231,7 +222,7 @@ Runtime: Go binary (governor). Event-driven via Supabase.
 - Service: vibepilot-governor (systemd --user)
 - Logs: journalctl --user -u vibepilot-governor
 - Branch: main
-- Commit: 444e056
+- Commit: 6e00087
 
 ## How To Use .context/
 1. boot.md (this file) = orientation + Tier 0 rules (~2K tokens)

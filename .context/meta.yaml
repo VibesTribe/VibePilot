@@ -1,10 +1,10 @@
 # Auto-generated. DO NOT EDIT.
-commit: 444e056
+commit: 6e00087
 branch: main
-generated: 2026-05-31T16:45:51Z
-boot_md_bytes: 14007
-map_md_bytes: 86965
-has_index_db: true
+generated: 2026-06-01T04:19:18Z
+boot_md_bytes: 13128
+map_md_bytes: 0
+has_index_db: false
 has_knowledge_db: true
 indexes:
   code: jCodeMunch SQLite - symbols, imports, call graph, AST
@@ -12,4 +12,4 @@ indexes:
   code_map: lean-ctx map mode - compressed function signatures
 tools:
   lean_ctx: "MISSING - run .context/tools/install.sh"
-  jcodemunch: "MISSING - run .context/tools/install.sh"
+  jcodemunch: "installed"
