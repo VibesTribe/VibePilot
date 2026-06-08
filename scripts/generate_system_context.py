@@ -125,10 +125,16 @@ data["model_catalog"] = {
     "benched": psql_int("SELECT COUNT(*) FROM model_catalog WHERE status='benched';"),
 }
 
-# Active connectors
+# Active connectors (from connectors.json, not a DB table)
 conns = []
-for row in psql_rows("SELECT id, type, status FROM connectors WHERE status='active';"):
-    conns.append({"id": row[0], "type": row[1], "status": row[2]})
+try:
+    import json as _json
+    with open("/home/vibes/vibepilot/governor/config/connectors.json") as _f:
+        _cdata = _json.load(_f)
+    for _d in _cdata.get("destinations", []):
+        conns.append({"id": _d.get("id",""), "name": _d.get("name",""), "type": _d.get("type",""), "status": _d.get("status","")})
+except Exception as e:
+    conns = [{"error": str(e)}]
 data["connectors"] = conns
 
 # Model health last 24h
