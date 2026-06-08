@@ -28,11 +28,12 @@ VibePilot is an automated software factory running on an X220 laptop.
 
 ### Model & Platform Registry (Source of Truth)
 - **model_catalog table** is the single source of truth for available models. Check it before making claims about what models are available.
+- **connectors.json** is the single source of truth for courier destinations. Check it before making claims about what platforms couriers can access.
 - **14 active courier web platforms:** ChatGPT Web, Claude Web, Gemini Web, DeepSeek Web, Qwen Web, Mistral Le Chat, NoteGPT, Kimi AI, HuggingChat, Google AI Studio, Poe, Chatbox AI, AiZolo, Perplexity
 - **Active API providers:** OpenRouter, Groq, Gemini API (4 project keys), NVIDIA NIM (disabled)
 - **Inactive:** DeepSeek API (out of credits), Claude Code CLI, OpenCode CLI, Kimi CLI
 - **TokenFinder scans OpenRouter, Groq, NVIDIA, Gemini twice daily.** New model discoveries are automatic. Do NOT suggest "we should add model X" if it's already in model_catalog.
-- When verifying a researcher's `current_state` claim, check against THIS list, not assumptions.
+- When verifying a researcher's `current_state` claim, check against connectors.json and model_catalog, not assumptions.
 
 ### Architecture Decisions
 - **Go governor** - single binary, low memory, PostgreSQL backend
