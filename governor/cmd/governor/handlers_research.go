@@ -819,6 +819,47 @@ func (h *ResearchHandler) handleResearchApproved(event runtime.Event) {
 		kbContext = h.loadKBContext(ctx, suggestionType)
 	}
 
+	// Extract approved_items: check review_item payload first (report-based flow),
+	// then fall back to suggestion details (single suggestion flow)
+	var approvedItems []map[string]any
+	riData, riErr := h.database.Query(ctx, "review_items", map[string]any{
+		"source_id": suggestionID,
+		"status":    "pending",
+	})
+	if riErr == nil && riData != nil {
+		var riRows []map[string]any
+		if json.Unmarshal(riData, &riRows) == nil && len(riRows) > 0 {
+			if payload, ok := riRows[0]["payload"].(map[string]any); ok {
+				if ai, ok := payload["approved_items"].([]any); ok {
+					for _, item := range ai {
+						if m, ok := item.(map[string]any); ok {
+							approvedItems = append(approvedItems, m)
+						}
+					}
+				}
+			}
+		}
+	}
+	// Fallback: check suggestion details for approved_items
+	if len(approvedItems) == 0 && details != nil {
+		if ai, ok := details["approved_items"].([]any); ok {
+			for _, item := range ai {
+				if m, ok := item.(map[string]any); ok {
+					approvedItems = append(approvedItems, m)
+				}
+			}
+		}
+	}
+	if approvedItems == nil {
+		approvedItems = []map[string]any{}
+	}
+
+	// Extract review_notes from the suggestion record
+	var reviewNotes any
+	if suggestion["review_notes"] != nil {
+		reviewNotes = suggestion["review_notes"]
+	}
+
 	// Build consultant context
 	consultantContext := map[string]any{
 		"action":           "generate_prd",
@@ -830,6 +871,10 @@ func (h *ResearchHandler) handleResearchApproved(event runtime.Event) {
 		"details":          details,
 		"research_content": researchContent,
 		"current_system":   kbContext,
+		"approved_items":   approvedItems,
+	}
+	if reviewNotes != nil {
+		consultantContext["review_notes"] = reviewNotes
 	}
 
 	// Route to consultant agent

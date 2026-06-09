@@ -2595,8 +2595,19 @@ func (s *Server) handleReportItemDecision(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if req.Decision != "approve" && req.Decision != "watch" && req.Decision != "reject" {
+	if req.Decision != "" && req.Decision != "approve" && req.Decision != "watch" && req.Decision != "reject" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "decision must be approve, watch, or reject"})
+		return
+	}
+
+	// Notes-only update (for Ask Q&A context save): if no decision, just update notes
+	if req.Decision == "" {
+		if req.Notes != "" {
+			s.db.Update(r.Context(), "research_report_items", id, map[string]any{
+				"notes": req.Notes,
+			})
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "notes_updated": true})
 		return
 	}
 
@@ -2633,18 +2644,45 @@ func (s *Server) handleReportItemDecision(w http.ResponseWriter, r *http.Request
 				s.db.RPC(r.Context(), "resolve_review_items_by_source", map[string]any{
 					"p_source_id": reportID,
 				})
+				// Fetch all approved items with their titles, summaries, and notes for the PRD context
+				approvedItemsData, _ := s.db.Query(r.Context(), "research_report_items", map[string]any{
+					"report_id": reportID,
+				})
+				var approvedItems []map[string]any
+				if approvedItemsData != nil {
+					var allItems []map[string]any
+					if json.Unmarshal(approvedItemsData, &allItems) == nil {
+						for _, it := range allItems {
+							if hd, _ := it["human_decision"].(string); hd == "approve" {
+								title, _ := it["title"].(string)
+								summary, _ := it["summary"].(string)
+								notes, _ := it["notes"].(string)
+								approvedItems = append(approvedItems, map[string]any{
+									"title":   title,
+									"summary": summary,
+									"notes":   notes,
+								})
+							}
+						}
+					}
+				}
+				if approvedItems == nil {
+					approvedItems = []map[string]any{}
+				}
+				log.Printf("[report-items] Report %s: %d approved items for PRD", reportID, len(approvedItems))
 				// Create review item for PRD generation
 				s.db.Insert(r.Context(), "review_items", map[string]any{
 					"type":     "research",
 					"source_id": reportID,
 					"title":    "Generate PRD from approved research items",
-					"summary":  fmt.Sprintf("All items decided. Approved items ready for PRD."),
+					"summary":  fmt.Sprintf("All items decided. %d approved items ready for PRD.", len(approvedItems)),
 					"status":   "pending",
 					"priority": "high",
 					"payload": map[string]any{
-						"report_id":    reportID,
-						"report_type":  "daily_scan",
-						"action":       "generate_prd",
+						"report_id":      reportID,
+						"report_type":    "daily_scan",
+						"action":         "generate_prd",
+						"approved_items": approvedItems,
 					},
 				})
 			}
