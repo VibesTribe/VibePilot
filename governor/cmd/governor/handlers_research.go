@@ -262,8 +262,11 @@ func (h *ResearchHandler) checkAndRouteReport(ctx context.Context, reportID stri
 	// with a delay to batch items that arrive in rapid succession.
 	// Only promotes if report is still in "collecting" status (idempotent).
 	if len(items) > 0 {
-		// Use a longer delay for the first few items to allow batch collection
-		batchDelay := 5 * time.Second
+		// Wait long enough for all items to arrive. Items come every ~10s;
+		// a typical batch of 5-15 items takes 50-150 seconds total.
+		// 90s gives enough room for all items before council starts.
+		// The "already promoted" guard (lines below) makes this idempotent.
+		batchDelay := 90 * time.Second
 		go func() {
 			time.Sleep(batchDelay)
 			// Only promote if still in "collecting" — avoids duplicate council runs
