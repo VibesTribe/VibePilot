@@ -1,0 +1,4 @@
+# Governor Python dependencies (pinned for reproducibility)
+# Used by: capture.go (VQA), generator.go (design preview), vqa_capture.py
+# Install: pip install -r requirements.txt && playwright install chromium --with-deps
+playwright==1.60.0

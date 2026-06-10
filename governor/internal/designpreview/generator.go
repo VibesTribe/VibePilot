@@ -14,6 +14,16 @@ import (
 	"time"
 )
 
+// pythonBin returns the path to a Python interpreter with Playwright installed.
+// Tries the governor venv first, falls back to system python3.
+func pythonBin() string {
+	venvPython := filepath.Join(".", ".venv", "bin", "python3")
+	if _, err := os.Stat(venvPython); err == nil {
+		return venvPython
+	}
+	return "python3"
+}
+
 const designPromptTemplate = `You are a UI design generator. Generate a complete, standalone HTML mockup for the following task.
 
 TASK: %s
@@ -178,7 +188,7 @@ except Exception as e:
     sys.exit(1)
 `, viewportWidth, absPath, screenshotPath)
 
-	cmd := exec.CommandContext(ctx, "python3", "-u", "-c", script)
+	cmd := exec.CommandContext(ctx, pythonBin(), "-u", "-c", script)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("[DesignPreview] Screenshot capture failed: %s: %w", string(output), err)

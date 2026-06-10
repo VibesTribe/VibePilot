@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --quiet browser-use playwright
+          pip install --quiet browser-use==0.13.1 playwright==1.60.0
           playwright install chromium --with-deps
 
       - name: Checkout repo (for courier script)

@@ -11,6 +11,17 @@ import (
 	"time"
 )
 
+// pythonBin returns the path to a Python interpreter with Playwright installed.
+// Tries the governor venv first, falls back to system python3.
+func pythonBin() string {
+	// Try governor venv relative to the executable's working directory
+	venvPython := filepath.Join(".", ".venv", "bin", "python3")
+	if _, err := os.Stat(venvPython); err == nil {
+		return venvPython
+	}
+	return "python3"
+}
+
 // CaptureResult holds the result of a screenshot capture.
 type CaptureResult struct {
 	Path     string
@@ -481,7 +492,7 @@ except Exception as e:
 		}
 
 		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
-		cmd := exec.CommandContext(attemptCtx, "python3", "-u", "-c", script)
+		cmd := exec.CommandContext(attemptCtx, pythonBin(), "-u", "-c", script)
 		output, err := cmd.CombinedOutput()
 		cancel()
 
