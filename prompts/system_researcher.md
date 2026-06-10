@@ -59,19 +59,29 @@ The following categories are a waste of everyone's time. Do NOT submit findings 
 - Interesting open-source projects or tools worth adopting directly if they fit, or studying for approaches we could adapt. Don't default to building our own. If an existing tool works and runs on our hardware with compatible licensing, just use it. Only suggest building custom when no existing tool fits.
 
 ### Stack Updates to Monitor
-Check for new releases, breaking changes, and security patches for ALL of these:
-- **Go 1.24.3** (governor is Go) - check golang.org
-- **PostgreSQL 16.14** with **pgvector 0.6.0** and **pg_trgm 1.6** - check postgresql.org
-- **Node.js v24.14.1** (dashboard build) - check nodejs.org
-- **Next.js** (Vercel dashboard) - check nextjs.org blog
-- **Hermes Agent v0.16.0** - check GitHub releases
-- **Playwright 1.60.0** (courier browser automation) - check playwright.dev
-- **cloudflared 2026.3.0** (tunnel) - check GitHub releases
-- **pgx v5.9.2** (Go Postgres driver) - check GitHub releases
-- **mcp-go v0.47.1** (MCP server SDK) - check GitHub releases
-- **Vercel CLI 50.44.0** - check vercel.com
-- **Python 3.12.3** (scripts, skills) - check python.org
-- **Git 2.43.0** - check git-scm.com
+The auto-generated version manifest is at `~/knowledgebase/STACK_VERSIONS.md`.
+It is refreshed daily by `scripts/scan_versions.py`. READ IT FIRST for exact version numbers and update tiers.
+
+When scanning for updates, check these sources against the manifest:
+- **Go** (governor is Go) - check golang.org/dl
+- **PostgreSQL** + **pgvector** (all state, semantic search) - check postgresql.org, github.com/pgvector/pgvector
+- **Node.js** (dashboard build) - check nodejs.org
+- **React / Vite / TypeScript** (Vercel dashboard) - check npm outdated
+- **Hermes Agent** - check GitHub releases (nousresearch/hermes-agent)
+- **Playwright** (courier browser automation) - check playwright.dev
+- **cloudflared** (tunnel) -- PINNED at 2026.3.0, DO NOT suggest updates
+- **pgx** (Go Postgres driver) - check github.com/jackc/pgx
+- **mcp-go** (MCP server SDK) - check github.com/mark3labs/mcp-go
+- **Python** (scripts, skills) - check python.org
+- **Git** - check git-scm.com
+
+**Update Decision Tree:**
+- **PATCH** (e.g., 16.14 -> 16.15): Submit as auto-approve. Agent can apply, test, commit.
+- **MINOR** (e.g., pgx v5.9 -> v5.10): Submit with test plan. Agent applies, verifies build, commits.
+- **MAJOR** (e.g., PG 16 -> 17): Submit as research report requiring HUMAN APPROVAL. Must include: backup plan, rollback plan, downtime estimate, dependency chain analysis, testing strategy.
+- **SKIP** (pinned): Do NOT suggest updates. See pinned versions in STACK_VERSIONS.md.
+
+After ANY update is applied, the agent must run `python3 ~/knowledgebase/scripts/scan_versions.py` to refresh the manifest, then commit to GitHub.
 
 ### AUTO-APPROVE Criteria
 These can skip deep council review and go straight to human:

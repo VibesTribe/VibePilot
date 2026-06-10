@@ -3,13 +3,13 @@
 This file describes what VibePilot currently has and how it works.
 Researchers and council members MUST read this before evaluating any finding.
 
-Last verified: 2026-05-22
+Last verified: 2026-06-10
 
 ## Hardware (Non-Negotiable)
 
 - ThinkPad X220, i5-2520M (AVX only, no AVX2)
 - 16GB RAM shared across all services
-- Spinning HDD (I/O is the bottleneck)
+- 1TB SSD (I/O is fast)
 - CANNOT run: Ollama, Docker containers, local LLMs, anything needing AVX2
 - CAN run: Go binaries (~30MB), PostgreSQL, Node.js, Python services
 - NO GPU. Cannot run any model locally.
@@ -99,19 +99,26 @@ Last verified: 2026-05-22
 - Web destinations: $0 (browser automation via courier agents)
 - Total monthly cost target: $0
 
-## Full Technology Stack (Track Updates For These)
-- Go 1.24.3 (governor binary, all backend logic)
-- PostgreSQL 16.14 with pgvector 0.6.0, pg_trgm 1.6 (all state, semantic search)
-- Node.js v24.14.1, npm 11.14.1 (dashboard builds)
-- Next.js (Vercel dashboard, auto-deploys from GitHub)
-- Hermes Agent v0.16.0 (multi-platform agent gateway, chat/CLI)
-- Playwright 1.60.0 (courier browser automation, visual QA)
-- cloudflared 2026.3.0 (tunnel exposing api.vibestribe.rocks)
-- pgx v5.9.2 (Go PostgreSQL driver)
-- mcp-go v0.47.1 (MCP server SDK for KB access)
-- Vercel CLI 50.44.0 (dashboard hosting)
-- Python 3.12.3 (scripts, skills, tools)
-- Git 2.43.0 (version control, worktrees for courier)
+## Full Technology Stack
+
+The auto-generated version manifest lives at `~/knowledgebase/STACK_VERSIONS.md`.
+It is refreshed daily by `scripts/scan_versions.py` during the sync cycle.
+DO NOT hardcode version numbers here -- always reference the manifest.
+
+### Stack Components (high-level, for context only)
+- **Go** (governor binary, all backend logic)
+- **PostgreSQL** with **pgvector** (all state, semantic search)
+- **pgx** (Go PostgreSQL driver)
+- **mcp-go** (MCP server SDK)
+- **Node.js** + **npm** (dashboard builds)
+- **React** + **Vite** + **TypeScript** (Vercel dashboard, auto-deploys from GitHub)
+- **Hermes Agent** (multi-platform agent gateway, chat/CLI)
+- **Playwright** (courier browser automation, visual QA)
+- **cloudflared** (tunnel exposing api.vibestribe.rocks) -- PINNED at 2026.3.0
+- **Python** (scripts, skills, tools)
+- **Git** (version control, worktrees for courier)
+
+For exact version numbers and update tiers, read `STACK_VERSIONS.md`.
 
 ## Tool License Requirements
 - All tools must be free-tier or open-source with MIT/Apache 2.0 license
