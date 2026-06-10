@@ -471,6 +471,7 @@ func (p *PostgresDB) buildSelectQuery(table string, filters map[string]any) (str
 // Returns (clause, nextArgIdx, args).
 func buildFilterClause(col, val string, argIdx int) (string, int, []any) {
 	operators := map[string]string{
+		"eq.":   "=",
 		"is.":   "IS",
 		"not.":  "!=",
 		"lt.":   "<",
