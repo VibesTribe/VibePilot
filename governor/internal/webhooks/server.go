@@ -765,6 +765,11 @@ func (s *Server) checkAdminAuth(r *http.Request) bool {
 	if len(auth) > 7 && auth[:7] == "Bearer " {
 		return auth[7:] == s.adminToken
 	}
+	// Allow dashboard origin without token (same pattern as Hermes gateway auth bypass)
+	origin := r.Header.Get("Origin")
+	if origin == "https://vibeflow-dashboard.vercel.app" {
+		return true
+	}
 	return false
 }
 
