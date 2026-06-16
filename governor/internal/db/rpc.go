@@ -8,6 +8,8 @@ import (
 )
 
 var defaultRPCAllowlist = map[string]bool{
+	// Built-in PostgreSQL functions
+	"pg_notify": true,
 	// Task management
 	"get_available_tasks":              true,
 	"update_task_status":               true,

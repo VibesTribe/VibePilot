@@ -80,6 +80,11 @@ func (s *Server) handleTaskPause(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": fmt.Sprintf("update failed: %v", err)})
 		return
 	}
+	// pg_notify is safe to call directly - it's a built-in PostgreSQL function
+	s.db.RPC(ctx, "pg_notify", map[string]interface{}{
+		"channel": "vp_changes",
+		"payload": fmt.Sprintf(`{"table":"tasks","action":"UPDATE","id":"%s","status":"paused"}`, req.TaskID),
+	})
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":             true,
@@ -164,6 +169,11 @@ func (s *Server) handleTaskResume(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": fmt.Sprintf("update failed: %v", err)})
 		return
 	}
+	// Notify SSE listeners so dashboard refreshes immediately
+	s.db.RPC(ctx, "pg_notify", map[string]interface{}{
+		"channel": "vp_changes",
+		"payload": fmt.Sprintf(`{"table":"tasks","action":"UPDATE","id":"%s","status":"%s"}`, req.TaskID, restoredStatus),
+	})
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":      true,
@@ -222,6 +232,11 @@ func (s *Server) handleTaskKill(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": fmt.Sprintf("update failed: %v", err)})
 		return
 	}
+	// Notify SSE listeners so dashboard refreshes immediately
+	s.db.RPC(ctx, "pg_notify", map[string]interface{}{
+		"channel": "vp_changes",
+		"payload": fmt.Sprintf(`{"table":"tasks","action":"UPDATE","id":"%s","status":"cancelled"}`, req.TaskID),
+	})
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":      true,
