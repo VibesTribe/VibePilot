@@ -481,6 +481,21 @@ func buildFilterClause(col, val string, argIdx int) (string, int, []any) {
 		"like.": "LIKE",
 	}
 
+	// Handle "not.in.(...)" — PostgREST not.in operator
+	// Must be checked BEFORE "not." prefix in the operators map below.
+	if strings.HasPrefix(val, "not.in.") {
+		items := strings.TrimPrefix(val, "not.in.")
+		items = strings.Trim(items, "()")
+		parts := strings.Split(items, ",")
+		placeholders := make([]string, len(parts))
+		args := make([]any, len(parts))
+		for i, part := range parts {
+			placeholders[i] = "$" + strconv.Itoa(argIdx+i)
+			args[i] = strings.TrimSpace(part)
+		}
+		return fmt.Sprintf("%s NOT IN (%s)", col, strings.Join(placeholders, ",")), argIdx + len(parts), args
+	}
+
 	// Handle "in.(...)" — PostgREST in operator
 	if strings.HasPrefix(val, "in.") {
 		items := strings.TrimPrefix(val, "in.")
