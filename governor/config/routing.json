@@ -64,7 +64,7 @@
       "priority": [
         "gemini-2.5-flash-lite",
         "gemini-3-flash-preview",
-        "gemini-2.5-flash",
+        "gemini-flash-latest",
         "qwen/qwen3-next-80b-a3b-instruct:free",
         "qwen/qwen3-coder:free",
         "openrouter/free",
