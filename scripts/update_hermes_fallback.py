@@ -154,8 +154,9 @@ def model_sort_key(model):
 def get_hermes_model_id(db_id, provider):
     """Map DB model ID to Hermes config model string."""
     if provider == "gemini":
-        # Hermes expects models/gemini-2.5-flash-lite (with models/ prefix)
-        return f"models/{db_id}"
+        # Gemini native API rejects models/ prefix (HTTP 404)
+        # Cron jobs use bare names (gemini-2.5-flash) and work fine
+        return db_id
     else:
         # OpenRouter, Groq, NVIDIA use raw routing IDs
         return db_id
