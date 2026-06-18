@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-18T15:21:00.770180+00:00",
+  "timestamp": "2026-06-18T22:57:06.630608+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -22,6 +22,11 @@
       "provider": "gemini"
     },
     "gemini-3-flash-preview": {
+      "alive": null,
+      "status": "skip",
+      "provider": "gemini"
+    },
+    "gemini-flash-latest": {
       "alive": null,
       "status": "skip",
       "provider": "gemini"
@@ -96,7 +101,7 @@
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
-        "meta-llama/llama-prompt-guard-2-86m"
+        "meta-llama/llama-4-scout-17b-16e-instruct"
       ]
     }
   ],
