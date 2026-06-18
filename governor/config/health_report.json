@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-18T14:42:30.577573+00:00",
+  "timestamp": "2026-06-18T15:21:00.770180+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -57,8 +57,8 @@
       "provider": "groq"
     },
     "google/gemma-4-26b-a4b-it:free": {
-      "alive": false,
-      "status": "HTTP 402: {\"error\":{\"message\":\"Provider returned error\",\"code\":402,\"metadata\":{\"raw\":\"{\\\"error\\\":{\\\"code\\\":\\\"insufficient_quota\\\",\\\"message\\\":\\\"your balance is too low for this request \u2014 add funds at /billing o",
+      "alive": true,
+      "status": "ok",
       "provider": "openrouter"
     },
     "deepseek-ai/deepseek-v4-flash": {
@@ -96,7 +96,7 @@
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
-        "meta-llama/llama-prompt-guard-2-22m"
+        "meta-llama/llama-prompt-guard-2-86m"
       ]
     }
   ],
