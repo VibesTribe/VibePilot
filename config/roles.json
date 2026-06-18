@@ -190,7 +190,7 @@
         "code"
       ],
       "default_destination": "opencode",
-      "default_model": "deepseek-v4-flash",
+      "default_model": "gemini-2.5-flash-lite",
       "tools": [
         "cli",
         "file_read",
@@ -231,7 +231,7 @@
         "code"
       ],
       "default_destination": "opencode",
-      "default_model": "deepseek-v4-flash",
+      "default_model": "gemini-2.5-flash-lite",
       "tools": [
         "cli",
         "file_read"
@@ -278,7 +278,7 @@
         "code"
       ],
       "default_destination": "opencode",
-      "default_model": "deepseek-v4-flash",
+      "default_model": "gemini-2.5-flash-lite",
       "tools": [
         "cli",
         "file_read",
