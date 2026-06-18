@@ -1303,6 +1303,21 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 
 func (h *TaskHandler) failTask(ctx context.Context, taskID, modelID, branchName, reason string) {
 	h.recordFailure(ctx, modelID, taskID, reason)
+
+	// Record the failed run in task_runs so Bayesian scoring (get_model_score_for_task)
+	// can learn from failures. Without this, only successes are recorded and the
+	// scoring system is permanently biased.
+	if modelID != "" && modelID != "no_routing_available" {
+		if _, err := h.database.RPC(ctx, "record_internal_run", map[string]any{
+			"p_task_id":   taskID,
+			"p_model_id":  modelID,
+			"p_status":    "failed",
+			"p_role":      "executor",
+		}); err != nil {
+			log.Printf("[TaskHandler] WARNING: record_internal_run (failed) for task %s model %s: %v", truncateID(taskID), modelID, err)
+		}
+	}
+
 	// Clean up worktree if active
 	if h.worktreeMgr != nil {
 		h.worktreeMgr.RemoveWorktree(ctx, taskID)
