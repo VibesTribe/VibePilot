@@ -427,3 +427,70 @@ func (s *Server) pauseAllActive(ctx context.Context) (paused int, errors int) {
 	}
 	return
 }
+
+// handleTasksResumeAll resumes all paused tasks.
+// POST /api/tasks/resume-all
+func (s *Server) handleTasksResumeAll(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if !s.checkAdminAuth(r) {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	if s.db == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"error": "DB not available"})
+		return
+	}
+
+	ctx := r.Context()
+
+	// Find all paused tasks and their saved previous status (routing_flag)
+	raw, err := s.db.Query(ctx, "tasks", map[string]any{
+		"select": "id, routing_flag",
+		"status": "eq.paused",
+		"limit":  1000,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": fmt.Sprintf("query failed: %v", err)})
+		return
+	}
+
+	var tasks []struct {
+		ID          string `json:"id"`
+		RoutingFlag string `json:"routing_flag"`
+	}
+	json.Unmarshal(raw, &tasks)
+
+	resumed := 0
+	for _, t := range tasks {
+		restoredStatus := t.RoutingFlag
+		if restoredStatus == "" {
+			restoredStatus = "pending"
+		}
+		_, err := s.db.Update(ctx, "tasks", t.ID, map[string]any{
+			"status":       restoredStatus,
+			"routing_flag": "",
+			"updated_at":   time.Now().UTC(),
+		})
+		if err == nil {
+			resumed++
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":      true,
+		"resumed": resumed,
+		"message": fmt.Sprintf("Resumed %d paused tasks", resumed),
+	})
+}

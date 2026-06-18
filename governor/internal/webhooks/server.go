@@ -219,6 +219,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/task/resume", s.handleTaskResume)
 	mux.HandleFunc("/api/task/kill", s.handleTaskKill)
 	mux.HandleFunc("/api/tasks/pause-all", s.handleTasksPauseAll)
+	mux.HandleFunc("/api/tasks/resume-all", s.handleTasksResumeAll)
 	mux.HandleFunc("/api/tasks/clear-all", s.handleTasksClearAll)
 	mux.HandleFunc("/api/tasks/active", s.handleTasksActive)
 
@@ -698,6 +699,7 @@ func (s *Server) handleCourierResult(w http.ResponseWriter, r *http.Request) {
 		Error     string `json:"error"`
 		TokensIn  int    `json:"tokens_in"`
 		TokensOut int    `json:"tokens_out"`
+		ModelID   string `json:"model_id"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)

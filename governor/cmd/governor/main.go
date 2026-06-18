@@ -371,6 +371,7 @@ func main() {
 				Error     string `json:"error"`
 				TokensIn  int    `json:"tokens_in"`
 				TokensOut int    `json:"tokens_out"`
+				ModelID   string `json:"model_id"`
 			}
 			if err := json.Unmarshal(rawJSON, &record); err != nil {
 				return fmt.Errorf("parse courier result: %w", err)
@@ -397,6 +398,7 @@ func main() {
 				"p_error":      record.Error,
 				"p_tokens_in":  record.TokensIn,
 				"p_tokens_out": record.TokensOut,
+				"p_model_id":   record.ModelID,
 			}
 			if _, err := database.RPC(ctx, "record_courier_result", params); err != nil {
 				log.Printf("[CourierResult] DB write failed: %v", err)
