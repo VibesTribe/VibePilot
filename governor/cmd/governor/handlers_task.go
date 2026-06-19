@@ -19,19 +19,20 @@ import (
 )
 
 type TaskHandler struct {
-	database       db.Database
-	factory        *runtime.SessionFactory
-	pool           *runtime.AgentPool
-	connRouter     *runtime.Router
-	git            *gitree.Gitree
-	checkpointMgr  *core.CheckpointManager
-	leakDetector   *security.LeakDetector
-	cfg            *runtime.Config
-	usageTracker   *runtime.UsageTracker
-	worktreeMgr    *gitree.WorktreeManager
-	courierRunner  *connectors.CourierRunner
-	vault          vaultProvider
-	contextBuilder *runtime.ContextBuilder
+	database        db.Database
+	factory         *runtime.SessionFactory
+	pool            *runtime.AgentPool
+	connRouter      *runtime.Router
+	git             *gitree.Gitree
+	checkpointMgr   *core.CheckpointManager
+	leakDetector    *security.LeakDetector
+	cfg             *runtime.Config
+	usageTracker    *runtime.UsageTracker
+	worktreeMgr     *gitree.WorktreeManager
+	courierRunner   *connectors.CourierRunner
+	vault           vaultProvider
+	contextBuilder  *runtime.ContextBuilder
+	projectResolver *runtime.ProjectResolver
 }
 
 // vaultProvider abstracts secret access for the task handler.
@@ -74,6 +75,39 @@ func (h *TaskHandler) SetContextBuilder(cb *runtime.ContextBuilder) {
 	h.contextBuilder = cb
 }
 
+// SetProjectResolver injects the project resolver for multi-project context loading.
+// If not set, the handler operates in legacy single-project mode (no project awareness).
+func (h *TaskHandler) SetProjectResolver(r *runtime.ProjectResolver) {
+	h.projectResolver = r
+}
+
+// resolveProjectContext loads the project configuration for a task and logs it.
+// Returns the *ProjectConfig for future use (Phase 3+). In Phase 2, the return
+// value is not yet consumed by dispatch logic — this is purely observability.
+//
+// Safety: if project_id is missing, empty, or the resolver is not configured,
+// this is a no-op. Existing dispatch behavior is completely unaffected.
+func (h *TaskHandler) resolveProjectContext(ctx context.Context, task map[string]any, taskNumber string) *runtime.ProjectConfig {
+	if h.projectResolver == nil {
+		return nil
+	}
+	projectIDStr, ok := task["project_id"].(string)
+	if !ok || projectIDStr == "" {
+		return nil
+	}
+	project, err := h.projectResolver.GetProjectByID(ctx, projectIDStr)
+	if err != nil {
+		log.Printf("[TaskAvailable] WARNING: task %s has project_id %s but resolution failed: %v", taskNumber, projectIDStr, err)
+		return nil
+	}
+	if project != nil {
+		log.Printf("[TaskAvailable] Task %s -> project: %s (%s), repo: %s/%s",
+			taskNumber, project.DisplayName, project.Slug,
+			project.GitHubOwner, project.GitHubRepo)
+	}
+	return project
+}
+
 func (h *TaskHandler) Register(router *runtime.EventRouter) {
 	router.On(runtime.EventTaskAvailable, h.handleTaskAvailable)
 	router.On(runtime.EventTaskReview, h.handleTaskReview)
@@ -100,6 +134,13 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	if taskID == "" {
 		return
 	}
+
+	// PROJECT CONTEXT: Resolve which project this task belongs to.
+	// project_id was added to the tasks table by migration 047 and is included
+	// in SELECT * queries. This is informational in Phase 2 — Phase 3 will use
+	// the project config to override repo paths, git config, and model keys.
+	// Non-fatal: if resolution fails, task proceeds with default (legacy) behavior.
+	h.resolveProjectContext(ctx, task, taskNumber)
 
 	// ATTEMPT GUARD: Stop dispatching if this task has exceeded its max attempts.
 	// Prevents infinite dispatch loops where a failing task is retried forever.
@@ -1884,6 +1925,7 @@ func setupTaskHandlers(
 ) {
 	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg, usageTracker, worktreeMgr, courierRunner, v)
 	handler.SetContextBuilder(contextBuilder)
+	handler.SetProjectResolver(runtime.NewProjectResolver(database))
 	handler.Register(router)
 }
 
