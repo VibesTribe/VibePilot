@@ -148,6 +148,15 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	// and worktree manager. For vibepilot tasks, everything is identical to before.
 	projectCfg := h.resolveProjectContext(ctx, task, taskNumber)
 
+	// Extract model key restriction for this project.
+	// Skip for vibepilot: its model_keys use a different namespace than connector
+	// api_key_refs (GEMINI_API_KEY_1 vs GEMINI_COURIER_KEY), so filtering would
+	// block legitimate connectors. Vibepilot always gets unrestricted access.
+	projectModelKeys := []string{}
+	if projectCfg != nil && len(projectCfg.ModelKeys) > 0 && projectCfg.Slug != "vibepilot" {
+		projectModelKeys = projectCfg.ModelKeys
+	}
+
 	// Select git/worktree objects for this task's project.
 	// Default to the vibepilot repo (h.git, h.worktreeMgr). Only override
 	// for non-vibepilot projects when a repo manager is available.
@@ -323,11 +332,12 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 			log.Printf("[TaskAvailable] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
 		}
 		routingResult, routeErr = h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
-			Role:            "task_runner",
-			TaskType:        taskCategory,
-			RoutingFlag:     taskRoutingFlag,
-			ExcludeModels:   failedModels,
-			EstimatedTokens: runtime.EstimateTokens(taskPacket.Prompt, "task_runner"),
+			Role:             "task_runner",
+			TaskType:         taskCategory,
+			RoutingFlag:      taskRoutingFlag,
+			ExcludeModels:    failedModels,
+			EstimatedTokens:  runtime.EstimateTokens(taskPacket.Prompt, "task_runner"),
+			ProjectModelKeys: projectModelKeys,
 		})
 		if routeErr != nil || routingResult == nil {
 			log.Printf("[TaskAvailable] No routing for task %s (attempt %d)", truncateID(taskID), attempt+1)
@@ -959,6 +969,14 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		return
 	}
 
+	// Resolve project context for model key restriction
+	// Skip for vibepilot (different key namespace — see handleTaskAvailable comment)
+	projectCfg := h.resolveProjectContext(ctx, task, taskNumber)
+	projectModelKeys := []string{}
+	if projectCfg != nil && len(projectCfg.ModelKeys) > 0 && projectCfg.Slug != "vibepilot" {
+		projectModelKeys = projectCfg.ModelKeys
+	}
+
 	branchName := h.buildBranchName(sliceID, taskNumber, taskID)
 
 	// Claim for review
@@ -1040,11 +1058,12 @@ func (h *TaskHandler) handleTaskReview(event runtime.Event) {
 		}
 		var routeErr error
 		routingResult, routeErr = h.connRouter.SelectRouting(ctx, runtime.RoutingRequest{
-			Role:            "supervisor",
-			TaskType:        taskType,
-			RoutingFlag:     "internal",
-			ExcludeModels:   failedModels,
-			EstimatedTokens: runtime.EstimateTokens(getString(task, "instructions"), "supervisor"),
+			Role:             "supervisor",
+			TaskType:         taskType,
+			RoutingFlag:      "internal",
+			ExcludeModels:    failedModels,
+			EstimatedTokens:  runtime.EstimateTokens(getString(task, "instructions"), "supervisor"),
+			ProjectModelKeys: projectModelKeys,
 		})
 		if routeErr != nil || routingResult == nil {
 			log.Printf("[TaskReview] No supervisor for task %s (attempt %d)", truncateID(taskID), attempt+1)

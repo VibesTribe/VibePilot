@@ -92,6 +92,7 @@ type RoutingRequest struct {
 	Dependencies     []string
 	ExcludeModels   []string // skip these models when cascading
 	EstimatedTokens  int     // tokens estimated from actual content (prompt + expected response)
+	ProjectModelKeys []string // restrict to connectors whose api_key_ref is in this list (empty = all allowed)
 }
 
 type RoutingResult struct {
@@ -144,6 +145,15 @@ func (r *Router) tryWebRouting(ctx context.Context, req RoutingRequest) *Routing
 	if courierConn == "" {
 		log.Printf("[Router] No connector for courier model %s", courierModel)
 		return nil
+	}
+
+	// Check project key restriction for courier connector
+	if len(req.ProjectModelKeys) > 0 {
+		conn := r.cfg.GetConnector(courierConn)
+		if conn != nil && !r.connectorKeyAllowed(conn.APIKeyRef, req.ProjectModelKeys) {
+			log.Printf("[Router] Courier connector %s blocked by project model_keys restriction", courierConn)
+			return nil
+		}
 	}
 
 	dest := r.selectDestination(ctx, req.TaskType, req.TaskCategory)
@@ -201,6 +211,22 @@ func (r *Router) selectInternal(ctx context.Context, req RoutingRequest) (*Routi
 	if len(connectors) == 0 {
 		log.Printf("[Router] No internal connectors available")
 		return nil, nil
+	}
+
+	// Filter connectors by project-allowed API keys when restricted
+	if len(req.ProjectModelKeys) > 0 {
+		filtered := make([]ConnectorConfig, 0, len(connectors))
+		for _, conn := range connectors {
+			if r.connectorKeyAllowed(conn.APIKeyRef, req.ProjectModelKeys) {
+				filtered = append(filtered, conn)
+			}
+		}
+		if len(filtered) == 0 {
+			log.Printf("[Router] All internal connectors filtered out by project model_keys restriction (%d allowed keys)", len(req.ProjectModelKeys))
+			return nil, nil
+		}
+		log.Printf("[Router] Project key filter: %d/%d connectors allowed", len(filtered), len(connectors))
+		connectors = filtered
 	}
 
 	// Prefer API connectors over CLI for toolless agents (planner, supervisor, tester, council)
@@ -675,6 +701,24 @@ func (r *Router) canConnectorAccessModel(connectorID string, modelID string) boo
 				}
 			}
 			return false
+		}
+	}
+	return false
+}
+
+// connectorKeyAllowed checks whether a connector's API key ref is in the
+// project's allowed list. Empty keyRef or empty allowedKeys means "allow all"
+// (backward-compatible: vibepilot project has all keys).
+func (r *Router) connectorKeyAllowed(keyRef string, allowedKeys []string) bool {
+	if keyRef == "" {
+		return true // CLI connectors without API keys are always allowed
+	}
+	if len(allowedKeys) == 0 {
+		return true // No restriction = all allowed
+	}
+	for _, allowed := range allowedKeys {
+		if keyRef == allowed {
+			return true
 		}
 	}
 	return false
