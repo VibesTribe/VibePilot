@@ -166,6 +166,19 @@ func main() {
 	worktreeMgr = gitree.NewWorktreeManager(git, worktreeBasePath)
 	log.Printf("[Worktrees] Enabled, base path: %s", worktreeBasePath)
 
+	// Create the multi-project repo manager with the vibepilot repo as default.
+	// Other project repos are created lazily when tasks arrive for them.
+	repoManager := gitree.NewRepoManager(managedRepo, gitree.RepoManagerOptions{
+		DataDir:      cfg.GetDataDir(),
+		Timeout:      time.Duration(cfg.GetGitTimeoutSeconds()) * time.Second,
+		GitUserEmail: cfg.GetGitUserEmail(),
+		GitUserName:  cfg.GetGitUserName(),
+		GetGitHubToken: func(ctx context.Context) (string, error) {
+			return v.GetSecret(ctx, "GITHUB_TOKEN")
+		},
+	})
+	log.Printf("[RepoManager] Initialized with default repo: %s/%s", repoOwner, repoName)
+
 	var courierRunner *connectors.CourierRunner // initialized after ctx is created
 
 	leakDetector := security.NewLeakDetector()
@@ -496,7 +509,7 @@ func main() {
 
 	go runProcessingRecovery(ctx, database, cfg)
 
-	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, configDir, contextBuilder)
+	setupEventHandlers(ctx, eventRouter, sessionFactory, pool, database, cfg, toolRegistry, connRouter, git, stateMachine, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, configDir, contextBuilder, repoManager)
 
 	// Start model scanner if configured
 	if cfg.System.ModelScanner != nil && cfg.System.ModelScanner.Enabled {
@@ -755,8 +768,8 @@ func registerConnectors(factory *runtime.SessionFactory, cfg *runtime.Config, v 
 	}
 }
 
-func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database db.Database, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector, usageTracker *runtime.UsageTracker, worktreeMgr *gitree.WorktreeManager, courierRunner *connectors.CourierRunner, v *vault.Vault, configDir string, contextBuilder *runtime.ContextBuilder) {
-	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, contextBuilder)
+func setupEventHandlers(ctx context.Context, router *runtime.EventRouter, factory *runtime.SessionFactory, pool *runtime.AgentPool, database db.Database, cfg *runtime.Config, toolRegistry *runtime.ToolRegistry, connRouter *runtime.Router, git *gitree.Gitree, stateMachine *core.StateMachine, checkpointMgr *core.CheckpointManager, leakDetector *security.LeakDetector, usageTracker *runtime.UsageTracker, worktreeMgr *gitree.WorktreeManager, courierRunner *connectors.CourierRunner, v *vault.Vault, configDir string, contextBuilder *runtime.ContextBuilder, repoManager *gitree.RepoManager) {
+	setupTaskHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, checkpointMgr, leakDetector, usageTracker, worktreeMgr, courierRunner, v, contextBuilder, repoManager)
 	setupPlanHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)
 	setupCouncilHandlers(ctx, router, factory, pool, database, cfg, connRouter, git, usageTracker)
 	setupMaintenanceHandler(ctx, router, factory, pool, database, cfg, connRouter, git, worktreeMgr, usageTracker)

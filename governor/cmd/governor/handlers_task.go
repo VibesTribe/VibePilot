@@ -33,6 +33,7 @@ type TaskHandler struct {
 	vault           vaultProvider
 	contextBuilder  *runtime.ContextBuilder
 	projectResolver *runtime.ProjectResolver
+	repoManager     *gitree.RepoManager
 }
 
 // vaultProvider abstracts secret access for the task handler.
@@ -79,6 +80,12 @@ func (h *TaskHandler) SetContextBuilder(cb *runtime.ContextBuilder) {
 // If not set, the handler operates in legacy single-project mode (no project awareness).
 func (h *TaskHandler) SetProjectResolver(r *runtime.ProjectResolver) {
 	h.projectResolver = r
+}
+
+// SetRepoManager injects the repo manager for multi-project git operations.
+// If not set, all tasks use the default (vibepilot) repo.
+func (h *TaskHandler) SetRepoManager(rm *gitree.RepoManager) {
+	h.repoManager = rm
 }
 
 // resolveProjectContext loads the project configuration for a task and logs it.
@@ -136,11 +143,32 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	}
 
 	// PROJECT CONTEXT: Resolve which project this task belongs to.
-	// project_id was added to the tasks table by migration 047 and is included
-	// in SELECT * queries. This is informational in Phase 2 — Phase 3 will use
-	// the project config to override repo paths, git config, and model keys.
-	// Non-fatal: if resolution fails, task proceeds with default (legacy) behavior.
-	h.resolveProjectContext(ctx, task, taskNumber)
+	// project_id was added to the tasks table by migration 047. If the task
+	// belongs to a non-vibepilot project, we switch to that project's git repo
+	// and worktree manager. For vibepilot tasks, everything is identical to before.
+	projectCfg := h.resolveProjectContext(ctx, task, taskNumber)
+
+	// Select git/worktree objects for this task's project.
+	// Default to the vibepilot repo (h.git, h.worktreeMgr). Only override
+	// for non-vibepilot projects when a repo manager is available.
+	taskGit := h.git
+	taskWorktreeMgr := h.worktreeMgr
+	if projectCfg != nil && projectCfg.Slug != "vibepilot" && h.repoManager != nil {
+		repo, err := h.repoManager.GetOrCreate(ctx, gitree.ProjectInfo{
+			Slug:              projectCfg.Slug,
+			GitHubOwner:       projectCfg.GitHubOwner,
+			GitHubRepo:        projectCfg.GitHubRepo,
+			DefaultBranch:     projectCfg.DefaultBranch,
+			ProtectedBranches: projectCfg.ProtectedBranches,
+		})
+		if err != nil {
+			log.Printf("[TaskAvailable] WARNING: failed to create repo for project %s: %v — falling back to default repo", projectCfg.Slug, err)
+		} else {
+			taskGit = repo.Gitree()
+			taskWorktreeMgr = gitree.NewWorktreeManager(repo.Gitree(), repo.WorktreeBasePath())
+			log.Printf("[TaskAvailable] Using project repo for %s: %s", projectCfg.Slug, repo.LocalPath())
+		}
+	}
 
 	// ATTEMPT GUARD: Stop dispatching if this task has exceeded its max attempts.
 	// Prevents infinite dispatch loops where a failing task is retried forever.
@@ -359,9 +387,9 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 
 	var worktreePath string
 
-	if h.worktreeMgr != nil {
+	if taskWorktreeMgr != nil {
 		// Worktree mode: isolated checkout per task
-		existingPath := h.worktreeMgr.GetWorktreePath(taskID)
+		existingPath := taskWorktreeMgr.GetWorktreePath(taskID)
 		if attempts > 0 && existingPath != "" {
 			// Check if worktree directory still exists (preserved after test failure)
 			if _, err := os.Stat(existingPath); err == nil {
@@ -370,10 +398,10 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 				log.Printf("[TaskAvailable] Task %s retry: reusing existing worktree at %s", truncateID(taskID), worktreePath)
 			} else {
 				// Worktree gone — create fresh
-				wtInfo, err := h.worktreeMgr.CreateWorktree(ctx, taskID, branchName)
+				wtInfo, err := taskWorktreeMgr.CreateWorktree(ctx, taskID, branchName)
 				if err != nil {
 					log.Printf("[TaskAvailable] Worktree create failed for %s: %v, falling back to branch-only", truncateID(taskID), err)
-					h.git.CreateBranch(ctx, branchName)
+					taskGit.CreateBranch(ctx, branchName)
 				} else {
 					worktreePath = wtInfo.Path
 					log.Printf("[TaskAvailable] Worktree created for %s at %s", truncateID(taskID), worktreePath)
@@ -381,10 +409,10 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 			}
 		} else {
 			// First attempt: create fresh worktree
-			wtInfo, err := h.worktreeMgr.CreateWorktree(ctx, taskID, branchName)
+			wtInfo, err := taskWorktreeMgr.CreateWorktree(ctx, taskID, branchName)
 			if err != nil {
 				log.Printf("[TaskAvailable] Worktree create failed for %s: %v, falling back to branch-only", truncateID(taskID), err)
-				h.git.CreateBranch(ctx, branchName)
+				taskGit.CreateBranch(ctx, branchName)
 			} else {
 				worktreePath = wtInfo.Path
 				log.Printf("[TaskAvailable] Worktree created for %s at %s", truncateID(taskID), worktreePath)
@@ -393,9 +421,9 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	} else {
 		// Legacy mode: single directory, branch checkout
 		if attempts > 0 {
-			h.git.DeleteBranch(ctx, branchName)
+			taskGit.DeleteBranch(ctx, branchName)
 		}
-		h.git.CreateBranch(ctx, branchName)
+		taskGit.CreateBranch(ctx, branchName)
 	}
 
 	h.database.RPC(ctx, "update_task_branch", map[string]any{
@@ -426,7 +454,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		log.Printf("[TaskAvailable] Courier dispatch for %s → %s (%s)", truncateID(taskID), platformID, platformURL)
 
 		err = h.pool.SubmitWithDestination(ctx, sliceID, connectorID, func() error {
-			return h.executeCourierTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, platformID, platformURL, worktreePath, runStart)
+			return h.executeCourierTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, platformID, platformURL, worktreePath, runStart, taskGit)
 		})
 		if err != nil {
 			log.Printf("[TaskAvailable] Courier pool error for %s: %v", truncateID(taskID), err)
@@ -437,7 +465,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 
 	// Internal execution: standard agent dispatch via pool
 	err = h.pool.SubmitWithDestination(ctx, sliceID, connectorID, func() error {
-		return h.executeTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, worktreePath, runStart)
+		return h.executeTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, worktreePath, runStart, taskGit)
 	})
 	if err != nil {
 		log.Printf("[TaskAvailable] Pool error for %s: %v", truncateID(taskID), err)
@@ -451,6 +479,7 @@ func (h *TaskHandler) executeTask(
 	taskPacket *db.TaskPacket,
 	taskID, taskNumber, modelID, connectorID, branchName, taskCategory, worktreePath string,
 	runStart time.Time,
+	taskGit *gitree.Gitree,
 ) error {
 
 	var contextData map[string]any
@@ -568,7 +597,7 @@ func (h *TaskHandler) executeTask(
 
 	// Build execution result for supervisor review
 	// Commit output to branch and get ACTUAL files from disk
-	actualFiles, commitErr := h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds(), worktreePath)
+	actualFiles, commitErr := h.commitOutput(ctx, branchName, files, cleanOutput, summary, modelID, taskID, duration.Seconds(), worktreePath, taskGit)
 	if commitErr != nil {
 		log.Printf("[TaskAvailable] WARNING: commitOutput failed for %s: %v — proceeding with parsed files", truncateID(taskID), commitErr)
 	}
@@ -664,6 +693,7 @@ func (h *TaskHandler) executeCourierTask(
 	taskPacket *db.TaskPacket,
 	taskID, taskNumber, modelID, connectorID, branchName, taskCategory, platformID, platformURL, worktreePath string,
 	runStart time.Time,
+	taskGit *gitree.Gitree,
 ) error {
 	// Resolve the LLM API key for browser-use from the vault
 	// The courier uses the same connector's key to drive browser automation
@@ -753,7 +783,7 @@ func (h *TaskHandler) executeCourierTask(
 	}
 
 	// Commit output to branch and get ACTUAL files from disk
-	actualFiles, commitErr := h.commitOutput(ctx, branchName, files, output, summary, modelID, taskID, duration.Seconds(), worktreePath)
+	actualFiles, commitErr := h.commitOutput(ctx, branchName, files, output, summary, modelID, taskID, duration.Seconds(), worktreePath, taskGit)
 	if commitErr != nil {
 		log.Printf("[CourierTask] WARNING: commitOutput failed for %s: %v — proceeding with parsed files", truncateID(taskID), commitErr)
 	}
@@ -1672,7 +1702,7 @@ func (h *TaskHandler) deriveRoutingFlag(conn *runtime.ConnectorConfig) string {
 //
 // The returned []gitree.DiskFile contains real file contents from the filesystem,
 // not parsed-from-stdout approximations. Supervisor and testers use these.
-func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files []runtime.File, rawOutput, summary, modelID, taskID string, duration float64, worktreePath string) ([]gitree.DiskFile, error) {
+func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files []runtime.File, rawOutput, summary, modelID, taskID string, duration float64, worktreePath string, taskGit *gitree.Gitree) ([]gitree.DiskFile, error) {
 	outputMap := map[string]any{
 		"raw_output": rawOutput,
 		"model_id":   modelID,
@@ -1701,9 +1731,9 @@ func (h *TaskHandler) commitOutput(ctx context.Context, branchName string, files
 	// Commit to branch (worktree-aware or legacy checkout)
 	var commitErr error
 	if worktreePath != "" {
-		commitErr = h.git.CommitOutputToWorktree(ctx, worktreePath, branchName, outputMap)
+		commitErr = taskGit.CommitOutputToWorktree(ctx, worktreePath, branchName, outputMap)
 	} else {
-		commitErr = h.git.CommitOutput(ctx, branchName, outputMap)
+		commitErr = taskGit.CommitOutput(ctx, branchName, outputMap)
 	}
 	if commitErr != nil {
 		log.Printf("[commitOutput] Git commit error for %s: %v", truncateID(taskID), commitErr)
@@ -1922,10 +1952,12 @@ func setupTaskHandlers(
 	courierRunner *connectors.CourierRunner,
 	v vaultProvider,
 	contextBuilder *runtime.ContextBuilder,
+	repoManager *gitree.RepoManager,
 ) {
 	handler := NewTaskHandler(database, factory, pool, connRouter, git, checkpointMgr, leakDetector, cfg, usageTracker, worktreeMgr, courierRunner, v)
 	handler.SetContextBuilder(contextBuilder)
 	handler.SetProjectResolver(runtime.NewProjectResolver(database))
+	handler.SetRepoManager(repoManager)
 	handler.Register(router)
 }
 
