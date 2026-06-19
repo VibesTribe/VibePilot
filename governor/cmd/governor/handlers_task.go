@@ -316,6 +316,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	var modelID, connectorID, routingFlag string
 	var connConfig *runtime.ConnectorConfig
 	maxRetries := h.cfg.GetMaxRetries()
+	capacityFailures := 0 // Track capacity failures separately from model failures
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		var routeErr error
 		if attempt > 0 {
@@ -348,6 +349,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		// Check pool capacity
 		if !h.pool.HasCapacity(sliceID, connectorID) {
 			log.Printf("[TaskAvailable] Task %s pending - no capacity (slice=%s, dest=%s)", truncateID(taskID), sliceID, connectorID)
+			capacityFailures++
 			failedModels = append(failedModels, modelID)
 			continue
 		}
@@ -373,7 +375,26 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	}
 
 	if routingResult == nil {
-		log.Printf("[TaskAvailable] No routing available for task %s after %d attempts — triggering analyst", truncateID(taskID), maxRetries)
+		// Distinguish between "no models available" (all in cooldown) vs
+		// "pool full" (capacity exhaustion). The former should trigger analyst
+		// diagnosis. The latter should queue for retry, not fail the task.
+		if capacityFailures > 0 && len(failedModels) > 0 {
+			log.Printf("[TaskAvailable] Task %s -> pending_resources: pool capacity exhausted after %d capacity failures (%d models tried)",
+				taskNumber, capacityFailures, len(failedModels))
+			h.database.RPC(ctx, "transition_task", map[string]any{
+				"p_task_id":    taskID,
+				"p_new_status": "pending_resources",
+			})
+			recordPipelineEvent(ctx, h.database, "task_pending_resources", taskID, "", "",
+				map[string]any{
+					"capacity_failures":  capacityFailures,
+					"models_tried":       len(failedModels),
+					"failed_models":      failedModels,
+					"reason":             "pool_capacity_exhausted",
+				})
+			return
+		}
+		log.Printf("[TaskAvailable] No routing available for task %s after %d attempts — triggering analyst", taskNumber, maxRetries)
 		h.failTask(ctx, taskID, "no_routing_available", "", fmt.Sprintf("exhausted %d routing attempts, failed models: %v", maxRetries, failedModels))
 		return
 	}
@@ -453,7 +474,11 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		platformID := routingResult.PlatformID
 		log.Printf("[TaskAvailable] Courier dispatch for %s → %s (%s)", truncateID(taskID), platformID, platformURL)
 
-		err = h.pool.SubmitWithDestination(ctx, sliceID, connectorID, func() error {
+		projectSlug := ""
+		if projectCfg != nil {
+			projectSlug = projectCfg.Slug
+		}
+		err = h.pool.SubmitForProject(ctx, sliceID, connectorID, projectSlug, func() error {
 			return h.executeCourierTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, platformID, platformURL, worktreePath, runStart, taskGit)
 		})
 		if err != nil {
@@ -464,7 +489,11 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 	}
 
 	// Internal execution: standard agent dispatch via pool
-	err = h.pool.SubmitWithDestination(ctx, sliceID, connectorID, func() error {
+	projectSlug := ""
+	if projectCfg != nil {
+		projectSlug = projectCfg.Slug
+	}
+	err = h.pool.SubmitForProject(ctx, sliceID, connectorID, projectSlug, func() error {
 		return h.executeTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, worktreePath, runStart, taskGit)
 	})
 	if err != nil {

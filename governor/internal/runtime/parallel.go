@@ -15,6 +15,7 @@ type AgentPool struct {
 	active       atomic.Int32
 	perModule    map[string]*int32
 	perDest      map[string]*int32
+	perProject   map[string]*int32
 	mu           sync.Mutex
 	wg           sync.WaitGroup
 	errorCh      chan error
@@ -30,6 +31,7 @@ func NewAgentPool(maxPerModule, maxTotal int) *AgentPool {
 		concurrency:  &ConcurrencyConfig{DefaultLimit: maxPerModule},
 		perModule:    make(map[string]*int32),
 		perDest:      make(map[string]*int32),
+		perProject:   make(map[string]*int32),
 		errorCh:      make(chan error, maxTotal),
 	}
 }
@@ -47,12 +49,67 @@ func NewAgentPoolWithConcurrency(maxPerModule, maxTotal int, concurrency *Concur
 		concurrency:  concurrency,
 		perModule:    make(map[string]*int32),
 		perDest:      make(map[string]*int32),
+		perProject:   make(map[string]*int32),
 		errorCh:      make(chan error, maxTotal),
 	}
 }
 
 func (p *AgentPool) Submit(ctx context.Context, moduleID string, fn func() error) error {
 	return p.SubmitWithDestination(ctx, moduleID, "", fn)
+}
+
+// SubmitForProject submits a task with project tracking. The projectSlug is
+// used for per-project stats only (no per-project limit enforced yet).
+// When projectSlug is empty, defaults to "vibepilot" for tracking purposes.
+func (p *AgentPool) SubmitForProject(ctx context.Context, moduleID, destination, projectSlug string, fn func() error) error {
+	if !p.acquire(moduleID, destination) {
+		return fmt.Errorf("capacity exceeded for module %s or destination %s or total limit reached", moduleID, destination)
+	}
+
+	// Track project usage for observability
+	slug := projectSlug
+	if slug == "" {
+		slug = "vibepilot"
+	}
+	p.mu.Lock()
+	projCount, ok := p.perProject[slug]
+	if !ok {
+		projCount = new(int32)
+		p.perProject[slug] = projCount
+	}
+	p.mu.Unlock()
+	atomic.AddInt32(projCount, 1)
+
+	p.wg.Add(1)
+	go func() {
+		defer p.wg.Done()
+		defer p.release(moduleID, destination)
+		defer func() {
+			p.mu.Lock()
+			if pc, ok := p.perProject[slug]; ok {
+				atomic.AddInt32(pc, -1)
+			}
+			p.mu.Unlock()
+
+			if r := recover(); r != nil {
+				log.Printf("[AgentPool] panic recovered in module %s: %v", moduleID, r)
+				select {
+				case p.errorCh <- fmt.Errorf("panic in %s: %v", moduleID, r):
+				default:
+				}
+			}
+		}()
+
+		if err := fn(); err != nil {
+			select {
+			case p.errorCh <- err:
+			default:
+				log.Printf("[AgentPool] error channel full, dropping error: %v", err)
+			}
+		}
+	}()
+
+	return nil
 }
 
 func (p *AgentPool) SubmitWithDestination(ctx context.Context, moduleID, destination string, fn func() error) error {
@@ -220,11 +277,17 @@ func (p *AgentPool) Stats() map[string]interface{} {
 		destStats[key] = int(atomic.LoadInt32(count))
 	}
 
+	projectStats := make(map[string]int)
+	for key, count := range p.perProject {
+		projectStats[key] = int(atomic.LoadInt32(count))
+	}
+
 	return map[string]interface{}{
 		"active_total":   p.ActiveCount(),
 		"max_total":      p.maxTotal,
 		"max_per_module": p.maxPerModule,
 		"modules":        moduleStats,
 		"destinations":   destStats,
+		"projects":       projectStats,
 	}
 }
