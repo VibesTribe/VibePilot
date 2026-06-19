@@ -187,6 +187,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/project/snapshot", s.handleProjectSnapshot)
 	mux.HandleFunc("/api/project/history", s.handleProjectHistory)
 	mux.HandleFunc("/api/project/alerts", s.handleProjectAlerts)
+	mux.HandleFunc("/api/projects", s.handleProjects)
 	mux.HandleFunc("/api/project-costs", s.handleProjectCosts)
 	mux.HandleFunc("/api/admin/model", s.handleAdminModel)
 	mux.HandleFunc("/api/admin/models", s.handleAdminModels)
@@ -512,6 +513,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	// Optional project filter: ?project=<slug> limits tasks to that project
+	projectFilter := r.URL.Query().Get("project")
+
 	// Query all tables the dashboard needs in parallel
 	type tableResult struct {
 		name string
@@ -519,12 +523,33 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		err  error
 	}
 
+	// Build task filters (add project filter if specified)
+	taskFilters := map[string]any{"order": "updated_at.desc", "limit": 100}
+	taskRunFilters := map[string]any{"order": "started_at.desc", "limit": 500}
+	if projectFilter != "" {
+		// Resolve project slug to UUID
+		projData, projErr := s.db.Query(ctx, "projects", map[string]any{
+			"select":   "id,slug",
+			"slug":     fmt.Sprintf("eq.%s", projectFilter),
+			"limit":    1,
+		})
+		if projErr == nil {
+			var projRows []map[string]any
+			if json.Unmarshal(projData, &projRows) == nil && len(projRows) > 0 {
+				if projID, ok := projRows[0]["id"].(string); ok && projID != "" {
+					taskFilters["project_id"] = fmt.Sprintf("eq.%s", projID)
+					taskRunFilters["project_id"] = fmt.Sprintf("eq.%s", projID)
+				}
+			}
+		}
+	}
+
 	tables := []struct {
 		name    string
 		filters map[string]any
 	}{
-		{"tasks", map[string]any{"order": "updated_at.desc", "limit": 100}},
-		{"task_runs", map[string]any{"order": "started_at.desc", "limit": 500}},
+		{"tasks", taskFilters},
+		{"task_runs", taskRunFilters},
 		{"models", nil},
 		{"platforms", nil},
 		{"orchestrator_events", map[string]any{"order": "created_at.desc", "limit": 500}},
@@ -1051,6 +1076,35 @@ func (s *Server) handleProjectAlerts(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(fmt.Sprintf(`{"alerts": %s}`, data)))
+}
+
+// handleProjects returns the list of all projects with branding info.
+// GET /api/projects — returns projects array with slug, display_name, theme, status.
+func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "GET only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+	data, err := s.db.Query(ctx, "projects", map[string]any{
+		"select": "id,slug,display_name,description,status,theme,deploy_url,github_owner,github_repo,total_tasks,completed_tasks",
+		"order":  "created_at.asc",
+	})
+	if err != nil {
+		http.Error(w, "Failed to fetch projects", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Write(data)
 }
 
 // handleReviewQueue returns pending items from the unified review_items table.
