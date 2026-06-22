@@ -70,18 +70,27 @@ def load_env():
     return env
 
 def api_request(url, method="GET", headers=None, body=None, timeout=15):
-    """Make an HTTP request."""
-    data = json.dumps(body).encode() if body else None
-    hdrs = {"User-Agent": "VibePilot-Scanner/2.0", "Content-Type": "application/json"}
+    """Make an HTTP request using curl (works in cron sandbox, unlike urllib)."""
+    import subprocess as _sp
+    cmd = ["curl", "-s", "--connect-timeout", str(timeout), "--max-time", str(timeout + 5)]
+    cmd += ["-H", "User-Agent: VibePilot-Scanner/2.0"]
+    cmd += ["-H", "Content-Type: application/json"]
     if headers:
-        hdrs.update(headers)
-    req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
+        for k, v in headers.items():
+            cmd += ["-H", f"{k}: {v}"]
+    if method == "POST" and body:
+        cmd += ["-d", json.dumps(body)]
+        cmd.append("-X")
+        cmd.append("POST")
+    cmd.append(url)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read()), None, resp.getcode()
-    except urllib.error.HTTPError as e:
-        body_text = e.read().decode()[:500]
-        return None, f"HTTP {e.code}: {body_text}", e.code
+        r = _sp.run(cmd, capture_output=True, text=True, timeout=timeout + 10)
+        if r.returncode != 0:
+            return None, f"curl exit {r.returncode}: {r.stderr.strip()[:500]}", r.returncode
+        data = json.loads(r.stdout)
+        return data, None, 200
+    except json.JSONDecodeError as e:
+        return None, f"JSON decode error: {e}", None
     except Exception as e:
         return None, str(e), None
 

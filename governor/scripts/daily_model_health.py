@@ -57,29 +57,41 @@ def load_env():
     return env
 
 def api_get(url, headers=None, timeout=10):
-    """Simple GET request."""
-    hdrs = {"User-Agent": "VibePilot-HealthCheck/1.0"}
+    """Simple GET request using curl (works in cron sandbox, unlike urllib)."""
+    cmd = ["curl", "-s", "--connect-timeout", str(timeout), "--max-time", str(timeout + 5)]
+    cmd += ["-H", "User-Agent: VibePilot-HealthCheck/2.0"]
     if headers:
-        hdrs.update(headers)
-    req = urllib.request.Request(url, headers=hdrs)
+        for k, v in headers.items():
+            cmd += ["-H", f"{k}: {v}"]
+    cmd.append(url)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read()), None
-    except urllib.error.HTTPError as e:
-        return None, f"HTTP {e.code}: {e.reason}"
+        import subprocess
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 10)
+        if r.returncode != 0:
+            return None, f"curl exit {r.returncode}: {r.stderr.strip()[:200]}"
+        return json.loads(r.stdout), None
+    except json.JSONDecodeError as e:
+        return None, f"JSON decode error: {e}"
     except Exception as e:
         return None, str(e)
 
 def api_post(url, body, headers=None, timeout=30):
-    """Simple POST request."""
-    data = json.dumps(body).encode()
-    req = urllib.request.Request(url, data=data, headers=headers or {})
+    """Simple POST request using curl (works in cron sandbox)."""
+    cmd = ["curl", "-s", "-X", "POST", "--connect-timeout", str(timeout), "--max-time", str(timeout + 5)]
+    cmd += ["-H", "Content-Type: application/json"]
+    if headers:
+        for k, v in headers.items():
+            cmd += ["-H", f"{k}: {v}"]
+    cmd += ["-d", json.dumps(body)]
+    cmd.append(url)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read()), None
-    except urllib.error.HTTPError as e:
-        body_text = e.read().decode()[:200]
-        return None, f"HTTP {e.code}: {body_text}"
+        import subprocess
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 10)
+        if r.returncode != 0:
+            return None, f"curl exit {r.returncode}: {r.stderr.strip()[:200]}"
+        return json.loads(r.stdout), None
+    except json.JSONDecodeError as e:
+        return None, f"JSON decode error: {e}"
     except Exception as e:
         return None, str(e)
 
@@ -423,6 +435,9 @@ def auto_commit_if_changed():
         commit_msg = f"chore: daily model health check ({datetime.now().strftime('%Y-%m-%d')})"
         subprocess.run(['git', 'commit', '-m', commit_msg, '--quiet'], cwd=repo_root, timeout=10)
 
+        # Pull before push to avoid rejection when remote is ahead
+        subprocess.run(['git', 'pull', '--rebase', 'origin', 'main', '--quiet'],
+                      cwd=repo_root, timeout=30)
         subprocess.run(['git', 'push', 'origin', 'main', '--quiet'], cwd=repo_root, timeout=30)
 
         print(f"\n  Auto-committed: {', '.join(changed_files)}")

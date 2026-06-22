@@ -168,7 +168,7 @@ def fetch_active_models():
     SELECT id, name, provider,
            COALESCE(array_to_string(capabilities, ','), '') AS capabilities
     FROM model_catalog
-    WHERE status IN ('active', 'benched')
+    WHERE status = 'active'
       AND is_free = true
     ORDER BY provider, id;
     """

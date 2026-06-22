@@ -583,6 +583,9 @@ def main():
             subprocess.run(["git", "-C", "/home/vibes/vibepilot", "commit", "-m",
                            f"live model config: {len(go_models)} models from model_catalog"],
                            capture_output=True, timeout=60)
+            # Pull before push to avoid rejection when remote is ahead
+            subprocess.run(["git", "-C", "/home/vibes/vibepilot", "pull", "--rebase", "origin", "main"],
+                          capture_output=True, timeout=60)
             subprocess.run(["git", "-C", "/home/vibes/vibepilot", "push", "origin", "main"],
                           capture_output=True, timeout=60)
             print(f"  Pushed to GitHub")
