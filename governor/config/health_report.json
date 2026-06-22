@@ -1,20 +1,6 @@
 {
-  "timestamp": "2026-06-18T22:57:06.630608+00:00",
-  "providers": {
-    "google": {
-      "status": "ok",
-      "models": 46
-    },
-    "groq": {
-      "status": "ok",
-      "models": 17
-    },
-    "openrouter": {
-      "status": "ok",
-      "models": 341,
-      "free": 27
-    }
-  },
+  "timestamp": "2026-06-22T19:19:34.209343+00:00",
+  "providers": {},
   "health_checks": {
     "gemini-2.5-flash-lite": {
       "alive": null,
@@ -32,80 +18,57 @@
       "provider": "gemini"
     },
     "qwen/qwen3-next-80b-a3b-instruct:free": {
-      "alive": true,
-      "status": "rate_limited_but_alive",
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
       "provider": "openrouter"
     },
     "qwen/qwen3-coder:free": {
-      "alive": true,
-      "status": "rate_limited_but_alive",
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
       "provider": "openrouter"
     },
     "openrouter/free": {
-      "alive": true,
-      "status": "ok",
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
       "provider": "openrouter"
     },
     "groq/llama-3.3-70b-versatile": {
       "alive": false,
-      "status": "HTTP 404: {\"error\":{\"message\":\"The model `groq/llama-3.3-70b-versatile` does not exist or you do not have access to it.\",\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}\n",
+      "status": "<urlopen error [Errno -2] Name or service not known>",
       "provider": "groq"
     },
     "openai/gpt-oss-120b": {
-      "alive": true,
-      "status": "ok",
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
       "provider": "nvidia"
     },
     "groq/llama-3.1-8b-instant": {
       "alive": false,
-      "status": "HTTP 404: {\"error\":{\"message\":\"The model `groq/llama-3.1-8b-instant` does not exist or you do not have access to it.\",\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}\n",
+      "status": "<urlopen error [Errno -2] Name or service not known>",
       "provider": "groq"
     },
     "google/gemma-4-26b-a4b-it:free": {
-      "alive": true,
-      "status": "ok",
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
       "provider": "openrouter"
     },
     "deepseek-ai/deepseek-v4-flash": {
       "alive": false,
-      "status": "HTTP 400: {\"error\":{\"message\":\"deepseek-ai/deepseek-v4-flash is not a valid model ID\",\"code\":400},\"user_id\":\"user_3CdMRRHo4N09mdBX77OuOG9Ihkq\"}",
+      "status": "<urlopen error [Errno -2] Name or service not known>",
       "provider": "nvidia"
     },
     "z-ai/glm-5.1": {
-      "alive": true,
-      "status": "ok",
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
       "provider": "nvidia"
     }
   },
-  "changes": [
-    {
-      "action": "new_free_models",
-      "count": 29,
-      "models": [
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-preview-tts",
-        "gemini-2.5-pro-preview-tts",
-        "gemini-2.5-flash-image",
-        "gemini-3.1-flash-lite-preview",
-        "gemini-3-pro-image-preview",
-        "gemini-3-pro-image",
-        "gemini-3.1-flash-image-preview",
-        "gemini-3.1-flash-image",
-        "gemini-3.1-flash-tts-preview",
-        "imagen-4.0-generate-001",
-        "imagen-4.0-ultra-generate-001",
-        "imagen-4.0-fast-generate-001",
-        "veo-2.0-generate-001",
-        "veo-3.0-generate-001",
-        "veo-3.0-fast-generate-001",
-        "veo-3.1-generate-preview",
-        "veo-3.1-fast-generate-preview",
-        "veo-3.1-lite-generate-preview",
-        "meta-llama/llama-4-scout-17b-16e-instruct"
-      ]
-    }
+  "changes": [],
+  "warnings": [
+    "Gemini: <urlopen error [Errno -2] Name or service not known>",
+    "Groq: <urlopen error [Errno -2] Name or service not known>",
+    "OpenRouter: <urlopen error [Errno -2] Name or service not known>"
   ],
-  "warnings": [],
   "cooldown_state": {
     "aizolo-mix": {
       "status": "active",
