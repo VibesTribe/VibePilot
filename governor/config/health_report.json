@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-22T20:35:36.626063+00:00",
+  "timestamp": "2026-06-22T20:40:35.879010+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -101,7 +101,7 @@
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
-        "whisper-large-v3-turbo"
+        "whisper-large-v3"
       ]
     }
   ],
