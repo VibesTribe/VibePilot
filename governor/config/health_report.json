@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-22T20:26:42.295012+00:00",
+  "timestamp": "2026-06-22T20:27:35.357925+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -63,7 +63,7 @@
     },
     "google/gemma-4-26b-a4b-it:free": {
       "alive": true,
-      "status": "rate_limited_but_alive",
+      "status": "ok",
       "provider": "openrouter"
     },
     "deepseek-ai/deepseek-v4-flash": {
@@ -101,7 +101,7 @@
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
-        "whisper-large-v3"
+        "whisper-large-v3-turbo"
       ]
     }
   ],
