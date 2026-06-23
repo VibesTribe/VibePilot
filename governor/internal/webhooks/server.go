@@ -2688,12 +2688,18 @@ func (s *Server) handleReportItemDecision(w http.ResponseWriter, r *http.Request
 	if json.Unmarshal(result, &item) == nil {
 		if reportID, ok := item["report_id"].(string); ok && reportID != "" {
 			undecided, _ := s.db.RPC(r.Context(), "report_undecided_count", map[string]any{
-				"p_report_id": reportID,
-			})
-			count := 0
-			if undecided != nil {
-				json.Unmarshal(undecided, &count)
-			}
+					"p_report_id": reportID,
+				})
+				count := 0
+				if undecided != nil {
+					// RPC returns [{"report_undecided_count": N}] (array wrapper from rowsToJSON)
+					var rows []map[string]any
+					if json.Unmarshal(undecided, &rows) == nil && len(rows) > 0 {
+						if v, ok := rows[0]["report_undecided_count"].(float64); ok {
+							count = int(v)
+						}
+					}
+				}
 			if count == 0 {
 				// All items decided. Mark report, resolve parent review_item, trigger PRD generation.
 				log.Printf("[report-items] Report %s fully decided, resolving parent review_item and triggering PRD generation", reportID)
