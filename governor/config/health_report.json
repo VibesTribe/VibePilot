@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-22T23:35:13.744877+00:00",
+  "timestamp": "2026-06-23T10:30:23.168144+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -101,7 +101,7 @@
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
-        "llama-3.1-8b-instant"
+        "meta-llama/llama-4-scout-17b-16e-instruct"
       ]
     }
   ],
