@@ -160,7 +160,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 		// Apply CORS to all API routes and status endpoint
 		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/status" {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 			w.Header().Set("Access-Control-Max-Age", "86400") // 24h cache preflight
 
