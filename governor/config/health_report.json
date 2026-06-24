@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-23T10:30:23.168144+00:00",
+  "timestamp": "2026-06-24T10:30:22.779996+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,7 +11,7 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 340,
+      "models": 339,
       "free": 26
     }
   },
@@ -63,7 +63,7 @@
     },
     "google/gemma-4-26b-a4b-it:free": {
       "alive": true,
-      "status": "ok",
+      "status": "rate_limited_but_alive",
       "provider": "openrouter"
     },
     "deepseek-ai/deepseek-v4-flash": {
@@ -101,7 +101,7 @@
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
-        "meta-llama/llama-4-scout-17b-16e-instruct"
+        "meta-llama/llama-prompt-guard-2-86m"
       ]
     }
   ],
