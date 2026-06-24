@@ -155,10 +155,18 @@ def get_hermes_model_id(db_id, provider):
     """Map DB model ID to Hermes config model string."""
     if provider == "gemini":
         # Gemini native API rejects models/ prefix (HTTP 404)
-        # Cron jobs use bare names (gemini-2.5-flash) and work fine
+        return db_id
+    elif provider == "groq":
+        # Groq native API rejects groq/ prefix on its own models (HTTP 404).
+        # The model_catalog stores IDs as "groq/llama-3.3-70b-versatile" but
+        # Groq's API expects bare "llama-3.3-70b-versatile".
+        # Strip the "groq/" prefix. Keep non-groq prefixed IDs (e.g. "openai/gpt-oss-20b")
+        # because those are vendor-prefixed names Groq DOES accept.
+        if db_id.startswith("groq/"):
+            return db_id[len("groq/"):]
         return db_id
     else:
-        # OpenRouter, Groq, NVIDIA use raw routing IDs
+        # OpenRouter, NVIDIA use raw routing IDs (vendor/model format)
         return db_id
 
 
