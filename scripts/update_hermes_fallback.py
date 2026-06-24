@@ -45,8 +45,15 @@ EXCLUDE_IDS = {
         "nano-banana",               # experimental
         "gemini-3-pro",              # paid tier
         "gemini-3.1-pro",            # paid tier
+        "gemini-3-pro-preview",      # paid tier
+        "gemini-3.1-flash-lite",     # known incompatibility (thought_signature)
+        "gemini-3.5-flash",          # known incompatibility (thought_signature)
+        "gemini-3-flash-preview",    # known incompatibility (thought_signature)
         "gemini-2.0-flash",          # older gen, skip when 2.5+/3.x available
         "gemini-2.0-flash-lite",     # older gen
+        "antigravity-preview",       # no multiturn chat support (400 error)
+        "gemma-4",                   # untested Gemma models via Gemini API
+        "gemini-2.5-pro",            # paid tier quota exhausts fast
     },
     "groq": {
         "orpheus",  # TTS models
@@ -56,6 +63,10 @@ EXCLUDE_IDS = {
         "lyria",    # music generation, not chat
         "cohere/command-r7b",  # paid tier sneaking in as free
         "deepseek-r1",         # extremely slow, not practical fallback
+        "liquid/lfm",          # 32k context too small for agent prompts (35k+)
+        "meta-llama/llama-3.3-70b-instruct:free",  # rate limited constantly
+        "qwen/qwen3-coder",    # rate limited
+        "qwen/qwen3-next",     # rate limited
     },
     "nvidia": {
         "bge",
