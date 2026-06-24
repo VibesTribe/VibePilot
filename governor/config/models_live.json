@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-06-23T12:00:29.594817+00:00",
+  "updated": "2026-06-24T00:00:16.420179+00:00",
   "total": 177,
   "models": [
     {
@@ -8,23 +8,6 @@
       "name": "Owl Alpha",
       "context_length": 1048756,
       "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "google/lyria-3-pro-preview",
-      "name": "Google: Lyria 3 Pro Preview",
-      "context_length": 1048576,
-      "capabilities": [
-        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -72,6 +55,23 @@
       ]
     },
     {
+      "id": "google/lyria-3-pro-preview",
+      "name": "Google: Lyria 3 Pro Preview",
+      "context_length": 1048576,
+      "capabilities": [
+        "reasoning",
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
       "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
       "name": "NVIDIA: Nemotron 3 Ultra (free)",
       "context_length": 1000000,
@@ -91,57 +91,6 @@
       "id": "nvidia/nemotron-3-super-120b-a12b:free",
       "name": "NVIDIA: Nemotron 3 Super (free)",
       "context_length": 1000000,
-      "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "qwen/qwen3-next-80b-a3b-instruct:free",
-      "name": "Qwen: Qwen3 Next 80B A3B Instruct (free)",
-      "context_length": 262144,
-      "capabilities": [
-        "instruction",
-        "reasoning",
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "google/gemma-4-31b-it:free",
-      "name": "Google: Gemma 4 31B (free)",
-      "context_length": 262144,
-      "capabilities": [
-        "text",
-        "vision"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "poolside/laguna-m.1:free",
-      "name": "Poolside: Laguna M.1 (free)",
-      "context_length": 262144,
       "capabilities": [
         "text"
       ],
@@ -188,8 +137,59 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
-      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
+      "id": "google/gemma-4-31b-it:free",
+      "name": "Google: Gemma 4 31B (free)",
+      "context_length": 262144,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
+      "id": "poolside/laguna-m.1:free",
+      "name": "Poolside: Laguna M.1 (free)",
+      "context_length": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
+      "id": "qwen/qwen3-next-80b-a3b-instruct:free",
+      "name": "Qwen: Qwen3 Next 80B A3B Instruct (free)",
+      "context_length": 262144,
+      "capabilities": [
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
+      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
       "context_length": 256000,
       "capabilities": [
         "text"
@@ -220,8 +220,8 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-      "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
+      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
+      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
       "context_length": 256000,
       "capabilities": [
         "text"
@@ -252,11 +252,13 @@
       ]
     },
     {
-      "id": "meta-llama/llama-3.2-3b-instruct:free",
-      "name": "Meta: Llama 3.2 3B Instruct (free)",
+      "id": "openai/gpt-oss-20b:free",
+      "name": "OpenAI: gpt-oss-20b (free)",
       "context_length": 131072,
       "capabilities": [
+        "code",
         "instruction",
+        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -288,23 +290,6 @@
       ]
     },
     {
-      "id": "nousresearch/hermes-3-llama-3.1-405b:free",
-      "name": "Nous: Hermes 3 405B Instruct (free)",
-      "context_length": 131072,
-      "capabilities": [
-        "instruction",
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
       "id": "openai/gpt-oss-120b:free",
       "name": "OpenAI: gpt-oss-120b (free)",
       "context_length": 131072,
@@ -324,13 +309,28 @@
       ]
     },
     {
-      "id": "openai/gpt-oss-20b:free",
-      "name": "OpenAI: gpt-oss-20b (free)",
+      "id": "meta-llama/llama-3.2-3b-instruct:free",
+      "name": "Meta: Llama 3.2 3B Instruct (free)",
       "context_length": 131072,
       "capabilities": [
-        "code",
         "instruction",
-        "reasoning",
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
+      "id": "nousresearch/hermes-3-llama-3.1-405b:free",
+      "name": "Nous: Hermes 3 405B Instruct (free)",
+      "context_length": 131072,
+      "capabilities": [
+        "instruction",
         "text"
       ],
       "rate_limits": {
@@ -391,11 +391,11 @@
       ]
     },
     {
-      "id": "liquid/lfm-2.5-1.2b-instruct:free",
-      "name": "LiquidAI: LFM2.5-1.2B-Instruct (free)",
+      "id": "liquid/lfm-2.5-1.2b-thinking:free",
+      "name": "LiquidAI: LFM2.5-1.2B-Thinking (free)",
       "context_length": 32768,
       "capabilities": [
-        "instruction",
+        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -425,11 +425,11 @@
       ]
     },
     {
-      "id": "liquid/lfm-2.5-1.2b-thinking:free",
-      "name": "LiquidAI: LFM2.5-1.2B-Thinking (free)",
+      "id": "liquid/lfm-2.5-1.2b-instruct:free",
+      "name": "LiquidAI: LFM2.5-1.2B-Instruct (free)",
       "context_length": 32768,
       "capabilities": [
-        "reasoning",
+        "instruction",
         "text"
       ],
       "rate_limits": {
@@ -2544,8 +2544,8 @@
       "context_length": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2564,9 +2564,9 @@
       "context_length": 1048576,
       "capabilities": [
         "reasoning",
-        "vision",
+        "instruction",
         "text",
-        "instruction"
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2585,10 +2585,10 @@
       "context_length": 1048576,
       "capabilities": [
         "reasoning",
-        "instruction",
-        "vision",
         "text",
-        "code"
+        "instruction",
+        "code",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2606,8 +2606,8 @@
       "name": "Gemini Robotics-ER 1.5 Preview",
       "context_length": 1048576,
       "capabilities": [
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2626,8 +2626,8 @@
       "context_length": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2646,8 +2646,8 @@
       "context_length": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2666,9 +2666,9 @@
       "context_length": 1048576,
       "capabilities": [
         "reasoning",
-        "vision",
+        "instruction",
         "text",
-        "instruction"
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2687,8 +2687,8 @@
       "context_length": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2707,8 +2707,8 @@
       "context_length": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2726,8 +2726,8 @@
       "name": "Lyria 3 Clip Preview",
       "context_length": 1048576,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2746,8 +2746,8 @@
       "context_length": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2786,8 +2786,8 @@
       "context_length": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2806,8 +2806,8 @@
       "context_length": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2826,9 +2826,9 @@
       "context_length": 1048576,
       "capabilities": [
         "reasoning",
-        "vision",
+        "instruction",
         "text",
-        "instruction"
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2847,8 +2847,8 @@
       "context_length": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2867,10 +2867,10 @@
       "context_length": 1048576,
       "capabilities": [
         "reasoning",
-        "instruction",
-        "vision",
         "text",
-        "code"
+        "instruction",
+        "code",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2889,10 +2889,10 @@
       "context_length": 1048576,
       "capabilities": [
         "reasoning",
-        "instruction",
-        "vision",
         "text",
-        "code"
+        "instruction",
+        "code",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2910,8 +2910,8 @@
       "name": "Gemma 4 26B A4B IT",
       "context_length": 262144,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2929,8 +2929,8 @@
       "name": "Gemma 4 31B IT",
       "context_length": 262144,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2948,8 +2948,8 @@
       "name": "Gemini Robotics-ER 1.6 Preview",
       "context_length": 131072,
       "capabilities": [
-        "vision",
-        "instruction"
+        "instruction",
+        "vision"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2968,8 +2968,8 @@
       "context_length": 131072,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3027,8 +3027,8 @@
       "name": "Deep Research Preview (Apr-21-2026)",
       "context_length": 131072,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3046,8 +3046,8 @@
       "name": "Deep Research Max Preview (Apr-21-2026)",
       "context_length": 131072,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -3065,8 +3065,8 @@
       "name": "Antigravity Agent Preview",
       "context_length": 131072,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
