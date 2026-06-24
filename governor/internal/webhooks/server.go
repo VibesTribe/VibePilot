@@ -215,6 +215,9 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/design-reviews", s.handleDesignReviews)
 	mux.HandleFunc("/api/design-reviews/approve", s.handleDesignReviewAction)
 
+	// Research suggestion insert (replaces fragile psql -c commands from cron)
+	mux.HandleFunc("/api/research/suggestion", s.handleResearchSuggestion)
+
 	// Task lifecycle control: pause, resume, kill, pause-all, clear-all
 	mux.HandleFunc("/api/task/pause", s.handleTaskPause)
 	mux.HandleFunc("/api/task/resume", s.handleTaskResume)
@@ -490,6 +493,135 @@ func (s *Server) handleBookmark(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Error(w, "Database not available", http.StatusServiceUnavailable)
 	}
+}
+
+// handleResearchSuggestion accepts a JSON body and inserts it directly into
+// research_suggestions via the parameterized db.Insert method — no psql, no
+// shell quoting, no SQL injection risk. This replaces the fragile psql -c
+// pattern that broke when models couldn't handle triple-nested quoting.
+//
+// POST /api/research/suggestion
+// Body: {"title":"...", "type":"new_model", "complexity":"simple",
+//        "summary":"...", "details":{...}, "findings_path":"...",
+//        "status":"ready", "source":"daily_research"}
+//
+// Required fields: title, type
+// Optional fields: complexity (default "simple"), summary, details (default {}),
+//                  findings_path, status (default "ready"), source (default "daily_research")
+//
+// Valid types: new_model, new_platform, pricing_change, config_tweak,
+//              architecture, new_data_store, security, workflow_change,
+//              api_credit_exhausted, ui_ux_change, tool_update, analyst_proposal
+// Valid complexity: simple, complex, human
+// Valid status: pending, ready, in_review, council_review, approved, rejected,
+//               implemented, pending_human, watching, prd_created
+func (s *Server) handleResearchSuggestion(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Title        string                 `json:"title"`
+		Type         string                 `json:"type"`
+		Complexity   string                 `json:"complexity"`
+		Summary      string                 `json:"summary"`
+		Details      map[string]interface{} `json:"details"`
+		FindingsPath string                 `json:"findings_path"`
+		Status       string                 `json:"status"`
+		Source       string                 `json:"source"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.Title == "" {
+		http.Error(w, "title is required", http.StatusBadRequest)
+		return
+	}
+	if req.Type == "" {
+		http.Error(w, "type is required", http.StatusBadRequest)
+		return
+	}
+
+	// Defaults
+	if req.Complexity == "" {
+		req.Complexity = "simple"
+	}
+	if req.Status == "" {
+		req.Status = "ready"
+	}
+	if req.Source == "" {
+		req.Source = "daily_research"
+	}
+	if req.Details == nil {
+		req.Details = map[string]interface{}{}
+	}
+
+	validTypes := map[string]bool{
+		"new_model": true, "new_platform": true, "pricing_change": true,
+		"config_tweak": true, "architecture": true, "new_data_store": true,
+		"security": true, "workflow_change": true, "api_credit_exhausted": true,
+		"ui_ux_change": true, "tool_update": true, "analyst_proposal": true,
+	}
+	if !validTypes[req.Type] {
+		http.Error(w, fmt.Sprintf("Invalid type: %s", req.Type), http.StatusBadRequest)
+		return
+	}
+
+	validComplexity := map[string]bool{"simple": true, "complex": true, "human": true}
+	if !validComplexity[req.Complexity] {
+		http.Error(w, fmt.Sprintf("Invalid complexity: %s (must be simple, complex, or human)", req.Complexity), http.StatusBadRequest)
+		return
+	}
+
+	validStatus := map[string]bool{
+		"pending": true, "ready": true, "in_review": true, "council_review": true,
+		"approved": true, "rejected": true, "implemented": true,
+		"pending_human": true, "watching": true, "prd_created": true,
+	}
+	if !validStatus[req.Status] {
+		http.Error(w, fmt.Sprintf("Invalid status: %s", req.Status), http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	if s.db == nil {
+		http.Error(w, "Database not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	insertData := map[string]any{
+		"title":         req.Title,
+		"type":          req.Type,
+		"complexity":    req.Complexity,
+		"summary":       req.Summary,
+		"details":       req.Details,
+		"findings_path": req.FindingsPath,
+		"status":        req.Status,
+		"source":        req.Source,
+	}
+
+	result, err := s.db.Insert(ctx, "research_suggestions", insertData)
+	if err != nil {
+		log.Printf("[Research API] Failed to insert suggestion: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Write(result)
+	log.Printf("[Research API] Inserted suggestion: %s (type=%s, status=%s)", req.Title, req.Type, req.Status)
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
