@@ -1,7 +1,7 @@
-# PLAN: Hello World
+# PLAN: Hello World PRD
 
 ## Overview
-E2E pipeline smoke test. Minimal task to verify the full pipeline works: planning, execution, review, testing, merge.
+This plan addresses the "Hello World PRD" to verify the end-to-end automation pipeline.
 
 ## Tasks
 
@@ -12,7 +12,7 @@ E2E pipeline smoke test. Minimal task to verify the full pipeline works: plannin
 **Target Files:** output/hello.json
 
 #### Prompt Packet
-```
+```markdown
 # TASK: T001 - Create Hello World JSON
 
 ## Context
@@ -20,8 +20,9 @@ This is a pipeline validation task. The goal is to produce a single JSON output 
 
 ## What to Build
 Create the file `output/hello.json` with valid JSON containing:
-- A "greeting" field set to "Hello from VibePilot"
-- A "timestamp" field set to the current date in ISO 8601 format (YYYY-MM-DD)
+- A "greeting" field set to "Hello from VibePilot!"
+- A "status" field set to "success"
+- A "generated_at" field with the current ISO 8601 timestamp
 
 Do NOT modify any existing files. Only create `output/hello.json`.
 
@@ -32,6 +33,7 @@ Do NOT modify any existing files. Only create `output/hello.json`.
 #### Expected Output
 ```json
 {
+  "task_id": "T001",
   "files_created": ["output/hello.json"],
   "tests_written": []
 }
@@ -51,14 +53,16 @@ This is a pipeline validation task. The goal is to produce a single JSON output 
 
 ## What to Build
 Create the file `output/hello.json` with valid JSON containing:
-- A "greeting" field set to "Hello from VibePilot"
-- A "timestamp" field set to the current date in ISO 8601 format (YYYY-MM-DD)
+- A "greeting" field set to "Hello from VibePilot!"
+- A "status" field set to "success"
+- A "generated_at" field with the current ISO 8601 timestamp
 
 Do NOT modify any existing files. Only create `output/hello.json`.
 
 ## Files
 - `output/hello.json` - The output artifact",
       "expected_output": {
+        "task_id": "T001",
         "files_created": [
           "output/hello.json"
         ],
