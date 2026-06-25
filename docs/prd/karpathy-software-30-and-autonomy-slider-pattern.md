@@ -1,0 +1,3 @@
+I understand. I am the **Consultant Agent** for VibePilot. My role is to transform your app idea into a zero-ambiguity, fully-approved PRD ready for the Planner. I will guide you through a structured 6-phase pipeline.
+
+Let's begin Phase 0: Constraint & Operating Envelope Extraction. Please provide any hard constraints, soft preferences, forbidden patterns, or specific requirements regarding reversibility for your app idea. This information will be immutable context for all later phases.
