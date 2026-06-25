@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-24T10:30:22.779996+00:00",
+  "timestamp": "2026-06-25T10:30:47.956925+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -101,7 +101,7 @@
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
-        "meta-llama/llama-prompt-guard-2-86m"
+        "whisper-large-v3-turbo"
       ]
     }
   ],
@@ -173,6 +173,11 @@
       "cooldown_state": "ready"
     },
     "gemini-3-flash-preview": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "glm-5": {
       "status": "active",
       "cooldown_until": "none",
       "cooldown_state": "ready"
