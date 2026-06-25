@@ -1,267 +1,254 @@
 # PLAN: pgvector Critical Upgrade for X220 HDD Performance
 
 ## Overview
-Upgrade pgvector from v0.6.0 to v0.8.2 to enable halfvec storage, iterative index scans, and binary quantize - critical for VibePilot's kb_context_pack performance on the X220's spinning HDD within zero-cost constraints.
+This plan outlines the steps to upgrade the pgvector extension in PostgreSQL from v0.6.0 to v0.8.2. The primary goal is to address performance bottlenecks on the ThinkPad X220, specifically those related to its spinning HDD and limited RAM. The upgrade will enable features like `halfvec` storage, `binary_quantize` for pre-filtering, and improved index scan performance, leading to significant storage reduction and faster query times for the `kb_context_pack` table. This is a system infrastructure improvement with a zero-cost, zero-lock-in, and reversible implementation.
 
 ## Tasks
 
-### T001: Update pgvector Extension
+### T001: Update pgvector Extension to v0.8.2
 **Confidence:** 0.99
-**Category:** database
+**Category:** coding
 **Dependencies:** none
-**Target Files:** None
+**Target Files:** PostgreSQL database schema
 
 #### Prompt Packet
-```
-# TASK: T001 - Update pgvector Extension
+```markdown
+# TASK: T001 - Update pgvector Extension to v0.8.2
 
 ## Context
-This task upgrades the pgvector extension from v0.6.0 to v0.8.2 to access new features like halfvec storage, binary_quantize, and improved index scans that are essential for HDD performance on the X220.
+The current pgvector extension version (0.6.0) lacks critical features for optimizing performance on spinning HDDs, specifically `halfvec` storage and `binary_quantize` pre-filtering. This task aims to upgrade the extension to v0.8.2 to unlock these optimizations.
 
 ## What to Build
-Execute the necessary SQL command to update the pgvector extension to version 0.8.2 in the PostgreSQL database.
+1. Connect to the PostgreSQL 16.14 instance.
+2. Execute the command `ALTER EXTENSION vector UPDATE;` to upgrade the pgvector extension to the latest installed version (which should be 0.8.2 or higher, as specified by the plan).
+3. Verify the extension version using `SELECT extversion FROM pg_extension WHERE extname = 'vector';` to ensure it is reporting v0.8.2 or greater.
+
+**Do NOT:**
+- Modify any PostgreSQL configuration files.
+- Restart PostgreSQL if not explicitly required by the extension upgrade process (which `ALTER EXTENSION` typically handles gracefully).
 
 ## Files
-- None (this is a direct database operation)
+- `postgresql_upgrade.sql` - A script containing the SQL commands to perform the upgrade and verification.
 ```
 
 #### Expected Output
 ```json
 {
-  "files_created": [],
-  "tests_required": [],
-  "database_change": "pgvector extension updated to version 0.8.2"
-}
-```
-
-### T002: Convert Embedding Columns to halfvec
-**Confidence:** 0.96
-**Category:** database
-**Dependencies:** T001
-**Target Files:** None
-
-#### Prompt Packet
-```
-# TASK: T002 - Convert Embedding Columns to halfvec
-
-## Context
-After upgrading pgvector to v0.8.2, we need to convert the existing vector(768) columns in the kb_context_pack table to halfvec(768) to achieve ~50% storage reduction for embeddings, which is critical for the X220's limited RAM and spinning HDD.
-
-## What to Build
-Convert the embedding column in the kb_context_pack table from vector(768) to halfvec(768) type. This must handle any indexes on the column appropriately:
-1. Identify indexes on kb_context_pack.embedding column
-2. Drop those indexes (if any exist)
-3. Alter the column type to halfvec(768) USING embedding::halfvec
-4. Recreate the indexes (if any were dropped)
-
-## Files
-- None (this is a direct database operation)
-```
-
-#### Expected Output
-```json
-{
-  "files_created": [],
-  "tests_required": [],
-  "database_change": "kb_context_pack.embedding column converted to halfvec(768) type"
-}
-```
-
-### T003: Update Go pgx Dependency
-**Confidence:** 0.99
-**Category:** dependency
-**Dependencies:** T001
-**Target Files:** go.mod
-
-#### Prompt Packet
-```
-# TASK: T003 - Update Go pgx Dependency
-
-## Context
-The Hermes agent uses the Go pgx driver to interact with PostgreSQL. To support the new halfvec and binary_quantize types introduced in pgvector v0.8.0+, we need to update the pgx dependency to v5.10.0 or later, as earlier versions lack full support for these types.
-
-## What to Build
-Update the go.mod file to require github.com/jackc/pgx/v5.10.0 or later version, then run go mod tidy to update dependencies.
-
-## Files
-- go.mod - The Go module file to update
-```
-
-#### Expected Output
-```json
-{
-  "files_created": [],
-  "tests_required": [],
-  "files_modified": ["go.mod"],
-  "dependency_change": "Updated pgx dependency to v5.10.0+"
-}
-```
-
-### T004: Add Binary Quantize Column
-**Confidence:** 0.99
-**Category:** database
-**Dependencies:** T002
-**Target Files:** None
-
-#### Prompt Packet
-```
-# TASK: T004 - Add Binary Quantize Column
-
-## Context
-To enable fast pre-filtering of vector searches on the X220's spinning HDD, we need to add a binary_quantized_embedding column that stores the binary quantization of embeddings using hamming distance for first-pass search, reducing disk I/O.
-
-## What to Build
-Add a new column named binary_quantized_embedding of type bytea to the kb_context_pack table. This column will store the result of binary_quantize(embedding) for each row.
-
-## Files
-- None (this is a direct database operation)
-```
-
-#### Expected Output
-```json
-{
-  "files_created": [],
-  "tests_required": [],
-  "database_change": "Added binary_quantized_embedding column (bytea) to kb_context_pack table"
-}
-```
-
-### T005: Rebuild HNSW Indexes
-**Confidence:** 0.95
-**Category:** database
-**Dependencies:** T004
-**Target Files:** None
-
-#### Prompt Packet
-```
-# TASK: T005 - Rebuild HNSW Indexes
-
-## Context
-After upgrading pgvector and converting column types, rebuilding HNSW indexes allows us to leverage v0.8.0+ improvements in insert/scan performance, which is particularly beneficial for the X220's spinning HDD by reducing query latency.
-
-## What to Build
-Rebuild all HNSW indexes on embedding columns in the kb_context_pack table to leverage performance improvements in pgvector v0.8.0+. This should be done using the REINDEX command or equivalent to rebuild the indexes online where possible.
-
-## Files
-- None (this is a direct database operation)
-```
-
-#### Expected Output
-```json
-{
-  "files_created": [],
-  "tests_required": [],
-  "database_change": "Rebuilt all HNSW indexes on kb_context_pack embedding columns"
-}
-```
-
-### T006: Verify Upgrade Success
-**Confidence:** 0.95
-**Category:** testing
-**Dependencies:** T005
-**Target Files:** None
-
-#### Prompt Packet
-```
-# TASK: T006 - Verify Upgrade Success
-
-## Context
-After performing the pgvector upgrade and related changes, we need to verify that the upgrade was successful and that the system is functioning correctly with the new features.
-
-## What to Build
-Execute verification SQL queries to confirm:
-1. pgvector version is 0.8.2 or higher
-2. The embedding column in kb_context_pack is now halfvec type
-3. The binary_quantized_embedding column exists and is bytea type
-4. A simple vector search query works correctly
-5. Basic Hermes agent database operations would succeed
-
-## Files
-- None (this is a verification task)
-```
-
-#### Expected Output
-```json
-{
-  "files_created": [],
-  "tests_required": [],
-  "verification_results": {
-    "pgvector_version": "0.8.2+",
-    "embedding_column_type": "halfvec",
-    "binary_column_exists": true,
-    "sample_query_success": true
-  }
-}
-```
-
-### T007: Verify Hermes Agent Compatibility
-**Confidence:** 0.96
-**Category:** testing
-**Dependencies:** T003, T006
-**Target Files:** None
-
-#### Prompt Packet
-```
-# TASK: T007 - Verify Hermes Agent Compatibility
-
-## Context
-After updating the Go pgx dependency, we need to verify that the Hermes agent can still build and run correctly with the new pgx version, ensuring it properly handles the halfvec and binary_quantize types from the database.
-
-## What to Build
-1. Run 'go build' to verify the Hermes agent compiles successfully with the updated pgx dependency
-2. Run unit tests related to database/vector operations (if any exist) to verify type handling works
-3. If no specific tests exist, verify that the code imports and uses pgx types correctly for vector operations
-
-## Files
-- None (this is a build/test task)
-```
-
-#### Expected Output
-```json
-{
-  "files_created": [],
-  "tests_required": [],
-  "build_success": true,
-  "test_success": true,
-  "compatibility_verified": true
-}
-```
-
-### T008: Create Documentation
-**Confidence:** 0.98
-**Category:** documentation
-**Dependencies:** T007
-**Target Files:** docs/upgrades/pgvector-v0.8.2-upgrade.md
-
-#### Prompt Packet
-```
-# TASK: T008 - Create Upgrade Documentation
-
-## Context
-Documenting the upgrade procedure and rollback steps is essential for maintaining system stability and allowing future administrators to understand and potentially reverse the changes if needed, in line with VibePilot's reversibility requirement.
-
-## What to Build
-Create a comprehensive markdown document that includes:
-1. Overview of the upgrade and its benefits
-2. Prerequisites and system state before upgrade
-3. Step-by-step upgrade procedure with exact commands
-4. Verification steps to confirm success
-5. Rollback procedure to revert changes if needed
-6. Performance impact analysis
-7. Timeline and maintenance window recommendations
-
-## Files
-- docs/upgrades/pgvector-v0.8.2-upgrade.md - The documentation file to create
-```
-
-#### Expected Output
-```json
-{
-  "files_created": ["docs/upgrades/pgvector-v0.8.2-upgrade.md"],
-  "tests_required": [],
-  "documentation_created": true
-}
-```
+  "task_id": "T001",
+  "files_created": [
+    "postgresql_upgrade.sql"
   ],
-  "total_tasks": 8,
-  "status": "review
+  "tests_written": [],
+  "db_operations": [
+    "ALTER EXTENSION vector UPDATE;",
+    "SELECT extversion FROM pg_extension WHERE extname = 'vector';"
+  ],
+  "verification_steps": [
+    "Confirm successful execution of ALTER EXTENSION command.",
+    "Confirm SELECT query returns '0.8.2' or higher for vector extension version."
+  ]
+}
+```
+
+### T002: Migrate Embedding Columns to halfvec(768)
+**Confidence:** 0.98
+**Category:** coding
+**Dependencies:** T001
+**Target Files:** PostgreSQL database schema
+
+#### Prompt Packet
+```markdown
+# TASK: T002 - Migrate Embedding Columns to halfvec(768)
+
+## Context
+The current `vector(768)` columns in the `kb_context_pack` table consume approximately twice the storage compared to the `halfvec(768)` type. This migration is critical for reducing storage footprint and improving performance on the X220's limited hardware.
+
+## What to Build
+1. Connect to the PostgreSQL 16.14 instance.
+2. For the `kb_context_pack` table, alter the `embedding` column (or any other columns storing vector embeddings) to use the `halfvec(768)` type.
+3. Ensure the migration process is as non-disruptive as possible, aiming for concurrent writes if PostgreSQL and pgvector version support it.
+4. Measure the storage usage before and after the migration using `pg_total_relation_size('kb_context_pack');` to confirm at least a 45% reduction.
+5. Perform spot checks on a diverse set of code search queries to ensure search relevance has not dropped. This can be a qualitative check initially, confirming expected results are returned.
+
+**Do NOT:**
+- Alter column names unless absolutely necessary for compatibility.
+- Delete original data before confirming successful conversion and data integrity.
+
+## Files
+- `migrate_embedding_to_halfvec.sql` - A script containing the SQL commands for the column type migration and verification.
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T002",
+  "files_created": [
+    "migrate_embedding_to_halfvec.sql"
+  ],
+  "tests_written": [],
+  "db_operations": [
+    "ALTER TABLE kb_context_pack ALTER COLUMN embedding TYPE halfvec(768);",
+    "pg_total_relation_size('kb_context_pack');"
+  ],
+  "verification_steps": [
+    "Confirm successful execution of ALTER TABLE command.",
+    "Verify storage reduction is >= 45% via pg_total_relation_size.",
+    "Perform spot-check searches to confirm relevance is maintained."
+  ]
+}
+```
+
+### T003: Add binary_quantize Column for Fast Pre-filtering
+**Confidence:** 0.98
+**Category:** coding
+**Dependencies:** T001
+**Target Files:** PostgreSQL database schema
+
+#### Prompt Packet
+```markdown
+# TASK: T003 - Add binary_quantize Column for Fast Pre-filtering
+
+## Context
+The `binary_quantize` feature in pgvector v0.8.0+ allows for a faster, preliminary filtering step using Hamming distance on binary representations of embeddings. This is crucial for reducing disk I/O on the spinning HDD by allowing queries to quickly eliminate large portions of the index before performing more expensive distance calculations.
+
+## What to Build
+1. Connect to the PostgreSQL 16.14 instance.
+2. Add a new column, e.g., `embedding_binary`, of type `bytea` to the `kb_context_pack` table.
+3. Populate this new column by applying the `binary_quantize()` function to the existing `embedding` (now `halfvec`) column. This should ideally be done in a way that minimizes locking and allows concurrent reads.
+4. Verify the column is created and populated correctly.
+5. Update relevant similarity search queries to utilize this new column for initial filtering. This will involve modifying queries to use Hamming distance first, followed by L2/cosine distance on the remaining candidates.
+6. Use `EXPLAIN ANALYZE` on sample filtered search queries to confirm the query plan now involves the `embedding_binary` column and shows reduced disk I/O compared to a plan without it.
+
+**Do NOT:**
+- Remove the original `embedding` (halfvec) column until the new column and its usage are fully validated.
+- Assume a specific query structure; the task is to *enable* the feature and verify its *usage* in relevant queries.
+
+## Files
+- `add_binary_quantize_column.sql` - A script containing the SQL commands for adding the column, populating it, and potentially an example query demonstrating its usage.
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T003",
+  "files_created": [
+    "add_binary_quantize_column.sql"
+  ],
+  "tests_written": [],
+  "db_operations": [
+    "ALTER TABLE kb_context_pack ADD COLUMN embedding_binary bytea;",
+    "UPDATE kb_context_pack SET embedding_binary = binary_quantize(embedding);",
+    "EXPLAIN ANALYZE ..."
+  ],
+  "verification_steps": [
+    "Confirm `embedding_binary` column is added.",
+    "Verify column is populated with bytea data.",
+    "Verify sample queries use `embedding_binary` for filtering via EXPLAIN ANALYZE.",
+    "Confirm reduction in disk I/O for filtered queries."
+  ]
+}
+```
+
+### T004: Rebuild HNSW Indexes
+**Confidence:** 0.98
+**Category:** coding
+**Dependencies:** T001, T002, T003
+**Target Files:** PostgreSQL database schema
+
+#### Prompt Packet
+```markdown
+# TASK: T004 - Rebuild HNSW Indexes
+
+## Context
+pgvector versions 0.8.0 and later include performance improvements for HNSW index building and scanning. Rebuilding these indexes is necessary to leverage these enhancements, particularly for filtered vector searches on the `kb_context_pack` table, which is crucial for HDD performance.
+
+## What to Build
+1. Connect to the PostgreSQL 16.14 instance.
+2. Identify all HNSW indexes on the `kb_context_pack` table that were previously used for vector similarity searches.
+3. Rebuild these HNSW indexes. Utilize PostgreSQL's `CONCURRENTLY` option where possible to minimize downtime and allow for concurrent reads/writes during the rebuild process.
+4. Measure the index build time for each index and compare it to a baseline measurement taken before the upgrade (or a simulated baseline if not available) to confirm improvement.
+5. Run benchmark queries (e.g., similarity searches with filters) and use `EXPLAIN ANALYZE` to confirm query performance has improved by at least 25% compared to the pre-upgrade baseline.
+
+**Do NOT:**
+- Drop existing indexes without ensuring new ones are successfully created.
+- Ignore index build times; they are a key performance indicator.
+
+## Files
+- `rebuild_hnsw_indexes.sql` - A script containing the SQL commands for rebuilding the indexes and potentially benchmark queries.
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T004",
+  "files_created": [
+    "rebuild_hnsw_indexes.sql"
+  ],
+  "tests_written": [],
+  "db_operations": [
+    "DROP INDEX IF EXISTS ...;",
+    "CREATE INDEX ... ON kb_context_pack USING ivfflat (...) WITH (lists = 100);",
+    "CREATE INDEX CONCURRENTLY ... ON kb_context_pack USING hnsw (...) WITH (m=16, ef_construction=64);",
+    "EXPLAIN ANALYZE ..."
+  ],
+  "verification_steps": [
+    "Confirm indexes are rebuilt and using appropriate HNSW parameters.",
+    "Measure and confirm index build time improvement.",
+    "Verify query performance improvement >= 25% for filtered vector searches."
+  ]
+}
+```
+
+### T005: Update Go pgx Dependency to v5.10.0+
+**Confidence:** 0.99
+**Category:** coding
+**Dependencies:** T001
+**Target Files:** `go.mod`, `go.sum`, Hermes Agent source code
+
+#### Prompt Packet
+```markdown
+# TASK: T005 - Update Go pgx Dependency to v5.10.0+
+
+## Context
+The Hermes Agent uses the `jackc/pgx` Go driver to interact with PostgreSQL. Versions prior to v5.10.0 do not fully support the new `halfvec` and `bytea` (for `binary_quantize`) types introduced in pgvector v0.8.0+. Updating to v5.10.0+ is critical for the Hermes Agent to correctly handle and utilize the new data types and features enabled by the pgvector upgrade.
+
+## What to Build
+1. Navigate to the Hermes Agent's Go module directory.
+2. Update the `go.mod` file to specify `github.com/jackc/pgx/v5` with a version of v5.10.0 or later.
+3. Run `go mod tidy` to resolve dependencies and update `go.sum`.
+4. Compile the Hermes Agent. Ensure there are no compilation errors related to pgx type handling.
+5. Run existing API endpoints that interact with vector data (e.g., embeddings search, data ingestion) and verify they function correctly without runtime panics or errors related to vector types.
+
+**Do NOT:**
+- Pin to a specific minor version unless absolutely necessary; allow `go mod tidy` to find the latest compatible patch/minor version.
+- Introduce any business logic changes; focus solely on the dependency update and compilation/runtime verification.
+
+## Files
+- `go.mod` - Updated file specifying the new pgx version.
+- `go.sum` - Updated file reflecting the new dependency.
+- Hermes Agent source code (implicitly modified by `go mod tidy` and potential type adjustments).
+```
+
+#### Expected Output
+```json
+{
+  "task_id": "T005",
+  "files_created": [
+    "go.mod",
+    "go.sum"
+  ],
+  "tests_written": [],
+  "verification_steps": [
+    "Confirm Hermes Agent compiles successfully.",
+    "Verify no runtime errors related to pgx vector types.",
+    "Confirm API endpoints using vector operations return successfully."
+  ],
+  "dependency_updates": [
+    {
+      "package": "github.com/jackc/pgx/v5",
+      "from_version": "<previous_version>",
+      "to_version": ">=v5.10.0"
+    }
+  ]
+}
+```
