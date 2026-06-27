@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-26T10:30:19.619107+00:00",
+  "timestamp": "2026-06-27T15:54:15.063393+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -15,93 +15,32 @@
       "free": 26
     }
   },
-  "health_checks": {
-    "gemini-2.5-flash-lite": {
-      "alive": null,
-      "status": "skip",
-      "provider": "gemini"
-    },
-    "gemini-3-flash-preview": {
-      "alive": null,
-      "status": "skip",
-      "provider": "gemini"
-    },
-    "gemini-flash-latest": {
-      "alive": null,
-      "status": "skip",
-      "provider": "gemini"
-    },
-    "qwen/qwen3-next-80b-a3b-instruct:free": {
-      "alive": true,
-      "status": "rate_limited_but_alive",
-      "provider": "openrouter"
-    },
-    "qwen/qwen3-coder:free": {
-      "alive": true,
-      "status": "rate_limited_but_alive",
-      "provider": "openrouter"
-    },
-    "openrouter/free": {
-      "alive": true,
-      "status": "ok",
-      "provider": "openrouter"
-    },
-    "groq/llama-3.3-70b-versatile": {
-      "alive": false,
-      "status": "HTTP 404: {\"error\":{\"message\":\"The model `groq/llama-3.3-70b-versatile` does not exist or you do not have access to it.\",\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}\n",
-      "provider": "groq"
-    },
-    "openai/gpt-oss-120b": {
-      "alive": true,
-      "status": "ok",
-      "provider": "nvidia"
-    },
-    "groq/llama-3.1-8b-instant": {
-      "alive": false,
-      "status": "HTTP 404: {\"error\":{\"message\":\"The model `groq/llama-3.1-8b-instant` does not exist or you do not have access to it.\",\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}\n",
-      "provider": "groq"
-    },
-    "google/gemma-4-26b-a4b-it:free": {
-      "alive": true,
-      "status": "ok",
-      "provider": "openrouter"
-    },
-    "deepseek-ai/deepseek-v4-flash": {
-      "alive": false,
-      "status": "HTTP 400: {\"error\":{\"message\":\"deepseek-ai/deepseek-v4-flash is not a valid model ID\",\"code\":400},\"user_id\":\"user_3CdMRRHo4N09mdBX77OuOG9Ihkq\"}",
-      "provider": "nvidia"
-    },
-    "z-ai/glm-5.1": {
-      "alive": true,
-      "status": "ok",
-      "provider": "nvidia"
-    }
-  },
+  "health_checks": {},
   "changes": [
     {
       "action": "new_free_models",
-      "count": 29,
+      "count": 79,
       "models": [
         "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-001",
+        "gemini-2.0-flash-lite-001",
+        "gemini-2.0-flash-lite",
         "gemini-2.5-flash-preview-tts",
         "gemini-2.5-pro-preview-tts",
+        "gemma-4-26b-a4b-it",
+        "gemma-4-31b-it",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-pro-latest",
+        "gemini-2.5-flash-lite",
         "gemini-2.5-flash-image",
-        "gemini-3.1-flash-lite-preview",
-        "gemini-3-pro-image-preview",
-        "gemini-3-pro-image",
-        "gemini-3.1-flash-image-preview",
-        "gemini-3.1-flash-image",
-        "gemini-3.1-flash-tts-preview",
-        "imagen-4.0-generate-001",
-        "imagen-4.0-ultra-generate-001",
-        "imagen-4.0-fast-generate-001",
-        "veo-2.0-generate-001",
-        "veo-3.0-generate-001",
-        "veo-3.0-fast-generate-001",
-        "veo-3.1-generate-preview",
-        "veo-3.1-fast-generate-preview",
-        "veo-3.1-lite-generate-preview",
-        "meta-llama/llama-prompt-guard-2-22m"
+        "gemini-3-pro-preview",
+        "gemini-3-flash-preview",
+        "gemini-3.1-pro-preview",
+        "gemini-3.1-pro-preview-customtools",
+        "gemini-3.1-flash-lite-preview"
       ]
     }
   ],
