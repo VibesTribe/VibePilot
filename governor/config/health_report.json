@@ -1,50 +1,74 @@
 {
-  "timestamp": "2026-06-27T15:54:15.063393+00:00",
-  "providers": {
-    "google": {
-      "status": "ok",
-      "models": 46
+  "timestamp": "2026-06-28T16:28:11.280207+00:00",
+  "providers": {},
+  "health_checks": {
+    "gemini-2.5-flash-lite": {
+      "alive": null,
+      "status": "skip",
+      "provider": "gemini"
     },
-    "groq": {
-      "status": "ok",
-      "models": 17
+    "gemini-3-flash-preview": {
+      "alive": null,
+      "status": "skip",
+      "provider": "gemini"
     },
-    "openrouter": {
-      "status": "ok",
-      "models": 339,
-      "free": 26
+    "gemini-flash-latest": {
+      "alive": null,
+      "status": "skip",
+      "provider": "gemini"
+    },
+    "qwen/qwen3-next-80b-a3b-instruct:free": {
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
+      "provider": "openrouter"
+    },
+    "qwen/qwen3-coder:free": {
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
+      "provider": "openrouter"
+    },
+    "openrouter/free": {
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
+      "provider": "openrouter"
+    },
+    "groq/llama-3.3-70b-versatile": {
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
+      "provider": "groq"
+    },
+    "openai/gpt-oss-120b": {
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
+      "provider": "nvidia"
+    },
+    "groq/llama-3.1-8b-instant": {
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
+      "provider": "groq"
+    },
+    "google/gemma-4-26b-a4b-it:free": {
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
+      "provider": "openrouter"
+    },
+    "deepseek-ai/deepseek-v4-flash": {
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
+      "provider": "nvidia"
+    },
+    "z-ai/glm-5.1": {
+      "alive": false,
+      "status": "<urlopen error [Errno -2] Name or service not known>",
+      "provider": "nvidia"
     }
   },
-  "health_checks": {},
-  "changes": [
-    {
-      "action": "new_free_models",
-      "count": 79,
-      "models": [
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-001",
-        "gemini-2.0-flash-lite-001",
-        "gemini-2.0-flash-lite",
-        "gemini-2.5-flash-preview-tts",
-        "gemini-2.5-pro-preview-tts",
-        "gemma-4-26b-a4b-it",
-        "gemma-4-31b-it",
-        "gemini-flash-latest",
-        "gemini-flash-lite-latest",
-        "gemini-pro-latest",
-        "gemini-2.5-flash-lite",
-        "gemini-2.5-flash-image",
-        "gemini-3-pro-preview",
-        "gemini-3-flash-preview",
-        "gemini-3.1-pro-preview",
-        "gemini-3.1-pro-preview-customtools",
-        "gemini-3.1-flash-lite-preview"
-      ]
-    }
+  "changes": [],
+  "warnings": [
+    "Gemini: curl exit 6: ",
+    "Groq: curl exit 6: ",
+    "OpenRouter: curl exit 6: "
   ],
-  "warnings": [],
   "cooldown_state": {
     "aizolo-mix": {
       "status": "active",
