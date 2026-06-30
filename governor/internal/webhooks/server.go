@@ -188,6 +188,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/project/history", s.handleProjectHistory)
 	mux.HandleFunc("/api/project/alerts", s.handleProjectAlerts)
 	mux.HandleFunc("/api/projects", s.handleProjects)
+	mux.HandleFunc("/api/projects/scaffold", s.handleProjectScaffold)
 	mux.HandleFunc("/api/project-costs", s.handleProjectCosts)
 	mux.HandleFunc("/api/admin/model", s.handleAdminModel)
 	mux.HandleFunc("/api/admin/models", s.handleAdminModels)
@@ -1215,18 +1216,26 @@ func (s *Server) handleProjectAlerts(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+
+	// POST: create a new project
+	if r.Method == http.MethodPost {
+		s.handleProjectCreate(w, r)
+		return
+	}
+
 	if r.Method != http.MethodGet {
-		http.Error(w, "GET only", http.StatusMethodNotAllowed)
+		http.Error(w, "GET or POST only", http.StatusMethodNotAllowed)
 		return
 	}
 
 	ctx := r.Context()
 	data, err := s.db.Query(ctx, "projects", map[string]any{
-		"select": "id,slug,display_name,description,status,theme,deploy_url,github_owner,github_repo,total_tasks,completed_tasks",
+		"select": "id,slug,display_name,description,status,theme,deploy_url,github_owner,github_repo,total_tasks,completed_tasks,connected_services,model_keys",
 		"order":  "created_at.asc",
 	})
 	if err != nil {
@@ -1237,6 +1246,207 @@ func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Write(data)
+}
+
+// handleProjectCreate creates a new project.
+// POST /api/projects
+// Body: {"slug":"sealed", "display_name":"Sealed", "description":"Music contracts",
+//        "theme":{"primary_color":"#34d399"}, "github_owner":"VibesTribe", ...}
+func (s *Server) handleProjectCreate(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Slug             string                 `json:"slug"`
+		DisplayName      string                 `json:"display_name"`
+		Description      string                 `json:"description"`
+		GithubOwner      string                 `json:"github_owner"`
+		GithubRepo       string                 `json:"github_repo"`
+		RepoPath         string                 `json:"repo_path"`
+		DeployTarget     string                 `json:"deploy_target"`
+		DeployURL        string                 `json:"deploy_url"`
+		TechStack        string                 `json:"tech_stack"`
+		Theme            map[string]interface{} `json:"theme"`
+		ConnectedServices []interface{}         `json:"connected_services"`
+		ModelKeys        []interface{}          `json:"model_keys"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Slug == "" {
+		http.Error(w, "slug is required", http.StatusBadRequest)
+		return
+	}
+	if req.DisplayName == "" {
+		req.DisplayName = req.Slug
+	}
+	if req.DeployTarget == "" {
+		req.DeployTarget = "none"
+	}
+	if req.TechStack == "" {
+		req.TechStack = "auto"
+	}
+
+	// Check for duplicate slug
+	existing, err := s.db.Query(r.Context(), "projects", map[string]any{"slug": req.Slug})
+	if err == nil {
+		var rows []map[string]any
+		if json.Unmarshal(existing, &rows) == nil && len(rows) > 0 {
+			http.Error(w, `{"error":"slug_exists","message":"A project with this slug already exists"}`, http.StatusConflict)
+			return
+		}
+	}
+
+	insertData := map[string]any{
+		"slug":               req.Slug,
+		"display_name":       req.DisplayName,
+		"description":        req.Description,
+		"status":             "active",
+		"github_owner":       req.GithubOwner,
+		"github_repo":        req.GithubRepo,
+		"repo_path":          req.RepoPath,
+		"deploy_target":      req.DeployTarget,
+		"deploy_url":         req.DeployURL,
+		"tech_stack":         req.TechStack,
+		"default_branch":     "main",
+		"branch_prefix_task": "task/",
+		"branch_prefix_module": "module/",
+		"protected_branches": []string{"main"},
+	}
+	if req.Theme != nil {
+		insertData["theme"] = req.Theme
+	} else {
+		insertData["theme"] = map[string]any{"primary_color": "#34d399"}
+	}
+	if req.ConnectedServices != nil {
+		insertData["connected_services"] = req.ConnectedServices
+	} else {
+		insertData["connected_services"] = []interface{}{}
+	}
+	if req.ModelKeys != nil {
+		insertData["model_keys"] = req.ModelKeys
+	} else {
+		insertData["model_keys"] = []interface{}{}
+	}
+
+	result, err := s.db.Insert(r.Context(), "projects", insertData)
+	if err != nil {
+		log.Printf("[Projects API] Failed to create project: %v", err)
+		http.Error(w, `{"error":"insert_failed","message":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Run the PIF scaffold (creates directory structure, vibepilot.toml, export.sh,
+	// Hermes profile, git repo, backup repo, SQLite database). Non-fatal if it fails —
+	// the project DB row is already created and the scaffold can be re-run.
+	scaffoldResult := s.runPIFScaffold(req.Slug, req.DisplayName, req.Description, req.DeployTarget, req.DeployURL)
+	if scaffoldResult != "" {
+		log.Printf("[Projects API] PIF scaffold for %s: %s", req.Slug, scaffoldResult)
+	}
+
+	// Invalidate project resolver cache if available
+	// (the resolver has its own TTL so this is best-effort)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(http.StatusCreated)
+	w.Write(result)
+	log.Printf("[Projects API] Created project: %s (%s)", req.DisplayName, req.Slug)
+}
+
+// runPIFScaffold executes the PIF scaffold script to create the full project
+// directory structure, vibepilot.toml, export.sh, restore.sh, Hermes profile,
+// git repo, backup repo, and SQLite database. Returns a summary string (empty on failure).
+// This is non-fatal: if the scaffold fails, the project DB row still exists and
+// the scaffold can be re-run via the /api/projects/scaffold endpoint.
+func (s *Server) runPIFScaffold(slug, displayName, description, deployTarget, deployURL string) string {
+	scriptPath := filepath.Join(os.Getenv("HOME"), "vibepilot", "scripts", "pif_scaffold.py")
+	if _, err := os.Stat(scriptPath); err != nil {
+		return fmt.Sprintf("scaffold script not found at %s: %v", scriptPath, err)
+	}
+
+	args := []string{
+		"python3", scriptPath,
+		"--slug", slug,
+		"--json",
+	}
+	if displayName != "" {
+		args = append(args, "--display-name", displayName)
+	}
+	if description != "" {
+		args = append(args, "--description", description)
+	}
+	if deployTarget != "" {
+		args = append(args, "--deploy-target", deployTarget)
+	}
+	if deployURL != "" {
+		args = append(args, "--deploy-url", deployURL)
+	}
+
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Dir = filepath.Join(os.Getenv("HOME"), "vibepilot")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Sprintf("scaffold failed: %v, output: %s", err, string(output))
+	}
+
+	// Parse JSON output to extract success status
+	var result struct {
+		Success bool              `json:"success"`
+		Errors  []string          `json:"errors"`
+		Steps   map[string]any    `json:"steps"`
+	}
+	if json.Unmarshal(output, &result) == nil {
+		if result.Success {
+			stepCount := len(result.Steps)
+			return fmt.Sprintf("success (%d steps)", stepCount)
+		}
+		return fmt.Sprintf("completed with %d errors: %v", len(result.Errors), result.Errors)
+	}
+
+	return fmt.Sprintf("completed (unparseable output: %d bytes)", len(output))
+}
+
+// handleProjectScaffold re-runs the PIF scaffold for an existing project.
+// POST /api/projects/scaffold  Body: {"slug":"sealed", ...}
+// This is idempotent if the project dir doesn't exist yet; it will fail if the
+// directory already exists (use --force on the script directly to override).
+func (s *Server) handleProjectScaffold(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Slug         string `json:"slug"`
+		DisplayName  string `json:"display_name"`
+		Description  string `json:"description"`
+		DeployTarget string `json:"deploy_target"`
+		DeployURL    string `json:"deploy_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Slug == "" {
+		http.Error(w, `{"error":"slug_required"}`, http.StatusBadRequest)
+		return
+	}
+
+	result := s.runPIFScaffold(req.Slug, req.DisplayName, req.Description, req.DeployTarget, req.DeployURL)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	json.NewEncoder(w).Encode(map[string]any{
+		"slug":    req.Slug,
+		"result":  result,
+		"success": !strings.Contains(result, "failed"),
+	})
 }
 
 // handleReviewQueue returns pending items from the unified review_items table.
