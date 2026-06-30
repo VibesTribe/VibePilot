@@ -339,10 +339,13 @@ up the working directory, and invokes the agent with the project's context.
 - Script: `scripts/pif_scaffold.py`
 - First test case: Sealed at `~/projects/sealed/`
 
-### Phase B: Context Switching (WHEN SCAFFOLDING WORKS)
-- When VibePilot dispatches a task, load the project's skills + memories + KB
-- Set agent cwd to project's repo/
-- Filter dashboard data by project
+### Phase B: Context Switching (COMPLETE)
+- [x] project_context.go loads project's .hermes.md, vibepilot.toml, skills, file tree
+- [x] Session.Run injects project context into prompt for non-vibepilot tasks
+- [x] executeTask receives projectCfg and loads ProjectContext per-project
+- [x] VibePilot tasks completely unaffected (nil check)
+- [x] Unit tests pass (sealed context loaded correctly, vibepilot/missing return nil)
+- File: governor/internal/runtime/project_context.go
 
 ### Phase C: Database Separation (WHEN CONTEXT SWITCHING WORKS)
 - Each project declares its DB in vibepilot.toml
