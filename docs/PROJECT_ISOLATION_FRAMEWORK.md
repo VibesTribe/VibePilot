@@ -379,13 +379,25 @@ If the PIF works for Sealed, it works for everything that comes after.
 2. **No cross-project data access.** Project A's agent cannot read Project B's database,
    skills, or memories. Enforced by directory structure and profile separation.
 
-3. **No monolithic shared state.** The only shared state is the `projects` table
-   (metadata) and the task queue (task_id → project_id mapping). Everything else is
-   per-project.
+3. **No monolithic shared state — within OR between projects.** The only shared
+   state between projects is the `projects` table (metadata) and the task queue
+   (task_id → project_id mapping). Everything else is per-project. WITHIN each
+   project's codebase, the same principle applies: components are modular,
+   atomic, and loosely coupled. Fixing the payment flow must never break the
+   signing flow. Fixing the auth system must never break the document generation.
+   Vertical slices, clean interfaces, zero implicit dependencies between modules.
+   The "fix one thing, break three others" pattern is a design failure, not an
+   accepted reality.
 
-4. **Secrets never hardcoded.** All API keys, tokens, passwords are referenced by env
-   var name in vibepilot.toml, resolved at runtime. Never stored in plaintext in the
-   project directory.
+4. **Secrets in encrypted vault, never plaintext.** All API keys, tokens,
+   passwords live in an encrypted vault (VibePilot's existing vault system).
+   Keys are injected as environment variables at runtime — the agent references
+   them by name (e.g., `SEALED_STRIPE_SECRET_KEY`) but never sees or handles the
+   actual value. No .env files with plaintext secrets in the project directory.
+   The vault loads briefly, provides the values, and the values exist only in the
+   process environment for the duration of the task. Agents cannot leak, reveal,
+   or accidentally commit secrets because they never have direct access to them.
+   This is safe without being confusing — the agent just uses the env var name.
 
 5. **Every project must have export.sh.** No exceptions. If it can't be exported, it's
    not done.
