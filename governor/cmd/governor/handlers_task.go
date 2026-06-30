@@ -504,7 +504,7 @@ func (h *TaskHandler) handleTaskAvailable(event runtime.Event) {
 		projectSlug = projectCfg.Slug
 	}
 	err = h.pool.SubmitForProject(ctx, sliceID, connectorID, projectSlug, func() error {
-		return h.executeTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, worktreePath, runStart, taskGit)
+		return h.executeTask(ctx, task, taskPacket, taskID, taskNumber, modelID, connectorID, branchName, taskCategory, worktreePath, runStart, taskGit, projectCfg)
 	})
 	if err != nil {
 		log.Printf("[TaskAvailable] Pool error for %s: %v", truncateID(taskID), err)
@@ -519,6 +519,7 @@ func (h *TaskHandler) executeTask(
 	taskID, taskNumber, modelID, connectorID, branchName, taskCategory, worktreePath string,
 	runStart time.Time,
 	taskGit *gitree.Gitree,
+	projectCfg *runtime.ProjectConfig,
 ) error {
 
 	var contextData map[string]any
@@ -549,6 +550,24 @@ func (h *TaskHandler) executeTask(
 	if worktreePath != "" {
 		sessionParams["worktree_path"] = worktreePath
 		sessionParams["repo_path"] = worktreePath
+	}
+
+	// PIF Phase B: If this task belongs to a non-vibepilot project, load the
+	// project's isolated context (its own file tree, skills, .hermes.md rules,
+	// manifest config) and inject it into the session. This REPLACES vibepilot's
+	// codebase context for this agent — it only sees the project's files.
+	if projectCfg != nil && projectCfg.Slug != "vibepilot" {
+		projCtx := runtime.LoadProjectContext(projectCfg.Slug)
+		if projCtx != nil {
+			sessionParams["project_context"] = projCtx.AssemblePrompt()
+			sessionParams["project_slug"] = projCtx.Slug
+			sessionParams["project_repo_dir"] = projCtx.RepoDir
+			log.Printf("[TaskHandler] Task %s injected PIF project context: %s (%d skills, %d file tree lines)",
+				truncateID(taskID), projCtx.Slug, len(projCtx.Skills), strings.Count(projCtx.FileTree, "\n")+1)
+		} else {
+			log.Printf("[TaskHandler] Task %s belongs to project %s but PIF directory not found — using default context",
+				truncateID(taskID), projectCfg.Slug)
+		}
 	}
 
 	// Execute with timeout — prevent hung workers from locking tasks forever

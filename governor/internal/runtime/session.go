@@ -71,6 +71,19 @@ func (s *Session) Run(ctx context.Context, input map[string]any) (*SessionResult
 	prompt.WriteString(s.prompt)
 	prompt.WriteString("\n\n---\n\n")
 
+	// PIF Phase B: If project_context is present in the input, inject it
+	// BEFORE the task input so the agent has project context framing.
+	// This is the project's own file tree, rules, skills, manifest —
+	// NOT vibepilot's codebase context.
+	if input != nil {
+		if projCtx, ok := input["project_context"]; ok {
+			if ctxStr, ok := projCtx.(string); ok && ctxStr != "" {
+				prompt.WriteString(ctxStr)
+				prompt.WriteString("\n\n---\n\n")
+			}
+		}
+	}
+
 	if input != nil {
 		inputJSON, _ := json.MarshalIndent(input, "", "  ")
 		prompt.WriteString("INPUT:\n")
