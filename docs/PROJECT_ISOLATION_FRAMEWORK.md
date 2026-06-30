@@ -327,11 +327,17 @@ up the working directory, and invokes the agent with the project's context.
 
 ## 6. IMPLEMENTATION PHASES
 
-### Phase A: Scaffold System (BUILD FIRST)
-- Create `vibepilot project create` command (or enhance the hexagon "New Project" flow)
-- Generate directory structure, vibepilot.toml, export.sh
-- Initialize Hermes profile per project
-- Register in projects table
+### Phase A: Scaffold System (COMPLETE)
+- [x] `pif_scaffold.py` — creates directory structure, vibepilot.toml, export.sh, restore.sh, README, .hermes.md
+- [x] Hermes profile created per project (~/.hermes/profiles/{slug}/)
+- [x] Git repo initialized + GitHub remote created
+- [x] Private backup repo created
+- [x] SQLite database with append-only Merkle DAG audit log
+- [x] Wired into governor: handleProjectCreate calls scaffold after DB insert
+- [x] New endpoint: POST /api/projects/scaffold (re-scaffold existing projects)
+- [x] Tested: Sealed project scaffolded, export/restore verified
+- Script: `scripts/pif_scaffold.py`
+- First test case: Sealed at `~/projects/sealed/`
 
 ### Phase B: Context Switching (WHEN SCAFFOLDING WORKS)
 - When VibePilot dispatches a task, load the project's skills + memories + KB
