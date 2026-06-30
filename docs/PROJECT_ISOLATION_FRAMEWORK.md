@@ -582,5 +582,24 @@ recovery (the system can detect and correct problems by appending, not editing).
 
 ## END OF DOCUMENT
 
-This framework is the foundation for every product VibePilot builds. It exists to
-ensure that what we build is portable, maintainable, and owned — not entangled.
+---
+
+## RESOLVED DECISIONS (Approved by User — June 30, 2026)
+
+All three open design decisions have been reviewed and approved.
+
+**Decision 1: Inter-Project Communication → APPROVED: Default deny, orchestrator-mediated only.**
+No direct communication between projects. If a project needs something, it asks
+VibePilot. Projects are isolated neighbors — they don't share doorbells.
+A problem with Sealed is Sealed's problem. A problem with VibePilot is everyone's
+problem, but projects shouldn't be messing with VibePilot.
+
+**Decision 2: File Deduplication → APPROVED: No cross-project dedup.**
+Separate copies per project. Disk space is cheap. Isolation is not.
+Per-project dedup (for backups/versions within a project) is fine.
+
+**Decision 3: Audit Log → APPROVED: Append-only Merkle DAG with compensation events.**
+The log is never edited. Corrections are appended. History is immutable.
+Recovery is automatic but transparent — every correction is itself logged.
+
+These decisions are now binding. Do not re-open without explicit user direction.
