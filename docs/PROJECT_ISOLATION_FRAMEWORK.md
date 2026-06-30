@@ -31,12 +31,14 @@ Every project is a self-contained directory on disk with zero external dependenc
   repo/                   ← The application codebase (own git remote)
   database/               ← Database files, migrations, seed data, connection config
   skills/                 ← Agent skills specific to this project
-  memories/               ← Agent memories specific to this project
-  knowledgebase/          ← Project-specific KB (docs, research, templates)
-  research/               ← Research scan configs, reports, council decisions
+  memories/               ← Agent memories, namespaced (planner/, architect/, etc.)
+  knowledgebase/          ← Stable project knowledge (API docs, architecture, business rules)
+  research/               ← Temporary findings (benchmarks, comparisons) — graduates to KB
   config/                 ← Model keys, deploy targets, API endpoints, secrets refs
-  backups/                ← Automated git-backed snapshots
-  export.sh               ← One-command packaging for transfer/exit
+  backups/                ← Automated snapshots (git-backed) — NOT inside main backup cycle
+  logs/                   ← Operational data: execution logs, audit trail, cache
+  export.sh               ← Package project for transfer (with secret scrub + signing)
+  restore.sh              ← Unpack and restore on a clean machine (with signature verify)
   README.md               ← Project overview, setup instructions
 ```
 
@@ -46,6 +48,11 @@ This is the contract between VibePilot and the project. It declares everything
 VibePilot needs to know without hardcoding anything:
 
 ```toml
+[manifest]
+version = 1                    # Schema version — bump when manifest format changes
+framework_min = "1.0"          # Minimum VibePilot version that understands this manifest
+framework_max = "2.x"          # Maximum compatible version
+
 [project]
 slug = "sealed"
 display_name = "Sealed"
@@ -64,6 +71,12 @@ runtime = "hermes"          # "hermes" | "claude-code" | "opencode" | "kilo" | "
 profile = "sealed"          # Hermes profile name, or CLI config name
 working_dir = "repo/"
 
+[execution]
+# Execution profile — how the agent should behave on this project
+cost_limit_usd = 5.00       # Daily spend cap — agent halted if exceeded
+retry_policy = "conservative"  # "conservative" | "aggressive" | "none"
+approval_required = true    # Human must approve before deploying/merging
+
 [database]
 # The project's own database. VibePilot's PostgreSQL is NOT used.
 type = "sqlite"             # "sqlite" | "postgres" | "supabase" | "none"
@@ -81,6 +94,10 @@ edge_node = "x220"          # Which machine runs the edge component
 # Which API keys this project may use. Empty = inherit from VibePilot.
 # Populated = project has its own keys.
 keys = []                   # e.g. ["SEALED_OPENAI_KEY", "SEALED_STRIPE_KEY"]
+
+[network]
+# Egress allowlist — agent can ONLY contact these domains. Default: no internet.
+egress_allow = []           # e.g. ["api.stripe.com:443", "github.com:443", "api.openai.com:443"]
 
 [isolation]
 database_separate = true    # Project has its own DB, not sharing VibePilot's
@@ -399,13 +416,37 @@ If the PIF works for Sealed, it works for everything that comes after.
    or accidentally commit secrets because they never have direct access to them.
    This is safe without being confusing — the agent just uses the env var name.
 
-5. **Every project must have export.sh.** No exceptions. If it can't be exported, it's
-   not done.
+5. **Every project must have export.sh AND restore.sh.** No exceptions. export.sh
+   packages the project; restore.sh unpacks it on a clean machine. Both must be
+   tested. Portability is bidirectional — if it can't be restored, the export is
+   worthless.
 
-6. **Every project must have a backup repo.** Automated, git-backed, verifiable restore.
+6. **Every project must have a backup repo.** Automated, git-backed, verifiable
+   restore.
 
 7. **One change at a time.** Each isolation layer is built, tested, verified before the
    next one starts. No big-bang refactors.
+
+8. **Network egress is isolated per project.** (Added per council review.) Each
+   project declares which external URLs its agent may contact (e.g.,
+   api.stripe.com, github.com). Default: no internet access unless explicitly
+   declared in vibepilot.toml. This prevents a compromised or buggy agent from
+   exfiltrating data to unexpected destinations.
+
+9. **Secrets are scrubbed on export.** (Added per council review.) export.sh runs
+   a redaction pass across the entire project directory before packaging — it
+   scans for anything that looks like an API key, token, or credential and
+   replaces it with a placeholder reference. This catches secrets the agent may
+   have accidentally written into files despite the vault system.
+
+10. **Audit entries record WHO acted.** (Added per council review.) Every log
+    entry includes the actor: which agent runtime (Hermes vs Claude Code), which
+    session, or whether it was a human action. Without this, the audit trail
+    can't answer the questions audits exist for.
+
+11. **Export archives are signed.** (Added per council review.) export.sh produces
+    a checksum/signature for the archive. restore.sh verifies it before
+    extracting anything. This catches tampering or corruption during transfer.
 
 ---
 
@@ -428,6 +469,114 @@ If the PIF works for Sealed, it works for everything that comes after.
 - VibePilot's dashboard adds per-project data scoping (project_costs, counters)
 - Hermes profiles created per project
 - KB server configured for multiple roots
+
+---
+
+---
+
+## 10. OPEN DESIGN DECISIONS (From Council Review — Need Your Decision)
+
+These are the three areas where the four AI models (Gemini, ChatGPT, Claude,
+DeepSeek) disagreed. Each needs your call before we finalize.
+
+### Decision 1: Should Projects Talk to Each Other?
+
+**The question:** Do projects need to communicate at all? For example, should Sealed
+be able to ask VibePilot for model key status, or trigger a research scan?
+
+**Gemini says YES — event bus:** Projects publish events to a shared message bus.
+Project A doesn't know about Project B, but they can react to each other's events.
+Like how different apps on your phone can share notifications.
+
+**Claude says NO — contradicts isolation:** Any communication channel between projects
+is a deliberate hole in the isolation wall. If Sealed is sold and transferred, you
+don't want it secretly depending on VibePilot's event bus. Communication should be
+default-deny, orchestrator-mediated only, and treated as an explicit exception.
+
+**DeepSeek says YES but carefully:** A "command queue" where projects send signed
+messages. VibePilot acts as a mailman — it delivers the message but doesn't let
+projects see each other's addresses. Default deny unless vibepilot.toml explicitly
+allows it.
+
+| Option | Pros | Cons |
+|--------|------|------|
+| No communication (Claude) | Maximum isolation, simplest to reason about, easiest transfer/sale | Projects can't share resources even when it would be useful |
+| Orchestrator-mediated (DeepSeek) | Controlled, logged, default-deny. VibePilot decides what passes | Adds complexity to VibePilot. Projects still depend on orchestrator for comms |
+| Open event bus (Gemini) | Flexible, projects can react to each other | Direct coupling, harder to transfer/sell, isolation holes |
+
+**My recommendation:** Claude's approach — default deny, orchestrator-mediated only.
+Projects should NOT talk to each other directly. If Sealed needs something, it asks
+VibePilot (the orchestrator), VibePilot decides whether to fulfill the request, and
+logs it. This keeps the isolation wall solid and makes projects truly standalone.
+We can always open this up later if needed — but starting permissive and tightening
+is much harder than starting tight and loosening.
+
+---
+
+### Decision 2: Should We Deduplicate Shared Files Across Projects?
+
+**The question:** If VibePilot and Sealed both use the same 500MB knowledge file
+(e.g., a shared reference library), should we store one copy and point both
+projects at it, or store separate copies?
+
+**Gemini says YES — content-addressable storage:** Hash the file content, store one
+copy, both projects reference it by hash. Saves disk space.
+
+**Claude says NO — side channel risk:** If Project A can detect that Project B has
+the same file (by checking if a hash already exists in the shared store), that's an
+information leak. A competitor or buyer could deduce what knowledge your other
+projects use.
+
+**DeepSeek says YES but encrypt first:** Encrypt each project's files with a
+project-specific key before hashing. Same plaintext produces different hashes, so
+the side channel disappears. You still get dedup but only for files that are
+identical AND encrypted with the same key (i.e., within the same project).
+
+| Option | Pros | Cons |
+|--------|------|------|
+| No dedup (Claude) | Maximum isolation, zero information leak between projects | Disk usage grows linearly with number of projects |
+| Per-project dedup only (DeepSeek) | Dedup works within a project (backups, versions). No cross-project leak | Doesn't help if 5 projects all have the same 500MB file |
+| Cross-project CAS (Gemini) | Maximum space savings | Side channel: projects can detect each other's files |
+
+**My recommendation:** Claude's approach — no cross-project dedup. Per-project dedup
+is fine (for backups and version history within a project). But across projects,
+separate copies. Disk space is cheap. Isolation is not. A 500MB file duplicated
+across 5 projects costs 2.5GB — trivial. The side channel risk is not worth saving
+$0.10 in storage.
+
+---
+
+### Decision 3: How Should the Audit Log Handle Problems?
+
+**The question:** When something goes wrong (agent crashes, writes bad data, project
+state gets corrupted), how should the audit log help recover?
+
+**Gemini says "self-healing":** The system replays the audit log, detects where things
+went wrong, and automatically rolls back to a known good state.
+
+**Claude says "self-healing" is dangerous:** Audit logs must be append-only and
+immutable. "Self-healing" implies the system rewrites or edits log entries — which
+destroys the tamper-evidence that makes the log valuable. If the log can be changed,
+you can't trust it.
+
+**DeepSeek says Merkle DAG reconciliation:** The log is append-only (never edited).
+"Self-healing" means the system replays the log, compares the current state hash
+against the expected hash, and if they don't match, it ADDS a new entry (a
+"compensation event") that says "revert transaction 123." The log is never edited —
+corrections are appended.
+
+| Option | Pros | Cons |
+|--------|------|------|
+| Append-only, no auto-recovery (Claude) | Maximum trust in log integrity | Recovery from corruption is manual |
+| Merkle DAG with compensation events (DeepSeek) | Log stays immutable. Recovery is automatic but transparent — every correction is itself logged | More complex to implement. Compensation events can chain |
+| Self-healing with edits (Gemini) | Simplest automatic recovery | Log can't be trusted as tamper-evidence. Edits destroy audit value |
+
+**My recommendation:** DeepSeek's Merkle DAG approach. The log is never edited — it's
+append-only and cryptographically chained (each entry references the hash of the
+previous one, like a mini blockchain). When something goes wrong, the system detects
+the mismatch and appends a correction entry — it never rewrites history. This gives
+us both tamper-evidence (you can verify the log hasn't been altered) AND automatic
+recovery (the system can detect and correct problems by appending, not editing).
 
 ---
 
