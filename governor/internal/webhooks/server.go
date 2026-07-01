@@ -677,6 +677,25 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Build project-scoped filters for costs and counters
+	costFilters := map[string]any{"order": "incurred_at.desc", "limit": 200}
+	counterFilters := map[string]any{}
+	if projectFilter != "" {
+		// Resolve project slug to UUID (reuse the same lookup as taskFilters above)
+		projData2, _ := s.db.Query(ctx, "projects", map[string]any{
+			"select": "id",
+			"slug":   fmt.Sprintf("eq.%s", projectFilter),
+			"limit":  1,
+		})
+		var projRows2 []map[string]any
+		if json.Unmarshal(projData2, &projRows2) == nil && len(projRows2) > 0 {
+			if projID2, ok := projRows2[0]["id"].(string); ok && projID2 != "" {
+				costFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				counterFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+			}
+		}
+	}
+
 	tables := []struct {
 		name    string
 		filters map[string]any
@@ -692,8 +711,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"exchange_rates", nil},
 		{"failure_records", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"maintenance_commands", map[string]any{"order": "created_at.desc", "limit": 200}},
-		{"system_counters", nil},
-		{"project_costs", map[string]any{"order": "incurred_at.desc", "limit": 200}},
+		{"system_counters", counterFilters},
+		{"project_costs", costFilters},
 		{"subscription_history", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"project_snapshots", map[string]any{"order": "created_at.desc", "limit": 50}},
 		{"chat_usage", map[string]any{"order": "created_at.desc", "limit": 500}},
@@ -1628,6 +1647,7 @@ func (s *Server) handleProjectCosts(w http.ResponseWriter, r *http.Request) {
 			Description string  `json:"description"`
 			AmountUSD   float64 `json:"amount_usd"`
 			Frequency   string  `json:"frequency"`
+			ProjectID   string  `json:"project_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, `{"error":"bad request"}`, http.StatusBadRequest)
@@ -1646,12 +1666,16 @@ func (s *Server) handleProjectCosts(w http.ResponseWriter, r *http.Request) {
 			if req.Frequency == "" {
 				req.Frequency = "one_time"
 			}
-			result, err := s.db.RPC(ctx, "add_project_cost", map[string]any{
+			rpcParams := map[string]any{
 				"p_category":    req.Category,
 				"p_description": req.Description,
 				"p_amount_usd":  req.AmountUSD,
 				"p_frequency":   req.Frequency,
-			})
+			}
+			if req.ProjectID != "" {
+				rpcParams["p_project_id"] = req.ProjectID
+			}
+			result, err := s.db.RPC(ctx, "add_project_cost", rpcParams)
 			if err != nil {
 				log.Printf("[ProjectCosts] Add failed: %v", err)
 				http.Error(w, `{"error":"internal"}`, http.StatusInternalServerError)
