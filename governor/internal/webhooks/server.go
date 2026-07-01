@@ -229,6 +229,13 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/tasks/clear-all", s.handleTasksClearAll)
 	mux.HandleFunc("/api/tasks/active", s.handleTasksActive)
 
+	// PIF Phase G: Per-project kanban
+	mux.HandleFunc("/api/todos", s.handleTodos)
+	mux.HandleFunc("/api/todos/", s.handleTodoByID)
+
+	// PIF Phase G: Per-project code graph
+	mux.HandleFunc("/api/code-graph", s.handleCodeGraph)
+
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("127.0.0.1:%d", s.port),
 		Handler: s.corsMiddleware(mux),
@@ -682,9 +689,14 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build project-scoped filters for costs and counters
+	// Build project-scoped filters for costs, counters, todos, and code graph
 	costFilters := map[string]any{"order": "incurred_at.desc", "limit": 200}
 	counterFilters := map[string]any{}
+	todoFilters := map[string]any{"order": "sort_order.asc", "limit": 200}
+	codeGraphFilters := map[string]any{}
+	kbFilters := map[string]any{"limit": 200}
+	kbFileFilters := map[string]any{"order": "updated_at.desc", "limit": 200}
+	kbDocFilters := map[string]any{"limit": 200}
 	if projectFilter != "" {
 		// Resolve project slug to UUID (reuse the same lookup as taskFilters above)
 		projData2, _ := s.db.Query(ctx, "projects", map[string]any{
@@ -697,6 +709,11 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			if projID2, ok := projRows2[0]["id"].(string); ok && projID2 != "" {
 				costFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				counterFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				todoFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				codeGraphFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				kbFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				kbFileFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				kbDocFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 			}
 		}
 	}
@@ -720,6 +737,11 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"project_costs", costFilters},
 		{"subscription_history", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"project_snapshots", map[string]any{"order": "created_at.desc", "limit": 50}},
+		{"project_todos", todoFilters},
+		{"code_graph_snapshots", codeGraphFilters},
+		{"kb_knowledge_items", kbFilters},
+		{"kb_files", kbFileFilters},
+		{"kb_doc_sections", kbDocFilters},
 		{"chat_usage", map[string]any{"order": "created_at.desc", "limit": 500}},
 		{"agent_sessions", map[string]any{"order": "last_activity_at.desc", "limit": 100}},
 		{"visual_qa_runs", map[string]any{"order": "started_at.desc", "limit": 50}},
@@ -3214,4 +3236,246 @@ func unwrapRPCResult(data []byte, funcName string) []byte {
 		return inner
 	}
 	return data
+}
+
+// ============================================================================
+// PIF Phase G: Per-project Kanban (project_todos CRUD)
+// ============================================================================
+
+func (s *Server) handleTodos(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		projectFilter := r.URL.Query().Get("project")
+		filters := map[string]any{"order": "sort_order.asc", "limit": 500}
+		if projectFilter != "" {
+			projID, err := s.resolveProjectSlug(r.Context(), projectFilter)
+			if err == nil && projID != "" {
+				filters["project_id"] = fmt.Sprintf("eq.%s", projID)
+			}
+		}
+		data, err := s.db.Query(r.Context(), "project_todos", filters)
+		if err != nil {
+			http.Error(w, "Failed to fetch todos", http.StatusInternalServerError)
+			return
+		}
+		if data == nil {
+			data = json.RawMessage("[]")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
+
+	case http.MethodPost:
+		var req struct {
+			ProjectSlug string `json:"project_slug"`
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			Status      string `json:"status"`
+			Priority    string `json:"priority"`
+			Category    string `json:"category"`
+			Source      string `json:"source"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+		if req.Title == "" {
+			http.Error(w, "title is required", http.StatusBadRequest)
+			return
+		}
+
+		projID, err := s.resolveProjectSlug(r.Context(), req.ProjectSlug)
+		if err != nil || projID == "" {
+			http.Error(w, "Unknown project: "+req.ProjectSlug, http.StatusBadRequest)
+			return
+		}
+
+		status := req.Status
+		if status == "" {
+			status = "todo"
+		}
+		priority := req.Priority
+		if priority == "" {
+			priority = "medium"
+		}
+		category := req.Category
+		if category == "" {
+			category = "general"
+		}
+		source := req.Source
+		if source == "" {
+			source = "manual"
+		}
+
+		rpcData, err := s.db.RPC(r.Context(), "create_todo", map[string]any{
+			"p_project_id":  projID,
+			"p_title":       req.Title,
+			"p_description": req.Description,
+			"p_status":      status,
+			"p_priority":    priority,
+			"p_category":    category,
+			"p_source":      source,
+			"p_sort_order":  0,
+		})
+		if err != nil {
+			log.Printf("[Todos] Failed to create todo: %v", err)
+			http.Error(w, "Failed to create todo", http.StatusInternalServerError)
+			return
+		}
+
+		// RPC returns scalar (new_id), wrap in a JSON object for the client
+		w.Header().Set("Content-Type", "application/json")
+		if len(rpcData) > 0 && string(rpcData) != "null" {
+			w.Write([]byte(`{"status":"ok","id":` + string(rpcData) + `}`))
+		} else {
+			w.Write([]byte(`{"status":"ok"}`))
+		}
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleTodoByID(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "PUT, PATCH, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	todoID := r.URL.Path[len("/api/todos/"):]
+	if todoID == "" {
+		http.Error(w, "Todo ID required", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPut, http.MethodPatch:
+		var req struct {
+			Title       *string `json:"title"`
+			Description *string `json:"description"`
+			Status      *string `json:"status"`
+			Priority    *string `json:"priority"`
+			Category    *string `json:"category"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		updateParams := map[string]any{"p_id": todoID}
+		if req.Title != nil {
+			updateParams["p_title"] = *req.Title
+		}
+		if req.Description != nil {
+			updateParams["p_description"] = *req.Description
+		}
+		if req.Status != nil {
+			updateParams["p_status"] = *req.Status
+		}
+		if req.Priority != nil {
+			updateParams["p_priority"] = *req.Priority
+		}
+		if req.Category != nil {
+			updateParams["p_category"] = *req.Category
+		}
+
+		_, err := s.db.RPC(r.Context(), "update_todo", updateParams)
+		if err != nil {
+			log.Printf("[Todos] Failed to update todo %s: %v", todoID, err)
+			http.Error(w, "Failed to update todo", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok"}`))
+
+	case http.MethodDelete:
+		_, err := s.db.RPC(r.Context(), "delete_todo", map[string]any{
+			"p_id": todoID,
+		})
+		if err != nil {
+			log.Printf("[Todos] Failed to delete todo %s: %v", todoID, err)
+			http.Error(w, "Failed to delete todo", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok"}`))
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// ============================================================================
+// PIF Phase G: Per-project Code Graph (Understand Anything snapshots)
+// ============================================================================
+
+func (s *Server) handleCodeGraph(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	projectFilter := r.URL.Query().Get("project")
+	if projectFilter == "" {
+		http.Error(w, "project parameter required", http.StatusBadRequest)
+		return
+	}
+
+	projID, err := s.resolveProjectSlug(r.Context(), projectFilter)
+	if err != nil || projID == "" {
+		http.Error(w, "Unknown project: "+projectFilter, http.StatusBadRequest)
+		return
+	}
+
+	data, err := s.db.Query(r.Context(), "code_graph_snapshots", map[string]any{
+		"project_id": fmt.Sprintf("eq.%s", projID),
+		"limit":      1,
+	})
+	if err != nil {
+		http.Error(w, "Failed to fetch code graph", http.StatusInternalServerError)
+		return
+	}
+	if data == nil {
+		data = json.RawMessage("[]")
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+}
+
+// resolveProjectSlug resolves a project slug to its UUID.
+func (s *Server) resolveProjectSlug(ctx context.Context, slug string) (string, error) {
+	if slug == "" {
+		return "", fmt.Errorf("empty slug")
+	}
+	projData, err := s.db.Query(ctx, "projects", map[string]any{
+		"select": "id",
+		"slug":   fmt.Sprintf("eq.%s", slug),
+		"limit":  1,
+	})
+	if err != nil {
+		return "", err
+	}
+	var rows []map[string]any
+	if json.Unmarshal(projData, &rows) != nil || len(rows) == 0 {
+		return "", fmt.Errorf("project not found: %s", slug)
+	}
+	id, _ := rows[0]["id"].(string)
+	return id, nil
 }

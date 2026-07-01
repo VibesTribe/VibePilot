@@ -216,6 +216,13 @@ var defaultRPCAllowlist = map[string]bool{
 	"resolve_review_items_by_source": true,
 	"report_undecided_count":         true,
 	"mark_report_if_decided":         true,
+
+	// PIF Phase G: Per-project kanban and code graph
+	"create_todo":               true,
+	"update_todo":               true,
+	"delete_todo":               true,
+	"reorder_todos":             true,
+	"upsert_code_graph":         true,
 }
 
 type RPCAllowlist struct {
