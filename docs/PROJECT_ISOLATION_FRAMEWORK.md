@@ -347,11 +347,14 @@ up the working directory, and invokes the agent with the project's context.
 - [x] Unit tests pass (sealed context loaded correctly, vibepilot/missing return nil)
 - File: governor/internal/runtime/project_context.go
 
-### Phase C: Database Separation (WHEN CONTEXT SWITCHING WORKS)
-- Each project declares its DB in vibepilot.toml
-- VibePilot's dashboard queries the project's DB for project-specific data
-- project_costs and system_counters get project_id columns (VibePilot's DB, for
-  the dashboard's ROI panel only)
+### Phase C: Database Separation (COMPLETE)
+- [x] Migration 048: project_id column added to project_costs + system_counters
+- [x] All existing rows backfilled to vibepilot UUID
+- [x] FK constraints + indexes on project_id
+- [x] RPC functions updated: add_project_cost, list_project_costs, get_project_cost_summary accept p_project_id
+- [x] Dashboard filters costs/counters by project_id when ?project=slug query param present
+- [x] handleProjectCosts handler passes project_id to RPCs
+- [x] Verified: vibepilot=16 costs/1 counter, sealed=0/0, global=16/1
 
 ### Phase D: Research Isolation (WHEN DB SEPARATION WORKS)
 - Each project can have its own research pipeline
