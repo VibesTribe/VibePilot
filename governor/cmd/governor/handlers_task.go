@@ -730,6 +730,21 @@ func (h *TaskHandler) executeTask(
 		"p_new_status": "review",
 	})
 
+	// PIF Phase C: Aggregate task costs and update project cumulative totals.
+	// This keeps the projects table current for the dashboard ROI panel.
+	if projectCfg != nil {
+		if _, err := h.database.RPC(ctx, "aggregate_task_costs", map[string]any{
+			"p_task_id": taskID,
+		}); err != nil {
+			log.Printf("[TaskHandler] aggregate_task_costs failed for %s: %v", truncateID(taskID), err)
+		}
+		if _, err := h.database.RPC(ctx, "update_project_cumulative", map[string]any{
+			"p_project_id": projectCfg.ID,
+		}); err != nil {
+			log.Printf("[TaskHandler] update_project_cumulative failed for project %s: %v", projectCfg.Slug, err)
+		}
+	}
+
 	h.recordSuccess(ctx, taskID, modelID, taskCategory, duration.Seconds(), totalTokens)
 
 	// Record successful completion with tracker

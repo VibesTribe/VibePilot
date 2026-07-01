@@ -197,6 +197,9 @@ var defaultRPCAllowlist = map[string]bool{
 	"archive_project_cost":   true,
 	"list_project_costs":     true,
 	"get_project_cost_summary": true,
+	"get_project_roi":          true,
+	"get_all_projects_roi":     true,
+	"update_project_cumulative": true,
 
 	// Knowledge base context pack (for agent orientation)
 	"kb_context_pack": true,

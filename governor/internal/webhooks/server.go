@@ -189,6 +189,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/project/alerts", s.handleProjectAlerts)
 	mux.HandleFunc("/api/projects", s.handleProjects)
 	mux.HandleFunc("/api/projects/scaffold", s.handleProjectScaffold)
+	mux.HandleFunc("/api/project-roi", s.handleProjectROI)
 	mux.HandleFunc("/api/project-costs", s.handleProjectCosts)
 	mux.HandleFunc("/api/admin/model", s.handleAdminModel)
 	mux.HandleFunc("/api/admin/models", s.handleAdminModels)
@@ -1466,6 +1467,73 @@ func (s *Server) handleProjectScaffold(w http.ResponseWriter, r *http.Request) {
 		"result":  result,
 		"success": !strings.Contains(result, "failed"),
 	})
+}
+
+// handleProjectROI returns per-project ROI data (task counts, tokens, costs, savings).
+// GET /api/project-roi?slug=sealed  or  GET /api/project-roi (returns all projects)
+func (s *Server) handleProjectROI(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "GET only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	slug := r.URL.Query().Get("slug")
+
+	if slug != "" {
+		// Single project ROI
+		projData, err := s.db.Query(r.Context(), "projects", map[string]any{
+			"select": "id",
+			"slug":   fmt.Sprintf("eq.%s", slug),
+			"limit":  1,
+		})
+		if err != nil {
+			http.Error(w, `{"error":"project not found"}`, http.StatusNotFound)
+			return
+		}
+		var projRows []map[string]any
+		if json.Unmarshal(projData, &projRows) != nil || len(projRows) == 0 {
+			http.Error(w, `{"error":"project not found"}`, http.StatusNotFound)
+			return
+		}
+		projID, _ := projRows[0]["id"].(string)
+		if projID == "" {
+			http.Error(w, `{"error":"project has no id"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// First refresh cumulative totals
+		s.db.RPC(r.Context(), "update_project_cumulative", map[string]any{
+			"p_project_id": projID,
+		})
+
+		result, err := s.db.RPC(r.Context(), "get_project_roi", map[string]any{
+			"p_project_id": projID,
+		})
+		if err != nil {
+			http.Error(w, `{"error":"roi query failed"}`, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Write(result)
+		return
+	}
+
+	// All projects ROI
+	result, err := s.db.RPC(r.Context(), "get_all_projects_roi", nil)
+	if err != nil {
+		http.Error(w, `{"error":"roi query failed"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Write(result)
 }
 
 // handleReviewQueue returns pending items from the unified review_items table.
