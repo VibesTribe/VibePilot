@@ -236,6 +236,9 @@ func (s *Server) Start(ctx context.Context) error {
 	// PIF Phase G: Per-project code graph
 	mux.HandleFunc("/api/code-graph", s.handleCodeGraph)
 
+	// PIF Phase H: Project intake (PRD → kanban + KB seeding)
+	mux.HandleFunc("/api/project-intake", s.handleProjectIntake)
+
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("127.0.0.1:%d", s.port),
 		Handler: s.corsMiddleware(mux),
@@ -3478,4 +3481,224 @@ func (s *Server) resolveProjectSlug(ctx context.Context, slug string) (string, e
 	}
 	id, _ := rows[0]["id"].(string)
 	return id, nil
+}
+
+// ============================================================================
+// PIF Phase H: Project Intake (PRD → kanban seeding + KB setup)
+// ============================================================================
+
+// handleProjectIntake accepts a PRD/blueprint for a project and:
+// 1. Saves the PRD document to the project's knowledgebase directory
+// 2. Parses it for features/tasks and creates initial kanban items
+// 3. Updates the project's .hermes.md with domain-specific context
+// POST /api/project-intake
+// Body: {"project_slug":"sealed", "prd":"...", "tech_stack":"Go,Next.js"}
+func (s *Server) handleProjectIntake(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ProjectSlug string `json:"project_slug"`
+		PRD         string `json:"prd"`
+		TechStack   string `json:"tech_stack"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.ProjectSlug == "" {
+		http.Error(w, "project_slug is required", http.StatusBadRequest)
+		return
+	}
+	if req.PRD == "" {
+		http.Error(w, "prd is required", http.StatusBadRequest)
+		return
+	}
+
+	projID, err := s.resolveProjectSlug(r.Context(), req.ProjectSlug)
+	if err != nil || projID == "" {
+		http.Error(w, "Unknown project: "+req.ProjectSlug, http.StatusBadRequest)
+		return
+	}
+
+	result := map[string]any{
+		"project_slug": req.ProjectSlug,
+		"actions":      []map[string]any{},
+	}
+
+	// 1. Save PRD to project's knowledgebase directory
+	projectDir := filepath.Join(os.Getenv("HOME"), "projects", req.ProjectSlug)
+	kbDir := filepath.Join(projectDir, "knowledgebase")
+	prdPath := filepath.Join(kbDir, "PRD.md")
+	os.MkdirAll(kbDir, 0755)
+	if err := os.WriteFile(prdPath, []byte(req.PRD), 0644); err != nil {
+		log.Printf("[Intake] Failed to save PRD for %s: %v", req.ProjectSlug, err)
+	} else {
+		result["actions"] = append(result["actions"].([]map[string]any), map[string]any{
+			"action": "prd_saved",
+			"path":   prdPath,
+		})
+	}
+
+	// 2. Save tech stack info if provided
+	if req.TechStack != "" {
+		stackPath := filepath.Join(kbDir, "TECH_STACK.md")
+		stackContent := fmt.Sprintf("# %s — Tech Stack\n\n%s\n", req.ProjectSlug, req.TechStack)
+		os.WriteFile(stackPath, []byte(stackContent), 0644)
+		result["actions"] = append(result["actions"].([]map[string]any), map[string]any{
+			"action": "tech_stack_saved",
+			"path":   stackPath,
+		})
+	}
+
+	// 3. Parse PRD for features and create kanban items
+	todos := parsePRDToTodos(req.PRD)
+	createdTodos := []map[string]any{}
+	for _, todo := range todos {
+		rpcResult, rpcErr := s.db.RPC(r.Context(), "create_todo", map[string]any{
+			"p_project_id":  projID,
+			"p_title":       todo["title"],
+			"p_description": todo["description"],
+			"p_status":      "backlog",
+			"p_priority":    todo["priority"],
+			"p_category":    todo["category"],
+			"p_source":      "dashboard",
+		})
+		if rpcErr != nil {
+			log.Printf("[Intake] Failed to create todo '%s': %v", todo["title"], rpcErr)
+			continue
+		}
+		var todoID int
+		json.Unmarshal(rpcResult, &todoID)
+		createdTodos = append(createdTodos, map[string]any{
+			"title":    todo["title"],
+			"priority": todo["priority"],
+			"category": todo["category"],
+			"id":       todoID,
+		})
+	}
+	result["actions"] = append(result["actions"].([]map[string]any), map[string]any{
+		"action":    "kanban_seeded",
+		"todo_count": len(createdTodos),
+		"todos":     createdTodos,
+	})
+
+	// 4. Update project's .hermes.md with PRD context
+	hermesPath := filepath.Join(projectDir, ".hermes.md")
+	if _, err := os.Stat(hermesPath); err == nil {
+		existing, _ := os.ReadFile(hermesPath)
+		// Append PRD reference if not already there
+		content := string(existing)
+		if !strings.Contains(content, "## Project Blueprint") {
+			// Extract first 500 chars of PRD as summary
+			prdSummary := req.PRD
+			if len(prdSummary) > 500 {
+				prdSummary = prdSummary[:500] + "..."
+			}
+			content += "\n## Project Blueprint\n\n" + prdSummary + "\n\nFull PRD: knowledgebase/PRD.md\n"
+			os.WriteFile(hermesPath, []byte(content), 0644)
+			result["actions"] = append(result["actions"].([]map[string]any), map[string]any{
+				"action": "hermes_md_updated",
+				"path":   hermesPath,
+			})
+		}
+	}
+
+	// 5. Update project tech_stack in DB if provided
+	if req.TechStack != "" {
+		// Resolve project UUID for the Update call
+		s.db.RPC(r.Context(), "upsert_project_meta", map[string]any{
+			"p_slug":       req.ProjectSlug,
+			"p_tech_stack": req.TechStack,
+		})
+	}
+
+	log.Printf("[Intake] Project intake complete for %s: %d kanban items, PRD saved", req.ProjectSlug, len(createdTodos))
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// parsePRDToTodos extracts actionable items from a PRD document.
+// Looks for markdown headers, bullet points, and feature descriptions.
+func parsePRDToTodos(prd string) []map[string]string {
+	todos := []map[string]string{}
+	lines := strings.Split(prd, "\n")
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Match markdown headers (## Feature: ...)
+		if strings.HasPrefix(trimmed, "## ") || strings.HasPrefix(trimmed, "### ") {
+			title := strings.TrimPrefix(strings.TrimPrefix(trimmed, "## "), "### ")
+			title = strings.TrimSpace(title)
+			// Skip non-feature headers
+			lower := strings.ToLower(title)
+			if strings.Contains(lower, "overview") || strings.Contains(lower, "introduction") ||
+				strings.Contains(lower, "table of contents") || strings.Contains(lower, "summary") ||
+				len(title) < 5 {
+				continue
+			}
+			priority := "medium"
+			if strings.Contains(lower, "critical") || strings.Contains(lower, "core") || strings.Contains(lower, "must") {
+				priority = "high"
+			}
+			category := "feature"
+			if strings.Contains(lower, "database") || strings.Contains(lower, "schema") {
+				category = "database"
+			} else if strings.Contains(lower, "api") || strings.Contains(lower, "endpoint") {
+				category = "api"
+			} else if strings.Contains(lower, "auth") || strings.Contains(lower, "security") {
+				category = "security"
+			} else if strings.Contains(lower, "ui") || strings.Contains(lower, "frontend") || strings.Contains(lower, "dashboard") {
+				category = "frontend"
+			}
+			todos = append(todos, map[string]string{
+				"title":       title,
+				"description": "From PRD: " + trimmed,
+				"priority":    priority,
+				"category":    category,
+			})
+		}
+
+		// Match action items (- [ ] Task or - Must do X)
+		if (strings.HasPrefix(trimmed, "- [ ]") || strings.HasPrefix(trimmed, "- [x]")) && len(trimmed) > 8 {
+			title := strings.TrimSpace(trimmed[5:])
+			if len(title) > 5 {
+				todos = append(todos, map[string]string{
+					"title":       title,
+					"description": "From PRD action item",
+					"priority":    "medium",
+					"category":    "feature",
+				})
+			}
+		}
+
+		// Match "Must" / "Shall" / "Needs to" requirements
+		if (strings.HasPrefix(trimmed, "- Must ") || strings.HasPrefix(trimmed, "- Shall ") || strings.HasPrefix(trimmed, "- Needs to ")) && len(trimmed) > 10 {
+			title := strings.TrimSpace(trimmed[2:])
+			todos = append(todos, map[string]string{
+				"title":       title,
+				"description": "From PRD requirement: " + trimmed,
+				"priority":    "high",
+				"category":    "requirement",
+			})
+		}
+	}
+
+	// Cap at 30 items to avoid flooding the kanban
+	if len(todos) > 30 {
+		todos = todos[:30]
+	}
+
+	return todos
 }

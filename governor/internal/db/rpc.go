@@ -223,6 +223,7 @@ var defaultRPCAllowlist = map[string]bool{
 	"delete_todo":               true,
 	"reorder_todos":             true,
 	"upsert_code_graph":         true,
+	"upsert_project_meta":       true,
 }
 
 type RPCAllowlist struct {
