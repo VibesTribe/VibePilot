@@ -540,6 +540,7 @@ func (s *Server) handleResearchSuggestion(w http.ResponseWriter, r *http.Request
 		FindingsPath string                 `json:"findings_path"`
 		Status       string                 `json:"status"`
 		Source       string                 `json:"source"`
+		ProjectID    string                 `json:"project_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
@@ -611,6 +612,9 @@ func (s *Server) handleResearchSuggestion(w http.ResponseWriter, r *http.Request
 		"findings_path": req.FindingsPath,
 		"status":        req.Status,
 		"source":        req.Source,
+	}
+	if req.ProjectID != "" {
+		insertData["project_id"] = req.ProjectID
 	}
 
 	result, err := s.db.Insert(ctx, "research_suggestions", insertData)
@@ -2888,6 +2892,10 @@ func (s *Server) handleResearchReports(w http.ResponseWriter, r *http.Request) {
 	}
 	if reportType := r.URL.Query().Get("type"); reportType != "" {
 		filters["report_type"] = reportType
+	}
+	// PIF Phase D: filter by project_id if provided
+	if projectID := r.URL.Query().Get("project_id"); projectID != "" {
+		filters["project_id"] = fmt.Sprintf("eq.%s", projectID)
 	}
 
 	data, err := s.db.Query(r.Context(), "research_reports", filters)
