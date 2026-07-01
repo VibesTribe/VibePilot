@@ -356,19 +356,24 @@ up the working directory, and invokes the agent with the project's context.
 - [x] handleProjectCosts handler passes project_id to RPCs
 - [x] Verified: vibepilot=16 costs/1 counter, sealed=0/0, global=16/1
 
-### Phase D: Research Isolation (WHEN DB SEPARATION WORKS)
-- Each project can have its own research pipeline
-- Different sources, different council, different schedule
-- Reports go to project's own DB / directory
+### Phase D: Research Isolation (COMPLETE)
+- [x] Migration 050: project_id added to research_suggestions, research_reports, research_bookmarks, research_queue
+- [x] 63 suggestions + 16 reports backfilled to vibepilot
+- [x] handleResearchSuggestion accepts project_id in POST body
+- [x] handleResearchReports supports ?project_id= query param filtering
 
-### Phase E: Export & Transfer (WHEN PROJECT IS STABLE)
-- export.sh functional
-- Test: export Sealed, deploy on a clean machine, verify it runs
+### Phase E: Export & Transfer (COMPLETE)
+- [x] export.sh tested: secret scrub, SHA256 signing, --include-db, --include-secrets flags
+- [x] restore.sh tested: signature verification before extraction
+- [x] Full export/import cycle verified on Sealed (archive created, extracted, verified)
+- [x] Guardrails 5, 9, 11 satisfied
 
-### Phase F: Backup Automation (ONGOING)
-- Git-backed backups to private repo
-- Schedule via cron
-- Verify restore works
+### Phase F: Backup Automation (COMPLETE)
+- [x] pif_backup.sh: git-commits project to private backup repo
+- [x] Reads backup repo from vibepilot.toml, rsyncs, commits, pushes
+- [x] Supports single project (--slug) or all projects (--all)
+- [x] Daily cron job at 3 AM (job ID: 756e4bf0a7f8)
+- [x] Sealed backed up to VibesTribe/sealed-backup (18 files)
 
 ---
 
