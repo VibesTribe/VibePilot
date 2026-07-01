@@ -390,11 +390,17 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 			continue
 		}
 
-		// Build context: full report, original content, system context, and prior member votes for context
+		// Build context: council reviews ALL items together, not one-per-member
+		// Use modulo to safely pick a representative item for context display
+		itemIdx := i % len(itemsRaw)
+		currentItem, _ := itemsRaw[itemIdx].(map[string]any)
 		contextData := map[string]any{
-			"report":          report,
-			"items":           itemsRaw,
-			"original_report": reportContent,
+			"report_summary": map[string]any{
+				"title":       getString(report, "title"),
+				"total_items": len(itemsRaw),
+			},
+			"current_item":    currentItem,
+			"report_excerpt":  reportContent,
 			"system_context":  systemContext,
 			"lens":            lens,
 			"member_number":   i + 1,
@@ -410,7 +416,11 @@ func (h *ResearchHandler) handleReportCouncilReview(event runtime.Event) {
 					continue
 				}
 				if pr.items != nil {
-					priorVotes = append(priorVotes, map[string]any{"member": pi + 1, "votes": pr.items})
+					// Pass summarized votes to maintain low context for subsequent members
+					priorVotes = append(priorVotes, map[string]any{
+						"member": pi + 1,
+						"votes":  pr.items,
+					})
 				}
 			}
 			if len(priorVotes) > 0 {
