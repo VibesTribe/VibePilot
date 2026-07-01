@@ -700,6 +700,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	kbFilters := map[string]any{"limit": 200}
 	kbFileFilters := map[string]any{"order": "updated_at.desc", "limit": 200}
 	kbDocFilters := map[string]any{"limit": 200}
+	subFilters := map[string]any{"order": "created_at.desc", "limit": 200}
 	if projectFilter != "" {
 		// Resolve project slug to UUID (reuse the same lookup as taskFilters above)
 		projData2, _ := s.db.Query(ctx, "projects", map[string]any{
@@ -717,6 +718,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 				kbFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				kbFileFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				kbDocFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				subFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 			}
 		}
 	}
@@ -738,7 +740,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"maintenance_commands", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"system_counters", counterFilters},
 		{"project_costs", costFilters},
-		{"subscription_history", map[string]any{"order": "created_at.desc", "limit": 200}},
+		{"subscription_history", subFilters},
 		{"project_snapshots", map[string]any{"order": "created_at.desc", "limit": 50}},
 		{"project_todos", todoFilters},
 		{"code_graph_snapshots", codeGraphFilters},
