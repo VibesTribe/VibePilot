@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-01T10:30:10.756244+00:00",
+  "timestamp": "2026-07-02T10:30:40.520238+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -70,11 +70,6 @@
       "alive": false,
       "status": "HTTP 400: {\"error\":{\"message\":\"deepseek-ai/deepseek-v4-flash is not a valid model ID\",\"code\":400},\"user_id\":\"user_3CdMRRHo4N09mdBX77OuOG9Ihkq\"}",
       "provider": "nvidia"
-    },
-    "z-ai/glm-5.1": {
-      "alive": true,
-      "status": "ok",
-      "provider": "nvidia"
     }
   },
   "changes": [
@@ -100,8 +95,8 @@
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
         "gemini-2.5-flash-native-audio-latest",
-        "whisper-large-v3",
-        "meta-llama/llama-prompt-guard-2-86m"
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "llama-3.1-8b-instant"
       ]
     }
   ],
