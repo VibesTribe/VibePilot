@@ -14,12 +14,20 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 1048576
+      "status": "active"
+    },
+    {
+      "id": "google/lyria-3-clip-preview",
+      "name": "Google: Lyria 3 Clip Preview",
+      "provider": "openrouter",
+      "context_limit": 1048576,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
     },
     {
       "id": "google/lyria-3-pro-preview",
@@ -33,30 +41,7 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 1048576
-    },
-    {
-      "id": "google/lyria-3-clip-preview",
-      "name": "Google: Lyria 3 Clip Preview",
-      "provider": "openrouter",
-      "context_limit": 1048576,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
@@ -85,27 +70,8 @@
       "status": "active"
     },
     {
-      "id": "google/gemma-4-31b-it:free",
-      "name": "Google: Gemma 4 31B (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text",
-        "vision"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 262144
-    },
-    {
-      "id": "poolside/laguna-xs-2.1:free",
-      "name": "Poolside: Laguna XS 2.1 (free)",
+      "id": "poolside/laguna-xs.2:free",
+      "name": "Poolside: Laguna XS.2 (free)",
       "provider": "openrouter",
       "context_limit": 262144,
       "capabilities": [
@@ -114,30 +80,7 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 262144
-    },
-    {
-      "id": "poolside/laguna-m.1:free",
-      "name": "Poolside: Laguna M.1 (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 262144
+      "status": "active"
     },
     {
       "id": "qwen/qwen3-next-80b-a3b-instruct:free",
@@ -152,30 +95,7 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 262144
-    },
-    {
-      "id": "poolside/laguna-xs.2:free",
-      "name": "Poolside: Laguna XS.2 (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 262144
+      "status": "active"
     },
     {
       "id": "google/gemma-4-26b-a4b-it:free",
@@ -189,20 +109,42 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 262144
+      "status": "active"
     },
     {
-      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
-      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
+      "id": "poolside/laguna-m.1:free",
+      "name": "Poolside: Laguna M.1 (free)",
       "provider": "openrouter",
-      "context_limit": 256000,
+      "context_limit": 262144,
       "capabilities": [
         "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "poolside/laguna-xs-2.1:free",
+      "name": "Poolside: Laguna XS 2.1 (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-4-31b-it:free",
+      "name": "Google: Gemma 4 31B (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text",
+        "vision"
       ],
       "access_via": [
         "openrouter-api"
@@ -220,16 +162,24 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 256000
+      "status": "active"
     },
     {
       "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
       "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
+      "provider": "openrouter",
+      "context_limit": 256000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
+      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
       "provider": "openrouter",
       "context_limit": 256000,
       "capabilities": [
@@ -251,12 +201,7 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 200000
+      "status": "active"
     },
     {
       "id": "nousresearch/hermes-3-llama-3.1-405b:free",
@@ -270,54 +215,7 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 131072
-    },
-    {
-      "id": "openai/gpt-oss-20b:free",
-      "name": "OpenAI: gpt-oss-20b (free)",
-      "provider": "openrouter",
-      "context_limit": 131072,
-      "capabilities": [
-        "code",
-        "instruction",
-        "reasoning",
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 131072
-    },
-    {
-      "id": "openai/gpt-oss-120b:free",
-      "name": "OpenAI: gpt-oss-120b (free)",
-      "provider": "openrouter",
-      "context_limit": 131072,
-      "capabilities": [
-        "code",
-        "instruction",
-        "reasoning",
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 131072
+      "status": "active"
     },
     {
       "id": "meta-llama/llama-3.3-70b-instruct:free",
@@ -333,12 +231,39 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 131072
+      "status": "active"
+    },
+    {
+      "id": "openai/gpt-oss-20b:free",
+      "name": "OpenAI: gpt-oss-20b (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "openai/gpt-oss-120b:free",
+      "name": "OpenAI: gpt-oss-120b (free)",
+      "provider": "openrouter",
+      "context_limit": 131072,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
     },
     {
       "id": "meta-llama/llama-3.2-3b-instruct:free",
@@ -352,16 +277,11 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 131072
+      "status": "active"
     },
     {
-      "id": "nvidia/nemotron-nano-9b-v2:free",
-      "name": "NVIDIA: Nemotron Nano 9B V2 (free)",
+      "id": "nvidia/nemotron-3.5-content-safety:free",
+      "name": "NVIDIA: Nemotron 3.5 Content Safety (free)",
       "provider": "openrouter",
       "context_limit": 128000,
       "capabilities": [
@@ -386,8 +306,8 @@
       "status": "active"
     },
     {
-      "id": "nvidia/nemotron-3.5-content-safety:free",
-      "name": "NVIDIA: Nemotron 3.5 Content Safety (free)",
+      "id": "nvidia/nemotron-nano-9b-v2:free",
+      "name": "NVIDIA: Nemotron Nano 9B V2 (free)",
       "provider": "openrouter",
       "context_limit": 128000,
       "capabilities": [
@@ -453,13 +373,7 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200,
-        "tokens_per_day": 100000
-      },
-      "context_length": 262144
+      "status": "active"
     },
     {
       "id": "groq/llama-3.3-70b-versatile",
@@ -490,13 +404,7 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200,
-        "tokens_per_day": 100000
-      },
-      "context_length": 131072
+      "status": "active"
     },
     {
       "id": "openai/gpt-oss-safeguard-20b",
@@ -512,13 +420,7 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200,
-        "tokens_per_day": 100000
-      },
-      "context_length": 131072
+      "status": "active"
     },
     {
       "id": "groq/llama-3.1-8b-instant",
@@ -558,12 +460,7 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 30,
-        "requests_per_day": 14400,
-        "tokens_per_day": 100000
-      }
+      "status": "active"
     },
     {
       "id": "canopylabs/orpheus-arabic-saudi",
@@ -576,12 +473,7 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 30,
-        "requests_per_day": 14400,
-        "tokens_per_day": 100000
-      }
+      "status": "active"
     },
     {
       "id": "z-ai/glm-5.2",
@@ -597,12 +489,7 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "nvidia/nemotron-3-super-120b-a12b",
@@ -631,23 +518,31 @@
       "status": "active"
     },
     {
-      "id": "moonshotai/kimi-k2.6",
-      "name": "moonshotai/kimi-k2.6",
+      "id": "google/gemma-4-31b-it",
+      "name": "google/gemma-4-31b-it",
       "provider": "nvidia",
       "context_limit": 262144,
       "capabilities": [
-        "instruction",
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemotron-3-nano-30b-a3b",
+      "name": "nvidia/nemotron-3-nano-30b-a3b",
+      "provider": "nvidia",
+      "context_limit": 262144,
+      "capabilities": [
         "text"
       ],
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 262144
+      "status": "active"
     },
     {
       "id": "qwen/qwen3.5-122b-a10b",
@@ -662,31 +557,21 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 262144
+      "status": "active"
     },
     {
-      "id": "google/gemma-4-31b-it",
-      "name": "google/gemma-4-31b-it",
+      "id": "moonshotai/kimi-k2.6",
+      "name": "moonshotai/kimi-k2.6",
       "provider": "nvidia",
       "context_limit": 262144,
       "capabilities": [
-        "text",
-        "vision"
+        "instruction",
+        "text"
       ],
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 262144
+      "status": "active"
     },
     {
       "id": "qwen/qwen3-next-80b-a3b-instruct",
@@ -696,24 +581,6 @@
       "capabilities": [
         "instruction",
         "reasoning",
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 262144
-    },
-    {
-      "id": "nvidia/nemotron-3-nano-30b-a3b",
-      "name": "nvidia/nemotron-3-nano-30b-a3b",
-      "provider": "nvidia",
-      "context_limit": 262144,
-      "capabilities": [
         "text"
       ],
       "access_via": [
@@ -734,12 +601,7 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 256000
+      "status": "active"
     },
     {
       "id": "openai/gpt-oss-20b",
@@ -756,13 +618,7 @@
         "nvidia-api",
         "groq-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200,
-        "tokens_per_day": 100000
-      },
-      "context_length": 131072
+      "status": "active"
     },
     {
       "id": "google/gemma-3-4b-it",
@@ -776,12 +632,49 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 131072
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+      "name": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-3-12b-it",
+      "name": "google/gemma-3-12b-it",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.1-nemotron-70b-instruct",
+      "name": "nvidia/llama-3.1-nemotron-70b-instruct",
+      "provider": "nvidia",
+      "context_limit": 131072,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
     },
     {
       "id": "microsoft/phi-4-mini-instruct",
@@ -812,26 +705,6 @@
         "nvidia-api",
         "groq-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200,
-        "tokens_per_day": 100000
-      },
-      "context_length": 131072
-    },
-    {
-      "id": "nvidia/llama-3.1-nemotron-70b-instruct",
-      "name": "nvidia/llama-3.1-nemotron-70b-instruct",
-      "provider": "nvidia",
-      "context_limit": 131072,
-      "capabilities": [
-        "instruction",
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
       "status": "active"
     },
     {
@@ -840,81 +713,6 @@
       "provider": "nvidia",
       "context_limit": 131072,
       "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "google/gemma-3-12b-it",
-      "name": "google/gemma-3-12b-it",
-      "provider": "nvidia",
-      "context_limit": 131072,
-      "capabilities": [
-        "text",
-        "vision"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 131072
-    },
-    {
-      "id": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-      "name": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-      "provider": "nvidia",
-      "context_limit": 131072,
-      "capabilities": [
-        "instruction",
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "nvidia/cosmos-reason2-8b",
-      "name": "nvidia/cosmos-reason2-8b",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "nvidia/riva-translate-4b-instruct-v1.1",
-      "name": "nvidia/riva-translate-4b-instruct-v1.1",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
-        "instruction",
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "nvidia/nv-embedqa-mistral-7b-v2",
-      "name": "nvidia/nv-embedqa-mistral-7b-v2",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
-        "embedding",
-        "instruction",
         "text"
       ],
       "access_via": [
@@ -938,21 +736,8 @@
       "status": "active"
     },
     {
-      "id": "google/recurrentgemma-2b",
-      "name": "google/recurrentgemma-2b",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "mistralai/mistral-large-2-instruct",
-      "name": "mistralai/mistral-large-2-instruct",
+      "id": "nvidia/riva-translate-4b-instruct-v1.1",
+      "name": "nvidia/riva-translate-4b-instruct-v1.1",
       "provider": "nvidia",
       "context_limit": 128000,
       "capabilities": [
@@ -967,6 +752,20 @@
     {
       "id": "mistralai/mistral-medium-3.5-128b",
       "name": "mistralai/mistral-medium-3.5-128b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mistral-large-2-instruct",
+      "name": "mistralai/mistral-large-2-instruct",
       "provider": "nvidia",
       "context_limit": 128000,
       "capabilities": [
@@ -1036,21 +835,6 @@
       "status": "active"
     },
     {
-      "id": "nvidia/nv-embedcode-7b-v1",
-      "name": "nvidia/nv-embedcode-7b-v1",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
-        "code",
-        "embedding",
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
       "id": "adept/fuyu-8b",
       "name": "adept/fuyu-8b",
       "provider": "nvidia",
@@ -1070,6 +854,21 @@
       "context_limit": 128000,
       "capabilities": [
         "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nv-embedcode-7b-v1",
+      "name": "nvidia/nv-embedcode-7b-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "code",
+        "embedding",
         "text"
       ],
       "access_via": [
@@ -1163,6 +962,47 @@
       "status": "active"
     },
     {
+      "id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+      "name": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nemoretriever-parse",
+      "name": "nvidia/nemoretriever-parse",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "meta/llama-3.1-8b-instruct",
+      "name": "meta/llama-3.1-8b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
       "id": "meta/llama-4-maverick-17b-128e-instruct",
       "name": "meta/llama-4-maverick-17b-128e-instruct",
       "provider": "nvidia",
@@ -1206,6 +1046,20 @@
       "status": "active"
     },
     {
+      "id": "stockmark/stockmark-2-100b-instruct",
+      "name": "stockmark/stockmark-2-100b-instruct",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
       "id": "microsoft/phi-3.5-moe-instruct",
       "name": "microsoft/phi-3.5-moe-instruct",
       "provider": "nvidia",
@@ -1234,12 +1088,11 @@
       "status": "active"
     },
     {
-      "id": "meta/llama2-70b",
-      "name": "meta/llama2-70b",
+      "id": "google/recurrentgemma-2b",
+      "name": "google/recurrentgemma-2b",
       "provider": "nvidia",
       "context_limit": 128000,
       "capabilities": [
-        "instruction",
         "text"
       ],
       "access_via": [
@@ -1248,8 +1101,8 @@
       "status": "active"
     },
     {
-      "id": "mistralai/mistral-nemotron",
-      "name": "mistralai/mistral-nemotron",
+      "id": "meta/llama2-70b",
+      "name": "meta/llama2-70b",
       "provider": "nvidia",
       "context_limit": 128000,
       "capabilities": [
@@ -1273,12 +1126,7 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 32768
+      "status": "active"
     },
     {
       "id": "writer/palmyra-creative-122b",
@@ -1346,6 +1194,60 @@
       "status": "active"
     },
     {
+      "id": "nvidia/vila",
+      "name": "nvidia/vila",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "stepfun-ai/step-3.5-flash",
+      "name": "stepfun-ai/step-3.5-flash",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mistralai/mistral-nemotron",
+      "name": "mistralai/mistral-nemotron",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-3.3-nemotron-super-49b-v1",
+      "name": "nvidia/llama-3.3-nemotron-super-49b-v1",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
       "id": "nvidia/riva-translate-4b-instruct",
       "name": "nvidia/riva-translate-4b-instruct",
       "provider": "nvidia",
@@ -1374,38 +1276,12 @@
       "status": "active"
     },
     {
-      "id": "stepfun-ai/step-3.5-flash",
-      "name": "stepfun-ai/step-3.5-flash",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
       "id": "nvidia/nemotron-mini-4b-instruct",
       "name": "nvidia/nemotron-mini-4b-instruct",
       "provider": "nvidia",
       "context_limit": 128000,
       "capabilities": [
         "instruction",
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "nvidia/vila",
-      "name": "nvidia/vila",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
         "text"
       ],
       "access_via": [
@@ -1454,12 +1330,7 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 20,
-        "requests_per_day": 200
-      },
-      "context_length": 128000
+      "status": "active"
     },
     {
       "id": "mistralai/mistral-small-4-119b-2603",
@@ -1489,53 +1360,12 @@
       "status": "active"
     },
     {
-      "id": "stockmark/stockmark-2-100b-instruct",
-      "name": "stockmark/stockmark-2-100b-instruct",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
-        "instruction",
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
       "id": "ibm/granite-3.0-3b-a800m-instruct",
       "name": "ibm/granite-3.0-3b-a800m-instruct",
       "provider": "nvidia",
       "context_limit": 128000,
       "capabilities": [
         "instruction",
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
-      "name": "nvidia/llama-3.1-nemotron-nano-8b-v1",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
-        "instruction",
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "nvidia/nemoretriever-parse",
-      "name": "nvidia/nemoretriever-parse",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
         "text"
       ],
       "access_via": [
@@ -2012,12 +1842,12 @@
       "status": "active"
     },
     {
-      "id": "snowflake/arctic-embed-l",
-      "name": "snowflake/arctic-embed-l",
+      "id": "nvidia/nemotron-3-content-safety",
+      "name": "nvidia/nemotron-3-content-safety",
       "provider": "nvidia",
       "context_limit": 128000,
       "capabilities": [
-        "embedding"
+        "text"
       ],
       "access_via": [
         "nvidia-api"
@@ -2039,12 +1869,12 @@
       "status": "active"
     },
     {
-      "id": "nvidia/nemotron-3-content-safety",
-      "name": "nvidia/nemotron-3-content-safety",
+      "id": "snowflake/arctic-embed-l",
+      "name": "snowflake/arctic-embed-l",
       "provider": "nvidia",
       "context_limit": 128000,
       "capabilities": [
-        "text"
+        "embedding"
       ],
       "access_via": [
         "nvidia-api"
@@ -2067,20 +1897,6 @@
     {
       "id": "zyphra/zamba2-7b-instruct",
       "name": "zyphra/zamba2-7b-instruct",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
-        "instruction",
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "meta/llama-3.1-8b-instruct",
-      "name": "meta/llama-3.1-8b-instruct",
       "provider": "nvidia",
       "context_limit": 128000,
       "capabilities": [
@@ -2229,12 +2045,11 @@
       "status": "active"
     },
     {
-      "id": "nvidia/llama-3.3-nemotron-super-49b-v1",
-      "name": "nvidia/llama-3.3-nemotron-super-49b-v1",
+      "id": "nvidia/nemotron-4-340b-reward",
+      "name": "nvidia/nemotron-4-340b-reward",
       "provider": "nvidia",
       "context_limit": 128000,
       "capabilities": [
-        "instruction",
         "text"
       ],
       "access_via": [
@@ -2243,11 +2058,26 @@
       "status": "active"
     },
     {
-      "id": "nvidia/nemotron-4-340b-reward",
-      "name": "nvidia/nemotron-4-340b-reward",
+      "id": "nvidia/cosmos-reason2-8b",
+      "name": "nvidia/cosmos-reason2-8b",
       "provider": "nvidia",
       "context_limit": 128000,
       "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nv-embedqa-mistral-7b-v2",
+      "name": "nvidia/nv-embedqa-mistral-7b-v2",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding",
+        "instruction",
         "text"
       ],
       "access_via": [
@@ -2269,13 +2099,24 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_minute": 1000000
-      },
-      "context_length": 1048576
+      "status": "active"
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "name": "Gemini 3.1 Pro Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "reasoning",
+        "vision",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
     },
     {
       "id": "gemini-3.1-pro-preview-customtools",
@@ -2283,22 +2124,16 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
+        "reasoning",
         "vision",
         "instruction",
-        "text",
-        "reasoning"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 5,
-        "requests_per_day": 25,
-        "tokens_per_minute": 250000
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "gemini-2.5-pro",
@@ -2314,13 +2149,7 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 5,
-        "requests_per_day": 25,
-        "tokens_per_minute": 250000
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "gemini-2.0-flash-lite-001",
@@ -2336,36 +2165,7 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_minute": 1000000
-      },
-      "context_length": 1048576
-    },
-    {
-      "id": "gemini-3-pro-preview",
-      "name": "Gemini 3 Pro Preview",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "vision",
-        "instruction",
-        "text",
-        "reasoning"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 5,
-        "requests_per_day": 25,
-        "tokens_per_minute": 250000
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "gemini-flash-latest",
@@ -2373,23 +2173,17 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
-        "instruction",
-        "code",
         "reasoning",
-        "text"
+        "code",
+        "text",
+        "instruction",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_minute": 1000000
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "gemini-2.0-flash",
@@ -2405,13 +2199,7 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_minute": 1000000
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "gemini-2.0-flash-lite",
@@ -2427,35 +2215,7 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_minute": 1000000
-      },
-      "context_length": 1048576
-    },
-    {
-      "id": "gemini-3.1-flash-lite",
-      "name": "Gemini 3.1 Flash Lite",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "vision",
-        "instruction",
-        "text"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_minute": 1000000
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "gemini-2.5-flash-lite",
@@ -2471,13 +2231,23 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_minute": 1000000
-      },
-      "context_length": 1048576
+      "status": "active"
+    },
+    {
+      "id": "gemini-3.1-flash-lite",
+      "name": "Gemini 3.1 Flash Lite",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
     },
     {
       "id": "gemini-3.5-flash",
@@ -2493,13 +2263,7 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_minute": 1000000
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "gemini-flash-lite-latest",
@@ -2507,23 +2271,33 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
-        "instruction",
-        "code",
         "reasoning",
+        "code",
+        "text",
+        "instruction",
+        "vision"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "lyria-3-pro-preview",
+      "name": "Lyria 3 Pro Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "reasoning",
+        "vision",
         "text"
       ],
       "access_via": [
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_minute": 1000000
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "gemini-3-flash-preview",
@@ -2539,35 +2313,7 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_minute": 1000000
-      },
-      "context_length": 1048576
-    },
-    {
-      "id": "lyria-3-pro-preview",
-      "name": "Lyria 3 Pro Preview",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "vision",
-        "reasoning",
-        "text"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 5,
-        "requests_per_day": 25,
-        "tokens_per_minute": 250000
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "lyria-3-clip-preview",
@@ -2582,8 +2328,7 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "gemini-robotics-er-1.5-preview",
@@ -2598,8 +2343,24 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "context_length": 1048576
+      "status": "active"
+    },
+    {
+      "id": "gemini-3-pro-preview",
+      "name": "Gemini 3 Pro Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "reasoning",
+        "vision",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
     },
     {
       "id": "gemini-pro-latest",
@@ -2607,46 +2368,17 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
-        "instruction",
-        "code",
         "reasoning",
-        "text"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 5,
-        "requests_per_day": 25,
-        "tokens_per_minute": 250000
-      },
-      "context_length": 1048576
-    },
-    {
-      "id": "gemini-3.1-pro-preview",
-      "name": "Gemini 3.1 Pro Preview",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "vision",
-        "instruction",
+        "code",
         "text",
-        "reasoning"
+        "instruction",
+        "vision"
       ],
       "access_via": [
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 5,
-        "requests_per_day": 25,
-        "tokens_per_minute": 250000
-      },
-      "context_length": 1048576
+      "status": "active"
     },
     {
       "id": "gemma-4-31b-it",
@@ -2661,8 +2393,7 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "context_length": 262144
+      "status": "active"
     },
     {
       "id": "gemma-4-26b-a4b-it",
@@ -2677,69 +2408,37 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "context_length": 262144
+      "status": "active"
     },
     {
-      "id": "deep-research-pro-preview-12-2025",
-      "name": "Deep Research Pro Preview (Dec-12-2025)",
+      "id": "antigravity-preview-05-2026",
+      "name": "Antigravity Agent Preview",
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
         "vision",
-        "reasoning",
         "text"
       ],
       "access_via": [
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 5,
-        "requests_per_day": 25,
-        "tokens_per_minute": 250000
-      },
-      "context_length": 131072
+      "status": "active"
     },
     {
-      "id": "nano-banana-pro-preview",
-      "name": "Nano Banana Pro",
+      "id": "gemini-robotics-er-1.6-preview",
+      "name": "Gemini Robotics-ER 1.6 Preview",
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
         "vision",
-        "reasoning",
-        "text"
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 5,
-        "requests_per_day": 25,
-        "tokens_per_minute": 250000
-      },
-      "context_length": 131072
-    },
-    {
-      "id": "gemini-2.5-computer-use-preview-10-2025",
-      "name": "Gemini 2.5 Computer Use Preview 10-2025",
-      "provider": "gemini",
-      "context_limit": 131072,
-      "capabilities": [
-        "vision",
-        "instruction",
-        "text"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active",
-      "context_length": 131072
+      "status": "active"
     },
     {
       "id": "deep-research-preview-04-2026",
@@ -2754,8 +2453,7 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "context_length": 131072
+      "status": "active"
     },
     {
       "id": "gemini-omni-flash-preview",
@@ -2771,45 +2469,7 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "rate_limits": {
-        "requests_per_minute": 15,
-        "requests_per_day": 1500,
-        "tokens_per_minute": 1000000
-      },
-      "context_length": 131072
-    },
-    {
-      "id": "gemini-robotics-er-1.6-preview",
-      "name": "Gemini Robotics-ER 1.6 Preview",
-      "provider": "gemini",
-      "context_limit": 131072,
-      "capabilities": [
-        "vision",
-        "instruction"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active",
-      "context_length": 131072
-    },
-    {
-      "id": "antigravity-preview-05-2026",
-      "name": "Antigravity Agent Preview",
-      "provider": "gemini",
-      "context_limit": 131072,
-      "capabilities": [
-        "vision",
-        "text"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-general"
-      ],
-      "status": "active",
-      "context_length": 131072
+      "status": "active"
     },
     {
       "id": "deep-research-max-preview-04-2026",
@@ -2824,9 +2484,55 @@
         "gemini-api-general",
         "gemini-api-general"
       ],
-      "status": "active",
-      "context_length": 131072
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.5-computer-use-preview-10-2025",
+      "name": "Gemini 2.5 Computer Use Preview 10-2025",
+      "provider": "gemini",
+      "context_limit": 131072,
+      "capabilities": [
+        "vision",
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nano-banana-pro-preview",
+      "name": "Nano Banana Pro",
+      "provider": "gemini",
+      "context_limit": 131072,
+      "capabilities": [
+        "reasoning",
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "deep-research-pro-preview-12-2025",
+      "name": "Deep Research Pro Preview (Dec-12-2025)",
+      "provider": "gemini",
+      "context_limit": 131072,
+      "capabilities": [
+        "reasoning",
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-general"
+      ],
+      "status": "active"
     }
-  ],
-  "last_health_check": "2026-07-05T10:30:18.165401+00:00"
+  ]
 }
