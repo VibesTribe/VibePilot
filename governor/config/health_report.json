@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-05T10:30:18.165401+00:00",
+  "timestamp": "2026-07-06T10:30:49.252115+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -63,7 +63,7 @@
     },
     "google/gemma-4-26b-a4b-it:free": {
       "alive": true,
-      "status": "rate_limited_but_alive",
+      "status": "ok",
       "provider": "openrouter"
     },
     "deepseek-ai/deepseek-v4-flash": {
@@ -95,8 +95,8 @@
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
         "gemini-2.5-flash-native-audio-latest",
-        "whisper-large-v3-turbo",
-        "meta-llama/llama-prompt-guard-2-22m"
+        "groq/compound-mini",
+        "whisper-large-v3"
       ]
     }
   ],
