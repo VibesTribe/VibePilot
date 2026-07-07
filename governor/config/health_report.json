@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-06T10:30:49.252115+00:00",
+  "timestamp": "2026-07-07T10:30:20.926877+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,8 +11,8 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 340,
-      "free": 26
+      "models": 343,
+      "free": 27
     }
   },
   "health_checks": {
@@ -96,7 +96,7 @@
         "veo-3.1-lite-generate-preview",
         "gemini-2.5-flash-native-audio-latest",
         "groq/compound-mini",
-        "whisper-large-v3"
+        "whisper-large-v3-turbo"
       ]
     }
   ],
