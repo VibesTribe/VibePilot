@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-10T10:30:00.618373+00:00",
+  "timestamp": "2026-07-11T10:30:32.706348+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,7 +11,7 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 347,
+      "models": 345,
       "free": 26
     }
   },
@@ -63,7 +63,7 @@
     },
     "google/gemma-4-26b-a4b-it:free": {
       "alive": true,
-      "status": "ok",
+      "status": "rate_limited_but_alive",
       "provider": "openrouter"
     },
     "deepseek-ai/deepseek-v4-flash": {
@@ -95,8 +95,8 @@
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
         "gemini-2.5-flash-native-audio-latest",
-        "meta-llama/llama-prompt-guard-2-22m",
-        "llama-3.3-70b-versatile"
+        "groq/compound",
+        "whisper-large-v3"
       ]
     }
   ],
@@ -138,6 +138,11 @@
       "cooldown_state": "ready"
     },
     "deepseek-v3": {
+      "status": "active",
+      "cooldown_until": "none",
+      "cooldown_state": "ready"
+    },
+    "deepseek-v4-flash": {
       "status": "active",
       "cooldown_until": "none",
       "cooldown_state": "ready"
