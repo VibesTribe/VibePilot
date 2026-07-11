@@ -187,7 +187,7 @@
       "id": "deepseek-api",
       "name": "DeepSeek API",
       "type": "api",
-      "status": "inactive",
+      "status": "active",
       "provider": "deepseek",
       "endpoint": "https://api.deepseek.com",
       "api_key_ref": "DEEPSEEK_API_KEY",

@@ -326,7 +326,28 @@ func (h *CouncilHandler) handleCouncilReview(event runtime.Event) {
 }
 
 func (h *CouncilHandler) handleApprovedPlan(ctx context.Context, plan map[string]any, planID string) {
-	if err := createTasksFromApprovedPlan(ctx, h.database, plan, h.cfg.GetValidationConfig(), h.cfg.GetRepoPath(), h.git); err != nil {
+	// PIF: Resolve project-specific repo path
+	repoPath := h.cfg.GetRepoPath()
+	councilProjectID, _ := plan["project_id"].(string)
+	if councilProjectID != "" && councilProjectID != "00000000-0000-0000-0000-000000000000" {
+		projData, projErr := h.database.Query(ctx, "projects", map[string]any{
+			"select": "slug,repo_path",
+			"id":     fmt.Sprintf("eq.%s", councilProjectID),
+			"limit":  1,
+		})
+		if projErr == nil {
+			var projRows []map[string]any
+			if json.Unmarshal(projData, &projRows) == nil && len(projRows) > 0 {
+				if pRepoPath, ok := projRows[0]["repo_path"].(string); ok && pRepoPath != "" {
+					if _, statErr := os.Stat(pRepoPath); statErr == nil {
+						repoPath = pRepoPath
+						log.Printf("[Council] Using project repo: %s", repoPath)
+					}
+				}
+			}
+		}
+	}
+	if err := createTasksFromApprovedPlan(ctx, h.database, plan, h.cfg.GetValidationConfig(), repoPath, h.git); err != nil {
 		var validationErr *ValidationFailedError
 		if errors.As(err, &validationErr) {
 			log.Printf("[Council] Task validation failed for %s", truncateID(planID))

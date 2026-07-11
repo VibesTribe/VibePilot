@@ -100,6 +100,11 @@ func validateTasks(tasks []TaskData, cfg *runtime.ValidationConfig) *ValidationF
 func createTasksFromApprovedPlan(ctx context.Context, database db.Database, plan map[string]any, cfg *runtime.ValidationConfig, repoPath string, git *gitree.Gitree) error {
 	planID, _ := plan["id"].(string)
 	planPath, _ := plan["plan_path"].(string)
+	// PIF: propagate project_id from plan to all created tasks
+	planProjectID, _ := plan["project_id"].(string)
+	if planProjectID == "" {
+		planProjectID = "00000000-0000-0000-0000-000000000000" // vibepilot default
+	}
 	if planPath == "" {
 		return fmt.Errorf("plan has no plan_path")
 	}
@@ -217,6 +222,7 @@ func createTasksFromApprovedPlan(ctx context.Context, database db.Database, plan
 
 		taskData := map[string]any{
 			"plan_id":             planID,
+			"project_id":          planProjectID,
 			"task_number":         taskNumber,
 			"title":               task.Title,
 			"type":                task.Type,

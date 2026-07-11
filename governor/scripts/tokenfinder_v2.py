@@ -425,10 +425,10 @@ def main():
 
     # ── Credit Balance Check (paid APIs, runs every 30 min) ──
     print(f"\n--- Credit Balance Check ---")
-    for provider_name, key_env in [("DeepSeek", "deepseek-v4-flash")]:
-        api_key = os.environ.get(key_env, "")
+    for provider_name, key_env in [("DeepSeek", "DEEPSEEK_API_KEY")]:
+        api_key = os.environ.get(key_env, "") or os.environ.get("deepseek-v4-flash", "")
         if not api_key:
-            api_key = vault_get(key_env) or ""
+            api_key = vault_get("deepseek-v4-flash") or vault_get("DEEPSEEK_API_KEY") or ""
         if api_key:
             try:
                 req = urllib.request.Request(
@@ -452,9 +452,8 @@ def main():
                     if total_cred > 0:
                         ratio = total_bal / total_cred
                         conn.execute(
-                            "UPDATE models SET credit_remaining_usd = %s * (credit_total_usd / %s) "
-                            "WHERE id LIKE %s AND credit_total_usd > 0",
-                            (total_bal, total_cred, "%deepseek%")
+                            "UPDATE models SET credit_remaining_usd = %s WHERE id LIKE %s AND credit_total_usd > 0",
+                            (total_bal, "%deepseek%")
                         )
                         if ratio < 0.2:
                             print(f"  ⚠️  {provider_name} at {ratio*100:.0f}% remaining (${total_bal:.2f} of ${total_cred:.2f})")

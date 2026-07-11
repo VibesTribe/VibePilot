@@ -78,10 +78,11 @@ Do NOT just say "this is good" or "this is interesting." You must compare it to 
 ## INPUT FORMAT
 
 You will receive:
-1. The research report with all findings
-2. The original research content (full analysis document)
-3. Your assigned lens
-4. Prior council members' votes (if any)
+1. A report summary (title, total items)
+2. The CURRENT ITEM being reviewed (the finding, its details, etc.)
+3. An excerpt of the original research content
+4. Your assigned lens
+5. Prior council members' votes (summarized)
 
 ---
 

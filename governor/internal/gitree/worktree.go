@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,7 @@ import (
 type WorktreeManager struct {
 	gitree    *Gitree
 	basePath  string // e.g. ~/VibePilot-work/
+	mu        sync.Mutex
 }
 
 // WorktreeInfo tracks an active worktree.
@@ -73,9 +75,12 @@ func (wm *WorktreeManager) CreateWorktree(ctx context.Context, taskID, branchNam
 
 	// Ensure main repo is on main before creating branch/worktree
 	// (can't create worktree for a branch that's checked out in main repo)
-	if err := wm.gitree.gitCommand(ctx, "checkout", "main").Run(); err != nil {
-		log.Printf("[Worktrees] Warning: checkout main failed: %v", err)
+	wm.mu.Lock()
+	if err := wm.gitree.ResetToMain(ctx); err != nil {
+		wm.mu.Unlock()
+		return nil, fmt.Errorf("ensure main branch: %w", err)
 	}
+	wm.mu.Unlock()
 
 	// Create the branch if it doesn't exist
 	if err := wm.gitree.CreateBranchFrom(ctx, branchName, "main"); err != nil {

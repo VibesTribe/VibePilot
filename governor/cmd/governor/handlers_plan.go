@@ -88,7 +88,27 @@ func handlePlanCreated(
 		})
 	}
 
+	// PIF: Resolve project-specific repo path if this plan belongs to a non-vibepilot project
+	planProjectID, _ := plan["project_id"].(string)
 	repoPath := cfg.GetRepoPath()
+	if planProjectID != "" && planProjectID != "00000000-0000-0000-0000-000000000000" {
+		projData, projErr := database.Query(ctx, "projects", map[string]any{
+			"select": "slug,repo_path,github_owner,github_repo",
+			"id":     fmt.Sprintf("eq.%s", planProjectID),
+			"limit":  1,
+		})
+		if projErr == nil {
+			var projRows []map[string]any
+			if json.Unmarshal(projData, &projRows) == nil && len(projRows) > 0 {
+				if pRepoPath, ok := projRows[0]["repo_path"].(string); ok && pRepoPath != "" {
+					if _, statErr := os.Stat(pRepoPath); statErr == nil {
+						repoPath = pRepoPath
+						log.Printf("[EventPlanCreated] Using project repo: %s", repoPath)
+					}
+				}
+			}
+		}
+	}
 
 	// Fetch PRD content
 	prdContent, err := fetchContent(ctx, repoPath, prdPath)
@@ -106,7 +126,7 @@ func handlePlanCreated(
 	maxRetries := 5
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		var routeErr error
-		if attempt > 0 && routingResult != nil {
+		if attempt > 0 && routingResult != nil && !routingResult.IsFallback {
 			failedModels = append(failedModels, routingResult.ModelID)
 			log.Printf("[EventPlanCreated] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
 		}
@@ -365,7 +385,27 @@ func runPlanReview(
 	}
 
 	// Fetch PRD and plan content
+	// PIF: Resolve project-specific repo path
+	reviewProjectID, _ := plan["project_id"].(string)
 	repoPath := cfg.GetRepoPath()
+	if reviewProjectID != "" && reviewProjectID != "00000000-0000-0000-0000-000000000000" {
+		projData, projErr := database.Query(ctx, "projects", map[string]any{
+			"select": "slug,repo_path",
+			"id":     fmt.Sprintf("eq.%s", reviewProjectID),
+			"limit":  1,
+		})
+		if projErr == nil {
+			var projRows []map[string]any
+			if json.Unmarshal(projData, &projRows) == nil && len(projRows) > 0 {
+				if pRepoPath, ok := projRows[0]["repo_path"].(string); ok && pRepoPath != "" {
+					if _, statErr := os.Stat(pRepoPath); statErr == nil {
+						repoPath = pRepoPath
+						log.Printf("[PlanReview] Using project repo: %s", repoPath)
+					}
+				}
+			}
+		}
+	}
 
 	prdContent, err := fetchContent(ctx, repoPath, prdPath)
 	if err != nil {
@@ -387,7 +427,7 @@ func runPlanReview(
 	var failedModels []string
 	maxRetries := 5
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		if attempt > 0 && routingResult != nil {
+		if attempt > 0 && routingResult != nil && !routingResult.IsFallback {
 			failedModels = append(failedModels, routingResult.ModelID)
 			log.Printf("[PlanReview] Retry %d/%d: failed models %v", attempt+1, maxRetries, failedModels)
 		}

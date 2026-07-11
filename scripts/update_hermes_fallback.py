@@ -20,7 +20,7 @@ DB = "vibepilot"
 
 # Provider priority order for the fallback chain
 # Gemini first (fastest, most reliable free tier), then Groq, OpenRouter, NVIDIA
-PROVIDER_PRIORITY = ["gemini", "groq", "openrouter", "nvidia"]
+PROVIDER_PRIORITY = ["gemini", "groq", "openrouter"]
 
 # Max models per provider in fallback chain
 MAX_PER_PROVIDER = {
