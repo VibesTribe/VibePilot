@@ -703,6 +703,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	subFilters := map[string]any{"order": "created_at.desc", "limit": 200}
 	sessFilters := map[string]any{"order": "last_activity_at.desc", "limit": 100}
 	chatFilters := map[string]any{"order": "created_at.desc", "limit": 500}
+	planFilters := map[string]any{"order": "created_at.desc", "limit": 100}
 	if projectFilter != "" {
 		// Resolve project slug to UUID (reuse the same lookup as taskFilters above)
 		projData2, _ := s.db.Query(ctx, "projects", map[string]any{
@@ -722,6 +723,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 				kbDocFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				subFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				sessFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				planFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 			}
 		}
 	}
@@ -735,7 +737,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"models", nil},
 		{"platforms", nil},
 		{"orchestrator_events", map[string]any{"order": "created_at.desc", "limit": 500}},
-		{"plans", map[string]any{"order": "created_at.desc", "limit": 100}},
+		{"plans", planFilters},
 		{"council_reviews", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"test_results", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"exchange_rates", nil},
