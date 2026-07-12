@@ -701,6 +701,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	kbFileFilters := map[string]any{"order": "updated_at.desc", "limit": 200}
 	kbDocFilters := map[string]any{"limit": 200}
 	subFilters := map[string]any{"order": "created_at.desc", "limit": 200}
+	sessFilters := map[string]any{"order": "last_activity_at.desc", "limit": 100}
+	chatFilters := map[string]any{"order": "created_at.desc", "limit": 500}
 	if projectFilter != "" {
 		// Resolve project slug to UUID (reuse the same lookup as taskFilters above)
 		projData2, _ := s.db.Query(ctx, "projects", map[string]any{
@@ -719,6 +721,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 				kbFileFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				kbDocFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				subFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				sessFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				chatFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 			}
 		}
 	}
@@ -747,8 +751,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"kb_knowledge_items", kbFilters},
 		{"kb_files", kbFileFilters},
 		{"kb_doc_sections", kbDocFilters},
-		{"chat_usage", map[string]any{"order": "created_at.desc", "limit": 500}},
-		{"agent_sessions", map[string]any{"order": "last_activity_at.desc", "limit": 100}},
+		{"chat_usage", chatFilters},
+		{"agent_sessions", sessFilters},
 		{"visual_qa_runs", map[string]any{"order": "started_at.desc", "limit": 50}},
 		{"design_reviews", map[string]any{"order": "created_at.desc", "limit": 50}},
 		{"model_health_snapshots", map[string]any{"order": "scanned_at.desc", "limit": 500}},
