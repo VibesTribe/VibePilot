@@ -704,6 +704,12 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	sessFilters := map[string]any{"order": "last_activity_at.desc", "limit": 100}
 	chatFilters := map[string]any{"order": "created_at.desc", "limit": 500}
 	planFilters := map[string]any{"order": "created_at.desc", "limit": 100}
+	eventFilters := map[string]any{"order": "created_at.desc", "limit": 500}
+	modelFilters := map[string]any{"limit": 200}
+	healthFilters := map[string]any{"order": "scanned_at.desc", "limit": 500}
+	visualFilters := map[string]any{"order": "started_at.desc", "limit": 50}
+	testFilters := map[string]any{"order": "created_at.desc", "limit": 200}
+	designFilters := map[string]any{"order": "created_at.desc", "limit": 50}
 	if projectFilter != "" {
 		// Resolve project slug to UUID (reuse the same lookup as taskFilters above)
 		projData2, _ := s.db.Query(ctx, "projects", map[string]any{
@@ -724,6 +730,13 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 				subFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				sessFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				planFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				chatFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				eventFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				modelFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				healthFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				visualFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				testFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				designFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 			}
 		}
 	}
@@ -734,12 +747,12 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}{
 		{"tasks", taskFilters},
 		{"task_runs", taskRunFilters},
-		{"models", nil},
+		{"models", modelFilters},
 		{"platforms", nil},
-		{"orchestrator_events", map[string]any{"order": "created_at.desc", "limit": 500}},
+		{"orchestrator_events", eventFilters},
 		{"plans", planFilters},
 		{"council_reviews", map[string]any{"order": "created_at.desc", "limit": 200}},
-		{"test_results", map[string]any{"order": "created_at.desc", "limit": 200}},
+		{"test_results", testFilters},
 		{"exchange_rates", nil},
 		{"failure_records", map[string]any{"order": "created_at.desc", "limit": 200}},
 		{"maintenance_commands", map[string]any{"order": "created_at.desc", "limit": 200}},
@@ -754,9 +767,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"kb_doc_sections", kbDocFilters},
 		{"chat_usage", chatFilters},
 		{"agent_sessions", sessFilters},
-		{"visual_qa_runs", map[string]any{"order": "started_at.desc", "limit": 50}},
-		{"design_reviews", map[string]any{"order": "created_at.desc", "limit": 50}},
-		{"model_health_snapshots", map[string]any{"order": "scanned_at.desc", "limit": 500}},
+		{"visual_qa_runs", visualFilters},
+		{"design_reviews", designFilters},
+		{"model_health_snapshots", healthFilters},
 	}
 
 	results := make(chan tableResult, len(tables))
