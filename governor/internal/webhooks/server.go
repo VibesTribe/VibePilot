@@ -710,6 +710,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	visualFilters := map[string]any{"order": "started_at.desc", "limit": 50}
 	testFilters := map[string]any{"order": "created_at.desc", "limit": 200}
 	designFilters := map[string]any{"order": "created_at.desc", "limit": 50}
+	councilFilters := map[string]any{"order": "created_at.desc", "limit": 200}
+	failureFilters := map[string]any{"order": "created_at.desc", "limit": 200}
+	maintFilters := map[string]any{"order": "created_at.desc", "limit": 200}
 	if projectFilter != "" {
 		// Resolve project slug to UUID (reuse the same lookup as taskFilters above)
 		projData2, _ := s.db.Query(ctx, "projects", map[string]any{
@@ -737,6 +740,11 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 				visualFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				testFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				designFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				councilFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				failureFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				maintFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
+				// Models are global + project-specific: show both
+				modelFilters["project_id"] = fmt.Sprintf("in.(%s,00000000-0000-0000-0000-000000000000)", projID2)
 			}
 		}
 	}
@@ -751,11 +759,11 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		{"platforms", nil},
 		{"orchestrator_events", eventFilters},
 		{"plans", planFilters},
-		{"council_reviews", map[string]any{"order": "created_at.desc", "limit": 200}},
+		{"council_reviews", councilFilters},
 		{"test_results", testFilters},
 		{"exchange_rates", nil},
-		{"failure_records", map[string]any{"order": "created_at.desc", "limit": 200}},
-		{"maintenance_commands", map[string]any{"order": "created_at.desc", "limit": 200}},
+		{"failure_records", failureFilters},
+		{"maintenance_commands", maintFilters},
 		{"system_counters", counterFilters},
 		{"project_costs", costFilters},
 		{"subscription_history", subFilters},
