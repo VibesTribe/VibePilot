@@ -722,7 +722,6 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 				kbDocFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				subFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 				sessFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
-				chatFilters["project_id"] = fmt.Sprintf("eq.%s", projID2)
 			}
 		}
 	}
