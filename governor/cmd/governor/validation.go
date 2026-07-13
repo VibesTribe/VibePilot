@@ -103,7 +103,7 @@ func createTasksFromApprovedPlan(ctx context.Context, database db.Database, plan
 	// PIF: propagate project_id from plan to all created tasks
 	planProjectID, _ := plan["project_id"].(string)
 	if planProjectID == "" {
-		planProjectID = "00000000-0000-0000-0000-000000000000" // vibepilot default
+		planProjectID = "947c2db2-ac1f-4307-9048-8d838ef3aacd" // vibepilot default for backward compat
 	}
 	if planPath == "" {
 		return fmt.Errorf("plan has no plan_path")

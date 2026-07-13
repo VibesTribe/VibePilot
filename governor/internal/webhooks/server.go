@@ -1411,10 +1411,19 @@ func (s *Server) handleProjectCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Extract the new project's UUID from the insert result
+	projectUUID := ""
+	var insertResult []map[string]any
+	if json.Unmarshal(result, &insertResult) == nil && len(insertResult) > 0 {
+		if id, ok := insertResult[0]["id"].(string); ok {
+			projectUUID = id
+		}
+	}
+
 	// Run the PIF scaffold (creates directory structure, vibepilot.toml, export.sh,
 	// Hermes profile, git repo, backup repo, SQLite database). Non-fatal if it fails —
 	// the project DB row is already created and the scaffold can be re-run.
-	scaffoldResult := s.runPIFScaffold(req.Slug, req.DisplayName, req.Description, req.DeployTarget, req.DeployURL)
+	scaffoldResult := s.runPIFScaffold(req.Slug, req.DisplayName, req.Description, req.DeployTarget, req.DeployURL, projectUUID)
 	if scaffoldResult != "" {
 		log.Printf("[Projects API] PIF scaffold for %s: %s", req.Slug, scaffoldResult)
 	}
@@ -1434,7 +1443,7 @@ func (s *Server) handleProjectCreate(w http.ResponseWriter, r *http.Request) {
 // git repo, backup repo, and SQLite database. Returns a summary string (empty on failure).
 // This is non-fatal: if the scaffold fails, the project DB row still exists and
 // the scaffold can be re-run via the /api/projects/scaffold endpoint.
-func (s *Server) runPIFScaffold(slug, displayName, description, deployTarget, deployURL string) string {
+func (s *Server) runPIFScaffold(slug, displayName, description, deployTarget, deployURL, projectUUID string) string {
 	scriptPath := filepath.Join(os.Getenv("HOME"), "vibepilot", "scripts", "pif_scaffold.py")
 	if _, err := os.Stat(scriptPath); err != nil {
 		return fmt.Sprintf("scaffold script not found at %s: %v", scriptPath, err)
@@ -1456,6 +1465,9 @@ func (s *Server) runPIFScaffold(slug, displayName, description, deployTarget, de
 	}
 	if deployURL != "" {
 		args = append(args, "--deploy-url", deployURL)
+	}
+	if projectUUID != "" {
+		args = append(args, "--project-uuid", projectUUID)
 	}
 
 	cmd := exec.Command(args[0], args[1:]...)
@@ -1515,7 +1527,9 @@ func (s *Server) handleProjectScaffold(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := s.runPIFScaffold(req.Slug, req.DisplayName, req.Description, req.DeployTarget, req.DeployURL)
+	result := s.runPIFScaffold(req.Slug, req.DisplayName, req.Description, req.DeployTarget, req.DeployURL, "")
+	// Re-scaffold also updates .hermes-project. The project UUID already exists,
+	// so fetch it from the DB to pass to the scaffold.
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")

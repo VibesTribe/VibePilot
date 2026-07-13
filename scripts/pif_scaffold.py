@@ -739,7 +739,8 @@ Query: `sqlite3 database/{slug}.db "SELECT * FROM audit_log ORDER BY id DESC LIM
 
 def scaffold_project(slug: str, display_name: str = "", description: str = "",
                      deploy_target: str = "cloudflare", deploy_url: str = "",
-                     skip_github: bool = False, json_output: bool = False) -> dict:
+                     skip_github: bool = False, json_output: bool = False,
+                     project_uuid: str = "") -> dict:
     """
     Execute the full PIF scaffold for a project.
     Returns a result dict with all created paths and statuses.
@@ -816,6 +817,26 @@ def scaffold_project(slug: str, display_name: str = "", description: str = "",
         hermes_md = create_hermes_md(project_dir, slug, display_name, description)
         result["steps"]["hermes_md"] = {"status": "ok", "path": str(hermes_md)}
         
+        # Step 11: .hermes-project file (for session auto-detection)
+        hermes_project_file = project_dir / ".hermes-project"
+        hermes_project_file.write_text(slug + "\n")
+        result["steps"]["hermes_project"] = {"status": "ok", "path": str(hermes_project_file)}
+        
+        # Step 12: Register in Hermes project system (for auto-detect)
+        if not skip_github:
+            try:
+                repo_dir = project_dir / "repo"
+                run(f"hermes project create {slug}", check=False)
+                run(f"hermes project add-folder {slug} {repo_dir}", check=False)
+                # Also set up .hermes-project in the repo dir for automatic detection
+                (repo_dir / ".hermes-project").write_text(slug + "\n")
+                result["steps"]["hermes_registration"] = {"status": "ok"}
+            except Exception as e:
+                result["errors"].append(f"Hermes registration: {e}")
+                result["steps"]["hermes_registration"] = {"status": "warning", "error": str(e)}
+        else:
+            result["steps"]["hermes_registration"] = {"status": "skipped", "reason": "skip_github"}
+        
         result["success"] = True
         
     except Exception as e:
@@ -847,6 +868,8 @@ def main():
                        help="Skip GitHub repo creation (local only)")
     parser.add_argument("--json", action="store_true",
                        help="Output result as JSON (for API integration)")
+    parser.add_argument("--project-uuid", default="",
+                       help="PostgreSQL project UUID (for DB record linking)")
     
     args = parser.parse_args()
     
@@ -858,6 +881,7 @@ def main():
         deploy_url=args.deploy_url,
         skip_github=args.skip_github,
         json_output=args.json,
+        project_uuid=args.project_uuid,
     )
     
     if not args.json:
