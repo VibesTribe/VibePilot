@@ -1672,10 +1672,37 @@ func (s *Server) handleReviewQueue(w http.ResponseWriter, r *http.Request) {
 		})
 		var projRows []map[string]any
 		if json.Unmarshal(projData, &projRows) == nil && len(projRows) > 0 {
-			if pid, ok := projRows[0]["id"].(string); ok && pid != "" {
+			if pid, ok := projRows[0]["id"].(string); ok {
 				filters["project_id"] = fmt.Sprintf("eq.%s", pid)
 			}
 		}
+	} else if ref := r.Header.Get("Referer"); ref != "" {
+		// Fall back to Referer path (e.g. /p/sealed) when old frontend
+		// doesn't pass project_slug (pre-Vercel-deploy compatibility)
+		if idx := strings.Index(ref, "/p/"); idx >= 0 {
+			slugPart := ref[idx+3:]
+			if slashIdx := strings.IndexAny(slugPart, "/?#"); slashIdx >= 0 {
+				slugPart = slugPart[:slashIdx]
+			}
+			if slugPart != "" && slugPart != "vibepilot" {
+				projData, _ := s.db.Query(ctx, "projects", map[string]any{
+					"select": "id",
+					"slug":   fmt.Sprintf("eq.%s", slugPart),
+					"limit":  1,
+				})
+				var projRows []map[string]any
+				if json.Unmarshal(projData, &projRows) == nil && len(projRows) > 0 {
+					if pid, ok := projRows[0]["id"].(string); ok && pid != "" {
+						filters["project_id"] = fmt.Sprintf("eq.%s", pid)
+					}
+				}
+			}
+		}
+	} else {
+		// No project context available (old frontend, no Referer hash) — return
+		// empty until the frontend passes project_slug (post-Vercel-deploy).
+		// This prevents leaking VibePilot's review items to other projects.
+		filters["project_id"] = "is.null"
 	}
 
 	dbItems, err := s.db.Query(ctx, "review_items", filters)
