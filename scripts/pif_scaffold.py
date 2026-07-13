@@ -860,6 +860,18 @@ def scaffold_project(slug: str, display_name: str = "", description: str = "",
                 run(f"hermes project add-folder {slug} {repo_dir}", check=False)
                 # Also set up .hermes-project in the repo dir for automatic detection
                 (repo_dir / ".hermes-project").write_text(slug + "\n")
+                
+                # Register backup cron job in the project's Hermes profile
+                profile_cron_dir = HERMES_HOME / "profiles" / slug / "cron"
+                profile_cron_dir.mkdir(parents=True, exist_ok=True)
+                cron_file = profile_cron_dir / "backup.sh"
+                cron_file.write_text(f'''#!/usr/bin/env bash
+# Automated daily backup for {slug}
+# Runs pif_backup.sh to sync project + PostgreSQL data to backup repo
+exec bash $HOME/vibepilot/scripts/pif_backup.sh {slug} 2>&1
+''')
+                cron_file.chmod(0o755)
+                
                 result["steps"]["hermes_registration"] = {"status": "ok"}
             except Exception as e:
                 result["errors"].append(f"Hermes registration: {e}")
