@@ -2849,6 +2849,42 @@ func (s *Server) handleReviewItems(w http.ResponseWriter, r *http.Request) {
 		filters["type"] = itemType
 	}
 
+	// PIF: filter by project when viewing a specific project's review items
+	if projectSlug := r.URL.Query().Get("project_slug"); projectSlug != "" {
+		projData, _ := s.db.Query(r.Context(), "projects", map[string]any{
+			"select": "id",
+			"slug":   fmt.Sprintf("eq.%s", projectSlug),
+			"limit":  1,
+		})
+		var projRows []map[string]any
+		if json.Unmarshal(projData, &projRows) == nil && len(projRows) > 0 {
+			if pid, ok := projRows[0]["id"].(string); ok && pid != "" {
+				filters["project_id"] = fmt.Sprintf("eq.%s", pid)
+			}
+		}
+	} else if ref := r.Header.Get("Referer"); ref != "" {
+		// Fallback: extract slug from Referer path (e.g. /p/sealed)
+		if idx := strings.Index(ref, "/p/"); idx >= 0 {
+			slugPart := ref[idx+3:]
+			if slashIdx := strings.IndexAny(slugPart, "/?#"); slashIdx >= 0 {
+				slugPart = slugPart[:slashIdx]
+			}
+			if slugPart != "" && slugPart != "vibepilot" {
+				projData, _ := s.db.Query(r.Context(), "projects", map[string]any{
+					"select": "id",
+					"slug":   fmt.Sprintf("eq.%s", slugPart),
+					"limit":  1,
+				})
+				var projRows []map[string]any
+				if json.Unmarshal(projData, &projRows) == nil && len(projRows) > 0 {
+					if pid, ok := projRows[0]["id"].(string); ok && pid != "" {
+						filters["project_id"] = fmt.Sprintf("eq.%s", pid)
+					}
+				}
+			}
+		}
+	}
+
 	data, err := s.db.Query(r.Context(), "review_items", filters)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
