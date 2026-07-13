@@ -802,6 +802,22 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ETag: hash only the actual data (no volatile timestamp)
+	
+	// Sanitize models.tokens_used for non-VibePilot projects
+	// The agentTokens frontend calculation sums this globally — zero it for
+	// other projects to prevent leaking VibePilot's aggregate token count.
+	if projectFilter != "" && strings.ToLower(projectFilter) != "vibepilot" && response["models"] != nil {
+		var models []map[string]any
+		if json.Unmarshal(response["models"], &models) == nil {
+			for i := range models {
+				models[i]["tokens_used"] = 0
+			}
+			if cleaned, err := json.Marshal(models); err == nil {
+				response["models"] = cleaned
+			}
+		}
+	}
+	
 	responseBytes, err := json.Marshal(response)
 	if err != nil {
 		log.Printf("[Dashboard] Error marshaling response: %v", err)
@@ -1685,11 +1701,15 @@ func (s *Server) handleReviewQueue(w http.ResponseWriter, r *http.Request) {
 	}
 	var alerts []compatAlert
 	if includeCreditAlerts {
-		alertData, rpcErr := s.db.RPC(ctx, "check_subscription_thresholds", map[string]any{})
-		if rpcErr != nil {
-			log.Printf("[review-queue] credit alert RPC error: %v", rpcErr)
-		} else {
-			var rawAlerts []map[string]any
+		// Credit alerts are VibePilot infrastructure concerns, not per-project.
+		// Skip them when viewing a non-VibePilot project's review queue.
+		projectSlug := r.URL.Query().Get("project_slug")
+		if projectSlug == "" || projectSlug == "vibepilot" {
+			alertData, rpcErr := s.db.RPC(ctx, "check_subscription_thresholds", map[string]any{})
+			if rpcErr != nil {
+				log.Printf("[review-queue] credit alert RPC error: %v", rpcErr)
+			} else {
+				var rawAlerts []map[string]any
 			if json.Unmarshal(alertData, &rawAlerts) == nil {
 				for _, a := range rawAlerts {
 					modelID, _ := a["model_id"].(string)
@@ -1709,7 +1729,8 @@ func (s *Server) handleReviewQueue(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-	}
+	} // closes if projectSlug == "" || projectSlug == "vibepilot"
+	} // closes if includeCreditAlerts
 
 	// Build response: merge review_items + ephemeral credit alerts
 	type responseItem struct {
