@@ -244,14 +244,17 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ARCHIVE_NAME="${SLUG}-export-$(date +%Y%m%d-%H%M%S).tar.gz"
 
 INCLUDE_SECRETS=false
+INCLUDE_PG=false
 
 for arg in "$@"; do
     case $arg in
         --include-secrets) INCLUDE_SECRETS=true ;;
+        --include-pg) INCLUDE_PG=true ;;
         --help|-h)
-            echo "Usage: ./export.sh [--include-secrets]"
+            echo "Usage: ./export.sh [--include-secrets] [--include-pg]"
             echo ""
             echo "  --include-secrets  Include decrypted secrets (DANGEROUS)"
+            echo "  --include-pg       Include PostgreSQL data dump (project-filtered)"
             echo ""
             echo "  Database files are always included (project SQLite data)."
             exit 0
@@ -260,6 +263,39 @@ for arg in "$@"; do
 done
 
 echo "==> Packaging project: $SLUG"
+
+# --- PostgreSQL export ---
+if [ "$INCLUDE_PG" = true ]; then
+    PG_DUMP_DIR="${PROJECT_DIR}/database/pg_export"
+    mkdir -p "$PG_DUMP_DIR"
+    echo "==> Dumping project data from PostgreSQL..."
+    
+    # Get project UUID from .hermes-project
+    PROJECT_UUID=$(cat "${PROJECT_DIR}/.hermes-project" 2>/dev/null || echo "")
+    if [ -z "$PROJECT_UUID" ]; then
+        echo "  WARNING: No .hermes-project file found. Exporting all project-tagged data may not work."
+        echo "  Pass --project-uuid <UUID> to specify the project."
+    fi
+    
+    # Dump each table with project_id filter
+    if [ -n "$PROJECT_UUID" ]; then
+        echo "  Project UUID: $PROJECT_UUID"
+        TABLES=(
+            "tasks" "task_runs" "plans" "subscription_history" "project_costs"
+            "system_counters" "agent_sessions" "chat_usage" "orchestrator_events"
+            "review_items" "project_todos" "code_graph_snapshots" "project_snapshots"
+            "research_queue" "research_reports" "research_suggestions" "research_bookmarks"
+            "models" "model_health_snapshots" "visual_qa_runs" "test_results"
+            "design_reviews" "council_reviews" "failure_records" "maintenance_commands"
+        )
+        for table in "${TABLES[@]}"; do
+            echo -n "  $table... "
+            psql -d vibepilot -c "\COPY (SELECT * FROM \"$table\" WHERE project_id = '$PROJECT_UUID') TO '${PG_DUMP_DIR}/${table}.csv' WITH CSV HEADER" 2>/dev/null
+            echo "done"
+        done
+        echo "==> PostgreSQL dump complete: $(du -sh ${PG_DUMP_DIR} | cut -f1)"
+    fi
+fi
 
 EXCLUDES=(
     --exclude=./backups
