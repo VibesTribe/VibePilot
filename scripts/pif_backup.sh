@@ -78,10 +78,16 @@ backup_project() {
     # Dump project PostgreSQL data to backup (if .hermes-project exists)
     local pg_dump_dir="$clone_dir/database/pg_export"
     local project_uuid=""
+    local project_slug=""
     if [ -f "$project_dir/.hermes-project" ]; then
-        project_uuid=$(cat "$project_dir/.hermes-project")
-        mkdir -p "$pg_dump_dir"
-        echo "    Dumping PostgreSQL data for $slug..."
+        project_slug=$(cat "$project_dir/.hermes-project")
+        # Resolve slug to PostgreSQL UUID
+        project_uuid=$(psql -d vibepilot -t -A -c "SELECT id FROM projects WHERE slug = '$project_slug' LIMIT 1" 2>/dev/null || echo "")
+        if [ -z "$project_uuid" ]; then
+            echo "    WARNING: Could not resolve project slug '$project_slug' to UUID"
+        fi
+    fi
+    if [ -n "$project_uuid" ]; then
         for table in tasks task_runs plans subscription_history project_costs system_counters agent_sessions chat_usage orchestrator_events review_items project_todos code_graph_snapshots project_snapshots research_queue research_reports research_suggestions research_bookmarks models model_health_snapshots visual_qa_runs test_results design_reviews council_reviews failure_records maintenance_commands; do
             psql -d vibepilot -c "\COPY (SELECT * FROM \"$table\" WHERE project_id = '$project_uuid') TO '$pg_dump_dir/$table.csv' WITH CSV HEADER" 2>/dev/null
         done

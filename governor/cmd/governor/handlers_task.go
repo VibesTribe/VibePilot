@@ -1953,12 +1953,31 @@ func recordEvent(ctx context.Context, database db.Database, eventType, taskID, m
 	}
 	eventDetails["model_id"] = modelID
 
+	// Resolve project_id from task
+	projectID := ""
+	if taskID != "" && !strings.HasPrefix(taskID, "plan-") {
+		taskData, qErr := database.Query(ctx, "tasks", map[string]any{
+			"select": "project_id",
+			"id":     fmt.Sprintf("eq.%s", taskID),
+			"limit":  1,
+		})
+		if qErr == nil {
+			var taskRows []map[string]any
+			if json.Unmarshal(taskData, &taskRows) == nil && len(taskRows) > 0 {
+				if pid, ok := taskRows[0]["project_id"].(string); ok {
+					projectID = pid
+				}
+			}
+		}
+	}
+
 	_, err := database.Insert(ctx, "orchestrator_events", map[string]any{
 		"event_type": eventType,
 		"task_id":    taskID,
 		"model_id":   modelID,
 		"reason":     reason,
 		"details":    eventDetails,
+		"project_id": projectID,
 	})
 	if err != nil {
 		log.Printf("[recordEvent] Failed to write %s event: %v", eventType, err)
