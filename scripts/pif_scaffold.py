@@ -243,18 +243,17 @@ SLUG="__SLUG__"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ARCHIVE_NAME="${SLUG}-export-$(date +%Y%m%d-%H%M%S).tar.gz"
 
-INCLUDE_DB=false
 INCLUDE_SECRETS=false
 
 for arg in "$@"; do
     case $arg in
-        --include-db) INCLUDE_DB=true ;;
         --include-secrets) INCLUDE_SECRETS=true ;;
         --help|-h)
-            echo "Usage: ./export.sh [--include-db] [--include-secrets]"
+            echo "Usage: ./export.sh [--include-secrets]"
             echo ""
-            echo "  --include-db       Include database dumps"
             echo "  --include-secrets  Include decrypted secrets (DANGEROUS)"
+            echo ""
+            echo "  Database files are always included (project SQLite data)."
             exit 0
             ;;
     esac
@@ -272,12 +271,7 @@ EXCLUDES=(
     --exclude=.DS_Store
     --exclude=node_modules
     --exclude=.env
-    --exclude=*.db
 )
-
-if [ "$INCLUDE_DB" = true ]; then
-    EXCLUDES=("${EXCLUDES[@]/--exclude=*.db}")
-    echo "==> Including database files"
 fi
 
 if [ "$INCLUDE_SECRETS" = false ]; then
