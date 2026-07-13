@@ -1631,6 +1631,22 @@ func (s *Server) handleReviewQueue(w http.ResponseWriter, r *http.Request) {
 	if itemType != "" {
 		filters["type"] = itemType
 	}
+	if projectID := r.URL.Query().Get("project_id"); projectID != "" {
+		filters["project_id"] = fmt.Sprintf("eq.%s", projectID)
+	}
+	if projectSlug := r.URL.Query().Get("project_slug"); projectSlug != "" {
+		projData, _ := s.db.Query(ctx, "projects", map[string]any{
+			"select": "id",
+			"slug":   fmt.Sprintf("eq.%s", projectSlug),
+			"limit":  1,
+		})
+		var projRows []map[string]any
+		if json.Unmarshal(projData, &projRows) == nil && len(projRows) > 0 {
+			if pid, ok := projRows[0]["id"].(string); ok && pid != "" {
+				filters["project_id"] = fmt.Sprintf("eq.%s", pid)
+			}
+		}
+	}
 
 	dbItems, err := s.db.Query(ctx, "review_items", filters)
 	if err != nil {
