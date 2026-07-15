@@ -186,6 +186,7 @@ func (r *CourierRunner) SetGovernorURL(url string) {
 // cdpAvailable checks if Chrome is running with CDP on localhost:9222.
 // This determines whether we can use the local browser-harness path.
 func (r *CourierRunner) cdpAvailable(ctx context.Context) bool {
+	// Chrome must be running with remote debugging on port 9222
 	checkCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
@@ -198,7 +199,16 @@ func (r *CourierRunner) cdpAvailable(ctx context.Context) bool {
 		return false
 	}
 	defer resp.Body.Close()
-	return resp.StatusCode == 200
+	if resp.StatusCode != 200 {
+		return false
+	}
+
+	// browser-harness binary must also be installed in PATH
+	if _, err := exec.LookPath("browser-harness"); err != nil {
+		return false
+	}
+
+	return true
 }
 
 // detectPlatform finds the platform config matching the given URL.
