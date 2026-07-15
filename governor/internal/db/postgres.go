@@ -606,6 +606,14 @@ func rowsToJSON(rows pgx.Rows) (json.RawMessage, error) {
 		results = append(results, row)
 	}
 
+	// Check for errors encountered during row iteration (e.g. trigger failures
+	// that abort the query but don't surface via rows.Next returning false).
+	// Without this check, trigger errors that roll back the INSERT are silently
+	// swallowed and callers see empty results with no error — a data-loss bug.
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration: %w", err)
+	}
+
 	if results == nil {
 		results = []map[string]any{}
 	}

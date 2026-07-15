@@ -51,14 +51,18 @@ func recordPipelineEvent(ctx context.Context, database db.Database, eventType, t
 		}
 	}
 
-	_, err := database.Insert(ctx, "orchestrator_events", map[string]any{
+	eventData := map[string]any{
 		"event_type": eventType,
 		"task_id":    taskID,
 		"model_id":   modelID,
 		"reason":     reason,
 		"details":    eventDetails,
-		"project_id": projectID,
-	})
+	}
+	if projectID != "" {
+		eventData["project_id"] = projectID
+	}
+
+	_, err := database.Insert(ctx, "orchestrator_events", eventData)
 	if err != nil {
 		log.Printf("[recordPipelineEvent] Failed to write %s event: %v", eventType, err)
 	}
