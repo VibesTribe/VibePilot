@@ -375,11 +375,14 @@ func (r *CourierRunner) Run(ctx context.Context, prompt string, timeout int) (st
 		courierType = "local-browser-harness"
 	}
 
-	// Create task_runs row
+	// Create task_runs row — include platform and model for cost tracking
 	_, err := r.db.Insert(ctx, "task_runs", map[string]any{
 		"task_id":    taskID,
 		"status":     "running",
 		"courier":    courierType,
+		"platform":   webPlatformURL,
+		"model_id":   llmModel,
+		"role":       "courier",
 		"started_at": time.Now().UTC().Format(time.RFC3339),
 	})
 	if err != nil {
