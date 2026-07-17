@@ -1,8 +1,25 @@
 {
   "version": 2,
-  "updated": "2026-07-17T12:00:54.351018+00:00",
+  "updated": "2026-07-17T21:32:23.969897+00:00",
   "total": 173,
   "models": [
+    {
+      "id": "google/lyria-3-pro-preview",
+      "name": "Google: Lyria 3 Pro Preview",
+      "context_length": 1048576,
+      "capabilities": [
+        "reasoning",
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
     {
       "id": "qwen/qwen3-coder:free",
       "name": "Qwen: Qwen3 Coder 480B A35B (free)",
@@ -27,23 +44,6 @@
       "name": "Google: Lyria 3 Clip Preview",
       "context_length": 1048576,
       "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "google/lyria-3-pro-preview",
-      "name": "Google: Lyria 3 Pro Preview",
-      "context_length": 1048576,
-      "capabilities": [
-        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -88,12 +88,11 @@
       ]
     },
     {
-      "id": "google/gemma-4-31b-it:free",
-      "name": "Google: Gemma 4 31B (free)",
+      "id": "poolside/laguna-xs-2.1:free",
+      "name": "Poolside: Laguna XS 2.1 (free)",
       "context_length": 262144,
       "capabilities": [
-        "text",
-        "vision"
+        "text"
       ],
       "rate_limits": {
         "rpd": 200,
@@ -105,12 +104,11 @@
       ]
     },
     {
-      "id": "google/gemma-4-26b-a4b-it:free",
-      "name": "Google: Gemma 4 26B A4B  (free)",
+      "id": "poolside/laguna-m.1:free",
+      "name": "Poolside: Laguna M.1 (free)",
       "context_length": 262144,
       "capabilities": [
-        "text",
-        "vision"
+        "text"
       ],
       "rate_limits": {
         "rpd": 200,
@@ -140,11 +138,12 @@
       ]
     },
     {
-      "id": "poolside/laguna-m.1:free",
-      "name": "Poolside: Laguna M.1 (free)",
+      "id": "google/gemma-4-26b-a4b-it:free",
+      "name": "Google: Gemma 4 26B A4B  (free)",
       "context_length": 262144,
       "capabilities": [
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "rpd": 200,
@@ -172,11 +171,12 @@
       ]
     },
     {
-      "id": "poolside/laguna-xs-2.1:free",
-      "name": "Poolside: Laguna XS 2.1 (free)",
+      "id": "google/gemma-4-31b-it:free",
+      "name": "Google: Gemma 4 31B (free)",
       "context_length": 262144,
       "capabilities": [
-        "text"
+        "text",
+        "vision"
       ],
       "rate_limits": {
         "rpd": 200,
@@ -190,22 +190,6 @@
     {
       "id": "nvidia/nemotron-3-nano-30b-a3b:free",
       "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
-      "context_length": 256000,
-      "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "cohere/north-mini-code:free",
-      "name": "Cohere: North Mini Code (free)",
       "context_length": 256000,
       "capabilities": [
         "text"
@@ -236,6 +220,22 @@
       ]
     },
     {
+      "id": "cohere/north-mini-code:free",
+      "name": "Cohere: North Mini Code (free)",
+      "context_length": 256000,
+      "capabilities": [
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
       "id": "openrouter/free",
       "name": "Free Models Router",
       "context_length": 200000,
@@ -252,13 +252,11 @@
       ]
     },
     {
-      "id": "meta-llama/llama-3.3-70b-instruct:free",
-      "name": "Meta: Llama 3.3 70B Instruct (free)",
+      "id": "meta-llama/llama-3.2-3b-instruct:free",
+      "name": "Meta: Llama 3.2 3B Instruct (free)",
       "context_length": 131072,
       "capabilities": [
-        "code",
         "instruction",
-        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -307,27 +305,13 @@
       ]
     },
     {
-      "id": "meta-llama/llama-3.2-3b-instruct:free",
-      "name": "Meta: Llama 3.2 3B Instruct (free)",
+      "id": "meta-llama/llama-3.3-70b-instruct:free",
+      "name": "Meta: Llama 3.3 70B Instruct (free)",
       "context_length": 131072,
       "capabilities": [
+        "code",
         "instruction",
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "nvidia/nemotron-nano-9b-v2:free",
-      "name": "NVIDIA: Nemotron Nano 9B V2 (free)",
-      "context_length": 128000,
-      "capabilities": [
+        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -342,6 +326,22 @@
     {
       "id": "nvidia/nemotron-nano-12b-v2-vl:free",
       "name": "NVIDIA: Nemotron Nano 12B 2 VL (free)",
+      "context_length": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
+      "id": "nvidia/nemotron-nano-9b-v2:free",
+      "name": "NVIDIA: Nemotron Nano 9B V2 (free)",
       "context_length": 128000,
       "capabilities": [
         "text"
@@ -1110,11 +1110,10 @@
       ]
     },
     {
-      "id": "mistralai/mistral-large",
-      "name": "mistralai/mistral-large",
+      "id": "sarvamai/sarvam-m",
+      "name": "sarvamai/sarvam-m",
       "context_length": 128000,
       "capabilities": [
-        "instruction",
         "text"
       ],
       "rate_limits": {
@@ -1127,10 +1126,11 @@
       ]
     },
     {
-      "id": "sarvamai/sarvam-m",
-      "name": "sarvamai/sarvam-m",
+      "id": "mistralai/mistral-large",
+      "name": "mistralai/mistral-large",
       "context_length": 128000,
       "capabilities": [
+        "instruction",
         "text"
       ],
       "rate_limits": {
@@ -1293,8 +1293,8 @@
       ]
     },
     {
-      "id": "stepfun-ai/step-3.5-flash",
-      "name": "stepfun-ai/step-3.5-flash",
+      "id": "nvidia/nemotron-parse",
+      "name": "nvidia/nemotron-parse",
       "context_length": 128000,
       "capabilities": [
         "text"
@@ -1309,8 +1309,8 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-parse",
-      "name": "nvidia/nemotron-parse",
+      "id": "stepfun-ai/step-3.5-flash",
+      "name": "stepfun-ai/step-3.5-flash",
       "context_length": 128000,
       "capabilities": [
         "text"
@@ -2455,9 +2455,9 @@
       "name": "Gemini Flash Latest",
       "context_length": 1048576,
       "capabilities": [
+        "text",
         "reasoning",
         "code",
-        "text",
         "instruction",
         "vision"
       ],
@@ -2513,6 +2513,26 @@
       ]
     },
     {
+      "id": "gemini-3.1-flash-lite",
+      "name": "Gemini 3.1 Flash Lite",
+      "context_length": 1048576,
+      "capabilities": [
+        "text",
+        "instruction",
+        "vision"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
       "id": "gemini-3.1-pro-preview-customtools",
       "name": "Gemini 3.1 Pro Preview Custom Tools",
       "context_length": 1048576,
@@ -2534,14 +2554,12 @@
       ]
     },
     {
-      "id": "gemini-flash-lite-latest",
-      "name": "Gemini Flash-Lite Latest",
+      "id": "lyria-3-pro-preview",
+      "name": "Lyria 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "reasoning",
-        "code",
         "text",
-        "instruction",
+        "reasoning",
         "vision"
       ],
       "rate_limits": {
@@ -2558,26 +2576,6 @@
     {
       "id": "gemini-2.5-flash-lite",
       "name": "Gemini 2.5 Flash-Lite",
-      "context_length": 1048576,
-      "capabilities": [
-        "text",
-        "instruction",
-        "vision"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "gemini-3.1-flash-lite",
-      "name": "Gemini 3.1 Flash Lite",
       "context_length": 1048576,
       "capabilities": [
         "text",
@@ -2661,9 +2659,9 @@
       "name": "Gemini Pro Latest",
       "context_length": 1048576,
       "capabilities": [
+        "text",
         "reasoning",
         "code",
-        "text",
         "instruction",
         "vision"
       ],
@@ -2779,12 +2777,14 @@
       ]
     },
     {
-      "id": "lyria-3-pro-preview",
-      "name": "Lyria 3 Pro Preview",
+      "id": "gemini-flash-lite-latest",
+      "name": "Gemini Flash-Lite Latest",
       "context_length": 1048576,
       "capabilities": [
         "text",
         "reasoning",
+        "code",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
