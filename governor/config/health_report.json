@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-18T10:30:21.293436+00:00",
+  "timestamp": "2026-07-19T10:30:54.772038+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -95,7 +95,7 @@
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
         "gemini-2.5-flash-native-audio-latest",
-        "allam-2-7b",
+        "llama-3.1-8b-instant",
         "whisper-large-v3-turbo"
       ]
     }
