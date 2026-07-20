@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-19T10:30:54.772038+00:00",
+  "timestamp": "2026-07-20T10:30:28.347252+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,8 +11,8 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 344,
-      "free": 23
+      "models": 338,
+      "free": 17
     }
   },
   "health_checks": {
@@ -30,16 +30,6 @@
       "alive": null,
       "status": "skip",
       "provider": "gemini"
-    },
-    "qwen/qwen3-next-80b-a3b-instruct:free": {
-      "alive": true,
-      "status": "rate_limited_but_alive",
-      "provider": "openrouter"
-    },
-    "qwen/qwen3-coder:free": {
-      "alive": true,
-      "status": "rate_limited_but_alive",
-      "provider": "openrouter"
     },
     "openrouter/free": {
       "alive": true,
@@ -95,8 +85,8 @@
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
         "gemini-2.5-flash-native-audio-latest",
-        "llama-3.1-8b-instant",
-        "whisper-large-v3-turbo"
+        "whisper-large-v3-turbo",
+        "llama-3.1-8b-instant"
       ]
     }
   ],
