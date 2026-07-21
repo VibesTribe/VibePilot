@@ -11,3 +11,4 @@ Test that the courier pipeline works end-to-end: PRD → plan → task → couri
 - A task is created and dispatched to a courier agent
 - The courier returns the Python version with the correct TASK T001 prefix
 - No code changes are made to the VibePilot or governor codebase
+
