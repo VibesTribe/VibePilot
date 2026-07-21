@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-20T10:30:28.347252+00:00",
+  "timestamp": "2026-07-21T10:30:00.977027+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -12,7 +12,7 @@
     "openrouter": {
       "status": "ok",
       "models": 338,
-      "free": 17
+      "free": 16
     }
   },
   "health_checks": {
@@ -85,8 +85,8 @@
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
         "gemini-2.5-flash-native-audio-latest",
-        "whisper-large-v3-turbo",
-        "llama-3.1-8b-instant"
+        "meta-llama/llama-prompt-guard-2-22m",
+        "allam-2-7b"
       ]
     }
   ],
