@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-21T10:30:00.977027+00:00",
+  "timestamp": "2026-07-22T10:30:36.249247+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,8 +11,8 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 338,
-      "free": 16
+      "models": 342,
+      "free": 17
     }
   },
   "health_checks": {
@@ -65,7 +65,7 @@
   "changes": [
     {
       "action": "new_free_models",
-      "count": 27,
+      "count": 25,
       "models": [
         "gemini-2.5-flash",
         "gemini-2.5-flash-preview-tts",
@@ -83,10 +83,10 @@
         "imagen-4.0-fast-generate-001",
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
-        "veo-3.1-lite-generate-preview",
-        "gemini-2.5-flash-native-audio-latest",
-        "meta-llama/llama-prompt-guard-2-22m",
-        "allam-2-7b"
+        "llama-3.3-70b-versatile",
+        "whisper-large-v3-turbo",
+        "meta-llama/llama-prompt-guard-2-86m",
+        "llama-3.1-8b-instant"
       ]
     }
   ],
