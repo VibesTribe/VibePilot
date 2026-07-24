@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-23T10:30:07.819910+00:00",
+  "timestamp": "2026-07-24T10:30:42.509060+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,8 +11,8 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 342,
-      "free": 17
+      "models": 343,
+      "free": 18
     }
   },
   "health_checks": {
@@ -83,10 +83,10 @@
         "imagen-4.0-fast-generate-001",
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
-        "meta-llama/llama-prompt-guard-2-86m",
-        "allam-2-7b",
+        "groq/compound",
         "meta-llama/llama-prompt-guard-2-22m",
-        "whisper-large-v3"
+        "allam-2-7b",
+        "whisper-large-v3-turbo"
       ]
     }
   ],
