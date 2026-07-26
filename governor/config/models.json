@@ -12,7 +12,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 1048576
     },
     {
       "id": "google/lyria-3-clip-preview",
@@ -25,7 +30,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 1048576
     },
     {
       "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
@@ -51,7 +61,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "poolside/laguna-xs-2.1:free",
@@ -64,7 +79,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "google/gemma-4-26b-a4b-it:free",
@@ -78,7 +98,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "google/gemma-4-31b-it:free",
@@ -92,7 +117,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "nvidia/nemotron-3-super-120b-a12b:free",
@@ -118,7 +148,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "poolside/laguna-s-2.1:free",
@@ -131,7 +166,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "cohere/north-mini-code:free",
@@ -144,7 +184,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 256000
     },
     {
       "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
@@ -183,7 +228,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 200000
     },
     {
       "id": "openai/gpt-oss-20b:free",
@@ -199,7 +249,12 @@
       "access_via": [
         "openrouter-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "nvidia/nemotron-nano-12b-v2-vl:free",
@@ -253,7 +308,13 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200,
+        "tokens_per_day": 100000
+      },
+      "context_length": 262144
     },
     {
       "id": "groq/llama-3.1-8b-instant",
@@ -283,7 +344,13 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200,
+        "tokens_per_day": 100000
+      },
+      "context_length": 131072
     },
     {
       "id": "groq/llama-3.3-70b-versatile",
@@ -325,7 +392,12 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_day": 14400,
+        "tokens_per_day": 100000
+      }
     },
     {
       "id": "canopylabs/orpheus-v1-english",
@@ -338,7 +410,12 @@
       "access_via": [
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 30,
+        "requests_per_day": 14400,
+        "tokens_per_day": 100000
+      }
     },
     {
       "id": "z-ai/glm-5.2",
@@ -354,7 +431,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 1048576
     },
     {
       "id": "thinkingmachines/inkling",
@@ -368,7 +450,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 1048576
     },
     {
       "id": "nvidia/nemotron-3-super-120b-a12b",
@@ -409,7 +496,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "qwen/qwen3.5-397b-a17b",
@@ -424,7 +516,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "poolside/laguna-xs-2.1",
@@ -437,7 +534,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "google/gemma-4-31b-it",
@@ -451,7 +553,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "nvidia/nemotron-3-nano-30b-a3b",
@@ -478,7 +585,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 262144
     },
     {
       "id": "nvidia/llama-3.1-nemotron-70b-instruct",
@@ -509,7 +621,13 @@
         "nvidia-api",
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200,
+        "tokens_per_day": 100000
+      },
+      "context_length": 131072
     },
     {
       "id": "nvidia/nemotron-nano-12b-v2-vl",
@@ -536,7 +654,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
@@ -567,7 +690,13 @@
         "nvidia-api",
         "groq-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200,
+        "tokens_per_day": 100000
+      },
+      "context_length": 131072
     },
     {
       "id": "google/gemma-3-12b-it",
@@ -581,7 +710,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 131072
     },
     {
       "id": "meta/llama-3.1-70b-instruct",
@@ -915,7 +1049,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 128000
     },
     {
       "id": "nvidia/ising-calibration-1-35b-a3b",
@@ -1711,7 +1850,12 @@
       "access_via": [
         "nvidia-api"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 20,
+        "requests_per_day": 200
+      },
+      "context_length": 32768
     },
     {
       "id": "nvidia/nv-embedqa-e5-v5",
@@ -1928,7 +2072,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-3.1-pro-preview",
@@ -1951,7 +2101,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 5,
+        "requests_per_day": 25,
+        "tokens_per_minute": 250000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-robotics-er-1.5-preview",
@@ -1972,7 +2128,8 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "context_length": 1048576
     },
     {
       "id": "gemini-3-pro-preview",
@@ -1995,7 +2152,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 5,
+        "requests_per_day": 25,
+        "tokens_per_minute": 250000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-flash-latest",
@@ -2019,7 +2182,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-3.6-flash",
@@ -2041,7 +2210,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-2.0-flash",
@@ -2063,7 +2238,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-3-flash-preview",
@@ -2085,7 +2266,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-2.0-flash-lite",
@@ -2107,7 +2294,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-3.1-flash-lite",
@@ -2129,7 +2322,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-2.5-flash-lite",
@@ -2151,7 +2350,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-3.5-flash",
@@ -2173,7 +2378,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-3.5-flash-lite",
@@ -2195,7 +2406,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "lyria-3-pro-preview",
@@ -2217,7 +2434,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 5,
+        "requests_per_day": 25,
+        "tokens_per_minute": 250000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-3.1-pro-preview-customtools",
@@ -2240,7 +2463,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 5,
+        "requests_per_day": 25,
+        "tokens_per_minute": 250000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-flash-lite-latest",
@@ -2264,7 +2493,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-pro-latest",
@@ -2288,7 +2523,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 5,
+        "requests_per_day": 25,
+        "tokens_per_minute": 250000
+      },
+      "context_length": 1048576
     },
     {
       "id": "lyria-3-clip-preview",
@@ -2309,7 +2550,8 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "context_length": 1048576
     },
     {
       "id": "gemini-2.5-pro",
@@ -2331,7 +2573,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 5,
+        "requests_per_day": 25,
+        "tokens_per_minute": 250000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemini-2.0-flash-lite-001",
@@ -2353,7 +2601,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 1048576
     },
     {
       "id": "gemma-4-31b-it",
@@ -2374,7 +2628,8 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "context_length": 262144
     },
     {
       "id": "gemma-4-26b-a4b-it",
@@ -2395,7 +2650,8 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "context_length": 262144
     },
     {
       "id": "deep-research-preview-04-2026",
@@ -2416,7 +2672,8 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "context_length": 131072
     },
     {
       "id": "gemini-robotics-er-1.6-preview",
@@ -2437,7 +2694,8 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "context_length": 131072
     },
     {
       "id": "deep-research-max-preview-04-2026",
@@ -2458,7 +2716,8 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "context_length": 131072
     },
     {
       "id": "nano-banana-pro-preview",
@@ -2480,7 +2739,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 5,
+        "requests_per_day": 25,
+        "tokens_per_minute": 250000
+      },
+      "context_length": 131072
     },
     {
       "id": "antigravity-preview-05-2026",
@@ -2501,7 +2766,8 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "context_length": 131072
     },
     {
       "id": "gemini-omni-flash-preview",
@@ -2523,7 +2789,13 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 15,
+        "requests_per_day": 1500,
+        "tokens_per_minute": 1000000
+      },
+      "context_length": 131072
     },
     {
       "id": "gemini-2.5-computer-use-preview-10-2025",
@@ -2545,7 +2817,8 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "context_length": 131072
     },
     {
       "id": "deep-research-pro-preview-12-2025",
@@ -2567,7 +2840,14 @@
         "gemini-api-researcher",
         "gemini-api-visual"
       ],
-      "status": "active"
+      "status": "active",
+      "rate_limits": {
+        "requests_per_minute": 5,
+        "requests_per_day": 25,
+        "tokens_per_minute": 250000
+      },
+      "context_length": 131072
     }
-  ]
+  ],
+  "last_health_check": "2026-07-26T10:30:46.913770+00:00"
 }
