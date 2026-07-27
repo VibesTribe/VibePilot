@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-26T10:30:46.913770+00:00",
+  "timestamp": "2026-07-27T10:30:18.579444+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -83,10 +83,10 @@
         "imagen-4.0-fast-generate-001",
         "veo-3.1-generate-preview",
         "veo-3.1-fast-generate-preview",
-        "llama-3.3-70b-versatile",
-        "groq/compound-mini",
         "meta-llama/llama-prompt-guard-2-86m",
-        "llama-3.1-8b-instant"
+        "groq/compound-mini",
+        "groq/compound",
+        "allam-2-7b"
       ]
     }
   ],
