@@ -1,12 +1,11 @@
 {
   "models": [
     {
-      "id": "google/lyria-3-pro-preview",
-      "name": "Google: Lyria 3 Pro Preview",
+      "id": "google/lyria-3-clip-preview",
+      "name": "Google: Lyria 3 Clip Preview",
       "provider": "openrouter",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
         "text"
       ],
       "access_via": [
@@ -15,11 +14,12 @@
       "status": "active"
     },
     {
-      "id": "google/lyria-3-clip-preview",
-      "name": "Google: Lyria 3 Clip Preview",
+      "id": "google/lyria-3-pro-preview",
+      "name": "Google: Lyria 3 Pro Preview",
       "provider": "openrouter",
       "context_limit": 1048576,
       "capabilities": [
+        "reasoning",
         "text"
       ],
       "access_via": [
@@ -41,8 +41,8 @@
       "status": "active"
     },
     {
-      "id": "poolside/laguna-xs-2.1:free",
-      "name": "Poolside: Laguna XS 2.1 (free)",
+      "id": "inclusionai/ling-3.0-flash:free",
+      "name": "Ling-3.0-flash (free)",
       "provider": "openrouter",
       "context_limit": 262144,
       "capabilities": [
@@ -54,8 +54,8 @@
       "status": "active"
     },
     {
-      "id": "inclusionai/ling-3.0-flash:free",
-      "name": "Ling-3.0-flash (free)",
+      "id": "poolside/laguna-xs-2.1:free",
+      "name": "Poolside: Laguna XS 2.1 (free)",
       "provider": "openrouter",
       "context_limit": 262144,
       "capabilities": [
@@ -202,8 +202,8 @@
       "status": "active"
     },
     {
-      "id": "nvidia/nemotron-3.5-content-safety:free",
-      "name": "NVIDIA: Nemotron 3.5 Content Safety (free)",
+      "id": "nvidia/nemotron-nano-12b-v2-vl:free",
+      "name": "NVIDIA: Nemotron Nano 12B 2 VL (free)",
       "provider": "openrouter",
       "context_limit": 128000,
       "capabilities": [
@@ -215,8 +215,8 @@
       "status": "active"
     },
     {
-      "id": "nvidia/nemotron-nano-12b-v2-vl:free",
-      "name": "NVIDIA: Nemotron Nano 12B 2 VL (free)",
+      "id": "nvidia/nemotron-3.5-content-safety:free",
+      "name": "NVIDIA: Nemotron 3.5 Content Safety (free)",
       "provider": "openrouter",
       "context_limit": 128000,
       "capabilities": [
@@ -1672,16 +1672,14 @@
       "status": "active"
     },
     {
-      "id": "gemini-pro-latest",
-      "name": "Gemini Pro Latest",
+      "id": "gemini-2.0-flash-lite",
+      "name": "Gemini 2.0 Flash-Lite",
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "code",
+        "vision",
         "instruction",
-        "text",
-        "reasoning",
-        "vision"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1702,33 +1700,9 @@
       "context_limit": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "reasoning",
-        "instruction"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general",
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-flash-latest",
-      "name": "Gemini Flash Latest",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "code",
         "instruction",
         "text",
-        "reasoning",
-        "vision"
+        "reasoning"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1743,14 +1717,34 @@
       "status": "active"
     },
     {
-      "id": "gemini-3.5-flash-lite",
-      "name": "Gemini 3.5 Flash Lite",
+      "id": "gemini-robotics-er-1.5-preview",
+      "name": "Gemini Robotics-ER 1.5 Preview",
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
         "vision",
-        "text",
         "instruction"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "lyria-3-clip-preview",
+      "name": "Lyria 3 Clip Preview",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1771,8 +1765,8 @@
       "context_limit": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1793,8 +1787,8 @@
       "context_limit": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1815,8 +1809,8 @@
       "context_limit": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1837,8 +1831,8 @@
       "context_limit": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1859,8 +1853,8 @@
       "context_limit": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1881,31 +1875,9 @@
       "context_limit": 1048576,
       "capabilities": [
         "vision",
+        "instruction",
         "text",
-        "reasoning",
-        "instruction"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general",
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-2.5-flash-lite",
-      "name": "Gemini 2.5 Flash-Lite",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "vision",
-        "text",
-        "instruction"
+        "reasoning"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1926,8 +1898,30 @@
       "context_limit": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash-Lite",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "vision",
+        "instruction",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1948,8 +1942,8 @@
       "context_limit": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1964,14 +1958,62 @@
       "status": "active"
     },
     {
-      "id": "gemini-2.0-flash-lite",
-      "name": "Gemini 2.0 Flash-Lite",
+      "id": "gemini-pro-latest",
+      "name": "Gemini Pro Latest",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "instruction",
+        "vision",
+        "text",
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-flash-latest",
+      "name": "Gemini Flash Latest",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "instruction",
+        "vision",
+        "text",
+        "code",
+        "reasoning"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-3.5-flash-lite",
+      "name": "Gemini 3.5 Flash Lite",
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1991,11 +2033,11 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "code",
         "instruction",
+        "vision",
         "text",
-        "reasoning",
-        "vision"
+        "code",
+        "reasoning"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2038,30 +2080,9 @@
       "context_limit": 1048576,
       "capabilities": [
         "vision",
+        "instruction",
         "text",
-        "reasoning",
-        "instruction"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general",
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-robotics-er-1.5-preview",
-      "name": "Gemini Robotics-ER 1.5 Preview",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "vision",
-        "instruction"
+        "reasoning"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2082,8 +2103,8 @@
       "context_limit": 1048576,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2098,10 +2119,10 @@
       "status": "active"
     },
     {
-      "id": "lyria-3-clip-preview",
-      "name": "Lyria 3 Clip Preview",
+      "id": "gemma-4-31b-it",
+      "name": "Gemma 4 31B IT",
       "provider": "gemini",
-      "context_limit": 1048576,
+      "context_limit": 262144,
       "capabilities": [
         "vision",
         "text"
@@ -2140,10 +2161,31 @@
       "status": "active"
     },
     {
-      "id": "gemma-4-31b-it",
-      "name": "Gemma 4 31B IT",
+      "id": "deep-research-max-preview-04-2026",
+      "name": "Deep Research Max Preview (Apr-21-2026)",
       "provider": "gemini",
-      "context_limit": 262144,
+      "context_limit": 131072,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "antigravity-preview-05-2026",
+      "name": "Antigravity Agent Preview",
+      "provider": "gemini",
+      "context_limit": 131072,
       "capabilities": [
         "vision",
         "text"
@@ -2167,8 +2209,8 @@
       "context_limit": 131072,
       "capabilities": [
         "vision",
-        "text",
-        "instruction"
+        "instruction",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2248,20 +2290,15 @@
       "status": "active"
     },
     {
-      "id": "gemini-omni-flash-preview",
-      "name": "Gemini Omni Flash Preview",
+      "id": "gemini-robotics-er-2-preview",
+      "name": "Gemini Robotics-ER 2 Preview",
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
         "vision",
-        "text",
         "instruction"
       ],
       "access_via": [
-        "gemini-api-general",
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
         "gemini-api-general",
         "gemini-api-courier",
         "gemini-api-researcher",
@@ -2270,12 +2307,13 @@
       "status": "active"
     },
     {
-      "id": "deep-research-max-preview-04-2026",
-      "name": "Deep Research Max Preview (Apr-21-2026)",
+      "id": "gemini-omni-flash-preview",
+      "name": "Gemini Omni Flash Preview",
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
         "vision",
+        "instruction",
         "text"
       ],
       "access_via": [
@@ -2298,27 +2336,6 @@
       "capabilities": [
         "vision",
         "instruction"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general",
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "antigravity-preview-05-2026",
-      "name": "Antigravity Agent Preview",
-      "provider": "gemini",
-      "context_limit": 131072,
-      "capabilities": [
-        "vision",
-        "text"
       ],
       "access_via": [
         "gemini-api-general",
