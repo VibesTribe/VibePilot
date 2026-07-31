@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-30T10:31:00.000123+00:00",
+  "timestamp": "2026-07-31T10:30:34.697573+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,7 +11,7 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 367,
+      "models": 365,
       "free": 17
     }
   },
@@ -65,7 +65,7 @@
   "changes": [
     {
       "action": "new_free_models",
-      "count": 25,
+      "count": 24,
       "models": [
         "gemini-2.5-flash",
         "gemini-2.5-flash-preview-tts",
@@ -82,11 +82,11 @@
         "imagen-4.0-ultra-generate-001",
         "imagen-4.0-fast-generate-001",
         "veo-3.1-generate-preview",
-        "veo-3.1-fast-generate-preview",
-        "whisper-large-v3-turbo",
         "meta-llama/llama-prompt-guard-2-22m",
+        "whisper-large-v3-turbo",
         "meta-llama/llama-prompt-guard-2-86m",
-        "groq/compound-mini"
+        "groq/compound-mini",
+        "whisper-large-v3"
       ]
     }
   ],
