@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-06T10:30:48.276301+00:00",
+  "timestamp": "2026-08-07T10:30:19.881728+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,7 +11,7 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 340,
+      "models": 400,
       "free": 17
     }
   },
@@ -82,11 +82,11 @@
         "imagen-4.0-ultra-generate-001",
         "imagen-4.0-fast-generate-001",
         "veo-3.1-generate-preview",
+        "whisper-large-v3",
         "whisper-large-v3-turbo",
-        "meta-llama/llama-prompt-guard-2-22m",
-        "groq/compound",
         "meta-llama/llama-prompt-guard-2-86m",
-        "groq/compound-mini"
+        "groq/compound-mini",
+        "llama-3.3-70b-versatile"
       ]
     }
   ],
