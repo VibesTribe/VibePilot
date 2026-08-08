@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-07T10:30:19.881728+00:00",
+  "timestamp": "2026-08-08T10:30:50.988812+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -55,11 +55,6 @@
       "alive": true,
       "status": "ok",
       "provider": "openrouter"
-    },
-    "deepseek-ai/deepseek-v4-flash": {
-      "alive": false,
-      "status": "HTTP 400: {\"error\":{\"message\":\"deepseek-ai/deepseek-v4-flash is not a valid model ID\",\"code\":400},\"user_id\":\"user_3CdMRRHo4N09mdBX77OuOG9Ihkq\"}",
-      "provider": "nvidia"
     }
   },
   "changes": [
@@ -82,11 +77,11 @@
         "imagen-4.0-ultra-generate-001",
         "imagen-4.0-fast-generate-001",
         "veo-3.1-generate-preview",
-        "whisper-large-v3",
+        "allam-2-7b",
         "whisper-large-v3-turbo",
-        "meta-llama/llama-prompt-guard-2-86m",
         "groq/compound-mini",
-        "llama-3.3-70b-versatile"
+        "llama-3.1-8b-instant",
+        "groq/compound"
       ]
     }
   ],
