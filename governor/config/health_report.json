@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-09T10:30:20.632532+00:00",
+  "timestamp": "2026-08-10T10:30:52.087645+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -60,7 +60,7 @@
   "changes": [
     {
       "action": "new_free_models",
-      "count": 24,
+      "count": 30,
       "models": [
         "gemini-2.5-flash",
         "gemini-2.5-flash-preview-tts",
@@ -77,11 +77,11 @@
         "imagen-4.0-ultra-generate-001",
         "imagen-4.0-fast-generate-001",
         "veo-3.1-generate-preview",
-        "groq/compound-mini",
-        "llama-3.1-8b-instant",
-        "llama-3.3-70b-versatile",
-        "whisper-large-v3",
-        "meta-llama/llama-prompt-guard-2-22m"
+        "veo-3.1-fast-generate-preview",
+        "veo-3.1-lite-generate-preview",
+        "gemini-2.5-flash-native-audio-latest",
+        "gemini-2.5-flash-native-audio-preview-09-2025",
+        "gemini-2.5-flash-native-audio-preview-12-2025"
       ]
     }
   ],
