@@ -41,47 +41,6 @@
       "status": "active"
     },
     {
-      "id": "google/gemma-4-31b-it:free",
-      "name": "Google: Gemma 4 31B (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text",
-        "vision"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "poolside/laguna-s-2.1:free",
-      "name": "Poolside: Laguna S 2.1 (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "google/gemma-4-26b-a4b-it:free",
-      "name": "Google: Gemma 4 26B A4B  (free)",
-      "provider": "openrouter",
-      "context_limit": 262144,
-      "capabilities": [
-        "text",
-        "vision"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
       "id": "poolside/laguna-xs-2.1:free",
       "name": "Poolside: Laguna XS 2.1 (free)",
       "provider": "openrouter",
@@ -121,8 +80,49 @@
       "status": "active"
     },
     {
-      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
-      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
+      "id": "google/gemma-4-26b-a4b-it:free",
+      "name": "Google: Gemma 4 26B A4B  (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "google/gemma-4-31b-it:free",
+      "name": "Google: Gemma 4 31B (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "poolside/laguna-s-2.1:free",
+      "name": "Poolside: Laguna S 2.1 (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "cohere/north-mini-code:free",
+      "name": "Cohere: North Mini Code (free)",
       "provider": "openrouter",
       "context_limit": 256000,
       "capabilities": [
@@ -147,8 +147,8 @@
       "status": "active"
     },
     {
-      "id": "cohere/north-mini-code:free",
-      "name": "Cohere: North Mini Code (free)",
+      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
+      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
       "provider": "openrouter",
       "context_limit": 256000,
       "capabilities": [
@@ -189,6 +189,19 @@
       "status": "active"
     },
     {
+      "id": "nvidia/nemotron-3.5-content-safety:free",
+      "name": "NVIDIA: Nemotron 3.5 Content Safety (free)",
+      "provider": "openrouter",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
       "id": "nvidia/nemotron-nano-12b-v2-vl:free",
       "name": "NVIDIA: Nemotron Nano 12B 2 VL (free)",
       "provider": "openrouter",
@@ -204,19 +217,6 @@
     {
       "id": "nvidia/nemotron-nano-9b-v2:free",
       "name": "NVIDIA: Nemotron Nano 9B V2 (free)",
-      "provider": "openrouter",
-      "context_limit": 128000,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "nvidia/nemotron-3.5-content-safety:free",
-      "name": "NVIDIA: Nemotron 3.5 Content Safety (free)",
       "provider": "openrouter",
       "context_limit": 128000,
       "capabilities": [
@@ -537,6 +537,19 @@
       "access_via": [
         "nvidia-api",
         "groq-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/nvclip",
+      "name": "nvidia/nvclip",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
       ],
       "status": "active"
     },
@@ -1445,6 +1458,19 @@
       "status": "active"
     },
     {
+      "id": "meta/muse-glimmer-30b",
+      "name": "meta/muse-glimmer-30b",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
       "id": "deepseek-ai/deepseek-v4-flash-0731",
       "name": "deepseek-ai/deepseek-v4-flash-0731",
       "provider": "nvidia",
@@ -1630,29 +1656,14 @@
       "status": "active"
     },
     {
-      "id": "nvidia/nvclip",
-      "name": "nvidia/nvclip",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-flash-latest",
-      "name": "Gemini Flash Latest",
+      "id": "gemini-3.5-flash",
+      "name": "Gemini 3.5 Flash",
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
         "instruction",
-        "text",
         "vision",
-        "code",
-        "reasoning"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1672,9 +1683,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "reasoning",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1694,8 +1705,8 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1716,10 +1727,10 @@
       "context_limit": 1048576,
       "capabilities": [
         "instruction",
-        "text",
+        "reasoning",
         "vision",
         "code",
-        "reasoning"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1739,10 +1750,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
-        "instruction",
         "reasoning",
-        "vision"
+        "instruction",
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1762,9 +1773,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1784,9 +1795,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1806,9 +1817,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1828,9 +1839,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1850,32 +1861,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
-        "instruction",
         "reasoning",
-        "vision"
-      ],
-      "access_via": [
-        "gemini-api-general",
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual",
-        "gemini-api-general",
-        "gemini-api-courier",
-        "gemini-api-researcher",
-        "gemini-api-visual"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "gemini-2.5-flash-lite",
-      "name": "Gemini 2.5 Flash-Lite",
-      "provider": "gemini",
-      "context_limit": 1048576,
-      "capabilities": [
-        "text",
         "instruction",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1895,9 +1884,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1912,14 +1901,38 @@
       "status": "active"
     },
     {
-      "id": "gemini-3.5-flash",
-      "name": "Gemini 3.5 Flash",
+      "id": "gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash-Lite",
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "text",
         "instruction",
-        "vision"
+        "vision",
+        "text"
+      ],
+      "access_via": [
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual",
+        "gemini-api-general",
+        "gemini-api-courier",
+        "gemini-api-researcher",
+        "gemini-api-visual"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "gemini-flash-latest",
+      "name": "Gemini Flash Latest",
+      "provider": "gemini",
+      "context_limit": 1048576,
+      "capabilities": [
+        "instruction",
+        "reasoning",
+        "vision",
+        "code",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1940,10 +1953,10 @@
       "context_limit": 1048576,
       "capabilities": [
         "instruction",
-        "text",
+        "reasoning",
         "vision",
         "code",
-        "reasoning"
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1963,8 +1976,8 @@
       "provider": "gemini",
       "context_limit": 262144,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1984,8 +1997,8 @@
       "provider": "gemini",
       "context_limit": 262144,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2005,8 +2018,8 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2047,9 +2060,9 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
         "reasoning",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2069,9 +2082,9 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
         "instruction",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2107,14 +2120,13 @@
       "status": "active"
     },
     {
-      "id": "nano-banana-pro-preview",
-      "name": "Nano Banana Pro",
+      "id": "deep-research-max-preview-04-2026",
+      "name": "Deep Research Max Preview (Apr-21-2026)",
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
-        "reasoning",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2134,8 +2146,8 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2150,13 +2162,14 @@
       "status": "active"
     },
     {
-      "id": "deep-research-max-preview-04-2026",
-      "name": "Deep Research Max Preview (Apr-21-2026)",
+      "id": "nano-banana-pro-preview",
+      "name": "Nano Banana Pro",
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
-        "vision"
+        "reasoning",
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2176,9 +2189,9 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "text",
         "instruction",
-        "vision"
+        "vision",
+        "text"
       ],
       "access_via": [
         "gemini-api-general",
