@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-13T10:30:22.399966+00:00",
+  "timestamp": "2026-08-14T10:30:59.279062+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,7 +11,7 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 409,
+      "models": 411,
       "free": 18
     }
   },
@@ -60,7 +60,7 @@
   "changes": [
     {
       "action": "new_free_models",
-      "count": 30,
+      "count": 29,
       "models": [
         "gemini-2.5-flash",
         "gemini-2.5-flash-preview-tts",
