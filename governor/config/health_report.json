@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-15T10:30:31.829263+00:00",
+  "timestamp": "2026-08-16T10:30:04.492644+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -53,19 +53,18 @@
     },
     "google/gemma-4-26b-a4b-it:free": {
       "alive": true,
-      "status": "rate_limited_but_alive",
+      "status": "ok",
       "provider": "openrouter"
     }
   },
   "changes": [
     {
       "action": "new_free_models",
-      "count": 30,
+      "count": 29,
       "models": [
         "gemini-2.5-flash",
         "gemini-2.5-flash-preview-tts",
         "gemini-2.5-pro-preview-tts",
-        "gemini-3.7-flash-video-understanding-eap",
         "gemini-2.5-flash-image",
         "gemini-3.1-flash-lite-preview",
         "gemini-3-pro-image-preview",
@@ -81,7 +80,8 @@
         "veo-3.1-fast-generate-preview",
         "veo-3.1-lite-generate-preview",
         "gemini-2.5-flash-native-audio-latest",
-        "gemini-2.5-flash-native-audio-preview-09-2025"
+        "gemini-2.5-flash-native-audio-preview-09-2025",
+        "gemini-2.5-flash-native-audio-preview-12-2025"
       ]
     }
   ],
