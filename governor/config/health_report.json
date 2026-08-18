@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-17T10:30:38.150441+00:00",
+  "timestamp": "2026-08-18T10:30:11.725822+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,8 +11,8 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 414,
-      "free": 20
+      "models": 412,
+      "free": 18
     }
   },
   "health_checks": {
@@ -36,20 +36,10 @@
       "status": "ok",
       "provider": "openrouter"
     },
-    "groq/llama-3.3-70b-versatile": {
-      "alive": false,
-      "status": "HTTP 404: {\"error\":{\"message\":\"The model `groq/llama-3.3-70b-versatile` does not exist or you do not have access to it.\",\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}\n",
-      "provider": "groq"
-    },
     "openai/gpt-oss-120b": {
       "alive": true,
       "status": "ok",
       "provider": "nvidia"
-    },
-    "groq/llama-3.1-8b-instant": {
-      "alive": false,
-      "status": "HTTP 404: {\"error\":{\"message\":\"The model `groq/llama-3.1-8b-instant` does not exist or you do not have access to it.\",\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}\n",
-      "provider": "groq"
     },
     "google/gemma-4-26b-a4b-it:free": {
       "alive": true,
@@ -60,7 +50,7 @@
   "changes": [
     {
       "action": "new_free_models",
-      "count": 28,
+      "count": 27,
       "models": [
         "gemini-2.5-flash",
         "gemini-2.5-flash-preview-tts",
