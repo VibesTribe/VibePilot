@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-19T10:30:44.040982+00:00",
+  "timestamp": "2026-08-20T10:30:17.268177+00:00",
   "providers": {
     "google": {
       "status": "ok",
@@ -11,7 +11,7 @@
     },
     "openrouter": {
       "status": "ok",
-      "models": 415,
+      "models": 414,
       "free": 20
     }
   },
