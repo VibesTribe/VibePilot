@@ -1,6 +1,20 @@
 {
   "models": [
     {
+      "id": "google/lyria-3-pro-preview",
+      "name": "Google: Lyria 3 Pro Preview",
+      "provider": "openrouter",
+      "context_limit": 1048576,
+      "capabilities": [
+        "reasoning",
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
       "id": "google/lyria-3-clip-preview",
       "name": "Google: Lyria 3 Clip Preview",
       "provider": "openrouter",
@@ -14,12 +28,11 @@
       "status": "active"
     },
     {
-      "id": "google/lyria-3-pro-preview",
-      "name": "Google: Lyria 3 Pro Preview",
+      "id": "stealth/ox-alpha",
+      "name": "Ox Alpha",
       "provider": "openrouter",
       "context_limit": 1048576,
       "capabilities": [
-        "reasoning",
         "text"
       ],
       "access_via": [
@@ -80,6 +93,19 @@
       "status": "active"
     },
     {
+      "id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "name": "NVIDIA: Nemotron 3 Super (free)",
+      "provider": "openrouter",
+      "context_limit": 262144,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
       "id": "google/gemma-4-26b-a4b-it:free",
       "name": "Google: Gemma 4 26B A4B  (free)",
       "provider": "openrouter",
@@ -108,8 +134,8 @@
       "status": "active"
     },
     {
-      "id": "nvidia/nemotron-3-super-120b-a12b:free",
-      "name": "NVIDIA: Nemotron 3 Super (free)",
+      "id": "poolside/laguna-xs-2.1:free",
+      "name": "Poolside: Laguna XS 2.1 (free)",
       "provider": "openrouter",
       "context_limit": 262144,
       "capabilities": [
@@ -121,10 +147,10 @@
       "status": "active"
     },
     {
-      "id": "poolside/laguna-xs-2.1:free",
-      "name": "Poolside: Laguna XS 2.1 (free)",
+      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
       "provider": "openrouter",
-      "context_limit": 262144,
+      "context_limit": 256000,
       "capabilities": [
         "text"
       ],
@@ -155,19 +181,6 @@
         "code",
         "instruction",
         "reasoning",
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-      "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
-      "provider": "openrouter",
-      "context_limit": 256000,
-      "capabilities": [
         "text"
       ],
       "access_via": [
@@ -231,6 +244,19 @@
       "status": "active"
     },
     {
+      "id": "liquid/lfm-2.5-2.6b:free",
+      "name": "LiquidAI: LFM2.5-2.6B (free)",
+      "provider": "openrouter",
+      "context_limit": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "access_via": [
+        "openrouter-api"
+      ],
+      "status": "active"
+    },
+    {
       "id": "nvidia/nemotron-nano-12b-v2-vl:free",
       "name": "NVIDIA: Nemotron Nano 12B 2 VL (free)",
       "provider": "openrouter",
@@ -246,19 +272,6 @@
     {
       "id": "nvidia/nemotron-3.5-content-safety:free",
       "name": "NVIDIA: Nemotron 3.5 Content Safety (free)",
-      "provider": "openrouter",
-      "context_limit": 128000,
-      "capabilities": [
-        "text"
-      ],
-      "access_via": [
-        "openrouter-api"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "liquid/lfm-2.5-2.6b:free",
-      "name": "LiquidAI: LFM2.5-2.6B (free)",
       "provider": "openrouter",
       "context_limit": 128000,
       "capabilities": [
@@ -949,20 +962,6 @@
       "status": "active"
     },
     {
-      "id": "nvidia/llama-nemotron-embed-1b-v2",
-      "name": "nvidia/llama-nemotron-embed-1b-v2",
-      "provider": "nvidia",
-      "context_limit": 128000,
-      "capabilities": [
-        "embedding",
-        "instruction"
-      ],
-      "access_via": [
-        "nvidia-api"
-      ],
-      "status": "active"
-    },
-    {
       "id": "nvidia/nv-embed-v1",
       "name": "nvidia/nv-embed-v1",
       "provider": "nvidia",
@@ -982,6 +981,20 @@
       "context_limit": 128000,
       "capabilities": [
         "text"
+      ],
+      "access_via": [
+        "nvidia-api"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "nvidia/llama-nemotron-embed-1b-v2",
+      "name": "nvidia/llama-nemotron-embed-1b-v2",
+      "provider": "nvidia",
+      "context_limit": 128000,
+      "capabilities": [
+        "embedding",
+        "instruction"
       ],
       "access_via": [
         "nvidia-api"
@@ -1700,9 +1713,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
+        "vision",
         "text",
-        "vision"
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1722,9 +1735,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
+        "vision",
         "text",
-        "vision"
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1744,9 +1757,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
+        "vision",
         "text",
-        "vision"
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1766,9 +1779,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
+        "vision",
         "text",
-        "vision"
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1810,9 +1823,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
+        "vision",
         "text",
-        "vision"
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1832,9 +1845,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
+        "vision",
         "text",
-        "vision"
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1854,9 +1867,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
+        "vision",
         "text",
-        "vision"
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1876,9 +1889,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
         "vision",
         "text",
+        "instruction",
         "reasoning"
       ],
       "access_via": [
@@ -1899,9 +1912,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
+        "vision",
         "text",
-        "vision"
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -1921,9 +1934,9 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "instruction",
         "vision",
         "text",
+        "instruction",
         "reasoning"
       ],
       "access_via": [
@@ -1944,10 +1957,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
         "instruction",
-        "text",
         "code",
+        "vision",
+        "text",
         "reasoning"
       ],
       "access_via": [
@@ -1968,10 +1981,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
         "instruction",
-        "text",
         "code",
+        "vision",
+        "text",
         "reasoning"
       ],
       "access_via": [
@@ -2013,10 +2026,10 @@
       "provider": "gemini",
       "context_limit": 1048576,
       "capabilities": [
-        "vision",
         "instruction",
-        "text",
         "code",
+        "vision",
+        "text",
         "reasoning"
       ],
       "access_via": [
@@ -2100,8 +2113,8 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "instruction",
-        "vision"
+        "vision",
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2121,8 +2134,8 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "instruction",
-        "vision"
+        "vision",
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2185,9 +2198,9 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "instruction",
+        "vision",
         "text",
-        "vision"
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
@@ -2250,9 +2263,9 @@
       "provider": "gemini",
       "context_limit": 131072,
       "capabilities": [
-        "instruction",
+        "vision",
         "text",
-        "vision"
+        "instruction"
       ],
       "access_via": [
         "gemini-api-general",
