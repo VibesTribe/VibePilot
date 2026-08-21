@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "updated": "2026-08-21T00:00:40.006693+00:00",
-  "total": 150,
+  "updated": "2026-08-21T12:00:57.490887+00:00",
+  "total": 149,
   "models": [
     {
       "id": "google/lyria-3-pro-preview",
@@ -9,22 +9,6 @@
       "context_length": 1048576,
       "capabilities": [
         "reasoning",
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "google/lyria-3-clip-preview",
-      "name": "Google: Lyria 3 Clip Preview",
-      "context_length": 1048576,
-      "capabilities": [
         "text"
       ],
       "rate_limits": {
@@ -53,9 +37,9 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
-      "name": "NVIDIA: Nemotron 3 Ultra (free)",
-      "context_length": 1000000,
+      "id": "google/lyria-3-clip-preview",
+      "name": "Google: Lyria 3 Clip Preview",
+      "context_length": 1048576,
       "capabilities": [
         "text"
       ],
@@ -71,6 +55,22 @@
     {
       "id": "nvidia/nemotron-3.5-lightning:free",
       "name": "NVIDIA: Nemotron 3.5 Lightning (free)",
+      "context_length": 1000000,
+      "capabilities": [
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
+      "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "name": "NVIDIA: Nemotron 3 Ultra (free)",
       "context_length": 1000000,
       "capabilities": [
         "text"
@@ -133,23 +133,6 @@
       ]
     },
     {
-      "id": "google/gemma-4-26b-a4b-it:free",
-      "name": "Google: Gemma 4 26B A4B  (free)",
-      "context_length": 262144,
-      "capabilities": [
-        "text",
-        "vision"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
       "id": "google/gemma-4-31b-it:free",
       "name": "Google: Gemma 4 31B (free)",
       "context_length": 262144,
@@ -183,8 +166,25 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-      "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
+      "id": "google/gemma-4-26b-a4b-it:free",
+      "name": "Google: Gemma 4 26B A4B  (free)",
+      "context_length": 262144,
+      "capabilities": [
+        "text",
+        "vision"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
+      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
+      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
       "context_length": 256000,
       "capabilities": [
         "text"
@@ -215,13 +215,10 @@
       ]
     },
     {
-      "id": "z-ai/glm-5.2:free",
-      "name": "Z.ai: GLM 5.2 (free)",
+      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
       "context_length": 256000,
       "capabilities": [
-        "code",
-        "instruction",
-        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -234,10 +231,13 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
-      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
+      "id": "z-ai/glm-5.2:free",
+      "name": "Z.ai: GLM 5.2 (free)",
       "context_length": 256000,
       "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -285,40 +285,24 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-nano-9b-v2:free",
-      "name": "NVIDIA: Nemotron Nano 9B V2 (free)",
-      "context_length": 128000,
-      "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "liquid/lfm-2.5-2.6b:free",
-      "name": "LiquidAI: LFM2.5-2.6B (free)",
-      "context_length": 128000,
-      "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
       "id": "nvidia/nemotron-nano-12b-v2-vl:free",
       "name": "NVIDIA: Nemotron Nano 12B 2 VL (free)",
+      "context_length": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
+      "id": "nvidia/nemotron-nano-9b-v2:free",
+      "name": "NVIDIA: Nemotron Nano 9B V2 (free)",
       "context_length": 128000,
       "capabilities": [
         "text"
@@ -336,6 +320,22 @@
       "id": "nvidia/nemotron-3.5-content-safety:free",
       "name": "NVIDIA: Nemotron 3.5 Content Safety (free)",
       "context_length": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
+      "id": "liquid/lfm-2.5-2.6b:free",
+      "name": "LiquidAI: LFM2.5-2.6B (free)",
+      "context_length": 65536,
       "capabilities": [
         "text"
       ],
@@ -434,13 +434,11 @@
       ]
     },
     {
-      "id": "z-ai/glm-5.2",
-      "name": "z-ai/glm-5.2",
+      "id": "moonshotai/kimi-k3",
+      "name": "moonshotai/kimi-k3",
       "context_length": 1048576,
       "capabilities": [
-        "code",
         "instruction",
-        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -458,23 +456,6 @@
       "context_length": 1048576,
       "capabilities": [
         "reasoning",
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 1000,
-        "rpm": 10
-      },
-      "provider": "nvidia",
-      "connector_ids": [
-        "nvidia"
-      ]
-    },
-    {
-      "id": "moonshotai/kimi-k3",
-      "name": "moonshotai/kimi-k3",
-      "context_length": 1048576,
-      "capabilities": [
-        "instruction",
         "text"
       ],
       "rate_limits": {
@@ -519,26 +500,11 @@
       ]
     },
     {
-      "id": "poolside/laguna-xs-2.1",
-      "name": "poolside/laguna-xs-2.1",
+      "id": "moonshotai/kimi-k2.6",
+      "name": "moonshotai/kimi-k2.6",
       "context_length": 262144,
       "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 1000,
-        "rpm": 10
-      },
-      "provider": "nvidia",
-      "connector_ids": [
-        "nvidia"
-      ]
-    },
-    {
-      "id": "nvidia/nemotron-3-nano-30b-a3b",
-      "name": "nvidia/nemotron-3-nano-30b-a3b",
-      "context_length": 262144,
-      "capabilities": [
+        "instruction",
         "text"
       ],
       "rate_limits": {
@@ -568,11 +534,10 @@
       ]
     },
     {
-      "id": "moonshotai/kimi-k2.6",
-      "name": "moonshotai/kimi-k2.6",
+      "id": "nvidia/nemotron-3-nano-30b-a3b",
+      "name": "nvidia/nemotron-3-nano-30b-a3b",
       "context_length": 262144,
       "capabilities": [
-        "instruction",
         "text"
       ],
       "rate_limits": {
@@ -585,13 +550,10 @@
       ]
     },
     {
-      "id": "openai/gpt-oss-20b",
-      "name": "openai/gpt-oss-20b",
-      "context_length": 131072,
+      "id": "poolside/laguna-xs-2.1",
+      "name": "poolside/laguna-xs-2.1",
+      "context_length": 262144,
       "capabilities": [
-        "code",
-        "instruction",
-        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -600,8 +562,7 @@
       },
       "provider": "nvidia",
       "connector_ids": [
-        "nvidia",
-        "groq"
+        "nvidia"
       ]
     },
     {
@@ -622,24 +583,8 @@
       ]
     },
     {
-      "id": "meta/muse-glimmer-30b",
-      "name": "meta/muse-glimmer-30b",
-      "context_length": 131072,
-      "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 1000,
-        "rpm": 10
-      },
-      "provider": "nvidia",
-      "connector_ids": [
-        "nvidia"
-      ]
-    },
-    {
-      "id": "google/gemma-3-4b-it",
-      "name": "google/gemma-3-4b-it",
+      "id": "google/gemma-3-12b-it",
+      "name": "google/gemma-3-12b-it",
       "context_length": 131072,
       "capabilities": [
         "text",
@@ -671,8 +616,8 @@
       ]
     },
     {
-      "id": "google/gemma-3-12b-it",
-      "name": "google/gemma-3-12b-it",
+      "id": "google/gemma-3-4b-it",
+      "name": "google/gemma-3-4b-it",
       "context_length": 131072,
       "capabilities": [
         "text",
@@ -688,8 +633,44 @@
       ]
     },
     {
+      "id": "meta/muse-glimmer-30b",
+      "name": "meta/muse-glimmer-30b",
+      "context_length": 131072,
+      "capabilities": [
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 1000,
+        "rpm": 10
+      },
+      "provider": "nvidia",
+      "connector_ids": [
+        "nvidia"
+      ]
+    },
+    {
       "id": "openai/gpt-oss-120b",
       "name": "openai/gpt-oss-120b",
+      "context_length": 131072,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 1000,
+        "rpm": 10
+      },
+      "provider": "nvidia",
+      "connector_ids": [
+        "nvidia",
+        "groq"
+      ]
+    },
+    {
+      "id": "openai/gpt-oss-20b",
+      "name": "openai/gpt-oss-20b",
       "context_length": 131072,
       "capabilities": [
         "code",
@@ -741,23 +722,6 @@
       ]
     },
     {
-      "id": "databricks/dbrx-instruct",
-      "name": "databricks/dbrx-instruct",
-      "context_length": 128000,
-      "capabilities": [
-        "instruction",
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 1000,
-        "rpm": 10
-      },
-      "provider": "nvidia",
-      "connector_ids": [
-        "nvidia"
-      ]
-    },
-    {
       "id": "ai21labs/jamba-1.5-large-instruct",
       "name": "ai21labs/jamba-1.5-large-instruct",
       "context_length": 128000,
@@ -775,8 +739,8 @@
       ]
     },
     {
-      "id": "nvidia/riva-translate-4b-instruct-v1.1",
-      "name": "nvidia/riva-translate-4b-instruct-v1.1",
+      "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+      "name": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
       "context_length": 128000,
       "capabilities": [
         "instruction",
@@ -792,8 +756,25 @@
       ]
     },
     {
-      "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-      "name": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+      "id": "databricks/dbrx-instruct",
+      "name": "databricks/dbrx-instruct",
+      "context_length": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 1000,
+        "rpm": 10
+      },
+      "provider": "nvidia",
+      "connector_ids": [
+        "nvidia"
+      ]
+    },
+    {
+      "id": "nvidia/riva-translate-4b-instruct-v1.1",
+      "name": "nvidia/riva-translate-4b-instruct-v1.1",
       "context_length": 128000,
       "capabilities": [
         "instruction",
@@ -909,22 +890,6 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-nano-3-30b-a3b",
-      "name": "nvidia/nemotron-nano-3-30b-a3b",
-      "context_length": 128000,
-      "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 1000,
-        "rpm": 10
-      },
-      "provider": "nvidia",
-      "connector_ids": [
-        "nvidia"
-      ]
-    },
-    {
       "id": "meta/llama-3.2-3b-instruct",
       "name": "meta/llama-3.2-3b-instruct",
       "context_length": 128000,
@@ -960,6 +925,22 @@
     {
       "id": "nvidia/ising-calibration-1.5-31b",
       "name": "nvidia/ising-calibration-1.5-31b",
+      "context_length": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 1000,
+        "rpm": 10
+      },
+      "provider": "nvidia",
+      "connector_ids": [
+        "nvidia"
+      ]
+    },
+    {
+      "id": "nvidia/nemotron-nano-3-30b-a3b",
+      "name": "nvidia/nemotron-nano-3-30b-a3b",
       "context_length": 128000,
       "capabilities": [
         "text"
@@ -1125,22 +1106,6 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-parse",
-      "name": "nvidia/nemotron-parse",
-      "context_length": 128000,
-      "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 1000,
-        "rpm": 10
-      },
-      "provider": "nvidia",
-      "connector_ids": [
-        "nvidia"
-      ]
-    },
-    {
       "id": "mistralai/mistral-7b-instruct-v0.3",
       "name": "mistralai/mistral-7b-instruct-v0.3",
       "context_length": 128000,
@@ -1174,11 +1139,12 @@
       ]
     },
     {
-      "id": "nvidia/nv-embed-v1",
-      "name": "nvidia/nv-embed-v1",
+      "id": "nvidia/llama-nemotron-embed-1b-v2",
+      "name": "nvidia/llama-nemotron-embed-1b-v2",
       "context_length": 128000,
       "capabilities": [
-        "embedding"
+        "embedding",
+        "instruction"
       ],
       "rate_limits": {
         "rpd": 1000,
@@ -1206,63 +1172,12 @@
       ]
     },
     {
-      "id": "nvidia/llama-nemotron-embed-1b-v2",
-      "name": "nvidia/llama-nemotron-embed-1b-v2",
-      "context_length": 128000,
-      "capabilities": [
-        "embedding",
-        "instruction"
-      ],
-      "rate_limits": {
-        "rpd": 1000,
-        "rpm": 10
-      },
-      "provider": "nvidia",
-      "connector_ids": [
-        "nvidia"
-      ]
-    },
-    {
-      "id": "zyphra/zamba2-7b-instruct",
-      "name": "zyphra/zamba2-7b-instruct",
-      "context_length": 128000,
-      "capabilities": [
-        "instruction",
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 1000,
-        "rpm": 10
-      },
-      "provider": "nvidia",
-      "connector_ids": [
-        "nvidia"
-      ]
-    },
-    {
       "id": "google/diffusiongemma-26b-a4b-it",
       "name": "google/diffusiongemma-26b-a4b-it",
       "context_length": 128000,
       "capabilities": [
         "text",
         "vision"
-      ],
-      "rate_limits": {
-        "rpd": 1000,
-        "rpm": 10
-      },
-      "provider": "nvidia",
-      "connector_ids": [
-        "nvidia"
-      ]
-    },
-    {
-      "id": "nvidia/riva-translate-4b-instruct-v2",
-      "name": "nvidia/riva-translate-4b-instruct-v2",
-      "context_length": 128000,
-      "capabilities": [
-        "instruction",
-        "text"
       ],
       "rate_limits": {
         "rpd": 1000,
@@ -1322,6 +1237,23 @@
       ]
     },
     {
+      "id": "zyphra/zamba2-7b-instruct",
+      "name": "zyphra/zamba2-7b-instruct",
+      "context_length": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 1000,
+        "rpm": 10
+      },
+      "provider": "nvidia",
+      "connector_ids": [
+        "nvidia"
+      ]
+    },
+    {
       "id": "nvidia/llama-3.2-nv-embedqa-1b-v1",
       "name": "nvidia/llama-3.2-nv-embedqa-1b-v1",
       "context_length": 128000,
@@ -1340,8 +1272,8 @@
       ]
     },
     {
-      "id": "adept/fuyu-8b",
-      "name": "adept/fuyu-8b",
+      "id": "nvidia/nemotron-parse",
+      "name": "nvidia/nemotron-parse",
       "context_length": 128000,
       "capabilities": [
         "text"
@@ -1356,8 +1288,41 @@
       ]
     },
     {
+      "id": "nvidia/nv-embed-v1",
+      "name": "nvidia/nv-embed-v1",
+      "context_length": 128000,
+      "capabilities": [
+        "embedding"
+      ],
+      "rate_limits": {
+        "rpd": 1000,
+        "rpm": 10
+      },
+      "provider": "nvidia",
+      "connector_ids": [
+        "nvidia"
+      ]
+    },
+    {
       "id": "nvidia/llama-3.1-nemotron-51b-instruct",
       "name": "nvidia/llama-3.1-nemotron-51b-instruct",
+      "context_length": 128000,
+      "capabilities": [
+        "instruction",
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 1000,
+        "rpm": 10
+      },
+      "provider": "nvidia",
+      "connector_ids": [
+        "nvidia"
+      ]
+    },
+    {
+      "id": "nvidia/riva-translate-4b-instruct-v2",
+      "name": "nvidia/riva-translate-4b-instruct-v2",
       "context_length": 128000,
       "capabilities": [
         "instruction",
@@ -1390,11 +1355,43 @@
       ]
     },
     {
+      "id": "microsoft/kosmos-2",
+      "name": "microsoft/kosmos-2",
+      "context_length": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 1000,
+        "rpm": 10
+      },
+      "provider": "nvidia",
+      "connector_ids": [
+        "nvidia"
+      ]
+    },
+    {
       "id": "snowflake/arctic-embed-l",
       "name": "snowflake/arctic-embed-l",
       "context_length": 128000,
       "capabilities": [
         "embedding"
+      ],
+      "rate_limits": {
+        "rpd": 1000,
+        "rpm": 10
+      },
+      "provider": "nvidia",
+      "connector_ids": [
+        "nvidia"
+      ]
+    },
+    {
+      "id": "adept/fuyu-8b",
+      "name": "adept/fuyu-8b",
+      "context_length": 128000,
+      "capabilities": [
+        "text"
       ],
       "rate_limits": {
         "rpd": 1000,
@@ -1774,8 +1771,8 @@
       ]
     },
     {
-      "id": "mistralai/mistral-large",
-      "name": "mistralai/mistral-large",
+      "id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+      "name": "nvidia/llama-3.1-nemotron-nano-8b-v1",
       "context_length": 128000,
       "capabilities": [
         "instruction",
@@ -1797,23 +1794,6 @@
       "capabilities": [
         "embedding",
         "instruction"
-      ],
-      "rate_limits": {
-        "rpd": 1000,
-        "rpm": 10
-      },
-      "provider": "nvidia",
-      "connector_ids": [
-        "nvidia"
-      ]
-    },
-    {
-      "id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
-      "name": "nvidia/llama-3.1-nemotron-nano-8b-v1",
-      "context_length": 128000,
-      "capabilities": [
-        "instruction",
-        "text"
       ],
       "rate_limits": {
         "rpd": 1000,
@@ -1860,10 +1840,11 @@
       ]
     },
     {
-      "id": "microsoft/kosmos-2",
-      "name": "microsoft/kosmos-2",
+      "id": "mistralai/mistral-large",
+      "name": "mistralai/mistral-large",
       "context_length": 128000,
       "capabilities": [
+        "instruction",
         "text"
       ],
       "rate_limits": {
@@ -1929,8 +1910,8 @@
       ]
     },
     {
-      "id": "nvidia/mistral-nemo-minitron-8b-8k-instruct",
-      "name": "nvidia/mistral-nemo-minitron-8b-8k-instruct",
+      "id": "mistralai/mixtral-8x22b-v0.1",
+      "name": "mistralai/mixtral-8x22b-v0.1",
       "context_length": 128000,
       "capabilities": [
         "instruction",
@@ -1946,8 +1927,24 @@
       ]
     },
     {
-      "id": "mistralai/mixtral-8x22b-v0.1",
-      "name": "mistralai/mixtral-8x22b-v0.1",
+      "id": "google/deplot",
+      "name": "google/deplot",
+      "context_length": 128000,
+      "capabilities": [
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 1000,
+        "rpm": 10
+      },
+      "provider": "nvidia",
+      "connector_ids": [
+        "nvidia"
+      ]
+    },
+    {
+      "id": "nvidia/mistral-nemo-minitron-8b-8k-instruct",
+      "name": "nvidia/mistral-nemo-minitron-8b-8k-instruct",
       "context_length": 128000,
       "capabilities": [
         "instruction",
@@ -1980,10 +1977,11 @@
       ]
     },
     {
-      "id": "google/deplot",
-      "name": "google/deplot",
+      "id": "meta/llama-3.1-8b-instruct",
+      "name": "meta/llama-3.1-8b-instruct",
       "context_length": 128000,
       "capabilities": [
+        "instruction",
         "text"
       ],
       "rate_limits": {
@@ -1996,11 +1994,10 @@
       ]
     },
     {
-      "id": "meta/llama-3.1-8b-instruct",
-      "name": "meta/llama-3.1-8b-instruct",
+      "id": "nvidia/nvclip",
+      "name": "nvidia/nvclip",
       "context_length": 128000,
       "capabilities": [
-        "instruction",
         "text"
       ],
       "rate_limits": {
@@ -2019,22 +2016,6 @@
       "capabilities": [
         "code",
         "instruction",
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 1000,
-        "rpm": 10
-      },
-      "provider": "nvidia",
-      "connector_ids": [
-        "nvidia"
-      ]
-    },
-    {
-      "id": "nvidia/nvclip",
-      "name": "nvidia/nvclip",
-      "context_length": 128000,
-      "capabilities": [
         "text"
       ],
       "rate_limits": {
@@ -2081,13 +2062,57 @@
       ]
     },
     {
-      "id": "gemini-3.5-flash",
-      "name": "Gemini 3.5 Flash",
+      "id": "gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash-Lite",
       "context_length": 1048576,
       "capabilities": [
         "vision",
         "text",
         "instruction"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "gemini-flash-latest",
+      "name": "Gemini Flash Latest",
+      "context_length": 1048576,
+      "capabilities": [
+        "reasoning",
+        "text",
+        "vision",
+        "instruction",
+        "code"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "gemini-flash-lite-latest",
+      "name": "Gemini Flash-Lite Latest",
+      "context_length": 1048576,
+      "capabilities": [
+        "reasoning",
+        "text",
+        "vision",
+        "instruction",
+        "code"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2121,26 +2146,6 @@
       ]
     },
     {
-      "id": "gemini-2.5-flash-lite",
-      "name": "Gemini 2.5 Flash-Lite",
-      "context_length": 1048576,
-      "capabilities": [
-        "vision",
-        "text",
-        "instruction"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
       "id": "gemini-3.5-flash-lite",
       "name": "Gemini 3.5 Flash Lite",
       "context_length": 1048576,
@@ -2148,26 +2153,6 @@
         "vision",
         "text",
         "instruction"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "lyria-3-pro-preview",
-      "name": "Lyria 3 Pro Preview",
-      "context_length": 1048576,
-      "capabilities": [
-        "vision",
-        "text",
-        "reasoning"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2221,13 +2206,13 @@
       ]
     },
     {
-      "id": "gemini-3.6-flash",
-      "name": "Gemini 3.6 Flash",
+      "id": "lyria-3-pro-preview",
+      "name": "Lyria 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
+        "reasoning",
         "vision",
-        "text",
-        "instruction"
+        "text"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2246,9 +2231,29 @@
       "context_length": 1048576,
       "capabilities": [
         "vision",
+        "reasoning",
         "text",
-        "instruction",
-        "reasoning"
+        "instruction"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "gemini-3.6-flash",
+      "name": "Gemini 3.6 Flash",
+      "context_length": 1048576,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2287,9 +2292,9 @@
       "context_length": 1048576,
       "capabilities": [
         "vision",
+        "reasoning",
         "text",
-        "instruction",
-        "reasoning"
+        "instruction"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2303,15 +2308,13 @@
       ]
     },
     {
-      "id": "gemini-flash-latest",
-      "name": "Gemini Flash Latest",
+      "id": "gemini-3.5-flash",
+      "name": "Gemini 3.5 Flash",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
-        "code",
         "vision",
         "text",
-        "reasoning"
+        "instruction"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2329,11 +2332,11 @@
       "name": "Gemini Pro Latest",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
-        "code",
-        "vision",
+        "reasoning",
         "text",
-        "reasoning"
+        "vision",
+        "instruction",
+        "code"
       ],
       "rate_limits": {
         "total_rpm": 60,
@@ -2350,47 +2353,6 @@
       "id": "lyria-3-clip-preview",
       "name": "Lyria 3 Clip Preview",
       "context_length": 1048576,
-      "capabilities": [
-        "vision",
-        "text"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "gemini-flash-lite-latest",
-      "name": "Gemini Flash-Lite Latest",
-      "context_length": 1048576,
-      "capabilities": [
-        "instruction",
-        "code",
-        "vision",
-        "text",
-        "reasoning"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "gemma-4-31b-it",
-      "name": "Gemma 4 31B IT",
-      "context_length": 262144,
       "capabilities": [
         "vision",
         "text"
@@ -2426,8 +2388,145 @@
       ]
     },
     {
+      "id": "gemma-4-31b-it",
+      "name": "Gemma 4 31B IT",
+      "context_length": 262144,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
       "id": "deep-research-preview-04-2026",
       "name": "Deep Research Preview (Apr-21-2026)",
+      "context_length": 131072,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "gemini-2.5-computer-use-preview-10-2025",
+      "name": "Gemini 2.5 Computer Use Preview 10-2025",
+      "context_length": 131072,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "deep-research-max-preview-04-2026",
+      "name": "Deep Research Max Preview (Apr-21-2026)",
+      "context_length": 131072,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "deep-research-pro-preview-12-2025",
+      "name": "Deep Research Pro Preview (Dec-12-2025)",
+      "context_length": 131072,
+      "capabilities": [
+        "reasoning",
+        "vision",
+        "text"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "nano-banana-pro-preview",
+      "name": "Nano Banana Pro",
+      "context_length": 131072,
+      "capabilities": [
+        "reasoning",
+        "vision",
+        "text"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "gemini-omni-flash-preview",
+      "name": "Gemini Omni Flash Preview",
+      "context_length": 131072,
+      "capabilities": [
+        "vision",
+        "text",
+        "instruction"
+      ],
+      "rate_limits": {
+        "total_rpm": 60,
+        "rpd_per_key": 1500,
+        "rpm_per_key": 15
+      },
+      "provider": "gemini",
+      "connector_ids": [
+        "google",
+        "gemini"
+      ]
+    },
+    {
+      "id": "antigravity-preview-05-2026",
+      "name": "Antigravity Agent Preview",
       "context_length": 131072,
       "capabilities": [
         "vision",
@@ -2469,124 +2568,6 @@
       "context_length": 131072,
       "capabilities": [
         "vision",
-        "instruction"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "deep-research-max-preview-04-2026",
-      "name": "Deep Research Max Preview (Apr-21-2026)",
-      "context_length": 131072,
-      "capabilities": [
-        "vision",
-        "text"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "nano-banana-pro-preview",
-      "name": "Nano Banana Pro",
-      "context_length": 131072,
-      "capabilities": [
-        "vision",
-        "text",
-        "reasoning"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "gemini-2.5-computer-use-preview-10-2025",
-      "name": "Gemini 2.5 Computer Use Preview 10-2025",
-      "context_length": 131072,
-      "capabilities": [
-        "vision",
-        "text",
-        "instruction"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "antigravity-preview-05-2026",
-      "name": "Antigravity Agent Preview",
-      "context_length": 131072,
-      "capabilities": [
-        "vision",
-        "text"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "deep-research-pro-preview-12-2025",
-      "name": "Deep Research Pro Preview (Dec-12-2025)",
-      "context_length": 131072,
-      "capabilities": [
-        "vision",
-        "text",
-        "reasoning"
-      ],
-      "rate_limits": {
-        "total_rpm": 60,
-        "rpd_per_key": 1500,
-        "rpm_per_key": 15
-      },
-      "provider": "gemini",
-      "connector_ids": [
-        "google",
-        "gemini"
-      ]
-    },
-    {
-      "id": "gemini-omni-flash-preview",
-      "name": "Gemini Omni Flash Preview",
-      "context_length": 131072,
-      "capabilities": [
-        "vision",
-        "text",
         "instruction"
       ],
       "rate_limits": {
