@@ -1,14 +1,13 @@
 {
   "version": 2,
-  "updated": "2026-08-23T12:01:03.275469+00:00",
+  "updated": "2026-08-24T00:00:21.575049+00:00",
   "total": 150,
   "models": [
     {
-      "id": "google/lyria-3-pro-preview",
-      "name": "Google: Lyria 3 Pro Preview",
+      "id": "stealth/ox-alpha",
+      "name": "Ox Alpha",
       "context_length": 1048576,
       "capabilities": [
-        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -21,10 +20,11 @@
       ]
     },
     {
-      "id": "stealth/ox-alpha",
-      "name": "Ox Alpha",
+      "id": "google/lyria-3-pro-preview",
+      "name": "Google: Lyria 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
+        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -53,8 +53,8 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
-      "name": "NVIDIA: Nemotron 3 Ultra (free)",
+      "id": "nvidia/nemotron-3.5-lightning:free",
+      "name": "NVIDIA: Nemotron 3.5 Lightning (free)",
       "context_length": 1000000,
       "capabilities": [
         "text"
@@ -69,8 +69,8 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3.5-lightning:free",
-      "name": "NVIDIA: Nemotron 3.5 Lightning (free)",
+      "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "name": "NVIDIA: Nemotron 3 Ultra (free)",
       "context_length": 1000000,
       "capabilities": [
         "text"
@@ -101,27 +101,10 @@
       ]
     },
     {
-      "id": "poolside/laguna-xs-2.1:free",
-      "name": "Poolside: Laguna XS 2.1 (free)",
+      "id": "poolside/laguna-s-2.1:free",
+      "name": "Poolside: Laguna S 2.1 (free)",
       "context_length": 262144,
       "capabilities": [
-        "text"
-      ],
-      "rate_limits": {
-        "rpd": 200,
-        "rpm": 20
-      },
-      "provider": "openrouter",
-      "connector_ids": [
-        "openrouter"
-      ]
-    },
-    {
-      "id": "thinkingmachines/inkling-small:free",
-      "name": "Thinking Machines: Inkling Small (free)",
-      "context_length": 262144,
-      "capabilities": [
-        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -151,8 +134,8 @@
       ]
     },
     {
-      "id": "thinkingmachines/inkling:free",
-      "name": "Thinking Machines: Inkling (free)",
+      "id": "thinkingmachines/inkling-small:free",
+      "name": "Thinking Machines: Inkling Small (free)",
       "context_length": 262144,
       "capabilities": [
         "reasoning",
@@ -168,10 +151,11 @@
       ]
     },
     {
-      "id": "poolside/laguna-s-2.1:free",
-      "name": "Poolside: Laguna S 2.1 (free)",
+      "id": "thinkingmachines/inkling:free",
+      "name": "Thinking Machines: Inkling (free)",
       "context_length": 262144,
       "capabilities": [
+        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -217,9 +201,9 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
-      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
-      "context_length": 256000,
+      "id": "poolside/laguna-xs-2.1:free",
+      "name": "Poolside: Laguna XS 2.1 (free)",
+      "context_length": 262144,
       "capabilities": [
         "text"
       ],
@@ -249,6 +233,25 @@
       ]
     },
     {
+      "id": "z-ai/glm-5.2:free",
+      "name": "Z.ai: GLM 5.2 (free)",
+      "context_length": 256000,
+      "capabilities": [
+        "code",
+        "instruction",
+        "reasoning",
+        "text"
+      ],
+      "rate_limits": {
+        "rpd": 200,
+        "rpm": 20
+      },
+      "provider": "openrouter",
+      "connector_ids": [
+        "openrouter"
+      ]
+    },
+    {
       "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
       "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
       "context_length": 256000,
@@ -265,13 +268,10 @@
       ]
     },
     {
-      "id": "z-ai/glm-5.2:free",
-      "name": "Z.ai: GLM 5.2 (free)",
+      "id": "nvidia/nemotron-3-nano-30b-a3b:free",
+      "name": "NVIDIA: Nemotron 3 Nano 30B A3B (free)",
       "context_length": 256000,
       "capabilities": [
-        "code",
-        "instruction",
-        "reasoning",
         "text"
       ],
       "rate_limits": {
@@ -316,8 +316,8 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-nano-12b-v2-vl:free",
-      "name": "NVIDIA: Nemotron Nano 12B 2 VL (free)",
+      "id": "nvidia/nemotron-3.5-content-safety:free",
+      "name": "NVIDIA: Nemotron 3.5 Content Safety (free)",
       "context_length": 128000,
       "capabilities": [
         "text"
@@ -332,8 +332,8 @@
       ]
     },
     {
-      "id": "nvidia/nemotron-3.5-content-safety:free",
-      "name": "NVIDIA: Nemotron 3.5 Content Safety (free)",
+      "id": "nvidia/nemotron-nano-12b-v2-vl:free",
+      "name": "NVIDIA: Nemotron Nano 12B 2 VL (free)",
       "context_length": 128000,
       "capabilities": [
         "text"
@@ -2081,8 +2081,8 @@
       "name": "Gemini 2.5 Flash-Lite",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "text",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2101,10 +2101,10 @@
       "name": "Gemini Flash Latest",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "code",
-        "instruction",
+        "text",
         "reasoning",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2123,10 +2123,10 @@
       "name": "Gemini Pro Latest",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "code",
-        "instruction",
+        "text",
         "reasoning",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2164,10 +2164,10 @@
       "name": "Gemini Flash-Lite Latest",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "code",
-        "instruction",
+        "text",
         "reasoning",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2186,8 +2186,8 @@
       "name": "Gemini 2.5 Pro",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "text",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2206,8 +2206,8 @@
       "name": "Gemini 3.5 Flash Lite",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "text",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2226,8 +2226,8 @@
       "name": "Gemini 3.1 Flash Lite",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "text",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2246,8 +2246,8 @@
       "name": "Gemini 3 Flash Preview",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "text",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2266,8 +2266,8 @@
       "name": "Gemini 3.6 Flash",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "text",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2286,8 +2286,8 @@
       "name": "Lyria 3 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "text",
         "reasoning",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -2306,9 +2306,9 @@
       "name": "Gemini 3.1 Pro Preview",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "text",
         "reasoning",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2327,8 +2327,8 @@
       "name": "Gemini 3.7 Flash",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "text",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2347,9 +2347,9 @@
       "name": "Gemini 3.1 Pro Preview Custom Tools",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "text",
         "reasoning",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2368,8 +2368,8 @@
       "name": "Gemini 3.5 Flash",
       "context_length": 1048576,
       "capabilities": [
-        "instruction",
         "text",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2426,8 +2426,8 @@
       "name": "Gemini Omni Flash Preview",
       "context_length": 131072,
       "capabilities": [
-        "instruction",
         "text",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2484,8 +2484,8 @@
       "name": "Deep Research Pro Preview (Dec-12-2025)",
       "context_length": 131072,
       "capabilities": [
-        "text",
         "reasoning",
+        "text",
         "vision"
       ],
       "rate_limits": {
@@ -2523,8 +2523,8 @@
       "name": "Gemini 2.5 Computer Use Preview 10-2025",
       "context_length": 131072,
       "capabilities": [
-        "instruction",
         "text",
+        "instruction",
         "vision"
       ],
       "rate_limits": {
@@ -2562,8 +2562,8 @@
       "name": "Nano Banana Pro",
       "context_length": 131072,
       "capabilities": [
-        "text",
         "reasoning",
+        "text",
         "vision"
       ],
       "rate_limits": {
